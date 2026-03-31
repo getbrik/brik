@@ -1,0 +1,17 @@
+# Brik Build Stage
+# Compiles/builds the project via brik-lib.
+
+brik-build:
+  stage: build
+  needs:
+    - job: brik-init
+      artifacts: true
+  script:
+    - brik.gitlab.run_stage build
+  artifacts:
+    paths:
+      - node_modules/
+      - dist/
+      - build/
+      - target/
+    expire_in: 1 hour

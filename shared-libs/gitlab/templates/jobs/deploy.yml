@@ -1,0 +1,14 @@
+# Brik Deploy Stage
+# Deploys to target environment (conditional).
+
+brik-deploy:
+  stage: deploy
+  needs:
+    - job: brik-test
+  script:
+    - brik.gitlab.run_stage deploy
+  rules:
+    - if: '$CI_COMMIT_TAG'
+      when: on_success
+    - when: manual
+      allow_failure: true

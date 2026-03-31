@@ -2,10 +2,10 @@
 --pattern "*_spec.sh"
 --helperdir runtime/bash/spec
 --require spec_helper
---default-path runtime/bash/spec
+--default-path "**/spec"
 --env LC_NUMERIC=C
 
 ## Default kcov (coverage) options
---kcov-options "--include-path=./bin,./runtime/bash/lib --path-strip-level=1"
+--kcov-options "--include-path=./bin,./runtime/bash/lib,./shared-libs/gitlab/scripts --path-strip-level=1"
 --kcov-options "--include-pattern=.sh,/bin/brik"
---kcov-options "--exclude-path=./runtime/bash/spec"
+--kcov-options "--exclude-path=./runtime/bash/spec,./shared-libs/gitlab/spec"

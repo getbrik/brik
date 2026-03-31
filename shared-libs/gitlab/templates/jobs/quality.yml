@@ -1,0 +1,15 @@
+# Brik Quality Stage
+# Lint and format checks. Runs in parallel with Security (same GitLab stage).
+
+brik-quality:
+  stage: quality
+  needs:
+    - job: brik-build
+      artifacts: true
+  script:
+    - brik.gitlab.run_stage quality
+  rules:
+    - if: '$BRIK_QUALITY_ENABLED == "false"'
+      when: never
+    - when: on_success
+  allow_failure: true

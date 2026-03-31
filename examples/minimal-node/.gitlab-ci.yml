@@ -1,0 +1,4 @@
+include:
+  - project: 'brik/gitlab-templates'
+    ref: v0.1.0
+    file: '/templates/pipeline.yml'

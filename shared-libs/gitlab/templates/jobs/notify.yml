@@ -1,0 +1,8 @@
+# Brik Notify Stage
+# Prints pipeline summary. Always runs regardless of previous stage results.
+
+brik-notify:
+  stage: notify
+  script:
+    - brik.gitlab.run_stage notify
+  when: always

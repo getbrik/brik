@@ -1,0 +1,15 @@
+# Brik Release Stage
+# Computes semantic version (conditional - only if release section configured).
+
+brik-release:
+  stage: release
+  needs:
+    - job: brik-init
+      artifacts: true
+  script:
+    - brik.gitlab.run_stage release
+  rules:
+    - if: '$CI_COMMIT_TAG'
+      when: on_success
+    - when: manual
+      allow_failure: true
