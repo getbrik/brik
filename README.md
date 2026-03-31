@@ -14,7 +14,7 @@
 
 <p align="center">
   <a href="https://github.com/getbrik/brik/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/getbrik/brik/ci.yml?label=CI" alt="CI"></a>
-  <a href="https://codecov.io/gh/getbrik/brik"><img src="https://img.shields.io/codecov/c/github/getbrik/brik" alt="Coverage"></a>
+  <a href="https://codecov.io/gh/getbrik/brik"><img src="https://codecov.io/gh/getbrik/brik/graph/badge.svg?token=QMN3W4XI8Y" alt="codecov"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MPL--2.0-blue" alt="License"></a>
 </p>
 
