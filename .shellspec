@@ -4,3 +4,8 @@
 --require spec_helper
 --default-path runtime/bash/spec
 --env LC_NUMERIC=C
+
+## Default kcov (coverage) options
+--kcov-options "--include-path=./bin,./runtime/bash/lib --path-strip-level=1"
+--kcov-options "--include-pattern=.sh,/bin/brik"
+--kcov-options "--exclude-path=./runtime/bash/spec"
