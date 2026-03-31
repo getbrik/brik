@@ -4,7 +4,8 @@
 # Does NOT participate in the production CI/CD flow - shared libraries do that.
 #
 # Usage: brik <command> [options]
-# Commands: validate, version, help
+# Commands: validate, run, version, help
+# shellcheck disable=SC1091,SC2317
 set -euo pipefail
 
 # ---------------------------------------------------------------------------
@@ -97,6 +98,7 @@ Usage:
 
 Commands:
   validate    Validate brik.yml against the JSON Schema
+  run stage   Execute a pipeline stage locally
   version     Print brik version information
   help        Print this help message
 
@@ -104,10 +106,15 @@ Options for validate:
   --config <path>   Path to brik.yml (default: brik.yml in current directory)
   --schema <path>   Path to JSON Schema file (default: bundled schema)
 
+Options for run stage:
+  --config <path>      Path to brik.yml (default: brik.yml in current directory)
+  --workspace <path>   Path to project workspace (default: current directory)
+
 Examples:
   brik validate
   brik validate --config path/to/brik.yml
-  brik validate --config brik.yml --schema /custom/schema.json
+  brik run stage build
+  brik run stage test --workspace ./my-project
   brik version
 EOF
 }
@@ -183,6 +190,101 @@ cmd_validate() {
 }
 
 # ---------------------------------------------------------------------------
+# Command: run stage
+# ---------------------------------------------------------------------------
+cmd_run() {
+    if [[ $# -eq 0 ]]; then
+        brik_error "'brik run' requires a subcommand. Usage: brik run stage <name>"
+        return "${EXIT_INVALID}"
+    fi
+
+    local subcmd="$1"
+    shift
+
+    case "${subcmd}" in
+        stage) cmd_run_stage "$@" ;;
+        *)
+            brik_error "unknown run subcommand: ${subcmd}"
+            return "${EXIT_INVALID}"
+            ;;
+    esac
+}
+
+cmd_run_stage() {
+    if [[ $# -eq 0 ]]; then
+        brik_error "'brik run stage' requires a stage name"
+        return "${EXIT_INVALID}"
+    fi
+
+    local stage_name="$1"
+    shift
+    local config_path="${DEFAULT_CONFIG}"
+    local workspace
+    workspace="$(pwd)"
+
+    # Parse optional arguments
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --config) config_path="$2"; shift 2 ;;
+            --workspace) workspace="$2"; shift 2 ;;
+            *) brik_error "unknown option: $1"; return "${EXIT_INVALID}" ;;
+        esac
+    done
+
+    # Export environment for the runtime
+    export BRIK_PROJECT_DIR="${workspace}"
+    export BRIK_WORKSPACE="${workspace}"
+    export BRIK_CONFIG_FILE="${config_path}"
+    export BRIK_LOG_DIR="${BRIK_LOG_DIR:-/tmp/brik/logs}"
+
+    # Load runtime (set +e to avoid conflict with runtime's no-set-e policy)
+    # shellcheck source=../runtime/bash/lib/runtime/stage.sh
+    . "${BRIK_HOME}/runtime/bash/lib/runtime/stage.sh"
+    # shellcheck source=../runtime/bash/lib/core/_loader.sh
+    . "${BRIK_HOME}/runtime/bash/lib/core/_loader.sh"
+
+    # Map stage names to logic functions
+    local logic_function=""
+    case "${stage_name}" in
+        build)
+            brik.use build
+            brik.use build.node 2>/dev/null || true
+            logic_function="_brik_build_logic"
+            ;;
+        test)
+            brik.use test
+            logic_function="_brik_test_logic"
+            ;;
+        *)
+            brik_error "unsupported stage: ${stage_name}"
+            brik_error "Supported stages: build, test"
+            return "${EXIT_INVALID}"
+            ;;
+    esac
+
+    # Define logic wrapper functions
+    # shellcheck disable=SC2329
+    _brik_build_logic() {
+        build.run "${BRIK_WORKSPACE}"
+        return $?
+    }
+
+    # shellcheck disable=SC2329
+    _brik_test_logic() {
+        test.run "${BRIK_WORKSPACE}"
+        return $?
+    }
+
+    # Disable set -e for stage.run (runtime does its own error handling)
+    set +e
+    stage.run "${stage_name}" "${logic_function}" "${workspace}" "${config_path}"
+    local result=$?
+    set -e
+
+    return "${result}"
+}
+
+# ---------------------------------------------------------------------------
 # Main dispatch
 # ---------------------------------------------------------------------------
 main() {
@@ -197,6 +299,10 @@ main() {
     case "${command}" in
         validate)
             cmd_validate "$@"
+            exit "$?"
+            ;;
+        run)
+            cmd_run "$@"
             exit "$?"
             ;;
         version)

@@ -16,7 +16,10 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y shellcheck
 
       - name: Run shellcheck
-        run: shellcheck bin/brik
+        run: |
+          shellcheck --severity=warning bin/brik
+          shellcheck --severity=warning -x runtime/bash/lib/runtime/*.sh
+          shellcheck --severity=warning -x runtime/bash/lib/core/*.sh runtime/bash/lib/core/build/*.sh
 
   test:
     runs-on: ubuntu-latest
@@ -26,12 +29,21 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y jq kcov
+          sudo apt-get install -y jq binutils-dev libcurl4-openssl-dev zlib1g-dev libdw-dev libiberty-dev cmake g++
           # Install yq
           sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
           sudo chmod +x /usr/local/bin/yq
           # Install check-jsonschema
           pip install check-jsonschema
+          # Install kcov from source (not available via apt on Ubuntu 24.04)
+          KCOV_VERSION=43
+          wget -q https://github.com/SimonKagstrom/kcov/archive/refs/tags/v${KCOV_VERSION}.tar.gz -O kcov-${KCOV_VERSION}.tar.gz
+          tar xzf kcov-${KCOV_VERSION}.tar.gz
+          cd kcov-${KCOV_VERSION}
+          mkdir build && cd build
+          cmake ..
+          make -j$(nproc)
+          sudo make install
 
       - name: Install ShellSpec
         run: |

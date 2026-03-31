@@ -25,8 +25,15 @@ spec_helper_loaded() {
   export BRIK_SCHEMA="${BRIK_HOME}/schemas/config/v1/brik.schema.json"
   export FIXTURES="${BRIK_HOME}/testdata/fixtures"
   export EXAMPLES="${BRIK_HOME}/examples"
+
+  # Runtime and core library paths
+  export BRIK_RUNTIME_LIB="${BRIK_HOME}/runtime/bash/lib/runtime"
+  export BRIK_CORE_LIB="${BRIK_HOME}/runtime/bash/lib/core"
+  export WORKSPACES="${FIXTURES}/workspaces"
 }
 
 spec_helper_configure() {
-  :
+  # Temporary log directory for tests - cleaned up by ShellSpec
+  export BRIK_LOG_DIR
+  BRIK_LOG_DIR="$(mktemp -d)"
 }
