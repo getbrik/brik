@@ -1,0 +1,218 @@
+#!/usr/bin/env bash
+# brik - Portable CI/CD pipeline CLI
+# Provides local tooling for validation, diagnostics, and stage execution.
+# Does NOT participate in the production CI/CD flow - shared libraries do that.
+#
+# Usage: brik <command> [options]
+# Commands: validate, version, help
+set -euo pipefail
+
+# ---------------------------------------------------------------------------
+# Bootstrap: resolve BRIK_HOME from the real location of this script
+# ---------------------------------------------------------------------------
+_brik_resolve_home() {
+    local source="${BASH_SOURCE[0]}"
+    while [[ -L "${source}" ]]; do
+        local dir
+        dir="$(cd -P "$(dirname "${source}")" && pwd)"
+        source="$(readlink "${source}")"
+        [[ "${source}" != /* ]] && source="${dir}/${source}"
+    done
+    local bin_dir
+    bin_dir="$(cd -P "$(dirname "${source}")" && pwd)"
+    dirname "${bin_dir}"
+}
+
+if [[ -n "${BRIK_HOME:-}" ]]; then
+    _brik_resolved="$(_brik_resolve_home)"
+    if [[ "${BRIK_HOME}" != "${_brik_resolved}" ]]; then
+        printf 'warning: BRIK_HOME overridden by environment (%s)\n' "${BRIK_HOME}" >&2
+    fi
+    unset _brik_resolved
+else
+    BRIK_HOME="$(_brik_resolve_home)"
+fi
+readonly BRIK_HOME
+
+BRIK_VERSION="0.1.0"
+BRIK_SCHEMA_VERSION="v1"
+BRIK_RUNTIME="bash"
+
+readonly BRIK_VERSION BRIK_SCHEMA_VERSION BRIK_RUNTIME
+
+readonly DEFAULT_CONFIG="brik.yml"
+readonly DEFAULT_SCHEMA="${BRIK_HOME}/schemas/config/v1/brik.schema.json"
+
+# Exit codes
+readonly EXIT_OK=0
+readonly EXIT_INVALID=2
+readonly EXIT_NOT_FOUND=7
+
+# ---------------------------------------------------------------------------
+# Utility functions
+# ---------------------------------------------------------------------------
+
+# Print a message to stdout
+brik_print() {
+    printf '%s\n' "$*"
+}
+
+# Print a message to stderr
+brik_error() {
+    printf 'error: %s\n' "$*" >&2
+}
+
+# Check that a required tool is available on PATH.
+# Prints a helpful message and returns 1 if the tool is missing.
+brik_require_tool() {
+    local tool="$1"
+    local hint="${2:-}"
+    if ! command -v "${tool}" >/dev/null 2>&1; then
+        brik_error "'${tool}' is required but not found on PATH."
+        if [[ -n "${hint}" ]]; then
+            printf 'hint: %s\n' "${hint}" >&2
+        fi
+        return 1
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# Command: version
+# ---------------------------------------------------------------------------
+cmd_version() {
+    brik_print "brik ${BRIK_VERSION}"
+    brik_print "schema: ${BRIK_SCHEMA_VERSION}"
+    brik_print "runtime: ${BRIK_RUNTIME}"
+}
+
+# ---------------------------------------------------------------------------
+# Command: help
+# ---------------------------------------------------------------------------
+cmd_help() {
+    cat <<EOF
+brik ${BRIK_VERSION} - Portable CI/CD pipeline CLI
+
+Usage:
+  brik <command> [options]
+
+Commands:
+  validate    Validate brik.yml against the JSON Schema
+  version     Print brik version information
+  help        Print this help message
+
+Options for validate:
+  --config <path>   Path to brik.yml (default: brik.yml in current directory)
+  --schema <path>   Path to JSON Schema file (default: bundled schema)
+
+Examples:
+  brik validate
+  brik validate --config path/to/brik.yml
+  brik validate --config brik.yml --schema /custom/schema.json
+  brik version
+EOF
+}
+
+# ---------------------------------------------------------------------------
+# Command: validate
+# ---------------------------------------------------------------------------
+cmd_validate() {
+    local config_path="${DEFAULT_CONFIG}"
+    local schema_path="${DEFAULT_SCHEMA}"
+
+    # Parse arguments
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --config)
+                if [[ $# -lt 2 || -z "$2" ]]; then
+                    brik_error "--config requires a path argument"
+                    return "${EXIT_INVALID}"
+                fi
+                config_path="$2"
+                shift 2
+                ;;
+            --schema)
+                if [[ $# -lt 2 || -z "$2" ]]; then
+                    brik_error "--schema requires a path argument"
+                    return "${EXIT_INVALID}"
+                fi
+                schema_path="$2"
+                shift 2
+                ;;
+            *)
+                brik_error "unknown option: $1"
+                brik_error "Run 'brik help' for usage."
+                return "${EXIT_INVALID}"
+                ;;
+        esac
+    done
+
+    # Verify config file exists
+    if [[ ! -f "${config_path}" ]]; then
+        brik_error "config file not found: ${config_path}"
+        return "${EXIT_NOT_FOUND}"
+    fi
+
+    # Verify schema file exists
+    if [[ ! -f "${schema_path}" ]]; then
+        brik_error "schema file not found: ${schema_path}"
+        return "${EXIT_NOT_FOUND}"
+    fi
+
+    # Check required tools
+    brik_require_tool "yq" "Install yq (mikefarah/yq): https://github.com/mikefarah/yq" || return "${EXIT_INVALID}"
+    brik_require_tool "check-jsonschema" "Install check-jsonschema: pip install check-jsonschema" || return "${EXIT_INVALID}"
+
+    # Step 1: convert YAML to JSON
+    local json_output
+    if ! json_output="$(yq -o json "${config_path}" 2>&1)"; then
+        brik_error "failed to parse ${config_path} as YAML"
+        printf '%s\n' "${json_output}" >&2
+        return "${EXIT_INVALID}"
+    fi
+
+    # Step 2: validate JSON against schema
+    local validation_output
+    if ! validation_output="$(printf '%s\n' "${json_output}" | check-jsonschema --schemafile "${schema_path}" - 2>&1)"; then
+        brik_error "${config_path} is invalid"
+        printf '%s\n' "${validation_output}" >&2
+        return "${EXIT_INVALID}"
+    fi
+
+    brik_print "${config_path} is valid"
+    return "${EXIT_OK}"
+}
+
+# ---------------------------------------------------------------------------
+# Main dispatch
+# ---------------------------------------------------------------------------
+main() {
+    if [[ $# -eq 0 ]]; then
+        cmd_help
+        exit "${EXIT_OK}"
+    fi
+
+    local command="$1"
+    shift
+
+    case "${command}" in
+        validate)
+            cmd_validate "$@"
+            exit "$?"
+            ;;
+        version)
+            cmd_version
+            exit "${EXIT_OK}"
+            ;;
+        help | --help | -h)
+            cmd_help
+            exit "${EXIT_OK}"
+            ;;
+        *)
+            brik_error "unknown command: ${command}"
+            brik_error "Run 'brik help' for usage."
+            exit "${EXIT_INVALID}"
+            ;;
+    esac
+}
+
+main "$@"

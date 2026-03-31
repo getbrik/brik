@@ -1,0 +1,6 @@
+--shell bash
+--pattern "*_spec.sh"
+--helperdir runtime/bash/spec
+--require spec_helper
+--default-path runtime/bash/spec
+--env LC_NUMERIC=C

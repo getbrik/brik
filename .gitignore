@@ -1,0 +1,24 @@
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# macOS
+.DS_Store
+
+# Environment
+.env
+.env.*
+
+# Coverage
+coverage/
+.shellspec-quick.log
+
+# Temporary
+tmp/
+*.tmp
+
+# ShellSpec
+report/

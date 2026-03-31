@@ -1,0 +1,504 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://brik.dev/schemas/config/v1/brik.schema.json",
+  "title": "Brik Project Configuration",
+  "description": "Declarative project configuration for the Brik portable CI/CD pipeline system. Defines what happens at each stage (stack, tools, thresholds) without describing the pipeline structure itself. The fixed flow Init -> Release -> Build -> Quality/Security -> Test -> Package -> Deploy -> Notify is implemented by platform-specific shared libraries.",
+  "type": "object",
+  "required": ["version", "project"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "description": "Schema version for brik.yml. Must be 1.",
+      "type": "integer",
+      "const": 1
+    },
+    "project": {
+      "description": "Project identity and metadata. Required. Provides the name, optional stack hint, and optional monorepo root.",
+      "type": "object",
+      "required": ["name"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "description": "Project name. Used in logs, notifications, and artefact labels.",
+          "type": "string",
+          "minLength": 1
+        },
+        "stack": {
+          "description": "Technology stack. Optional - Brik performs auto-detection from project files (package.json -> node, pom.xml -> java, etc.) when omitted.",
+          "type": "string",
+          "enum": ["node", "java", "python", "dotnet", "rust"]
+        },
+        "description": {
+          "description": "Human-readable description of the project.",
+          "type": "string"
+        },
+        "root": {
+          "description": "Relative path to the service root directory. Used in monorepos where each service has its own brik.yml.",
+          "type": "string"
+        }
+      }
+    },
+    "build": {
+      "description": "Build stage configuration. Absent means use stack defaults (e.g. npm run build for node, mvn package for java).",
+      "$ref": "#/$defs/build"
+    },
+    "test": {
+      "description": "Test stage configuration. Absent means use stack defaults.",
+      "$ref": "#/$defs/test"
+    },
+    "quality": {
+      "description": "Quality stage configuration covering lint, formatting, and static analysis. Enabled by default.",
+      "$ref": "#/$defs/quality"
+    },
+    "security": {
+      "description": "Security stage configuration covering dependency scanning, secret scanning, and container scanning. Enabled by default.",
+      "$ref": "#/$defs/security"
+    },
+    "package": {
+      "description": "Package stage configuration for building and publishing artefacts such as Docker images.",
+      "$ref": "#/$defs/package"
+    },
+    "deploy": {
+      "description": "Deploy stage configuration. Defines one or more named environments with conditions and deployment targets.",
+      "$ref": "#/$defs/deploy"
+    },
+    "notify": {
+      "description": "Notify stage configuration for Slack, email, and webhook notifications.",
+      "$ref": "#/$defs/notify"
+    },
+    "hooks": {
+      "description": "Pre and post stage hook scripts. Each hook receives the pipeline context and runs as a shell command.",
+      "$ref": "#/$defs/hooks"
+    }
+  },
+  "$defs": {
+    "build": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "command": {
+          "description": "Build command to execute. Overrides the stack default.",
+          "type": "string",
+          "minLength": 1
+        },
+        "node_version": {
+          "description": "Node.js version to use (e.g. \"20\", \"18\"). Applicable when stack is node.",
+          "type": "string",
+          "minLength": 1
+        },
+        "java_version": {
+          "description": "Java version to use (e.g. \"21\", \"17\"). Applicable when stack is java.",
+          "type": "string",
+          "minLength": 1
+        },
+        "python_version": {
+          "description": "Python version to use (e.g. \"3.12\", \"3.11\"). Applicable when stack is python.",
+          "type": "string",
+          "minLength": 1
+        },
+        "dotnet_version": {
+          "description": ".NET version to use (e.g. \"8.0\", \"9.0\"). Applicable when stack is dotnet.",
+          "type": "string",
+          "minLength": 1
+        },
+        "rust_version": {
+          "description": "Rust version to use (e.g. \"1.76\", \"stable\"). Applicable when stack is rust.",
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "test": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "framework": {
+          "description": "Test framework to use. Overrides the stack default (e.g. jest for node, junit for java, pytest for python).",
+          "type": "string",
+          "minLength": 1
+        },
+        "coverage_threshold": {
+          "description": "Minimum code coverage percentage required to pass the test stage. Default is 0 (no minimum enforced).",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100,
+          "default": 0
+        },
+        "commands": {
+          "description": "Explicit test commands per test type. When present, these override the framework-derived defaults.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "unit": {
+              "description": "Command to run unit tests.",
+              "type": "string",
+              "minLength": 1
+            },
+            "integration": {
+              "description": "Command to run integration tests.",
+              "type": "string",
+              "minLength": 1
+            },
+            "e2e": {
+              "description": "Command to run end-to-end tests.",
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    "quality": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "description": "Whether the quality stage is active. Set to false to skip lint, format, and SAST checks entirely. Default is true.",
+          "type": "boolean",
+          "default": true
+        },
+        "lint": {
+          "description": "Linting configuration.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "tool": {
+              "description": "Lint tool to use (e.g. eslint, checkstyle, ruff, golangci-lint, clippy). Overrides the stack default.",
+              "type": "string",
+              "minLength": 1
+            },
+            "config": {
+              "description": "Path to the lint configuration file (e.g. .eslintrc.yml).",
+              "type": "string",
+              "minLength": 1
+            },
+            "fix": {
+              "description": "Whether to run the linter in auto-fix mode. Default is false.",
+              "type": "boolean",
+              "default": false
+            }
+          }
+        },
+        "format": {
+          "description": "Code formatting configuration.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "tool": {
+              "description": "Formatter to use (e.g. prettier, google-java-format, ruff format, gofmt, rustfmt). Overrides the stack default.",
+              "type": "string",
+              "minLength": 1
+            },
+            "check": {
+              "description": "Whether to run the formatter in check mode (fail if files would be reformatted) rather than applying changes. Default is false.",
+              "type": "boolean",
+              "default": false
+            }
+          }
+        },
+        "sast": {
+          "description": "Static application security testing configuration.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "tool": {
+              "description": "SAST tool to use (e.g. semgrep, sonarqube, codeql).",
+              "type": "string",
+              "minLength": 1
+            },
+            "ruleset": {
+              "description": "Ruleset or profile for the SAST tool (e.g. auto, p/security-audit).",
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    "security": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "description": "Whether the security stage is active. Set to false to skip all security scans. Default is true.",
+          "type": "boolean",
+          "default": true
+        },
+        "dependency_scan": {
+          "description": "Whether to scan project dependencies for known vulnerabilities.",
+          "type": "boolean"
+        },
+        "secret_scan": {
+          "description": "Whether to scan the codebase for accidentally committed secrets, tokens, or credentials.",
+          "type": "boolean"
+        },
+        "container_scan": {
+          "description": "Whether to scan the built Docker image for OS and application vulnerabilities. Typically meaningful only when package.docker is configured.",
+          "type": "boolean"
+        },
+        "severity_threshold": {
+          "description": "Minimum vulnerability severity that causes the security stage to fail. Vulnerabilities below this level are reported but do not block the pipeline.",
+          "type": "string",
+          "enum": ["critical", "high", "medium", "low"]
+        }
+      }
+    },
+    "package": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "docker": {
+          "description": "Docker image build and push configuration.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "image": {
+              "description": "Full image name including registry and repository (e.g. registry.example.com/my-service).",
+              "type": "string",
+              "minLength": 1
+            },
+            "dockerfile": {
+              "description": "Path to the Dockerfile relative to the build context. Default is Dockerfile.",
+              "type": "string",
+              "minLength": 1
+            },
+            "context": {
+              "description": "Docker build context path. Default is . (current directory).",
+              "type": "string",
+              "minLength": 1
+            },
+            "platforms": {
+              "description": "Target platforms for multi-arch builds (e.g. linux/amd64, linux/arm64).",
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "minItems": 1,
+              "uniqueItems": true
+            },
+            "build_args": {
+              "description": "Docker build arguments passed as --build-arg. Keys and values must be strings.",
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "deploy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "environments": {
+          "description": "Named deployment environments. Each key is an environment name (e.g. staging, production). Each value defines the deployment condition and target.",
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/deployEnvironment"
+          },
+          "minProperties": 1
+        }
+      }
+    },
+    "deployEnvironment": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "when": {
+          "description": "Condition expression evaluated by the shared library to decide whether this environment is deployed. Supports branch equality (branch == 'main'), glob matching (tag =~ 'v*'), and native CI variables ($CI_PIPELINE_SOURCE == 'merge_request_event').",
+          "type": "string",
+          "minLength": 1
+        },
+        "target": {
+          "description": "Deployment target type.",
+          "type": "string",
+          "enum": ["ssh", "compose", "k8s", "helm", "gitops"]
+        },
+        "namespace": {
+          "description": "Kubernetes namespace for k8s and helm targets.",
+          "type": "string",
+          "minLength": 1
+        },
+        "manifest": {
+          "description": "Path to the Kubernetes manifest file or directory for the k8s target.",
+          "type": "string",
+          "minLength": 1
+        },
+        "repo": {
+          "description": "GitOps infrastructure repository reference (e.g. org/repo-name) for the gitops target.",
+          "type": "string",
+          "minLength": 1
+        },
+        "path": {
+          "description": "Path within the GitOps repository where manifests for this service are located.",
+          "type": "string",
+          "minLength": 1
+        },
+        "controller": {
+          "description": "GitOps controller responsible for reconciliation (e.g. argocd, fluxcd).",
+          "type": "string",
+          "minLength": 1
+        },
+        "app_name": {
+          "description": "Application name as known to the GitOps controller.",
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "notifyEventList": {
+      "description": "Pipeline events that trigger a notification.",
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["failure", "success", "always"]
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "notify": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "slack": {
+          "description": "Slack notification configuration.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "channel": {
+              "description": "Slack channel name including the # prefix (e.g. #deployments).",
+              "type": "string",
+              "minLength": 1
+            },
+            "on": {
+              "description": "Pipeline events that trigger a Slack notification.",
+              "$ref": "#/$defs/notifyEventList"
+            }
+          }
+        },
+        "email": {
+          "description": "Email notification configuration.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "to": {
+              "description": "Recipient email address or comma-separated list of addresses.",
+              "type": "string",
+              "minLength": 1
+            },
+            "on": {
+              "description": "Pipeline events that trigger an email notification.",
+              "$ref": "#/$defs/notifyEventList"
+            }
+          }
+        },
+        "webhook": {
+          "description": "Webhook notification configuration.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "url": {
+              "description": "Webhook endpoint URL.",
+              "type": "string",
+              "format": "uri",
+              "minLength": 1
+            },
+            "on": {
+              "description": "Pipeline events that trigger a webhook call.",
+              "$ref": "#/$defs/notifyEventList"
+            }
+          }
+        }
+      }
+    },
+    "hookCommandList": {
+      "description": "Ordered list of shell commands to execute at a hook point.",
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 1
+    },
+    "hooks": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "pre_init": {
+          "description": "Commands executed before the init stage.",
+          "$ref": "#/$defs/hookCommandList"
+        },
+        "post_init": {
+          "description": "Commands executed after the init stage completes successfully.",
+          "$ref": "#/$defs/hookCommandList"
+        },
+        "pre_release": {
+          "description": "Commands executed before the release stage.",
+          "$ref": "#/$defs/hookCommandList"
+        },
+        "post_release": {
+          "description": "Commands executed after the release stage completes successfully.",
+          "$ref": "#/$defs/hookCommandList"
+        },
+        "pre_build": {
+          "description": "Commands executed before the build stage.",
+          "$ref": "#/$defs/hookCommandList"
+        },
+        "post_build": {
+          "description": "Commands executed after the build stage completes successfully.",
+          "$ref": "#/$defs/hookCommandList"
+        },
+        "pre_quality": {
+          "description": "Commands executed before the quality stage.",
+          "$ref": "#/$defs/hookCommandList"
+        },
+        "post_quality": {
+          "description": "Commands executed after the quality stage completes successfully.",
+          "$ref": "#/$defs/hookCommandList"
+        },
+        "pre_security": {
+          "description": "Commands executed before the security stage.",
+          "$ref": "#/$defs/hookCommandList"
+        },
+        "post_security": {
+          "description": "Commands executed after the security stage completes successfully.",
+          "$ref": "#/$defs/hookCommandList"
+        },
+        "pre_test": {
+          "description": "Commands executed before the test stage.",
+          "$ref": "#/$defs/hookCommandList"
+        },
+        "post_test": {
+          "description": "Commands executed after the test stage completes successfully.",
+          "$ref": "#/$defs/hookCommandList"
+        },
+        "pre_package": {
+          "description": "Commands executed before the package stage.",
+          "$ref": "#/$defs/hookCommandList"
+        },
+        "post_package": {
+          "description": "Commands executed after the package stage completes successfully.",
+          "$ref": "#/$defs/hookCommandList"
+        },
+        "pre_deploy": {
+          "description": "Commands executed before the deploy stage.",
+          "$ref": "#/$defs/hookCommandList"
+        },
+        "post_deploy": {
+          "description": "Commands executed after the deploy stage completes successfully.",
+          "$ref": "#/$defs/hookCommandList"
+        },
+        "pre_notify": {
+          "description": "Commands executed before the notify stage.",
+          "$ref": "#/$defs/hookCommandList"
+        },
+        "post_notify": {
+          "description": "Commands executed after the notify stage completes successfully.",
+          "$ref": "#/$defs/hookCommandList"
+        }
+      }
+    }
+  }
+}

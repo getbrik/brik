@@ -1,0 +1,24 @@
+version: 1
+
+project:
+  name: my-java-app
+  stack: java
+  description: Java Maven service with strict quality gates
+
+build:
+  java_version: "21"
+  command: mvn package -DskipTests
+
+test:
+  framework: junit
+  coverage_threshold: 80
+
+quality:
+  enabled: true
+  lint:
+    tool: checkstyle
+    config: checkstyle.xml
+    fix: false
+  format:
+    tool: google-java-format
+    check: true

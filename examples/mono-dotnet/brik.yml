@@ -1,0 +1,27 @@
+version: 1
+
+project:
+  name: my-dotnet-api
+  stack: dotnet
+  description: .NET Web API service
+
+build:
+  dotnet_version: "8.0"
+  command: dotnet build --configuration Release
+
+test:
+  framework: xunit
+  coverage_threshold: 80
+  commands:
+    unit: dotnet test --filter Category=Unit
+    integration: dotnet test --filter Category=Integration
+
+quality:
+  enabled: true
+  lint:
+    tool: dotnet-format
+    config: .editorconfig
+    fix: false
+  format:
+    tool: dotnet-format
+    check: true

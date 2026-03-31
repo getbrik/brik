@@ -1,0 +1,6 @@
+# version must be integer 1, not a string
+version: "one"
+
+project:
+  name: wrong-type-app
+  stack: node

@@ -1,0 +1,9 @@
+version: 1
+
+project:
+  name: unknown-key-app
+  stack: node
+
+# unknown top-level key - not in the schema
+unknown_section:
+  something: true
