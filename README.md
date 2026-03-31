@@ -1,15 +1,9 @@
 <p align="center">
-  <b><font size="6">Brik</font></b>
-  <!-- TODO: Replace with logo when available -->
-  <!-- <img src="assets/brik.svg" alt="Brik"> -->
+  <img src="assets/brik.svg" alt="Brik">
 </p>
 
 <p align="center">
   <b>Portable CI/CD pipelines - configure what, not how. One brik.yml, any platform.</b>
-</p>
-
-<p align="center">
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MPL--2.0-blue?style=for-the-badge&labelColor=2b2d42&color=4a90d9" alt="License"></a>
 </p>
 
 <p align="center">
