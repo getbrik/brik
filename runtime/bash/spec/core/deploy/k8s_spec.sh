@@ -28,7 +28,7 @@ Describe "deploy/k8s.sh"
         printf 'apiVersion: v1\nkind: Pod\n' > "${TEST_WS}/manifest.yaml"
         MOCK_BIN="$(mktemp -d)"
         ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:/usr/bin:/bin"
+        export PATH="${MOCK_BIN}"
       }
       cleanup_no_kubectl() {
         export PATH="$ORIG_PATH"

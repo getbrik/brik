@@ -66,7 +66,7 @@ Describe "build/python.sh"
         printf '[project]\nname = "test"\n' > "${TEST_WS}/pyproject.toml"
         MOCK_BIN="$(mktemp -d)"
         ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:/usr/bin:/bin"
+        export PATH="${MOCK_BIN}"
       }
       cleanup_no_pip() {
         export PATH="$ORIG_PATH"

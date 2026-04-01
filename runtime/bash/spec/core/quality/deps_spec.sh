@@ -123,9 +123,11 @@ printf 'safety %s\n' "\$*" >> "$MOCK_LOG"
 exit 0
 MOCKEOF
         chmod +x "${MOCK_BIN}/safety"
+        ln -sf "$(command -v bash)" "${MOCK_BIN}/bash"
+        ln -sf "$(command -v grep)" "${MOCK_BIN}/grep"
         ORIG_PATH="$PATH"
         # Only safety, no pip-audit
-        export PATH="${MOCK_BIN}:/usr/bin:/bin"
+        export PATH="${MOCK_BIN}"
       }
       cleanup_safety() {
         export PATH="$ORIG_PATH"
@@ -155,8 +157,10 @@ printf 'trivy %s\n' "\$*" >> "$MOCK_LOG"
 exit 0
 MOCKEOF
         chmod +x "${MOCK_BIN}/trivy"
+        ln -sf "$(command -v bash)" "${MOCK_BIN}/bash"
+        ln -sf "$(command -v grep)" "${MOCK_BIN}/grep"
         ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:/usr/bin:/bin"
+        export PATH="${MOCK_BIN}"
       }
       cleanup_trivy() {
         export PATH="$ORIG_PATH"
@@ -189,7 +193,7 @@ MOCKEOF
         TEST_WS="$(mktemp -d)"
         MOCK_BIN="$(mktemp -d)"
         ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:/usr/bin:/bin"
+        export PATH="${MOCK_BIN}"
       }
       cleanup_none() {
         export PATH="$ORIG_PATH"

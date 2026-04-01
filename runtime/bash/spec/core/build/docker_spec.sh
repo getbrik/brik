@@ -28,7 +28,7 @@ Describe "build/docker.sh"
         printf 'FROM alpine:3.19\n' > "${TEST_WS}/Dockerfile"
         MOCK_BIN="$(mktemp -d)"
         ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:/usr/bin:/bin"
+        export PATH="${MOCK_BIN}"
       }
       cleanup_no_docker() {
         export PATH="$ORIG_PATH"

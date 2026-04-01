@@ -76,7 +76,7 @@ MOCKEOF
         printf '{"name":"test"}\n' > "${TEST_WS}/package.json"
         MOCK_BIN="$(mktemp -d)"
         ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:/usr/bin:/bin"
+        export PATH="${MOCK_BIN}"
       }
       cleanup_no_npx() {
         export PATH="$ORIG_PATH"
@@ -139,7 +139,7 @@ MOCKEOF
         printf '[project]\nname = "test"\n' > "${TEST_WS}/pyproject.toml"
         MOCK_BIN="$(mktemp -d)"
         ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:/usr/bin:/bin"
+        export PATH="${MOCK_BIN}"
       }
       cleanup_no_ruff() {
         export PATH="$ORIG_PATH"

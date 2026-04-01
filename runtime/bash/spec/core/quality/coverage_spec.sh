@@ -231,7 +231,7 @@ EOF
 XMLEOF
         MOCK_BIN="$(mktemp -d)"
         ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:/usr/bin:/bin"
+        export PATH="${MOCK_BIN}"
       }
       cleanup_no_yq() {
         export PATH="$ORIG_PATH"
