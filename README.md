@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/brik.svg" alt="Brik">
+  <img src="assets/brik.jpg" alt="Brik">
 </p>
 
 <p align="center">
