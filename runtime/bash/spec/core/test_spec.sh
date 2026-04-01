@@ -28,16 +28,16 @@ Describe "test.sh"
     Describe "with Node.js workspace"
       setup_node() {
         TEST_WS="$(mktemp -d)"
-        MOCK_LOG="${TEST_WS}/mock_npx.log"
+        MOCK_LOG="${TEST_WS}/mock_npm.log"
         printf '{"name":"test","scripts":{"test":"echo ok"}}\n' > "${TEST_WS}/package.json"
         MOCK_BIN="$(mktemp -d)"
-        # Mock npx that records its arguments
-        cat > "${MOCK_BIN}/npx" << MOCKEOF
+        # Mock npm that records its arguments
+        cat > "${MOCK_BIN}/npm" << MOCKEOF
 #!/usr/bin/env bash
 printf '%s\n' "\$*" >> "$MOCK_LOG"
 exit 0
 MOCKEOF
-        chmod +x "${MOCK_BIN}/npx"
+        chmod +x "${MOCK_BIN}/npm"
         ORIG_PATH="$PATH"
         export PATH="${MOCK_BIN}:${PATH}"
       }
@@ -48,12 +48,12 @@ MOCKEOF
       Before 'setup_node'
       After 'cleanup_node'
 
-      It "detects Node.js and runs npx jest"
-        verify_npx_jest() {
+      It "detects Node.js with test script and runs npm test"
+        verify_npm_test() {
           test.run "$TEST_WS" 2>/dev/null
-          grep -q "jest" "$MOCK_LOG"
+          grep -q "test" "$MOCK_LOG"
         }
-        When call verify_npx_jest
+        When call verify_npm_test
         The status should be success
       End
 
@@ -63,14 +63,13 @@ MOCKEOF
         The stderr should include "running integration tests"
       End
 
-      It "passes --reporters=jest-junit when --report-dir is set"
-        verify_reporters() {
+      It "runs npm test even when --report-dir is set"
+        verify_npm_test_with_reports() {
           local rdir="${TEST_WS}/reports"
           test.run "$TEST_WS" --report-dir "$rdir" 2>/dev/null
-          [[ -d "$rdir" ]] || return 1
-          grep -q "jest-junit" "$MOCK_LOG"
+          grep -q "test" "$MOCK_LOG"
         }
-        When call verify_reporters
+        When call verify_npm_test_with_reports
         The status should be success
       End
     End

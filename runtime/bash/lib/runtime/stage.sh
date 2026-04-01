@@ -42,10 +42,11 @@ stage.create_log_file() {
         return 6
     }
     local log_file
-    log_file="$(mktemp "${log_dir}/${stage_name}-XXXXXX.log")" || {
+    log_file="$(mktemp "${log_dir}/${stage_name}-XXXXXX")" || {
         log.error "cannot create log file for stage: $stage_name"
         return 6
     }
+    mv "$log_file" "${log_file}.log" && log_file="${log_file}.log"
     printf '%s' "$log_file"
     return 0
 }

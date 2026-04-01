@@ -26,8 +26,17 @@ test.run() {
     # Detect test runner based on workspace
     local test_cmd=""
     if [[ -f "${workspace}/package.json" ]]; then
-        # Node.js project - use npm test or npx jest
-        if command -v npx >/dev/null 2>&1; then
+        # Node.js project - prefer npm test if a test script is defined
+        local has_test_script=""
+        if command -v node >/dev/null 2>&1; then
+            has_test_script="$(node -e "
+                const p = require('${workspace}/package.json');
+                if (p.scripts && p.scripts.test) console.log('yes');
+            " 2>/dev/null || true)"
+        fi
+        if [[ "$has_test_script" == "yes" ]]; then
+            test_cmd="npm test"
+        elif command -v npx >/dev/null 2>&1; then
             test_cmd="npx jest"
             if [[ -n "$report_dir" ]]; then
                 test_cmd="$test_cmd --reporters=default --reporters=jest-junit"
