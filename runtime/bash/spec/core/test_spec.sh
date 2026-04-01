@@ -31,13 +31,19 @@ Describe "test.sh"
         MOCK_LOG="${TEST_WS}/mock_npm.log"
         printf '{"name":"test","scripts":{"test":"echo ok"}}\n' > "${TEST_WS}/package.json"
         MOCK_BIN="$(mktemp -d)"
-        # Mock npm that records its arguments
         cat > "${MOCK_BIN}/npm" << MOCKEOF
 #!/usr/bin/env bash
-printf '%s\n' "\$*" >> "$MOCK_LOG"
+printf 'npm %s\n' "\$*" >> "$MOCK_LOG"
 exit 0
 MOCKEOF
         chmod +x "${MOCK_BIN}/npm"
+        # Mock node for test script detection (returns "yes" for -e flag)
+        cat > "${MOCK_BIN}/node" << 'NODEEOF'
+#!/usr/bin/env bash
+if [[ "$1" == "-e" ]]; then printf 'yes\n'; fi
+exit 0
+NODEEOF
+        chmod +x "${MOCK_BIN}/node"
         ORIG_PATH="$PATH"
         export PATH="${MOCK_BIN}:${PATH}"
       }
@@ -48,12 +54,12 @@ MOCKEOF
       Before 'setup_node'
       After 'cleanup_node'
 
-      It "detects Node.js with test script and runs npm test"
-        verify_npm_test() {
-          test.run "$TEST_WS" 2>/dev/null
-          grep -q "test" "$MOCK_LOG"
+      It "detects Node.js and runs npm test"
+        invoke_npm_test() {
+          test.run "$TEST_WS" 2>/dev/null || return 1
+          grep -q "^npm test" "$MOCK_LOG"
         }
-        When call verify_npm_test
+        When call invoke_npm_test
         The status should be success
       End
 
@@ -63,14 +69,10 @@ MOCKEOF
         The stderr should include "running integration tests"
       End
 
-      It "runs npm test even when --report-dir is set"
-        verify_npm_test_with_reports() {
-          local rdir="${TEST_WS}/reports"
-          test.run "$TEST_WS" --report-dir "$rdir" 2>/dev/null
-          grep -q "test" "$MOCK_LOG"
-        }
-        When call verify_npm_test_with_reports
+      It "succeeds and reports tests passed"
+        When call test.run "$TEST_WS"
         The status should be success
+        The stderr should include "tests passed"
       End
     End
 
@@ -82,7 +84,7 @@ MOCKEOF
         MOCK_BIN="$(mktemp -d)"
         cat > "${MOCK_BIN}/python" << MOCKEOF
 #!/usr/bin/env bash
-printf '%s\n' "\$*" >> "$MOCK_LOG"
+printf 'python %s\n' "\$*" >> "$MOCK_LOG"
 exit 0
 MOCKEOF
         chmod +x "${MOCK_BIN}/python"
@@ -97,25 +99,25 @@ MOCKEOF
       After 'cleanup_py'
 
       It "detects Python and runs pytest"
-        verify_pytest() {
-          test.run "$TEST_WS" 2>/dev/null
-          grep -q "\-m pytest" "$MOCK_LOG"
+        invoke_pytest() {
+          test.run "$TEST_WS" 2>/dev/null || return 1
+          grep -q "^python -m pytest" "$MOCK_LOG"
         }
-        When call verify_pytest
+        When call invoke_pytest
         The status should be success
       End
 
       It "passes --junitxml when --report-dir is set"
-        verify_junitxml() {
-          test.run "$TEST_WS" --report-dir "${TEST_WS}/reports" 2>/dev/null
-          grep -q "junitxml" "$MOCK_LOG"
+        invoke_junitxml() {
+          test.run "$TEST_WS" --report-dir "${TEST_WS}/reports" 2>/dev/null || return 1
+          grep -q "\-\-junitxml=" "$MOCK_LOG"
         }
-        When call verify_junitxml
+        When call invoke_junitxml
         The status should be success
       End
     End
 
-    Describe "with Java workspace"
+    Describe "with Java Maven workspace"
       setup_java() {
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock_mvn.log"
@@ -123,7 +125,7 @@ MOCKEOF
         MOCK_BIN="$(mktemp -d)"
         cat > "${MOCK_BIN}/mvn" << MOCKEOF
 #!/usr/bin/env bash
-printf '%s\n' "\$*" >> "$MOCK_LOG"
+printf 'mvn %s\n' "\$*" >> "$MOCK_LOG"
 exit 0
 MOCKEOF
         chmod +x "${MOCK_BIN}/mvn"
@@ -138,11 +140,184 @@ MOCKEOF
       After 'cleanup_java'
 
       It "detects Java and invokes mvn test"
-        verify_mvn() {
-          test.run "$TEST_WS" 2>/dev/null
-          grep -q "test" "$MOCK_LOG"
+        invoke_mvn() {
+          test.run "$TEST_WS" 2>/dev/null || return 1
+          grep -q "^mvn test" "$MOCK_LOG"
         }
-        When call verify_mvn
+        When call invoke_mvn
+        The status should be success
+      End
+
+      It "passes -Dsurefire.reportsDirectory when --report-dir is set"
+        invoke_mvn_report() {
+          test.run "$TEST_WS" --report-dir "${TEST_WS}/reports" 2>/dev/null || return 1
+          grep -q "\-Dsurefire.reportsDirectory=" "$MOCK_LOG"
+        }
+        When call invoke_mvn_report
+        The status should be success
+      End
+    End
+
+    Describe "with Gradle workspace"
+      setup_gradle() {
+        TEST_WS="$(mktemp -d)"
+        MOCK_LOG="${TEST_WS}/mock_gradle.log"
+        printf 'plugins { id "java" }\n' > "${TEST_WS}/build.gradle"
+        MOCK_BIN="$(mktemp -d)"
+        cat > "${MOCK_BIN}/gradle" << MOCKEOF
+#!/usr/bin/env bash
+printf 'gradle %s\n' "\$*" >> "$MOCK_LOG"
+exit 0
+MOCKEOF
+        chmod +x "${MOCK_BIN}/gradle"
+        ORIG_PATH="$PATH"
+        export PATH="${MOCK_BIN}:${PATH}"
+      }
+      cleanup_gradle() {
+        export PATH="$ORIG_PATH"
+        rm -rf "$TEST_WS" "$MOCK_BIN"
+      }
+      Before 'setup_gradle'
+      After 'cleanup_gradle'
+
+      It "detects Gradle and runs gradle test"
+        invoke_gradle() {
+          test.run "$TEST_WS" 2>/dev/null || return 1
+          grep -q "^gradle test" "$MOCK_LOG"
+        }
+        When call invoke_gradle
+        The status should be success
+      End
+    End
+
+    Describe "with build.gradle.kts workspace"
+      setup_gradle_kts() {
+        TEST_WS="$(mktemp -d)"
+        MOCK_LOG="${TEST_WS}/mock_gradle.log"
+        printf 'plugins { id("java") }\n' > "${TEST_WS}/build.gradle.kts"
+        MOCK_BIN="$(mktemp -d)"
+        cat > "${MOCK_BIN}/gradle" << MOCKEOF
+#!/usr/bin/env bash
+printf 'gradle %s\n' "\$*" >> "$MOCK_LOG"
+exit 0
+MOCKEOF
+        chmod +x "${MOCK_BIN}/gradle"
+        ORIG_PATH="$PATH"
+        export PATH="${MOCK_BIN}:${PATH}"
+      }
+      cleanup_gradle_kts() {
+        export PATH="$ORIG_PATH"
+        rm -rf "$TEST_WS" "$MOCK_BIN"
+      }
+      Before 'setup_gradle_kts'
+      After 'cleanup_gradle_kts'
+
+      It "detects build.gradle.kts and runs gradle test"
+        invoke_gradle_kts() {
+          test.run "$TEST_WS" 2>/dev/null || return 1
+          grep -q "^gradle test" "$MOCK_LOG"
+        }
+        When call invoke_gradle_kts
+        The status should be success
+      End
+    End
+
+    Describe "with Gradle wrapper"
+      setup_gradlew() {
+        TEST_WS="$(mktemp -d)"
+        MOCK_LOG="${TEST_WS}/mock_gradlew.log"
+        printf 'plugins { id "java" }\n' > "${TEST_WS}/build.gradle"
+        cat > "${TEST_WS}/gradlew" << MOCKEOF
+#!/usr/bin/env bash
+printf 'gradlew %s\n' "\$*" >> "$MOCK_LOG"
+exit 0
+MOCKEOF
+        chmod +x "${TEST_WS}/gradlew"
+        ORIG_PATH="$PATH"
+        MOCK_BIN="$(mktemp -d)"
+        export PATH="${MOCK_BIN}:/usr/bin:/bin"
+      }
+      cleanup_gradlew() {
+        export PATH="$ORIG_PATH"
+        rm -rf "$TEST_WS" "$MOCK_BIN"
+      }
+      Before 'setup_gradlew'
+      After 'cleanup_gradlew'
+
+      It "uses gradlew when present"
+        invoke_gradlew() {
+          test.run "$TEST_WS" 2>/dev/null || return 1
+          grep -q "^gradlew test" "$MOCK_LOG"
+        }
+        When call invoke_gradlew
+        The status should be success
+      End
+    End
+
+    Describe "with --framework override"
+      setup_framework() {
+        TEST_WS="$(mktemp -d)"
+        MOCK_LOG="${TEST_WS}/mock_cargo.log"
+        MOCK_BIN="$(mktemp -d)"
+        cat > "${MOCK_BIN}/cargo" << MOCKEOF
+#!/usr/bin/env bash
+printf 'cargo %s\n' "\$*" >> "$MOCK_LOG"
+exit 0
+MOCKEOF
+        chmod +x "${MOCK_BIN}/cargo"
+        ORIG_PATH="$PATH"
+        export PATH="${MOCK_BIN}:${PATH}"
+      }
+      cleanup_framework() {
+        export PATH="$ORIG_PATH"
+        rm -rf "$TEST_WS" "$MOCK_BIN"
+      }
+      Before 'setup_framework'
+      After 'cleanup_framework'
+
+      It "uses specified framework regardless of workspace content"
+        invoke_cargo() {
+          test.run "$TEST_WS" --framework cargo 2>/dev/null || return 1
+          grep -q "^cargo test" "$MOCK_LOG"
+        }
+        When call invoke_cargo
+        The status should be success
+      End
+
+      It "returns 7 for unsupported framework"
+        When call test.run "$TEST_WS" --framework unknown
+        The status should equal 7
+        The stderr should include "unsupported test framework"
+      End
+    End
+
+    Describe "with --framework dotnet"
+      setup_dotnet() {
+        TEST_WS="$(mktemp -d)"
+        MOCK_LOG="${TEST_WS}/mock_dotnet.log"
+        MOCK_BIN="$(mktemp -d)"
+        cat > "${MOCK_BIN}/dotnet" << MOCKEOF
+#!/usr/bin/env bash
+printf 'dotnet %s\n' "\$*" >> "$MOCK_LOG"
+exit 0
+MOCKEOF
+        chmod +x "${MOCK_BIN}/dotnet"
+        ORIG_PATH="$PATH"
+        export PATH="${MOCK_BIN}:${PATH}"
+      }
+      cleanup_dotnet() {
+        export PATH="$ORIG_PATH"
+        rm -rf "$TEST_WS" "$MOCK_BIN"
+      }
+      Before 'setup_dotnet'
+      After 'cleanup_dotnet'
+
+      It "runs dotnet test"
+        invoke_dotnet() {
+          test.run "$TEST_WS" --framework dotnet 2>/dev/null || return 1
+          grep -q "^dotnet test" "$MOCK_LOG"
+        }
+        When call invoke_dotnet
         The status should be success
       End
     End
@@ -192,16 +367,17 @@ EOF
     Describe "Node.js without npx"
       setup_no_npx() {
         TEST_WS="$(mktemp -d)"
+        MOCK_LOG="${TEST_WS}/mock_npm.log"
         printf '{"name":"test","scripts":{"test":"echo ok"}}\n' > "${TEST_WS}/package.json"
         MOCK_BIN="$(mktemp -d)"
-        # Only provide npm, no npx
-        cat > "${MOCK_BIN}/npm" << 'EOF'
+        # Only provide npm, no npx, no node (so can't detect test script)
+        cat > "${MOCK_BIN}/npm" << MOCKEOF
 #!/usr/bin/env bash
+printf 'npm %s\n' "\$*" >> "$MOCK_LOG"
 exit 0
-EOF
+MOCKEOF
         chmod +x "${MOCK_BIN}/npm"
         ORIG_PATH="$PATH"
-        # Put mock bin first, keep /usr/bin and /bin for shell basics but exclude npx
         export PATH="${MOCK_BIN}:/usr/bin:/bin"
       }
       cleanup_no_npx() {
@@ -231,11 +407,11 @@ EOF
     After 'cleanup'
 
     It "copies report to log directory"
-      verify_copy() {
-        test.publish_report "$REPORT_FILE" 2>/dev/null
+      invoke_copy() {
+        test.publish_report "$REPORT_FILE" 2>/dev/null || return 1
         [[ -f "${BRIK_LOG_DIR}/reports/$(basename "$REPORT_FILE")" ]]
       }
-      When call verify_copy
+      When call invoke_copy
       The status should be success
     End
 

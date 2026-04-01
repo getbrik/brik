@@ -1,0 +1,6 @@
+[packages]
+
+[dev-packages]
+
+[requires]
+python_version = "3"

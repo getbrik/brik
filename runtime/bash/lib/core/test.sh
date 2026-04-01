@@ -6,26 +6,69 @@
 [[ -n "${_BRIK_CORE_TEST_LOADED:-}" ]] && return 0
 _BRIK_CORE_TEST_LOADED=1
 
+# Build the test command for an explicit framework.
+# Prints the command on stdout.
+_test._cmd_for_framework() {
+    local framework="$1" workspace="$2" report_dir="$3"
+    local cmd=""
+
+    case "$framework" in
+        jest)
+            cmd="npx jest"
+            [[ -n "$report_dir" ]] && cmd="$cmd --reporters=default --reporters=jest-junit"
+            ;;
+        junit|maven)
+            cmd="mvn test"
+            [[ -n "$report_dir" ]] && cmd="$cmd -Dsurefire.reportsDirectory=${report_dir}"
+            ;;
+        gradle)
+            cmd="gradle test"
+            [[ -x "${workspace}/gradlew" ]] && cmd="./gradlew test"
+            ;;
+        pytest)
+            cmd="python -m pytest"
+            [[ -n "$report_dir" ]] && cmd="$cmd --junitxml=${report_dir}/report.xml"
+            ;;
+        cargo)
+            cmd="cargo test"
+            ;;
+        dotnet)
+            cmd="dotnet test"
+            ;;
+        *)
+            log.error "unsupported test framework: $framework"
+            return 7
+            ;;
+    esac
+
+    printf '%s' "$cmd"
+    return 0
+}
+
 # Run tests in a workspace.
 # Usage: test.run <workspace> [--suite <unit|integration|e2e>] [--report-dir <path>]
+#        [--framework <jest|junit|pytest|gradle|cargo|dotnet>]
 test.run() {
     local workspace="$1"
     shift
-    local suite="unit" report_dir=""
+    local suite="unit" report_dir="" framework=""
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --suite) suite="$2"; shift 2 ;;
             --report-dir) report_dir="$2"; shift 2 ;;
+            --framework) framework="$2"; shift 2 ;;
             *) log.error "unknown option: $1"; return 2 ;;
         esac
     done
 
     runtime.require_dir "$workspace" || return 6
 
-    # Detect test runner based on workspace
+    # Detect test runner based on workspace (or use --framework override)
     local test_cmd=""
-    if [[ -f "${workspace}/package.json" ]]; then
+    if [[ -n "$framework" ]]; then
+        test_cmd="$(_test._cmd_for_framework "$framework" "$workspace" "$report_dir")" || return $?
+    elif [[ -f "${workspace}/package.json" ]]; then
         # Node.js project - prefer npm test if a test script is defined
         local has_test_script=""
         if command -v node >/dev/null 2>&1; then
@@ -44,8 +87,16 @@ test.run() {
         else
             test_cmd="npm test"
         fi
+    elif [[ -f "${workspace}/build.gradle" || -f "${workspace}/build.gradle.kts" ]]; then
+        test_cmd="gradle test"
+        if [[ -x "${workspace}/gradlew" ]]; then
+            test_cmd="./gradlew test"
+        fi
     elif [[ -f "${workspace}/pom.xml" ]]; then
         test_cmd="mvn test"
+        if [[ -n "$report_dir" ]]; then
+            test_cmd="$test_cmd -Dsurefire.reportsDirectory=${report_dir}"
+        fi
     elif [[ -f "${workspace}/pyproject.toml" || -f "${workspace}/setup.py" ]]; then
         test_cmd="python -m pytest"
         if [[ -n "$report_dir" ]]; then
