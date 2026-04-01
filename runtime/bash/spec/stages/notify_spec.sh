@@ -21,6 +21,7 @@ Describe "stages.notify"
   cleanup_env() {
     rm -f "$BRIK_CONFIG_FILE"
     rm -rf "$BRIK_LOG_DIR" "$BRIK_WORKSPACE"
+    unset BRIK_NOTIFY_SLACK_CHANNEL BRIK_NOTIFY_EMAIL_TO BRIK_NOTIFY_WEBHOOK_URL 2>/dev/null || true
   }
   Before 'setup_env'
   After 'cleanup_env'
@@ -84,5 +85,83 @@ Describe "stages.notify"
     When call run_notify_sha
     The output should include "abc123d"
     The error should be present
+  End
+
+  Describe "with slack notification configured"
+    setup_slack() {
+      cat > "$BRIK_CONFIG_FILE" <<'YAML'
+version: 1
+project:
+  name: test-project
+notify:
+  slack:
+    channel: "#builds"
+    on: failure
+YAML
+      config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
+    }
+    Before 'setup_slack'
+
+    It "logs slack channel notification"
+      run_notify_slack() {
+        local ctx
+        ctx="$(context.create "notify")" 2>/dev/null || ctx="$(mktemp)"
+        stages.notify "$ctx" >/dev/null
+      }
+      When call run_notify_slack
+      The error should include "would notify slack channel: #builds"
+    End
+  End
+
+  Describe "with email notification configured"
+    setup_email() {
+      cat > "$BRIK_CONFIG_FILE" <<'YAML'
+version: 1
+project:
+  name: test-project
+notify:
+  email:
+    to: team@example.com
+    on: always
+YAML
+      config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
+    }
+    Before 'setup_email'
+
+    It "logs email notification"
+      run_notify_email() {
+        local ctx
+        ctx="$(context.create "notify")" 2>/dev/null || ctx="$(mktemp)"
+        stages.notify "$ctx" >/dev/null
+      }
+      When call run_notify_email
+      The error should include "would notify email: team@example.com"
+    End
+  End
+
+  Describe "with webhook notification configured"
+    setup_webhook() {
+      cat > "$BRIK_CONFIG_FILE" <<'YAML'
+version: 1
+project:
+  name: test-project
+notify:
+  webhook:
+    url: https://hooks.example.com/notify
+    on: success
+YAML
+      config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
+    }
+    Before 'setup_webhook'
+
+    It "logs webhook notification"
+      run_notify_webhook() {
+        local ctx
+        ctx="$(context.create "notify")" 2>/dev/null || ctx="$(mktemp)"
+        stages.notify "$ctx" >/dev/null
+      }
+      When call run_notify_webhook
+      The error should include "would notify webhook: https://hooks.example.com/notify"
+    End
   End
 End

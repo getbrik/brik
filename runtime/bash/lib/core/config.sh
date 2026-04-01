@@ -205,11 +205,19 @@ config.export_build_vars() {
     python_version="$(config.get '.build.python_version' '')"
     [[ -n "$python_version" ]] && export BRIK_BUILD_PYTHON_VERSION="$python_version"
 
+    local dotnet_version
+    dotnet_version="$(config.get '.build.dotnet_version' '')"
+    [[ -n "$dotnet_version" ]] && export BRIK_BUILD_DOTNET_VERSION="$dotnet_version"
+
+    local rust_version
+    rust_version="$(config.get '.build.rust_version' '')"
+    [[ -n "$rust_version" ]] && export BRIK_BUILD_RUST_VERSION="$rust_version"
+
     return 0
 }
 
 # Export test-related variables from brik.yml.
-# Sets: BRIK_TEST_FRAMEWORK, BRIK_TEST_COVERAGE_THRESHOLD, BRIK_TEST_COMMANDS_*
+# Sets: BRIK_TEST_FRAMEWORK, BRIK_TEST_COMMAND_*
 config.export_test_vars() {
     local stack
     stack="$(config.get '.project.stack' 'auto')"
@@ -222,10 +230,6 @@ config.export_test_vars() {
     local framework
     framework="$(config.get '.test.framework' "$default_framework")"
     export BRIK_TEST_FRAMEWORK="$framework"
-
-    local threshold
-    threshold="$(config.get '.test.coverage_threshold' '80')"
-    export BRIK_TEST_COVERAGE_THRESHOLD="$threshold"
 
     # Test commands per suite
     local unit_cmd
@@ -268,6 +272,54 @@ config.export_quality_vars() {
     format_tool="$(config.get '.quality.format.tool' "$default_format")"
     export BRIK_QUALITY_FORMAT_TOOL="$format_tool"
 
+    local lint_config
+    lint_config="$(config.get '.quality.lint.config' '')"
+    [[ -n "$lint_config" ]] && export BRIK_QUALITY_LINT_CONFIG="$lint_config"
+
+    local lint_fix
+    lint_fix="$(config.get '.quality.lint.fix' '')"
+    [[ -n "$lint_fix" ]] && export BRIK_QUALITY_LINT_FIX="$lint_fix"
+
+    local sast_tool
+    sast_tool="$(config.get '.quality.sast.tool' '')"
+    [[ -n "$sast_tool" ]] && export BRIK_QUALITY_SAST_TOOL="$sast_tool"
+
+    local sast_ruleset
+    sast_ruleset="$(config.get '.quality.sast.ruleset' '')"
+    [[ -n "$sast_ruleset" ]] && export BRIK_QUALITY_SAST_RULESET="$sast_ruleset"
+
+    local deps_tool
+    deps_tool="$(config.get '.quality.deps.tool' '')"
+    [[ -n "$deps_tool" ]] && export BRIK_QUALITY_DEPS_TOOL="$deps_tool"
+
+    local deps_severity
+    deps_severity="$(config.get '.quality.deps.severity' '')"
+    [[ -n "$deps_severity" ]] && export BRIK_QUALITY_DEPS_SEVERITY="$deps_severity"
+
+    local coverage_threshold
+    coverage_threshold="$(config.get '.quality.coverage.threshold' '')"
+    [[ -n "$coverage_threshold" ]] && export BRIK_QUALITY_COVERAGE_THRESHOLD="$coverage_threshold"
+
+    local coverage_report
+    coverage_report="$(config.get '.quality.coverage.report' '')"
+    [[ -n "$coverage_report" ]] && export BRIK_QUALITY_COVERAGE_REPORT="$coverage_report"
+
+    local license_allowed
+    license_allowed="$(config.get '.quality.license.allowed' '')"
+    [[ -n "$license_allowed" ]] && export BRIK_QUALITY_LICENSE_ALLOWED="$license_allowed"
+
+    local license_denied
+    license_denied="$(config.get '.quality.license.denied' '')"
+    [[ -n "$license_denied" ]] && export BRIK_QUALITY_LICENSE_DENIED="$license_denied"
+
+    local container_image
+    container_image="$(config.get '.quality.container.image' '')"
+    [[ -n "$container_image" ]] && export BRIK_QUALITY_CONTAINER_IMAGE="$container_image"
+
+    local container_severity
+    container_severity="$(config.get '.quality.container.severity' '')"
+    [[ -n "$container_severity" ]] && export BRIK_QUALITY_CONTAINER_SEVERITY="$container_severity"
+
     return 0
 }
 
@@ -281,6 +333,147 @@ config.export_security_vars() {
     local threshold
     threshold="$(config.get '.security.severity_threshold' 'high')"
     export BRIK_SECURITY_SEVERITY_THRESHOLD="$threshold"
+
+    local dep_scan
+    dep_scan="$(config.get '.security.dependency_scan' '')"
+    [[ -n "$dep_scan" ]] && export BRIK_SECURITY_DEPENDENCY_SCAN="$dep_scan"
+
+    local secret_scan
+    secret_scan="$(config.get '.security.secret_scan' '')"
+    [[ -n "$secret_scan" ]] && export BRIK_SECURITY_SECRET_SCAN="$secret_scan"
+
+    local container_scan
+    container_scan="$(config.get '.security.container_scan' '')"
+    [[ -n "$container_scan" ]] && export BRIK_SECURITY_CONTAINER_SCAN="$container_scan"
+
+    return 0
+}
+
+# Export package-related variables from brik.yml.
+# Sets: BRIK_PACKAGE_DOCKER_*
+config.export_package_vars() {
+    local image
+    image="$(config.get '.package.docker.image' '')"
+    [[ -n "$image" ]] && export BRIK_PACKAGE_DOCKER_IMAGE="$image"
+
+    local dockerfile
+    dockerfile="$(config.get '.package.docker.dockerfile' '')"
+    [[ -n "$dockerfile" ]] && export BRIK_PACKAGE_DOCKER_DOCKERFILE="$dockerfile"
+
+    local context
+    context="$(config.get '.package.docker.context' '')"
+    [[ -n "$context" ]] && export BRIK_PACKAGE_DOCKER_CONTEXT="$context"
+
+    local platforms
+    platforms="$(config.get '.package.docker.platforms' '')"
+    [[ -n "$platforms" ]] && export BRIK_PACKAGE_DOCKER_PLATFORMS="$platforms"
+
+    local build_args
+    build_args="$(config.get '.package.docker.build_args' '')"
+    [[ -n "$build_args" ]] && export BRIK_PACKAGE_DOCKER_BUILD_ARGS="$build_args"
+
+    return 0
+}
+
+# Export deploy-related variables from brik.yml.
+# Sets: BRIK_DEPLOY_ENVIRONMENTS, BRIK_DEPLOY_<ENV>_*
+config.export_deploy_vars() {
+    local env_keys
+    env_keys="$(config.get '.deploy.environments | keys | .[]' '')" 2>/dev/null || true
+    if [[ -z "$env_keys" ]]; then
+        export BRIK_DEPLOY_ENVIRONMENTS=""
+        return 0
+    fi
+
+    export BRIK_DEPLOY_ENVIRONMENTS="$env_keys"
+
+    local env_name upper_env
+    while IFS= read -r env_name; do
+        [[ -z "$env_name" ]] && continue
+        upper_env="$(printf '%s' "$env_name" | tr '[:lower:]' '[:upper:]')"
+
+        local val
+        val="$(config.get ".deploy.environments.${env_name}.target" '')"
+        [[ -n "$val" ]] && export "BRIK_DEPLOY_${upper_env}_TARGET=$val"
+
+        val="$(config.get ".deploy.environments.${env_name}.namespace" '')"
+        [[ -n "$val" ]] && export "BRIK_DEPLOY_${upper_env}_NAMESPACE=$val"
+
+        val="$(config.get ".deploy.environments.${env_name}.manifest" '')"
+        [[ -n "$val" ]] && export "BRIK_DEPLOY_${upper_env}_MANIFEST=$val"
+
+        val="$(config.get ".deploy.environments.${env_name}.when" '')"
+        [[ -n "$val" ]] && export "BRIK_DEPLOY_${upper_env}_WHEN=$val"
+
+        val="$(config.get ".deploy.environments.${env_name}.repo" '')"
+        [[ -n "$val" ]] && export "BRIK_DEPLOY_${upper_env}_REPO=$val"
+
+        val="$(config.get ".deploy.environments.${env_name}.path" '')"
+        [[ -n "$val" ]] && export "BRIK_DEPLOY_${upper_env}_PATH=$val"
+
+        val="$(config.get ".deploy.environments.${env_name}.controller" '')"
+        [[ -n "$val" ]] && export "BRIK_DEPLOY_${upper_env}_CONTROLLER=$val"
+
+        val="$(config.get ".deploy.environments.${env_name}.app_name" '')"
+        [[ -n "$val" ]] && export "BRIK_DEPLOY_${upper_env}_APP_NAME=$val"
+    done <<< "$env_keys"
+
+    return 0
+}
+
+# Export notify-related variables from brik.yml.
+# Sets: BRIK_NOTIFY_SLACK_*, BRIK_NOTIFY_EMAIL_*, BRIK_NOTIFY_WEBHOOK_*
+config.export_notify_vars() {
+    local val
+
+    val="$(config.get '.notify.slack.channel' '')"
+    [[ -n "$val" ]] && export BRIK_NOTIFY_SLACK_CHANNEL="$val"
+
+    val="$(config.get '.notify.slack.on' '')"
+    [[ -n "$val" ]] && export BRIK_NOTIFY_SLACK_ON="$val"
+
+    val="$(config.get '.notify.email.to' '')"
+    [[ -n "$val" ]] && export BRIK_NOTIFY_EMAIL_TO="$val"
+
+    val="$(config.get '.notify.email.on' '')"
+    [[ -n "$val" ]] && export BRIK_NOTIFY_EMAIL_ON="$val"
+
+    val="$(config.get '.notify.webhook.url' '')"
+    [[ -n "$val" ]] && export BRIK_NOTIFY_WEBHOOK_URL="$val"
+
+    val="$(config.get '.notify.webhook.on' '')"
+    [[ -n "$val" ]] && export BRIK_NOTIFY_WEBHOOK_ON="$val"
+
+    return 0
+}
+
+# Export hooks-related variables from brik.yml.
+# Sets: BRIK_HOOK_PRE_<STAGE>, BRIK_HOOK_POST_<STAGE>
+config.export_hooks_vars() {
+    local stage upper_stage val
+    for stage in init release build quality security test package deploy notify; do
+        upper_stage="$(printf '%s' "$stage" | tr '[:lower:]' '[:upper:]')"
+
+        val="$(config.get ".hooks.pre_${stage}" '')"
+        [[ -n "$val" ]] && export "BRIK_HOOK_PRE_${upper_stage}=$val"
+
+        val="$(config.get ".hooks.post_${stage}" '')"
+        [[ -n "$val" ]] && export "BRIK_HOOK_POST_${upper_stage}=$val"
+    done
+
+    return 0
+}
+
+# Export release-related variables from brik.yml.
+# Sets: BRIK_RELEASE_STRATEGY, BRIK_RELEASE_TAG_PREFIX
+config.export_release_vars() {
+    local strategy
+    strategy="$(config.get '.release.strategy' 'semver')"
+    export BRIK_RELEASE_STRATEGY="$strategy"
+
+    local tag_prefix
+    tag_prefix="$(config.get '.release.tag_prefix' 'v')"
+    export BRIK_RELEASE_TAG_PREFIX="$tag_prefix"
 
     return 0
 }
@@ -305,6 +498,11 @@ config.export_all() {
     config.export_test_vars
     config.export_quality_vars
     config.export_security_vars
+    config.export_package_vars
+    config.export_deploy_vars
+    config.export_notify_vars
+    config.export_hooks_vars
+    config.export_release_vars
 
     return 0
 }

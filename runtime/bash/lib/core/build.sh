@@ -61,6 +61,13 @@ build.run() {
 
     log.info "building with stack: $stack"
 
+    # If BRIK_BUILD_COMMAND is set, use it as custom command override
+    if [[ -n "${BRIK_BUILD_COMMAND:-}" ]]; then
+        log.info "using custom build command: $BRIK_BUILD_COMMAND"
+        (cd "$workspace" && eval "$BRIK_BUILD_COMMAND")
+        return $?
+    fi
+
     # Load and delegate to the stack-specific module
     brik.use "build.${stack}" || {
         log.error "unsupported build stack: $stack"

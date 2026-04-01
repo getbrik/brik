@@ -2,9 +2,10 @@
 # @module hooks
 # @description Hook system for the Brik runtime stage lifecycle.
 #
-# Hooks are resolved from:
+# Hooks are resolved from (in priority order):
 #   1. Project hooks: ${BRIK_PROJECT_DIR}/.brik/hooks/<hook_name>.sh
-#   2. Default hooks: ${BRIK_HOME}/runtime/bash/hooks/<hook_name>.sh
+#   2. brik.yml config hooks: hooks.pre_<stage> / hooks.post_<stage>
+#   3. Default hooks: ${BRIK_HOME}/runtime/bash/hooks/<hook_name>.sh
 #
 # If no hook script is found, the function is a no-op returning 0.
 
@@ -24,12 +25,42 @@ _hook._resolve() {
     local project_hook="${project_dir}/.brik/hooks/${hook_name}.sh"
     local default_hook="${BRIK_HOME}/runtime/bash/hooks/${hook_name}.sh"
 
+    # Priority 1: Project hook file
     if [[ -f "$project_hook" ]]; then
         printf '%s' "$project_hook"
         return 0
     fi
+
+    # Priority 2: brik.yml config hook (inline command)
+    local config_hook_var=""
+    case "$hook_name" in
+        pre_stage)
+            # For pre_stage, we need the stage name from the caller
+            # The stage name is passed as the second argument to _hook._run
+            ;;
+        post_stage)
+            ;;
+    esac
+
+    # Priority 3: Default hook
     if [[ -f "$default_hook" ]]; then
         printf '%s' "$default_hook"
+        return 0
+    fi
+    return 1
+}
+
+# Resolve a brik.yml inline hook for a stage.
+# Returns the inline command on stdout, or returns 1 if not found.
+_hook._resolve_config() {
+    local hook_type="$1"  # pre or post
+    local stage_name="$2"
+    local upper_stage
+    upper_stage="$(printf '%s' "$stage_name" | tr '[:lower:]' '[:upper:]')"
+    local var_name="BRIK_HOOK_${hook_type}_${upper_stage}"
+
+    if [[ -n "${!var_name:-}" ]]; then
+        printf '%s' "${!var_name}"
         return 0
     fi
     return 1
@@ -62,19 +93,39 @@ _hook._run() {
 }
 
 # Pre-stage hook. Can abort the stage (non-zero return stops execution).
+# Checks brik.yml config hooks first, then file-based hooks.
 hook.pre_stage() {
     local stage_name="$1"
     local context_file="$2"
     local log_file="$3"
+
+    # Check brik.yml inline hook
+    local inline_cmd
+    if inline_cmd="$(_hook._resolve_config "PRE" "$stage_name")"; then
+        log.debug "running brik.yml pre_${stage_name} hook: $inline_cmd"
+        eval "$inline_cmd"
+        return $?
+    fi
+
     _hook._run "pre_stage" "$stage_name" "$context_file" "$log_file"
 }
 
 # Post-stage hook. Called after success/failure hooks.
+# Checks brik.yml config hooks first, then file-based hooks.
 hook.post_stage() {
     local stage_name="$1"
     local context_file="$2"
     local log_file="$3"
     local exit_code="$4"
+
+    # Check brik.yml inline hook
+    local inline_cmd
+    if inline_cmd="$(_hook._resolve_config "POST" "$stage_name")"; then
+        log.debug "running brik.yml post_${stage_name} hook: $inline_cmd"
+        eval "$inline_cmd"
+        return $?
+    fi
+
     _hook._run "post_stage" "$stage_name" "$context_file" "$log_file" "$exit_code"
 }
 

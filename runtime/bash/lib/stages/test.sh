@@ -7,11 +7,29 @@
 stages.test() {
     local context_file="$1"
 
+    config.export_test_vars
+
     brik.use test
 
     log.info "running tests"
 
-    test.run "${BRIK_WORKSPACE}"
+    local test_args=("${BRIK_WORKSPACE}")
+
+    if [[ -n "${BRIK_TEST_FRAMEWORK:-}" ]]; then
+        test_args+=(--framework "$BRIK_TEST_FRAMEWORK")
+    fi
+
+    if [[ -n "${BRIK_TEST_COMMAND_UNIT:-}" ]]; then
+        log.info "unit test command: $BRIK_TEST_COMMAND_UNIT"
+    fi
+    if [[ -n "${BRIK_TEST_COMMAND_INTEGRATION:-}" ]]; then
+        log.info "integration test command: $BRIK_TEST_COMMAND_INTEGRATION"
+    fi
+    if [[ -n "${BRIK_TEST_COMMAND_E2E:-}" ]]; then
+        log.info "e2e test command: $BRIK_TEST_COMMAND_E2E"
+    fi
+
+    test.run "${test_args[@]}"
     local result=$?
 
     if [[ $result -eq 0 ]]; then

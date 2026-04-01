@@ -51,4 +51,53 @@ Describe "stages.release"
     When call run_release_check
     The output should equal "has_version"
   End
+
+  It "exports BRIK_RELEASE_STRATEGY from config"
+    run_release_strategy() {
+      local ctx
+      ctx="$(context.create "release")" 2>/dev/null || ctx="$(mktemp)"
+      stages.release "$ctx" >/dev/null 2>&1
+      printf '%s' "${BRIK_RELEASE_STRATEGY:-}"
+    }
+    When call run_release_strategy
+    The output should equal "semver"
+  End
+
+  It "exports BRIK_RELEASE_TAG_PREFIX from config"
+    run_release_prefix() {
+      local ctx
+      ctx="$(context.create "release")" 2>/dev/null || ctx="$(mktemp)"
+      stages.release "$ctx" >/dev/null 2>&1
+      printf '%s' "${BRIK_RELEASE_TAG_PREFIX:-}"
+    }
+    When call run_release_prefix
+    The output should equal "v"
+  End
+
+  Describe "with custom release config"
+    setup_release() {
+      cat > "$BRIK_CONFIG_FILE" <<'YAML'
+version: 1
+project:
+  name: test
+  stack: node
+release:
+  strategy: calver
+  tag_prefix: release-
+YAML
+      config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
+    }
+    Before 'setup_release'
+
+    It "uses custom strategy and prefix"
+      run_release_custom() {
+        local ctx
+        ctx="$(context.create "release")" 2>/dev/null || ctx="$(mktemp)"
+        stages.release "$ctx"
+      }
+      When call run_release_custom
+      The error should include "release strategy: calver"
+      The error should include "tag prefix: release-"
+    End
+  End
 End

@@ -204,7 +204,7 @@ Describe "stage-wrapper.sh"
     setup_stage_env() {
       export BRIK_CONFIG_FILE
       BRIK_CONFIG_FILE="$(mktemp)"
-      printf 'version: 1\nproject:\n  name: test-project\n  stack: node\n' > "$BRIK_CONFIG_FILE"
+      printf "version: 1\nproject:\n  name: test-project\n  stack: node\nquality:\n  enabled: 'false'\n" > "$BRIK_CONFIG_FILE"
       export BRIK_LOG_DIR
       BRIK_LOG_DIR="$(mktemp -d)"
       export BRIK_WORKSPACE
@@ -292,9 +292,9 @@ Describe "stage-wrapper.sh"
       The error should be present
     End
 
-    # --- Quality stub: verify side effects ---
+    # --- Quality stage: verify side effects ---
 
-    It "runs quality stub and writes BRIK_QUALITY_STATUS=skipped to context"
+    It "runs quality stage and writes BRIK_QUALITY_STATUS=skipped to context"
       run_quality_check_context() {
         brik.gitlab.run_stage "quality" >/dev/null 2>&1
         local context_file
@@ -309,16 +309,16 @@ Describe "stage-wrapper.sh"
       The output should equal "skipped"
     End
 
-    It "runs quality stub and logs M3 stub warning"
+    It "runs quality stage and logs disabled message"
       When call brik.gitlab.run_stage "quality"
       The status should be success
-      The output should include "stub"
+      The output should include "quality"
       The error should be present
     End
 
-    # --- Security stub: verify side effects ---
+    # --- Security stage: verify side effects ---
 
-    It "runs security stub and writes BRIK_SECURITY_STATUS=skipped to context"
+    It "runs security stage and writes BRIK_SECURITY_STATUS=skipped to context"
       run_security_check_context() {
         brik.gitlab.run_stage "security" >/dev/null 2>&1
         local context_file
@@ -333,10 +333,10 @@ Describe "stage-wrapper.sh"
       The output should equal "skipped"
     End
 
-    It "runs security stub and logs M3 stub warning"
+    It "runs security stage and logs disabled message"
       When call brik.gitlab.run_stage "security"
       The status should be success
-      The output should include "stub"
+      The output should include "security"
       The error should be present
     End
 

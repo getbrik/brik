@@ -47,6 +47,27 @@ HOOKEOF
         The status should equal 2
       End
     End
+
+    Describe "with brik.yml inline pre hook"
+      setup_config_hook() {
+        HOOK_DIR="$(mktemp -d)"
+        export BRIK_PROJECT_DIR="$HOOK_DIR"
+        export BRIK_HOME="/nonexistent"
+        export BRIK_HOOK_PRE_BUILD="printf 'config_pre_hook_called\n'"
+      }
+      cleanup_config_hook() {
+        rm -rf "$HOOK_DIR"
+        unset BRIK_HOOK_PRE_BUILD 2>/dev/null || true
+      }
+      Before 'setup_config_hook'
+      After 'cleanup_config_hook'
+
+      It "executes the brik.yml inline hook"
+        When call hook.pre_stage "build" "/tmp/ctx" "/tmp/log"
+        The status should be success
+        The output should equal "config_pre_hook_called"
+      End
+    End
   End
 
   Describe "hook.on_success"
@@ -216,6 +237,55 @@ HOOKEOF
         When call verify_post_args
         The status should be success
       End
+    End
+
+    Describe "with brik.yml inline post hook"
+      setup_config_post_hook() {
+        HOOK_DIR="$(mktemp -d)"
+        export BRIK_PROJECT_DIR="$HOOK_DIR"
+        export BRIK_HOME="/nonexistent"
+        export BRIK_HOOK_POST_BUILD="printf 'config_post_hook_called\n'"
+      }
+      cleanup_config_post_hook() {
+        rm -rf "$HOOK_DIR"
+        unset BRIK_HOOK_POST_BUILD 2>/dev/null || true
+      }
+      Before 'setup_config_post_hook'
+      After 'cleanup_config_post_hook'
+
+      It "executes the brik.yml inline post hook"
+        When call hook.post_stage "build" "/tmp/ctx" "/tmp/log" "0"
+        The status should be success
+        The output should equal "config_post_hook_called"
+      End
+    End
+  End
+
+  Describe "_hook._resolve_config"
+    Describe "with config hook set"
+      setup_config_resolve() {
+        export BRIK_HOOK_PRE_TEST="echo pre-test"
+      }
+      cleanup_config_resolve() {
+        unset BRIK_HOOK_PRE_TEST 2>/dev/null || true
+      }
+      Before 'setup_config_resolve'
+      After 'cleanup_config_resolve'
+
+      It "returns inline command for pre hook"
+        When call _hook._resolve_config "PRE" "test"
+        The status should be success
+        The output should equal "echo pre-test"
+      End
+    End
+
+    It "returns 1 when no config hook set"
+      resolve_missing() {
+        unset BRIK_HOOK_PRE_NONEXISTENT 2>/dev/null || true
+        _hook._resolve_config "PRE" "nonexistent"
+      }
+      When call resolve_missing
+      The status should equal 1
     End
   End
 End

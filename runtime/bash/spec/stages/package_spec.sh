@@ -14,11 +14,13 @@ Describe "stages.package"
     BRIK_WORKSPACE="$(mktemp -d)"
     export BRIK_PROJECT_DIR="$BRIK_WORKSPACE"
     export BRIK_PLATFORM="gitlab"
+    export BRIK_VERSION="1.0.0"
     config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
   }
   cleanup_env() {
     rm -f "$BRIK_CONFIG_FILE"
     rm -rf "$BRIK_LOG_DIR" "$BRIK_WORKSPACE"
+    unset BRIK_PACKAGE_DOCKER_IMAGE BRIK_VERSION 2>/dev/null || true
   }
   Before 'setup_env'
   After 'cleanup_env'
@@ -29,24 +31,98 @@ Describe "stages.package"
     The status should be success
   End
 
-  It "returns 0 (stub)"
-    run_package() {
-      local ctx
-      ctx="$(context.create "package")" 2>/dev/null || ctx="$(mktemp)"
-      stages.package "$ctx" >/dev/null 2>&1
-    }
-    When call run_package
-    The status should be success
-  End
-
-  It "sets BRIK_PACKAGE_STATUS to skipped"
-    run_package_check() {
+  It "sets BRIK_PACKAGE_STATUS to skipped when no docker image configured"
+    run_package_skip() {
+      brik.use() { :; }
       local ctx
       ctx="$(context.create "package")" 2>/dev/null || ctx="$(mktemp)"
       stages.package "$ctx" >/dev/null 2>&1
       grep "^BRIK_PACKAGE_STATUS=" "$ctx" | cut -d= -f2
     }
-    When call run_package_check
+    When call run_package_skip
     The output should equal "skipped"
+  End
+
+  Describe "with docker config"
+    setup_docker() {
+      cat > "$BRIK_CONFIG_FILE" <<'YAML'
+version: 1
+project:
+  name: test
+  stack: node
+package:
+  docker:
+    image: registry.example.com/myapp
+    dockerfile: Dockerfile.prod
+    context: .
+    build_args: NODE_ENV=production
+YAML
+      config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
+    }
+    Before 'setup_docker'
+
+    It "returns 0 when build.docker.run succeeds"
+      run_package_success() {
+        brik.use() { :; }
+        build.docker.run() { return 0; }
+        local ctx
+        ctx="$(context.create "package")" 2>/dev/null || ctx="$(mktemp)"
+        stages.package "$ctx" >/dev/null 2>&1
+      }
+      When call run_package_success
+      The status should be success
+    End
+
+    It "sets BRIK_PACKAGE_STATUS to success"
+      run_package_ctx() {
+        brik.use() { :; }
+        build.docker.run() { return 0; }
+        local ctx
+        ctx="$(context.create "package")" 2>/dev/null || ctx="$(mktemp)"
+        stages.package "$ctx" >/dev/null 2>&1
+        grep "^BRIK_PACKAGE_STATUS=" "$ctx" | cut -d= -f2
+      }
+      When call run_package_ctx
+      The output should equal "success"
+    End
+
+    It "sets BRIK_PACKAGE_STATUS to failed when build fails"
+      run_package_fail() {
+        brik.use() { :; }
+        build.docker.run() { return 1; }
+        local ctx
+        ctx="$(context.create "package")" 2>/dev/null || ctx="$(mktemp)"
+        stages.package "$ctx" >/dev/null 2>&1 || true
+        grep "^BRIK_PACKAGE_STATUS=" "$ctx" | cut -d= -f2
+      }
+      When call run_package_fail
+      The output should equal "failed"
+    End
+
+    It "passes docker arguments to build.docker.run"
+      run_package_args() {
+        brik.use() { :; }
+        build.docker.run() { printf '%s ' "$@"; printf '\n'; return 0; }
+        local ctx
+        ctx="$(context.create "package")" 2>/dev/null || ctx="$(mktemp)"
+        stages.package "$ctx" 2>/dev/null
+      }
+      When call run_package_args
+      The output should include "--file Dockerfile.prod"
+      The output should include "--tag registry.example.com/myapp:1.0.0"
+      The output should include "--build-arg NODE_ENV=production"
+    End
+
+    It "logs docker image name"
+      run_package_log() {
+        brik.use() { :; }
+        build.docker.run() { return 0; }
+        local ctx
+        ctx="$(context.create "package")" 2>/dev/null || ctx="$(mktemp)"
+        stages.package "$ctx"
+      }
+      When call run_package_log
+      The error should include "building image: registry.example.com/myapp:1.0.0"
+    End
   End
 End

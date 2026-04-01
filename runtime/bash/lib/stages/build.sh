@@ -7,19 +7,29 @@
 stages.build() {
     local context_file="$1"
 
+    config.export_build_vars
+
     brik.use build
 
-    local stack
-    stack="$(config.get '.project.stack' 'auto')"
+    local stack="${BRIK_BUILD_STACK:-auto}"
 
     # Load stack-specific module
     case "$stack" in
-        node)  brik.use build.node ;;
+        node)   brik.use build.node ;;
+        java)   brik.use build.java ;;
+        python) brik.use build.python ;;
+        dotnet) brik.use build.dotnet ;;
+        rust)   brik.use build.rust ;;
     esac
 
     log.info "running build (stack=$stack)"
 
-    build.run "${BRIK_WORKSPACE}" --stack "$stack" --config "${BRIK_CONFIG_FILE}"
+    # If BRIK_BUILD_COMMAND is set, use it as override
+    if [[ -n "${BRIK_BUILD_COMMAND:-}" ]]; then
+        build.run "${BRIK_WORKSPACE}" --stack "$stack" --config "${BRIK_CONFIG_FILE}"
+    else
+        build.run "${BRIK_WORKSPACE}" --stack "$stack" --config "${BRIK_CONFIG_FILE}"
+    fi
     local result=$?
 
     if [[ $result -eq 0 ]]; then

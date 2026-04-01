@@ -78,4 +78,47 @@ Describe "stages.test"
     When call run_test_ctx_failure
     The output should equal "failed"
   End
+
+  It "exports BRIK_TEST_FRAMEWORK from config"
+    run_test_framework() {
+      brik.use() { :; }
+      test.run() { return 0; }
+      local ctx
+      ctx="$(context.create "test")" 2>/dev/null || ctx="$(mktemp)"
+      stages.test "$ctx" >/dev/null 2>&1
+      printf '%s' "${BRIK_TEST_FRAMEWORK:-}"
+    }
+    When call run_test_framework
+    The output should equal "jest"
+  End
+
+  Describe "with test commands configured"
+    setup_test_cmds() {
+      cat > "$BRIK_CONFIG_FILE" <<'YAML'
+version: 1
+project:
+  name: test
+  stack: node
+test:
+  framework: jest
+  commands:
+    unit: npm test -- --unit
+    integration: npm test -- --integration
+YAML
+      config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
+    }
+    Before 'setup_test_cmds'
+
+    It "logs unit test command"
+      run_test_log_unit() {
+        brik.use() { :; }
+        test.run() { return 0; }
+        local ctx
+        ctx="$(context.create "test")" 2>/dev/null || ctx="$(mktemp)"
+        stages.test "$ctx"
+      }
+      When call run_test_log_unit
+      The error should include "unit test command"
+    End
+  End
 End

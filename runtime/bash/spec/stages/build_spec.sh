@@ -90,4 +90,44 @@ Describe "stages.build"
     When call run_build_log_stack
     The error should include "running build (stack=node)"
   End
+
+  It "calls config.export_build_vars to export BRIK_BUILD_STACK"
+    run_build_check_export() {
+      brik.use() { :; }
+      build.run() { return 0; }
+      local ctx
+      ctx="$(context.create "build")" 2>/dev/null || ctx="$(mktemp)"
+      stages.build "$ctx" >/dev/null 2>&1
+      printf '%s' "${BRIK_BUILD_STACK:-}"
+    }
+    When call run_build_check_export
+    The output should equal "node"
+  End
+
+  Describe "with java stack"
+    setup_java() {
+      cat > "$BRIK_CONFIG_FILE" <<'YAML'
+version: 1
+project:
+  name: test
+  stack: java
+YAML
+      config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
+    }
+    Before 'setup_java'
+
+    It "loads java stack module"
+      run_build_java() {
+        local loaded_modules=""
+        brik.use() { loaded_modules="${loaded_modules} $1"; }
+        build.run() { return 0; }
+        local ctx
+        ctx="$(context.create "build")" 2>/dev/null || ctx="$(mktemp)"
+        stages.build "$ctx" >/dev/null 2>&1
+        printf '%s' "$loaded_modules"
+      }
+      When call run_build_java
+      The output should include "build.java"
+    End
+  End
 End

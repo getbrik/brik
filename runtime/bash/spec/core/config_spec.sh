@@ -95,10 +95,10 @@ project:
   stack: node
 build:
   command: npm run build
-test:
-  coverage_threshold: 90
 quality:
   enabled: true
+  coverage:
+    threshold: 90
   lint:
     tool: eslint
   format:
@@ -124,7 +124,7 @@ YAML
     End
 
     It "reads a numeric value as string"
-      When call config.get '.test.coverage_threshold'
+      When call config.get '.quality.coverage.threshold'
       The output should equal "90"
     End
 
@@ -581,7 +581,10 @@ project:
   stack: node
 test:
   framework: jest
-  coverage_threshold: 90
+  commands:
+    unit: npm test -- --unit
+    integration: npm test -- --integration
+    e2e: npm run e2e
 YAML
         export BRIK_CONFIG_FILE="$TEMP_CONFIG"
       }
@@ -598,13 +601,31 @@ YAML
         The output should equal "jest"
       End
 
-      It "exports BRIK_TEST_COVERAGE_THRESHOLD"
+      It "exports BRIK_TEST_COMMAND_UNIT"
         export_and_check() {
           config.export_test_vars
-          printf '%s' "$BRIK_TEST_COVERAGE_THRESHOLD"
+          printf '%s' "${BRIK_TEST_COMMAND_UNIT:-}"
         }
         When call export_and_check
-        The output should equal "90"
+        The output should equal "npm test -- --unit"
+      End
+
+      It "exports BRIK_TEST_COMMAND_INTEGRATION"
+        export_and_check() {
+          config.export_test_vars
+          printf '%s' "${BRIK_TEST_COMMAND_INTEGRATION:-}"
+        }
+        When call export_and_check
+        The output should equal "npm test -- --integration"
+      End
+
+      It "exports BRIK_TEST_COMMAND_E2E"
+        export_and_check() {
+          config.export_test_vars
+          printf '%s' "${BRIK_TEST_COMMAND_E2E:-}"
+        }
+        When call export_and_check
+        The output should equal "npm run e2e"
       End
     End
 
@@ -630,15 +651,6 @@ YAML
         }
         When call export_and_check
         The output should equal "pytest"
-      End
-
-      It "defaults coverage_threshold to 80"
-        export_and_check() {
-          config.export_test_vars
-          printf '%s' "$BRIK_TEST_COVERAGE_THRESHOLD"
-        }
-        When call export_and_check
-        The output should equal "80"
       End
     End
   End
@@ -795,6 +807,483 @@ YAML
         }
         When call export_and_check
         The output should equal "high"
+      End
+    End
+  End
+
+  # =========================================================================
+  # config.export_build_vars - dotnet/rust versions
+  # =========================================================================
+  Describe "config.export_build_vars dotnet/rust versions"
+    setup_config() {
+      TEMP_CONFIG="$(mktemp)"
+      cat > "$TEMP_CONFIG" <<'YAML'
+version: 1
+project:
+  name: test
+  stack: dotnet
+build:
+  dotnet_version: "8.0"
+  rust_version: "1.75"
+YAML
+      export BRIK_CONFIG_FILE="$TEMP_CONFIG"
+    }
+    cleanup_config() { rm -f "$TEMP_CONFIG"; }
+    Before 'setup_config'
+    After 'cleanup_config'
+
+    It "exports BRIK_BUILD_DOTNET_VERSION"
+      export_and_check() {
+        config.export_build_vars
+        printf '%s' "${BRIK_BUILD_DOTNET_VERSION:-}"
+      }
+      When call export_and_check
+      The output should equal "8.0"
+    End
+
+    It "exports BRIK_BUILD_RUST_VERSION"
+      export_and_check() {
+        config.export_build_vars
+        printf '%s' "${BRIK_BUILD_RUST_VERSION:-}"
+      }
+      When call export_and_check
+      The output should equal "1.75"
+    End
+  End
+
+  # =========================================================================
+  # config.export_quality_vars - extended fields
+  # =========================================================================
+  Describe "config.export_quality_vars extended fields"
+    setup_config() {
+      TEMP_CONFIG="$(mktemp)"
+      cat > "$TEMP_CONFIG" <<'YAML'
+version: 1
+project:
+  name: test
+  stack: node
+quality:
+  enabled: true
+  lint:
+    tool: eslint
+    config: .eslintrc.json
+    fix: "true"
+  sast:
+    tool: semgrep
+    ruleset: p/security-audit
+  deps:
+    tool: npm-audit
+    severity: high
+  coverage:
+    threshold: 85
+    report: lcov
+  license:
+    allowed: MIT,Apache-2.0
+    denied: GPL-3.0
+  container:
+    image: myapp:latest
+    severity: critical
+YAML
+      export BRIK_CONFIG_FILE="$TEMP_CONFIG"
+    }
+    cleanup_config() { rm -f "$TEMP_CONFIG"; }
+    Before 'setup_config'
+    After 'cleanup_config'
+
+    It "exports BRIK_QUALITY_LINT_CONFIG"
+      export_and_check() { config.export_quality_vars; printf '%s' "${BRIK_QUALITY_LINT_CONFIG:-}"; }
+      When call export_and_check
+      The output should equal ".eslintrc.json"
+    End
+
+    It "exports BRIK_QUALITY_LINT_FIX"
+      export_and_check() { config.export_quality_vars; printf '%s' "${BRIK_QUALITY_LINT_FIX:-}"; }
+      When call export_and_check
+      The output should equal "true"
+    End
+
+    It "exports BRIK_QUALITY_SAST_TOOL"
+      export_and_check() { config.export_quality_vars; printf '%s' "${BRIK_QUALITY_SAST_TOOL:-}"; }
+      When call export_and_check
+      The output should equal "semgrep"
+    End
+
+    It "exports BRIK_QUALITY_SAST_RULESET"
+      export_and_check() { config.export_quality_vars; printf '%s' "${BRIK_QUALITY_SAST_RULESET:-}"; }
+      When call export_and_check
+      The output should equal "p/security-audit"
+    End
+
+    It "exports BRIK_QUALITY_DEPS_TOOL"
+      export_and_check() { config.export_quality_vars; printf '%s' "${BRIK_QUALITY_DEPS_TOOL:-}"; }
+      When call export_and_check
+      The output should equal "npm-audit"
+    End
+
+    It "exports BRIK_QUALITY_DEPS_SEVERITY"
+      export_and_check() { config.export_quality_vars; printf '%s' "${BRIK_QUALITY_DEPS_SEVERITY:-}"; }
+      When call export_and_check
+      The output should equal "high"
+    End
+
+    It "exports BRIK_QUALITY_COVERAGE_THRESHOLD"
+      export_and_check() { config.export_quality_vars; printf '%s' "${BRIK_QUALITY_COVERAGE_THRESHOLD:-}"; }
+      When call export_and_check
+      The output should equal "85"
+    End
+
+    It "exports BRIK_QUALITY_COVERAGE_REPORT"
+      export_and_check() { config.export_quality_vars; printf '%s' "${BRIK_QUALITY_COVERAGE_REPORT:-}"; }
+      When call export_and_check
+      The output should equal "lcov"
+    End
+
+    It "exports BRIK_QUALITY_LICENSE_ALLOWED"
+      export_and_check() { config.export_quality_vars; printf '%s' "${BRIK_QUALITY_LICENSE_ALLOWED:-}"; }
+      When call export_and_check
+      The output should equal "MIT,Apache-2.0"
+    End
+
+    It "exports BRIK_QUALITY_LICENSE_DENIED"
+      export_and_check() { config.export_quality_vars; printf '%s' "${BRIK_QUALITY_LICENSE_DENIED:-}"; }
+      When call export_and_check
+      The output should equal "GPL-3.0"
+    End
+
+    It "exports BRIK_QUALITY_CONTAINER_IMAGE"
+      export_and_check() { config.export_quality_vars; printf '%s' "${BRIK_QUALITY_CONTAINER_IMAGE:-}"; }
+      When call export_and_check
+      The output should equal "myapp:latest"
+    End
+
+    It "exports BRIK_QUALITY_CONTAINER_SEVERITY"
+      export_and_check() { config.export_quality_vars; printf '%s' "${BRIK_QUALITY_CONTAINER_SEVERITY:-}"; }
+      When call export_and_check
+      The output should equal "critical"
+    End
+  End
+
+  # =========================================================================
+  # config.export_security_vars - scan flags
+  # =========================================================================
+  Describe "config.export_security_vars scan flags"
+    setup_config() {
+      TEMP_CONFIG="$(mktemp)"
+      cat > "$TEMP_CONFIG" <<'YAML'
+version: 1
+security:
+  enabled: true
+  dependency_scan: "true"
+  secret_scan: "true"
+  container_scan: "false"
+YAML
+      export BRIK_CONFIG_FILE="$TEMP_CONFIG"
+    }
+    cleanup_config() { rm -f "$TEMP_CONFIG"; }
+    Before 'setup_config'
+    After 'cleanup_config'
+
+    It "exports BRIK_SECURITY_DEPENDENCY_SCAN"
+      export_and_check() { config.export_security_vars; printf '%s' "${BRIK_SECURITY_DEPENDENCY_SCAN:-}"; }
+      When call export_and_check
+      The output should equal "true"
+    End
+
+    It "exports BRIK_SECURITY_SECRET_SCAN"
+      export_and_check() { config.export_security_vars; printf '%s' "${BRIK_SECURITY_SECRET_SCAN:-}"; }
+      When call export_and_check
+      The output should equal "true"
+    End
+
+    It "exports BRIK_SECURITY_CONTAINER_SCAN"
+      export_and_check() { config.export_security_vars; printf '%s' "${BRIK_SECURITY_CONTAINER_SCAN:-}"; }
+      When call export_and_check
+      The output should equal "false"
+    End
+  End
+
+  # =========================================================================
+  # config.export_package_vars
+  # =========================================================================
+  Describe "config.export_package_vars"
+    setup_config() {
+      TEMP_CONFIG="$(mktemp)"
+      cat > "$TEMP_CONFIG" <<'YAML'
+version: 1
+package:
+  docker:
+    image: registry.example.com/myapp
+    dockerfile: Dockerfile.prod
+    context: .
+    platforms: linux/amd64,linux/arm64
+    build_args: NODE_ENV=production
+YAML
+      export BRIK_CONFIG_FILE="$TEMP_CONFIG"
+    }
+    cleanup_config() { rm -f "$TEMP_CONFIG"; }
+    Before 'setup_config'
+    After 'cleanup_config'
+
+    It "exports BRIK_PACKAGE_DOCKER_IMAGE"
+      export_and_check() { config.export_package_vars; printf '%s' "${BRIK_PACKAGE_DOCKER_IMAGE:-}"; }
+      When call export_and_check
+      The output should equal "registry.example.com/myapp"
+    End
+
+    It "exports BRIK_PACKAGE_DOCKER_DOCKERFILE"
+      export_and_check() { config.export_package_vars; printf '%s' "${BRIK_PACKAGE_DOCKER_DOCKERFILE:-}"; }
+      When call export_and_check
+      The output should equal "Dockerfile.prod"
+    End
+
+    It "exports BRIK_PACKAGE_DOCKER_CONTEXT"
+      export_and_check() { config.export_package_vars; printf '%s' "${BRIK_PACKAGE_DOCKER_CONTEXT:-}"; }
+      When call export_and_check
+      The output should equal "."
+    End
+
+    It "exports BRIK_PACKAGE_DOCKER_PLATFORMS"
+      export_and_check() { config.export_package_vars; printf '%s' "${BRIK_PACKAGE_DOCKER_PLATFORMS:-}"; }
+      When call export_and_check
+      The output should equal "linux/amd64,linux/arm64"
+    End
+
+    It "exports BRIK_PACKAGE_DOCKER_BUILD_ARGS"
+      export_and_check() { config.export_package_vars; printf '%s' "${BRIK_PACKAGE_DOCKER_BUILD_ARGS:-}"; }
+      When call export_and_check
+      The output should equal "NODE_ENV=production"
+    End
+
+    Describe "when package section absent"
+      setup_empty() {
+        TEMP_CONFIG="$(mktemp)"
+        printf 'version: 1\n' > "$TEMP_CONFIG"
+        export BRIK_CONFIG_FILE="$TEMP_CONFIG"
+      }
+      cleanup_empty() { rm -f "$TEMP_CONFIG"; }
+      Before 'setup_empty'
+      After 'cleanup_empty'
+
+      It "succeeds with no exports"
+        export_and_check() {
+          unset BRIK_PACKAGE_DOCKER_IMAGE 2>/dev/null || true
+          config.export_package_vars
+          printf '%s' "${BRIK_PACKAGE_DOCKER_IMAGE:-empty}"
+        }
+        When call export_and_check
+        The output should equal "empty"
+      End
+    End
+  End
+
+  # =========================================================================
+  # config.export_deploy_vars
+  # =========================================================================
+  Describe "config.export_deploy_vars"
+    setup_config() {
+      TEMP_CONFIG="$(mktemp)"
+      cat > "$TEMP_CONFIG" <<'YAML'
+version: 1
+deploy:
+  environments:
+    staging:
+      target: kubernetes
+      namespace: staging-ns
+      when: "branch == 'main'"
+    production:
+      target: kubernetes
+      namespace: prod-ns
+      manifest: k8s/production.yml
+YAML
+      export BRIK_CONFIG_FILE="$TEMP_CONFIG"
+    }
+    cleanup_config() { rm -f "$TEMP_CONFIG"; }
+    Before 'setup_config'
+    After 'cleanup_config'
+
+    It "exports BRIK_DEPLOY_ENVIRONMENTS"
+      export_and_check() { config.export_deploy_vars; printf '%s' "${BRIK_DEPLOY_ENVIRONMENTS:-}"; }
+      When call export_and_check
+      The output should include "staging"
+      The output should include "production"
+    End
+
+    It "exports BRIK_DEPLOY_STAGING_TARGET"
+      export_and_check() { config.export_deploy_vars; printf '%s' "${BRIK_DEPLOY_STAGING_TARGET:-}"; }
+      When call export_and_check
+      The output should equal "kubernetes"
+    End
+
+    It "exports BRIK_DEPLOY_STAGING_NAMESPACE"
+      export_and_check() { config.export_deploy_vars; printf '%s' "${BRIK_DEPLOY_STAGING_NAMESPACE:-}"; }
+      When call export_and_check
+      The output should equal "staging-ns"
+    End
+
+    It "exports BRIK_DEPLOY_PRODUCTION_MANIFEST"
+      export_and_check() { config.export_deploy_vars; printf '%s' "${BRIK_DEPLOY_PRODUCTION_MANIFEST:-}"; }
+      When call export_and_check
+      The output should equal "k8s/production.yml"
+    End
+
+    Describe "when deploy section absent"
+      setup_empty() {
+        TEMP_CONFIG="$(mktemp)"
+        printf 'version: 1\n' > "$TEMP_CONFIG"
+        export BRIK_CONFIG_FILE="$TEMP_CONFIG"
+      }
+      cleanup_empty() { rm -f "$TEMP_CONFIG"; }
+      Before 'setup_empty'
+      After 'cleanup_empty'
+
+      It "exports empty BRIK_DEPLOY_ENVIRONMENTS"
+        export_and_check() { config.export_deploy_vars; printf '%s' "${BRIK_DEPLOY_ENVIRONMENTS}"; }
+        When call export_and_check
+        The output should equal ""
+      End
+    End
+  End
+
+  # =========================================================================
+  # config.export_notify_vars
+  # =========================================================================
+  Describe "config.export_notify_vars"
+    setup_config() {
+      TEMP_CONFIG="$(mktemp)"
+      cat > "$TEMP_CONFIG" <<'YAML'
+version: 1
+notify:
+  slack:
+    channel: "#builds"
+    on: failure
+  email:
+    to: team@example.com
+    on: always
+  webhook:
+    url: https://hooks.example.com/notify
+    on: success
+YAML
+      export BRIK_CONFIG_FILE="$TEMP_CONFIG"
+    }
+    cleanup_config() { rm -f "$TEMP_CONFIG"; }
+    Before 'setup_config'
+    After 'cleanup_config'
+
+    It "exports BRIK_NOTIFY_SLACK_CHANNEL"
+      export_and_check() { config.export_notify_vars; printf '%s' "${BRIK_NOTIFY_SLACK_CHANNEL:-}"; }
+      When call export_and_check
+      The output should equal "#builds"
+    End
+
+    It "exports BRIK_NOTIFY_SLACK_ON"
+      export_and_check() { config.export_notify_vars; printf '%s' "${BRIK_NOTIFY_SLACK_ON:-}"; }
+      When call export_and_check
+      The output should equal "failure"
+    End
+
+    It "exports BRIK_NOTIFY_EMAIL_TO"
+      export_and_check() { config.export_notify_vars; printf '%s' "${BRIK_NOTIFY_EMAIL_TO:-}"; }
+      When call export_and_check
+      The output should equal "team@example.com"
+    End
+
+    It "exports BRIK_NOTIFY_WEBHOOK_URL"
+      export_and_check() { config.export_notify_vars; printf '%s' "${BRIK_NOTIFY_WEBHOOK_URL:-}"; }
+      When call export_and_check
+      The output should equal "https://hooks.example.com/notify"
+    End
+  End
+
+  # =========================================================================
+  # config.export_hooks_vars
+  # =========================================================================
+  Describe "config.export_hooks_vars"
+    setup_config() {
+      TEMP_CONFIG="$(mktemp)"
+      cat > "$TEMP_CONFIG" <<'YAML'
+version: 1
+hooks:
+  pre_build: echo pre-build
+  post_build: echo post-build
+  pre_test: echo pre-test
+YAML
+      export BRIK_CONFIG_FILE="$TEMP_CONFIG"
+    }
+    cleanup_config() { rm -f "$TEMP_CONFIG"; }
+    Before 'setup_config'
+    After 'cleanup_config'
+
+    It "exports BRIK_HOOK_PRE_BUILD"
+      export_and_check() { config.export_hooks_vars; printf '%s' "${BRIK_HOOK_PRE_BUILD:-}"; }
+      When call export_and_check
+      The output should equal "echo pre-build"
+    End
+
+    It "exports BRIK_HOOK_POST_BUILD"
+      export_and_check() { config.export_hooks_vars; printf '%s' "${BRIK_HOOK_POST_BUILD:-}"; }
+      When call export_and_check
+      The output should equal "echo post-build"
+    End
+
+    It "exports BRIK_HOOK_PRE_TEST"
+      export_and_check() { config.export_hooks_vars; printf '%s' "${BRIK_HOOK_PRE_TEST:-}"; }
+      When call export_and_check
+      The output should equal "echo pre-test"
+    End
+  End
+
+  # =========================================================================
+  # config.export_release_vars
+  # =========================================================================
+  Describe "config.export_release_vars"
+    Describe "with explicit values"
+      setup_config() {
+        TEMP_CONFIG="$(mktemp)"
+        cat > "$TEMP_CONFIG" <<'YAML'
+version: 1
+release:
+  strategy: calver
+  tag_prefix: release-
+YAML
+        export BRIK_CONFIG_FILE="$TEMP_CONFIG"
+      }
+      cleanup_config() { rm -f "$TEMP_CONFIG"; }
+      Before 'setup_config'
+      After 'cleanup_config'
+
+      It "exports BRIK_RELEASE_STRATEGY"
+        export_and_check() { config.export_release_vars; printf '%s' "${BRIK_RELEASE_STRATEGY:-}"; }
+        When call export_and_check
+        The output should equal "calver"
+      End
+
+      It "exports BRIK_RELEASE_TAG_PREFIX"
+        export_and_check() { config.export_release_vars; printf '%s' "${BRIK_RELEASE_TAG_PREFIX:-}"; }
+        When call export_and_check
+        The output should equal "release-"
+      End
+    End
+
+    Describe "defaults when release section absent"
+      setup_config() {
+        TEMP_CONFIG="$(mktemp)"
+        printf 'version: 1\n' > "$TEMP_CONFIG"
+        export BRIK_CONFIG_FILE="$TEMP_CONFIG"
+      }
+      cleanup_config() { rm -f "$TEMP_CONFIG"; }
+      Before 'setup_config'
+      After 'cleanup_config'
+
+      It "defaults BRIK_RELEASE_STRATEGY to semver"
+        export_and_check() { config.export_release_vars; printf '%s' "${BRIK_RELEASE_STRATEGY:-}"; }
+        When call export_and_check
+        The output should equal "semver"
+      End
+
+      It "defaults BRIK_RELEASE_TAG_PREFIX to v"
+        export_and_check() { config.export_release_vars; printf '%s' "${BRIK_RELEASE_TAG_PREFIX:-}"; }
+        When call export_and_check
+        The output should equal "v"
       End
     End
   End
