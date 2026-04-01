@@ -38,6 +38,10 @@
         }
       }
     },
+    "release": {
+      "description": "Release stage configuration. Absent means semver strategy with 'v' prefix.",
+      "$ref": "#/$defs/release"
+    },
     "build": {
       "description": "Build stage configuration. Absent means use stack defaults (e.g. npm run build for node, mvn package for java).",
       "$ref": "#/$defs/build"
@@ -67,11 +71,28 @@
       "$ref": "#/$defs/notify"
     },
     "hooks": {
-      "description": "Pre and post stage hook scripts. Each hook receives the pipeline context and runs as a shell command.",
+      "description": "Inline pre and post stage hook commands. Evaluated by the shared library (Layer 2). File-based hooks (.brik/hooks/pre-build.sh) are handled separately by the Bash Runtime (Layer 0).",
       "$ref": "#/$defs/hooks"
     }
   },
   "$defs": {
+    "release": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "strategy": {
+          "description": "Release strategy. Default is semver.",
+          "type": "string",
+          "enum": ["semver", "calver", "custom"],
+          "default": "semver"
+        },
+        "tag_prefix": {
+          "description": "Prefix for release tags (e.g. 'v'). Default is 'v'.",
+          "type": "string",
+          "default": "v"
+        }
+      }
+    },
     "build": {
       "type": "object",
       "additionalProperties": false,
@@ -117,13 +138,6 @@
           "type": "string",
           "minLength": 1
         },
-        "coverage_threshold": {
-          "description": "Minimum code coverage percentage required to pass the test stage. Default is 0 (no minimum enforced).",
-          "type": "integer",
-          "minimum": 0,
-          "maximum": 100,
-          "default": 0
-        },
         "commands": {
           "description": "Explicit test commands per test type. When present, these override the framework-derived defaults.",
           "type": "object",
@@ -163,7 +177,7 @@
           "additionalProperties": false,
           "properties": {
             "tool": {
-              "description": "Lint tool to use (e.g. eslint, checkstyle, ruff, golangci-lint, clippy). Overrides the stack default.",
+              "description": "Lint tool to use (e.g. eslint, checkstyle, ruff, clippy). Overrides the stack default.",
               "type": "string",
               "minLength": 1
             },
@@ -185,7 +199,7 @@
           "additionalProperties": false,
           "properties": {
             "tool": {
-              "description": "Formatter to use (e.g. prettier, google-java-format, ruff format, gofmt, rustfmt). Overrides the stack default.",
+              "description": "Formatter to use (e.g. prettier, google-java-format, ruff format, rustfmt). Overrides the stack default.",
               "type": "string",
               "minLength": 1
             },
@@ -210,6 +224,74 @@
               "description": "Ruleset or profile for the SAST tool (e.g. auto, p/security-audit).",
               "type": "string",
               "minLength": 1
+            }
+          }
+        },
+        "deps": {
+          "description": "Dependency vulnerability scanning configuration.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "severity": {
+              "description": "Minimum severity level that causes the dependency scan to fail.",
+              "type": "string",
+              "enum": ["critical", "high", "medium", "low"]
+            },
+            "tool": {
+              "description": "Dependency scanning tool to use (e.g. npm-audit, pip-audit, trivy).",
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "coverage": {
+          "description": "Test coverage threshold enforcement.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "threshold": {
+              "description": "Minimum coverage percentage required. Default is 80.",
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100,
+              "default": 80
+            },
+            "report": {
+              "description": "Path to the coverage report file (Cobertura XML).",
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "license": {
+          "description": "License compliance checking configuration.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "allowed": {
+              "description": "Comma-separated list of allowed licenses.",
+              "type": "string"
+            },
+            "denied": {
+              "description": "Comma-separated list of denied licenses.",
+              "type": "string"
+            }
+          }
+        },
+        "container": {
+          "description": "Container image vulnerability scanning configuration.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "image": {
+              "description": "Container image to scan.",
+              "type": "string",
+              "minLength": 1
+            },
+            "severity": {
+              "description": "Minimum severity level that causes the container scan to fail.",
+              "type": "string",
+              "enum": ["critical", "high", "medium", "low"]
             }
           }
         }

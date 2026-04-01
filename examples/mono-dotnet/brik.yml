@@ -11,7 +11,6 @@ build:
 
 test:
   framework: xunit
-  coverage_threshold: 80
   commands:
     unit: dotnet test --filter Category=Unit
     integration: dotnet test --filter Category=Integration

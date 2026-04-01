@@ -11,7 +11,6 @@ build:
 
 test:
   framework: junit
-  coverage_threshold: 80
 
 quality:
   enabled: true
@@ -22,3 +21,10 @@ quality:
   format:
     tool: google-java-format
     check: true
+  deps:
+    severity: high
+
+security:
+  dependency_scan: true
+  secret_scan: true
+  container_scan: false

@@ -10,7 +10,6 @@ build:
 
 test:
   framework: pytest
-  coverage_threshold: 80
 
 quality:
   enabled: true
@@ -21,3 +20,10 @@ quality:
   format:
     tool: ruff format
     check: true
+  deps:
+    severity: high
+
+security:
+  dependency_scan: true
+  secret_scan: true
+  container_scan: false
