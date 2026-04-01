@@ -1,5 +1,5 @@
-Describe "config-reader.sh"
-  Include "$BRIK_HOME/shared-libs/gitlab/scripts/config-reader.sh"
+Describe "config.sh (portable config reader)"
+  Include "$BRIK_HOME/runtime/bash/lib/core/config.sh"
 
   # =========================================================================
   # config.read
@@ -884,6 +884,24 @@ YAML
       When call config.export_all "/nonexistent/brik.yml"
       The status should equal 7
       The error should be present
+    End
+  End
+
+  # =========================================================================
+  # brik.use config integration
+  # =========================================================================
+  Describe "brik.use config"
+    Include "$BRIK_HOME/runtime/bash/lib/core/_loader.sh"
+
+    It "loads config module via brik.use"
+      load_via_brik_use() {
+        # Reset guard to allow re-load
+        unset _BRIK_MODULE_CONFIG_LOADED 2>/dev/null || true
+        brik.use config
+        declare -f config.read >/dev/null 2>&1 && echo "available" || echo "missing"
+      }
+      When call load_via_brik_use
+      The output should equal "available"
     End
   End
 End

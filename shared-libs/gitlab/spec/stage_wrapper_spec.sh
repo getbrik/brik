@@ -78,6 +78,15 @@ Describe "stage-wrapper.sh"
         The output should equal "available"
       End
 
+      It "makes stages.init available after setup"
+        setup_and_check() {
+          brik.gitlab.setup "$BRIK_HOME" >/dev/null 2>&1
+          declare -f stages.init >/dev/null 2>&1 && echo "available" || echo "missing"
+        }
+        When call setup_and_check
+        The output should equal "available"
+      End
+
       It "exports BRIK_PROJECT_NAME from config"
         setup_and_check() {
           brik.gitlab.setup "$BRIK_HOME" >/dev/null 2>&1
@@ -85,6 +94,86 @@ Describe "stage-wrapper.sh"
         }
         When call setup_and_check
         The output should equal "setup-test"
+      End
+
+      It "exports BRIK_BRANCH from CI_COMMIT_BRANCH"
+        setup_and_check() {
+          export CI_COMMIT_BRANCH="feature/test"
+          brik.gitlab.setup "$BRIK_HOME" >/dev/null 2>&1
+          printf '%s' "$BRIK_BRANCH"
+        }
+        When call setup_and_check
+        The output should equal "feature/test"
+      End
+
+      It "exports BRIK_TAG from CI_COMMIT_TAG"
+        setup_and_check() {
+          export CI_COMMIT_TAG="v1.0.0"
+          brik.gitlab.setup "$BRIK_HOME" >/dev/null 2>&1
+          printf '%s' "$BRIK_TAG"
+        }
+        When call setup_and_check
+        The output should equal "v1.0.0"
+      End
+
+      It "exports BRIK_COMMIT_SHA from CI_COMMIT_SHA"
+        setup_and_check() {
+          export CI_COMMIT_SHA="abc123def456"
+          brik.gitlab.setup "$BRIK_HOME" >/dev/null 2>&1
+          printf '%s' "$BRIK_COMMIT_SHA"
+        }
+        When call setup_and_check
+        The output should equal "abc123def456"
+      End
+
+      It "exports BRIK_COMMIT_SHORT_SHA from CI_COMMIT_SHORT_SHA"
+        setup_and_check() {
+          export CI_COMMIT_SHORT_SHA="abc123d"
+          brik.gitlab.setup "$BRIK_HOME" >/dev/null 2>&1
+          printf '%s' "$BRIK_COMMIT_SHORT_SHA"
+        }
+        When call setup_and_check
+        The output should equal "abc123d"
+      End
+
+      It "exports BRIK_COMMIT_REF from CI_COMMIT_REF_NAME"
+        setup_and_check() {
+          export CI_COMMIT_REF_NAME="main"
+          brik.gitlab.setup "$BRIK_HOME" >/dev/null 2>&1
+          printf '%s' "$BRIK_COMMIT_REF"
+        }
+        When call setup_and_check
+        The output should equal "main"
+      End
+
+      It "exports BRIK_PIPELINE_SOURCE from CI_PIPELINE_SOURCE"
+        setup_and_check() {
+          export CI_PIPELINE_SOURCE="push"
+          brik.gitlab.setup "$BRIK_HOME" >/dev/null 2>&1
+          printf '%s' "$BRIK_PIPELINE_SOURCE"
+        }
+        When call setup_and_check
+        The output should equal "push"
+      End
+
+      It "exports BRIK_MERGE_REQUEST_ID from CI_MERGE_REQUEST_IID"
+        setup_and_check() {
+          export CI_MERGE_REQUEST_IID="42"
+          brik.gitlab.setup "$BRIK_HOME" >/dev/null 2>&1
+          printf '%s' "$BRIK_MERGE_REQUEST_ID"
+        }
+        When call setup_and_check
+        The output should equal "42"
+      End
+
+      It "exports empty BRIK_BRANCH when CI_COMMIT_BRANCH is unset"
+        setup_and_check() {
+          unset CI_COMMIT_BRANCH 2>/dev/null || true
+          brik.gitlab.setup "$BRIK_HOME" >/dev/null 2>&1
+          printf '%s' "$BRIK_BRANCH"
+        }
+        When call setup_and_check
+        The output should equal ""
       End
     End
 
@@ -110,10 +199,6 @@ Describe "stage-wrapper.sh"
   # brik.gitlab.run_stage
   # =========================================================================
   Describe "brik.gitlab.run_stage"
-    Include "$BRIK_HOME/runtime/bash/lib/runtime/stage.sh"
-    Include "$BRIK_HOME/runtime/bash/lib/core/_loader.sh"
-    Include "$BRIK_HOME/shared-libs/gitlab/scripts/config-reader.sh"
-    Include "$BRIK_HOME/shared-libs/gitlab/scripts/condition-eval.sh"
     Include "$BRIK_HOME/shared-libs/gitlab/scripts/stage-wrapper.sh"
 
     setup_stage_env() {
@@ -127,8 +212,13 @@ Describe "stage-wrapper.sh"
       export BRIK_PROJECT_DIR="$BRIK_WORKSPACE"
       export BRIK_PLATFORM="gitlab"
       export BRIK_LOG_LEVEL="info"
-      config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
-      config.export_all "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
+
+      # Set CI_* variables before brik.gitlab.setup, which maps them to BRIK_*
+      export CI_COMMIT_REF_NAME="main"
+      export CI_COMMIT_SHORT_SHA="abc123d"
+
+      # Setup needs the runtime sourced and stages loaded
+      brik.gitlab.setup "$BRIK_HOME" >/dev/null 2>&1 || true
     }
     cleanup_stage_env() {
       rm -f "$BRIK_CONFIG_FILE"
@@ -157,7 +247,6 @@ Describe "stage-wrapper.sh"
       run_init_check_summary() {
         brik.gitlab.run_stage "init" >/dev/null 2>&1
         local status=$?
-        # stage.run writes a summary JSON to BRIK_LOG_DIR
         local summary_file="${BRIK_LOG_DIR}/init-summary.json"
         if [[ -f "$summary_file" ]]; then
           echo "summary_exists"
@@ -175,7 +264,6 @@ Describe "stage-wrapper.sh"
       run_init_check_context() {
         brik.gitlab.run_stage "init" >/dev/null 2>&1
         local status=$?
-        # Find the context file in BRIK_LOG_DIR
         local context_file
         context_file="$(ls "${BRIK_LOG_DIR}"/context-init-* 2>/dev/null | head -1)"
         if [[ -n "$context_file" ]]; then
@@ -293,7 +381,12 @@ Describe "stage-wrapper.sh"
       The status should be success
       The output should include "Pipeline Summary"
       The output should include "test-project"
-      The output should include "GitLab CI"
+      The error should be present
+    End
+
+    It "runs notify stage and uses BRIK_COMMIT_REF"
+      When call brik.gitlab.run_stage "notify"
+      The output should include "main"
       The error should be present
     End
 

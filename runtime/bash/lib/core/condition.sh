@@ -1,19 +1,23 @@
 #!/usr/bin/env bash
-# @module condition-eval
+# @module condition
 # @description Evaluates simple condition expressions from brik.yml deploy environments.
 #
+# Portable condition evaluator for the Brik runtime.
+# Loaded via: brik.use condition
+#
+# Uses normalized BRIK_* variables (see Spec 02, section 11).
+#
 # Supported expressions:
-#   branch == 'main'        - exact branch match against CI_COMMIT_BRANCH
+#   branch == 'main'        - exact branch match against BRIK_BRANCH
 #   branch == 'develop'     - exact branch match
-#   tag =~ 'v*'             - glob match against CI_COMMIT_TAG
+#   tag =~ 'v*'             - glob match against BRIK_TAG
 #   tag == 'v1.0.0'         - exact tag match
 #   manual                  - always false (requires manual trigger)
 #
 # The grammar is intentionally minimal: equality (==) and glob match (=~).
 
-# Guard against double-sourcing
-[[ -n "${_BRIK_CONDITION_EVAL_LOADED:-}" ]] && return 0
-_BRIK_CONDITION_EVAL_LOADED=1
+# Guard against double-sourcing (compatible with brik.use)
+[[ -n "${_BRIK_MODULE_CONDITION_LOADED:-}" ]] && return 0
 
 # Evaluate a condition expression.
 # Usage: condition.eval <expression>
@@ -82,23 +86,23 @@ condition.eval() {
     esac
 }
 
-# Resolve a condition subject to its actual value from CI environment variables.
+# Resolve a condition subject to its actual value from BRIK_* normalized variables.
 # Usage: _condition.resolve_subject <subject>
 _condition.resolve_subject() {
     local subject="$1"
 
     case "$subject" in
         branch)
-            printf '%s' "${CI_COMMIT_BRANCH:-${GITHUB_REF_NAME:-${GIT_BRANCH:-}}}"
+            printf '%s' "${BRIK_BRANCH:-}"
             ;;
         tag)
-            printf '%s' "${CI_COMMIT_TAG:-${GITHUB_REF_NAME:-${GIT_TAG:-}}}"
+            printf '%s' "${BRIK_TAG:-}"
             ;;
         pipeline_source)
-            printf '%s' "${CI_PIPELINE_SOURCE:-}"
+            printf '%s' "${BRIK_PIPELINE_SOURCE:-}"
             ;;
         merge_request)
-            printf '%s' "${CI_MERGE_REQUEST_IID:-}"
+            printf '%s' "${BRIK_MERGE_REQUEST_ID:-}"
             ;;
         *)
             # Try as a raw environment variable name
@@ -111,13 +115,16 @@ _condition.resolve_subject() {
 # Evaluate deploy conditions for a specific environment.
 # Reads the condition from brik.yml deploy.environments.<env>.when
 # Usage: condition.eval_deploy_env <env_name>
-# Requires: config-reader.sh to be sourced and BRIK_CONFIG_FILE to be set.
+# Requires: config module loaded (via brik.use config)
 condition.eval_deploy_env() {
     local env_name="$1"
 
+    # Lazy-load config module if not yet loaded
     if ! command -v config.get >/dev/null 2>&1; then
-        echo "error: config-reader.sh must be sourced before condition-eval.sh" >&2
-        return 1
+        brik.use config || {
+            echo "error: config module is required for condition.eval_deploy_env" >&2
+            return 1
+        }
     fi
 
     local when_expr

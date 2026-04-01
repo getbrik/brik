@@ -1,15 +1,24 @@
 #!/usr/bin/env bash
-# @module config-reader
+# @module config
 # @description Reads brik.yml via yq and exports stage-relevant environment variables.
 #
-# Centralizes all brik.yml parsing for the GitLab shared library.
-# Every GitLab job sources this script to access project configuration.
+# Portable configuration reader for the Brik runtime.
+# Loaded via: brik.use config
 #
 # Requires: yq (mikefarah/yq v4+)
 
-# Guard against double-sourcing
-[[ -n "${_BRIK_CONFIG_READER_LOADED:-}" ]] && return 0
-_BRIK_CONFIG_READER_LOADED=1
+# Guard against double-sourcing (compatible with brik.use)
+[[ -n "${_BRIK_MODULE_CONFIG_LOADED:-}" ]] && return 0
+
+# Ensure runtime logging is available
+if [[ -z "${_BRIK_LOGGING_LOADED:-}" ]]; then
+    local_runtime_dir="${BASH_SOURCE[0]%/*}/../runtime"
+    if [[ -f "${local_runtime_dir}/logging.sh" ]]; then
+        # shellcheck source=../runtime/logging.sh
+        . "${local_runtime_dir}/logging.sh"
+    fi
+    unset local_runtime_dir
+fi
 
 # ---------------------------------------------------------------------------
 # Core config functions
@@ -21,18 +30,18 @@ config.read() {
     local config_path="${1:-brik.yml}"
 
     if [[ ! -f "$config_path" ]]; then
-        echo "error: config file not found: $config_path" >&2
+        log.error "config file not found: $config_path"
         return 7
     fi
 
     if ! command -v yq >/dev/null 2>&1; then
-        echo "error: yq is required but not found on PATH" >&2
+        log.error "yq is required but not found on PATH"
         return 3
     fi
 
     # Validate YAML is parseable
     if ! yq '.' "$config_path" >/dev/null 2>&1; then
-        echo "error: failed to parse $config_path as YAML" >&2
+        log.error "failed to parse $config_path as YAML"
         return 2
     fi
 

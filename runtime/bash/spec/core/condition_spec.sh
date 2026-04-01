@@ -1,13 +1,13 @@
-Describe "condition-eval.sh"
-  Include "$BRIK_HOME/shared-libs/gitlab/scripts/config-reader.sh"
-  Include "$BRIK_HOME/shared-libs/gitlab/scripts/condition-eval.sh"
+Describe "condition.sh (portable condition evaluator)"
+  Include "$BRIK_HOME/runtime/bash/lib/core/config.sh"
+  Include "$BRIK_HOME/runtime/bash/lib/core/condition.sh"
 
   # =========================================================================
-  # condition.eval - branch conditions
+  # condition.eval - branch conditions (using BRIK_BRANCH)
   # =========================================================================
   Describe "condition.eval"
     Describe "branch == exact match"
-      setup_branch_main() { export CI_COMMIT_BRANCH="main"; }
+      setup_branch_main() { export BRIK_BRANCH="main"; }
       Before 'setup_branch_main'
 
       It "matches when branch equals value"
@@ -27,7 +27,7 @@ Describe "condition-eval.sh"
     End
 
     Describe "branch == with different branch"
-      setup_branch_dev() { export CI_COMMIT_BRANCH="develop"; }
+      setup_branch_dev() { export BRIK_BRANCH="develop"; }
       Before 'setup_branch_dev'
 
       It "matches develop"
@@ -42,10 +42,10 @@ Describe "condition-eval.sh"
     End
 
     # =========================================================================
-    # condition.eval - tag conditions
+    # condition.eval - tag conditions (using BRIK_TAG)
     # =========================================================================
     Describe "tag == exact match"
-      setup_tag_v1() { export CI_COMMIT_TAG="v1.0.0"; }
+      setup_tag_v1() { export BRIK_TAG="v1.0.0"; }
       Before 'setup_tag_v1'
 
       It "matches exact tag"
@@ -61,7 +61,7 @@ Describe "condition-eval.sh"
 
     Describe "tag =~ glob match"
       Describe "with tag v2.3.1"
-        setup_tag_v2() { export CI_COMMIT_TAG="v2.3.1"; }
+        setup_tag_v2() { export BRIK_TAG="v2.3.1"; }
         Before 'setup_tag_v2'
 
         It "matches v* glob"
@@ -76,7 +76,7 @@ Describe "condition-eval.sh"
       End
 
       Describe "with tag release-1.0"
-        setup_tag_rel() { export CI_COMMIT_TAG="release-1.0"; }
+        setup_tag_rel() { export BRIK_TAG="release-1.0"; }
         Before 'setup_tag_rel'
 
         It "does not match v* glob"
@@ -91,7 +91,7 @@ Describe "condition-eval.sh"
       End
 
       Describe "with no tag set"
-        setup_no_tag() { unset CI_COMMIT_TAG 2>/dev/null || true; unset GITHUB_REF_NAME 2>/dev/null || true; unset GIT_TAG 2>/dev/null || true; }
+        setup_no_tag() { unset BRIK_TAG 2>/dev/null || true; }
         Before 'setup_no_tag'
 
         It "does not match any tag condition"
@@ -102,10 +102,10 @@ Describe "condition-eval.sh"
     End
 
     # =========================================================================
-    # condition.eval - pipeline_source and custom vars (end-to-end)
+    # condition.eval - pipeline_source and custom vars
     # =========================================================================
     Describe "pipeline_source through full eval"
-      setup_source() { export CI_PIPELINE_SOURCE="merge_request_event"; }
+      setup_source() { export BRIK_PIPELINE_SOURCE="merge_request_event"; }
       Before 'setup_source'
 
       It "matches pipeline_source condition"
@@ -148,7 +148,7 @@ Describe "condition-eval.sh"
     # condition.eval - whitespace handling
     # =========================================================================
     Describe "whitespace handling"
-      setup_branch() { export CI_COMMIT_BRANCH="main"; }
+      setup_branch() { export BRIK_BRANCH="main"; }
       Before 'setup_branch'
 
       It "trims leading whitespace"
@@ -189,91 +189,73 @@ Describe "condition-eval.sh"
         The error should include "expected format"
       End
     End
+
+    # =========================================================================
+    # Negative test: CI_* vars without BRIK_* should not match
+    # =========================================================================
+    Describe "platform isolation"
+      setup_ci_only() {
+        unset BRIK_BRANCH 2>/dev/null || true
+        export CI_COMMIT_BRANCH="main"
+      }
+      Before 'setup_ci_only'
+
+      It "does not match when CI_COMMIT_BRANCH is set but BRIK_BRANCH is not"
+        When call condition.eval "branch == 'main'"
+        The status should equal 1
+      End
+    End
   End
 
   # =========================================================================
-  # _condition.resolve_subject
+  # _condition.resolve_subject (using BRIK_* variables)
   # =========================================================================
   Describe "_condition.resolve_subject"
-    Describe "branch resolution"
-      Describe "from CI_COMMIT_BRANCH"
-        setup_gl() { export CI_COMMIT_BRANCH="feature/test"; unset GITHUB_REF_NAME 2>/dev/null || true; unset GIT_BRANCH 2>/dev/null || true; }
-        Before 'setup_gl'
+    Describe "branch resolution from BRIK_BRANCH"
+      setup_branch() { export BRIK_BRANCH="feature/test"; }
+      Before 'setup_branch'
 
-        It "resolves from CI_COMMIT_BRANCH"
-          When call _condition.resolve_subject "branch"
-          The output should equal "feature/test"
-        End
-      End
-
-      Describe "fallback to GITHUB_REF_NAME"
-        setup_gh() { unset CI_COMMIT_BRANCH 2>/dev/null || true; export GITHUB_REF_NAME="main"; unset GIT_BRANCH 2>/dev/null || true; }
-        Before 'setup_gh'
-
-        It "falls back to GITHUB_REF_NAME when CI_COMMIT_BRANCH is unset"
-          When call _condition.resolve_subject "branch"
-          The output should equal "main"
-        End
-      End
-
-      Describe "fallback to GIT_BRANCH"
-        setup_generic() { unset CI_COMMIT_BRANCH 2>/dev/null || true; unset GITHUB_REF_NAME 2>/dev/null || true; export GIT_BRANCH="develop"; }
-        Before 'setup_generic'
-
-        It "falls back to GIT_BRANCH as last resort"
-          When call _condition.resolve_subject "branch"
-          The output should equal "develop"
-        End
-      End
-
-      Describe "when all branch vars are unset"
-        setup_none() { unset CI_COMMIT_BRANCH 2>/dev/null || true; unset GITHUB_REF_NAME 2>/dev/null || true; unset GIT_BRANCH 2>/dev/null || true; }
-        Before 'setup_none'
-
-        It "returns empty when all branch vars are unset"
-          When call _condition.resolve_subject "branch"
-          The output should equal ""
-        End
+      It "resolves from BRIK_BRANCH"
+        When call _condition.resolve_subject "branch"
+        The output should equal "feature/test"
       End
     End
 
-    Describe "tag resolution"
-      Describe "from CI_COMMIT_TAG"
-        setup_gl_tag() { export CI_COMMIT_TAG="v1.0.0"; unset GITHUB_REF_NAME 2>/dev/null || true; unset GIT_TAG 2>/dev/null || true; }
-        Before 'setup_gl_tag'
+    Describe "tag resolution from BRIK_TAG"
+      setup_tag() { export BRIK_TAG="v1.0.0"; }
+      Before 'setup_tag'
 
-        It "resolves from CI_COMMIT_TAG"
-          When call _condition.resolve_subject "tag"
-          The output should equal "v1.0.0"
-        End
+      It "resolves from BRIK_TAG"
+        When call _condition.resolve_subject "tag"
+        The output should equal "v1.0.0"
       End
+    End
 
-      Describe "fallback to GIT_TAG"
-        setup_generic_tag() { unset CI_COMMIT_TAG 2>/dev/null || true; unset GITHUB_REF_NAME 2>/dev/null || true; export GIT_TAG="v2.0.0"; }
-        Before 'setup_generic_tag'
+    Describe "when all branch vars are unset"
+      setup_none() { unset BRIK_BRANCH 2>/dev/null || true; }
+      Before 'setup_none'
 
-        It "falls back to GIT_TAG when CI_COMMIT_TAG is unset"
-          When call _condition.resolve_subject "tag"
-          The output should equal "v2.0.0"
-        End
+      It "returns empty when BRIK_BRANCH is unset"
+        When call _condition.resolve_subject "branch"
+        The output should equal ""
       End
     End
 
     Describe "pipeline_source"
-      setup_source() { export CI_PIPELINE_SOURCE="push"; }
+      setup_source() { export BRIK_PIPELINE_SOURCE="push"; }
       Before 'setup_source'
 
-      It "resolves from CI_PIPELINE_SOURCE"
+      It "resolves from BRIK_PIPELINE_SOURCE"
         When call _condition.resolve_subject "pipeline_source"
         The output should equal "push"
       End
     End
 
     Describe "merge_request"
-      setup_mr() { export CI_MERGE_REQUEST_IID="42"; }
+      setup_mr() { export BRIK_MERGE_REQUEST_ID="42"; }
       Before 'setup_mr'
 
-      It "resolves from CI_MERGE_REQUEST_IID"
+      It "resolves from BRIK_MERGE_REQUEST_ID"
         When call _condition.resolve_subject "merge_request"
         The output should equal "42"
       End
@@ -319,8 +301,8 @@ deploy:
       target: k8s
 YAML
         export BRIK_CONFIG_FILE="$TEMP_CONFIG"
-        export CI_COMMIT_BRANCH="main"
-        unset CI_COMMIT_TAG 2>/dev/null || true
+        export BRIK_BRANCH="main"
+        unset BRIK_TAG 2>/dev/null || true
       }
       cleanup() { rm -f "$TEMP_CONFIG"; }
       Before 'setup_deploy'
