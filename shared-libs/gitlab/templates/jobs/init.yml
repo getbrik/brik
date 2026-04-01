@@ -4,17 +4,26 @@
 brik-init:
   stage: init
   script:
-    - brik.gitlab.run_stage init
+    - bash -c '. /tmp/brik-bootstrap.sh && brik.gitlab.run_stage init'
   artifacts:
     reports:
       dotenv: brik-init.env
     expire_in: 1 hour
   after_script:
     # Export key variables as dotenv for downstream jobs
+    # Note: after_script runs in a separate shell, so we read brik.yml directly
     - |
+      STACK="auto"
+      if command -v yq >/dev/null 2>&1 && [ -f brik.yml ]; then
+        STACK="$(yq '.project.stack // "auto"' brik.yml)"
+      fi
+      PROJECT_NAME="unnamed"
+      if command -v yq >/dev/null 2>&1 && [ -f brik.yml ]; then
+        PROJECT_NAME="$(yq '.project.name // "unnamed"' brik.yml)"
+      fi
       {
-        echo "BRIK_BUILD_STACK=${BRIK_BUILD_STACK:-auto}"
-        echo "BRIK_PROJECT_NAME=${BRIK_PROJECT_NAME:-unnamed}"
+        echo "BRIK_BUILD_STACK=${STACK}"
+        echo "BRIK_PROJECT_NAME=${PROJECT_NAME}"
         echo "BRIK_QUALITY_ENABLED=${BRIK_QUALITY_ENABLED:-true}"
         echo "BRIK_SECURITY_ENABLED=${BRIK_SECURITY_ENABLED:-false}"
       } > brik-init.env

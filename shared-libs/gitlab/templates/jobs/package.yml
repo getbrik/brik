@@ -6,7 +6,7 @@ brik-package:
   needs:
     - job: brik-test
   script:
-    - brik.gitlab.run_stage package
+    - bash -c '. /tmp/brik-bootstrap.sh && brik.gitlab.run_stage package'
   rules:
     - if: '$CI_COMMIT_TAG'
       when: on_success

@@ -4,5 +4,5 @@
 brik-notify:
   stage: notify
   script:
-    - brik.gitlab.run_stage notify
+    - bash -c '. /tmp/brik-bootstrap.sh && brik.gitlab.run_stage notify'
   when: always

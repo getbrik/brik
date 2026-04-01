@@ -4,10 +4,12 @@
 brik-security:
   stage: quality
   needs:
+    - job: brik-init
+      artifacts: true
     - job: brik-build
       artifacts: true
   script:
-    - brik.gitlab.run_stage security
+    - bash -c '. /tmp/brik-bootstrap.sh && brik.gitlab.run_stage security'
   rules:
     - if: '$BRIK_SECURITY_ENABLED == "false"'
       when: never

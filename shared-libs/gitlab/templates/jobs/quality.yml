@@ -4,10 +4,12 @@
 brik-quality:
   stage: quality
   needs:
+    - job: brik-init
+      artifacts: true
     - job: brik-build
       artifacts: true
   script:
-    - brik.gitlab.run_stage quality
+    - bash -c '. /tmp/brik-bootstrap.sh && brik.gitlab.run_stage quality'
   rules:
     - if: '$BRIK_QUALITY_ENABLED == "false"'
       when: never

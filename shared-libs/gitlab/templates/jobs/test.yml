@@ -4,10 +4,12 @@
 brik-test:
   stage: test
   needs:
+    - job: brik-init
+      artifacts: true
     - job: brik-build
       artifacts: true
   script:
-    - brik.gitlab.run_stage test
+    - bash -c '. /tmp/brik-bootstrap.sh && brik.gitlab.run_stage test'
   artifacts:
     when: always
     reports:

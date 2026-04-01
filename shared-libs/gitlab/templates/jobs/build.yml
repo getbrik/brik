@@ -7,7 +7,7 @@ brik-build:
     - job: brik-init
       artifacts: true
   script:
-    - brik.gitlab.run_stage build
+    - bash -c '. /tmp/brik-bootstrap.sh && brik.gitlab.run_stage build'
   artifacts:
     paths:
       - node_modules/
