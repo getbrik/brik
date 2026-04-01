@@ -31,17 +31,6 @@ _hook._resolve() {
         return 0
     fi
 
-    # Priority 2: brik.yml config hook (inline command)
-    local config_hook_var=""
-    case "$hook_name" in
-        pre_stage)
-            # For pre_stage, we need the stage name from the caller
-            # The stage name is passed as the second argument to _hook._run
-            ;;
-        post_stage)
-            ;;
-    esac
-
     # Priority 3: Default hook
     if [[ -f "$default_hook" ]]; then
         printf '%s' "$default_hook"
