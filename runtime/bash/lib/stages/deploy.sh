@@ -10,6 +10,7 @@ stages.deploy() {
     config.export_deploy_vars
 
     brik.use deploy
+    brik.use condition
 
     log.info "deploy stage"
 
@@ -36,7 +37,7 @@ stages.deploy() {
 
         # Evaluate deploy condition if set
         if [[ -n "$when_cond" ]]; then
-            if ! deploy.eval_condition "$when_cond" 2>/dev/null; then
+            if ! condition.eval "$when_cond"; then
                 log.info "skipping $env_name (condition not met: $when_cond)"
                 continue
             fi

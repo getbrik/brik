@@ -24,12 +24,7 @@ stages.build() {
 
     log.info "running build (stack=$stack)"
 
-    # If BRIK_BUILD_COMMAND is set, use it as override
-    if [[ -n "${BRIK_BUILD_COMMAND:-}" ]]; then
-        build.run "${BRIK_WORKSPACE}" --stack "$stack" --config "${BRIK_CONFIG_FILE}"
-    else
-        build.run "${BRIK_WORKSPACE}" --stack "$stack" --config "${BRIK_CONFIG_FILE}"
-    fi
+    build.run "${BRIK_WORKSPACE}" --stack "$stack" --config "${BRIK_CONFIG_FILE}"
     local result=$?
 
     if [[ $result -eq 0 ]]; then

@@ -62,7 +62,7 @@ Describe "version.sh"
     It "rejects invalid version"
       When call version.bump "bad" "patch"
       The status should equal 2
-      The stderr should be present
+      The stderr should include "invalid semver"
     End
   End
 
@@ -175,6 +175,50 @@ Describe "version.sh"
       End
     End
 
+    Describe "from git tag with custom prefix"
+      setup_git_prefix() {
+        GIT_DIR="$(mktemp -d)"
+        cd "$GIT_DIR" || return 1
+        git init -q
+        git config user.name "test"
+        git config user.email "test@test.com"
+        printf 'hello\n' > file.txt
+        git add file.txt
+        git commit -q -m "initial"
+        git tag "release-2.0.0"
+      }
+      cleanup_git_prefix() { rm -rf "$GIT_DIR"; cd /tmp || true; }
+      Before 'setup_git_prefix'
+      After 'cleanup_git_prefix'
+
+      It "strips custom prefix from git tag"
+        When call version.current --from-git-tag --prefix "release-"
+        The output should equal "2.0.0"
+      End
+    End
+
+    Describe "from git tag with --prefix v (explicit)"
+      setup_git_vprefix() {
+        GIT_DIR="$(mktemp -d)"
+        cd "$GIT_DIR" || return 1
+        git init -q
+        git config user.name "test"
+        git config user.email "test@test.com"
+        printf 'hello\n' > file.txt
+        git add file.txt
+        git commit -q -m "initial"
+        git tag "v3.1.0"
+      }
+      cleanup_git_vprefix() { rm -rf "$GIT_DIR"; cd /tmp || true; }
+      Before 'setup_git_vprefix'
+      After 'cleanup_git_vprefix'
+
+      It "strips v prefix when explicitly passed"
+        When call version.current --from-git-tag --prefix "v"
+        The output should equal "3.1.0"
+      End
+    End
+
     Describe "auto mode with package.json"
       setup_auto() {
         AUTO_DIR="$(mktemp -d)"
@@ -229,7 +273,7 @@ Describe "version.sh"
     It "rejects invalid version"
       When call version.write "bad" --file "${WRITE_DIR}/VERSION"
       The status should equal 2
-      The stderr should be present
+      The stderr should include "invalid semver"
     End
 
     It "returns 2 for unknown option"

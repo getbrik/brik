@@ -2,6 +2,7 @@ Describe "stages.deploy"
   Include "$BRIK_HOME/runtime/bash/lib/runtime/stage.sh"
   Include "$BRIK_HOME/runtime/bash/lib/core/_loader.sh"
   Include "$BRIK_HOME/runtime/bash/lib/core/config.sh"
+  Include "$BRIK_HOME/runtime/bash/lib/core/condition.sh"
   Include "$BRIK_HOME/runtime/bash/lib/stages/deploy.sh"
 
   setup_env() {
@@ -64,7 +65,7 @@ YAML
       run_deploy_success() {
         brik.use() { :; }
         deploy.run() { return 0; }
-        deploy.eval_condition() { return 0; }
+
         local ctx
         ctx="$(context.create "deploy")" 2>/dev/null || ctx="$(mktemp)"
         stages.deploy "$ctx" >/dev/null 2>&1
@@ -77,7 +78,7 @@ YAML
       run_deploy_ctx() {
         brik.use() { :; }
         deploy.run() { return 0; }
-        deploy.eval_condition() { return 0; }
+
         local ctx
         ctx="$(context.create "deploy")" 2>/dev/null || ctx="$(mktemp)"
         stages.deploy "$ctx" >/dev/null 2>&1
@@ -91,7 +92,7 @@ YAML
       run_deploy_fail() {
         brik.use() { :; }
         deploy.run() { return 1; }
-        deploy.eval_condition() { return 0; }
+
         local ctx
         ctx="$(context.create "deploy")" 2>/dev/null || ctx="$(mktemp)"
         stages.deploy "$ctx" >/dev/null 2>&1 || true
@@ -105,7 +106,7 @@ YAML
       run_deploy_args() {
         brik.use() { :; }
         deploy.run() { printf '%s ' "$@"; printf '\n'; return 0; }
-        deploy.eval_condition() { return 0; }
+
         local ctx
         ctx="$(context.create "deploy")" 2>/dev/null || ctx="$(mktemp)"
         stages.deploy "$ctx" 2>/dev/null
@@ -120,13 +121,81 @@ YAML
       run_deploy_log() {
         brik.use() { :; }
         deploy.run() { return 0; }
-        deploy.eval_condition() { return 0; }
         local ctx
         ctx="$(context.create "deploy")" 2>/dev/null || ctx="$(mktemp)"
         stages.deploy "$ctx"
       }
       When call run_deploy_log
       The error should include "deploying to staging"
+    End
+  End
+
+  Describe "with deploy condition (when)"
+    setup_deploy_cond() {
+      cat > "$BRIK_CONFIG_FILE" <<'YAML'
+version: 1
+project:
+  name: test
+  stack: node
+deploy:
+  environments:
+    staging:
+      target: kubernetes
+      when: "branch == 'main'"
+YAML
+      config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
+    }
+    Before 'setup_deploy_cond'
+
+    It "skips deployment when branch condition is not met"
+      run_deploy_cond_skip() {
+        export BRIK_BRANCH="develop"
+        brik.use() { :; }
+        deploy.run() { printf 'DEPLOYED\n'; return 0; }
+        local ctx
+        ctx="$(context.create "deploy")" 2>/dev/null || ctx="$(mktemp)"
+        stages.deploy "$ctx" 2>/dev/null
+      }
+      When call run_deploy_cond_skip
+      The output should not include "DEPLOYED"
+    End
+
+    It "deploys when branch condition is met"
+      run_deploy_cond_match() {
+        export BRIK_BRANCH="main"
+        brik.use() { :; }
+        deploy.run() { printf 'DEPLOYED\n'; return 0; }
+        local ctx
+        ctx="$(context.create "deploy")" 2>/dev/null || ctx="$(mktemp)"
+        stages.deploy "$ctx" 2>/dev/null
+      }
+      When call run_deploy_cond_match
+      The output should include "DEPLOYED"
+    End
+
+    It "skips deployment when tag glob does not match"
+      run_deploy_tag_skip() {
+        cat > "$BRIK_CONFIG_FILE" <<'YAML'
+version: 1
+project:
+  name: test
+  stack: node
+deploy:
+  environments:
+    production:
+      target: kubernetes
+      when: "tag =~ 'v*'"
+YAML
+        config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
+        export BRIK_TAG=""
+        brik.use() { :; }
+        deploy.run() { printf 'DEPLOYED\n'; return 0; }
+        local ctx
+        ctx="$(context.create "deploy")" 2>/dev/null || ctx="$(mktemp)"
+        stages.deploy "$ctx" 2>/dev/null
+      }
+      When call run_deploy_tag_skip
+      The output should not include "DEPLOYED"
     End
   End
 End

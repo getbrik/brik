@@ -48,8 +48,8 @@ MOCKEOF
     It "completes successfully with mock npm"
       When call stage.run "build" "build_logic"
       The status should be success
-      The stderr should be present
-      The stdout should be present
+      The stderr should include "starting stage: build"
+      The stdout should include "mock npm build ok"
     End
 
     It "produces a summary JSON with SUCCESS"
@@ -106,8 +106,8 @@ MOCKEOF
     It "propagates the failure exit code"
       When call stage.run "build" "failing_build_logic"
       The status should equal 5
-      The stderr should be present
-      The stdout should be present
+      The stderr should include "stage build failed"
+      The stdout should include "ERROR: build failed"
     End
 
     It "generates a FAILED summary"

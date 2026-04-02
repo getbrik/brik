@@ -6,6 +6,30 @@
 [[ -n "${_BRIK_CORE_TEST_LOADED:-}" ]] && return 0
 _BRIK_CORE_TEST_LOADED=1
 
+# Detect the test framework from workspace marker files.
+# Prints the framework name on stdout.
+# Returns 1 if no framework detected.
+_test._detect_framework() {
+    local workspace="$1"
+
+    if [[ -f "${workspace}/package.json" ]]; then
+        printf 'node'
+    elif [[ -f "${workspace}/build.gradle" || -f "${workspace}/build.gradle.kts" ]]; then
+        printf 'gradle'
+    elif [[ -f "${workspace}/pom.xml" ]]; then
+        printf 'maven'
+    elif [[ -f "${workspace}/pyproject.toml" || -f "${workspace}/setup.py" ]]; then
+        printf 'pytest'
+    elif [[ -f "${workspace}/Cargo.toml" ]]; then
+        printf 'cargo'
+    elif ls "${workspace}"/*.csproj >/dev/null 2>&1 || ls "${workspace}"/*.sln >/dev/null 2>&1; then
+        printf 'dotnet'
+    else
+        return 1
+    fi
+    return 0
+}
+
 # Build the test command for an explicit framework.
 # Prints the command on stdout.
 _test._cmd_for_framework() {
@@ -68,43 +92,32 @@ test.run() {
     local test_cmd=""
     if [[ -n "$framework" ]]; then
         test_cmd="$(_test._cmd_for_framework "$framework" "$workspace" "$report_dir")" || return $?
-    elif [[ -f "${workspace}/package.json" ]]; then
-        # Node.js project - prefer npm test if a test script is defined
-        local has_test_script=""
-        if command -v node >/dev/null 2>&1; then
-            has_test_script="$(node -e "
-                const p = require('${workspace}/package.json');
-                if (p.scripts && p.scripts.test) console.log('yes');
-            " 2>/dev/null || true)"
-        fi
-        if [[ "$has_test_script" == "yes" ]]; then
-            test_cmd="npm test"
-        elif command -v npx >/dev/null 2>&1; then
-            test_cmd="npx jest"
-            if [[ -n "$report_dir" ]]; then
-                test_cmd="$test_cmd --reporters=default --reporters=jest-junit"
+    else
+        local detected
+        detected="$(_test._detect_framework "$workspace")" || {
+            log.error "cannot detect test framework for workspace: $workspace"
+            return 3
+        }
+
+        if [[ "$detected" == "node" ]]; then
+            # Node.js - prefer npm test if a test script is defined
+            local has_test_script=""
+            if command -v node >/dev/null 2>&1; then
+                has_test_script="$(node -e "
+                    const p = require('${workspace}/package.json');
+                    if (p.scripts && p.scripts.test) console.log('yes');
+                " 2>/dev/null || true)"
+            fi
+            if [[ "$has_test_script" == "yes" ]]; then
+                test_cmd="npm test"
+            elif command -v npx >/dev/null 2>&1; then
+                test_cmd="$(_test._cmd_for_framework "jest" "$workspace" "$report_dir")"
+            else
+                test_cmd="npm test"
             fi
         else
-            test_cmd="npm test"
+            test_cmd="$(_test._cmd_for_framework "$detected" "$workspace" "$report_dir")" || return $?
         fi
-    elif [[ -f "${workspace}/build.gradle" || -f "${workspace}/build.gradle.kts" ]]; then
-        test_cmd="gradle test"
-        if [[ -x "${workspace}/gradlew" ]]; then
-            test_cmd="./gradlew test"
-        fi
-    elif [[ -f "${workspace}/pom.xml" ]]; then
-        test_cmd="mvn test"
-        if [[ -n "$report_dir" ]]; then
-            test_cmd="$test_cmd -Dsurefire.reportsDirectory=${report_dir}"
-        fi
-    elif [[ -f "${workspace}/pyproject.toml" || -f "${workspace}/setup.py" ]]; then
-        test_cmd="python -m pytest"
-        if [[ -n "$report_dir" ]]; then
-            test_cmd="$test_cmd --junitxml=${report_dir}/report.xml"
-        fi
-    else
-        log.error "cannot detect test framework for workspace: $workspace"
-        return 3
     fi
 
     log.info "running $suite tests: $test_cmd"

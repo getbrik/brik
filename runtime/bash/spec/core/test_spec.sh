@@ -324,6 +324,38 @@ MOCKEOF
       End
     End
 
+    Describe "with Rust workspace (Cargo.toml)"
+      setup_rust() {
+        TEST_WS="$(mktemp -d)"
+        MOCK_LOG="${TEST_WS}/mock_cargo.log"
+        printf '[package]\nname = "test"\n' > "${TEST_WS}/Cargo.toml"
+        MOCK_BIN="$(mktemp -d)"
+        cat > "${MOCK_BIN}/cargo" << MOCKEOF
+#!/usr/bin/env bash
+printf 'cargo %s\n' "\$*" >> "$MOCK_LOG"
+exit 0
+MOCKEOF
+        chmod +x "${MOCK_BIN}/cargo"
+        ORIG_PATH="$PATH"
+        export PATH="${MOCK_BIN}:${PATH}"
+      }
+      cleanup_rust() {
+        export PATH="$ORIG_PATH"
+        rm -rf "$TEST_WS" "$MOCK_BIN"
+      }
+      Before 'setup_rust'
+      After 'cleanup_rust'
+
+      It "detects Rust and runs cargo test"
+        invoke_cargo_auto() {
+          test.run "$TEST_WS" 2>/dev/null || return 1
+          grep -q "^cargo test" "$MOCK_LOG"
+        }
+        When call invoke_cargo_auto
+        The status should be success
+      End
+    End
+
     Describe "with unknown workspace"
       setup_empty() {
         TEST_WS="$(mktemp -d)"

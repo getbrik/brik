@@ -99,10 +99,11 @@ version.compare() {
 }
 
 # Read current version from a file or git tag.
-# Usage: version.current [--from-file <path> | --from-git-tag]
+# Usage: version.current [--from-file <path> | --from-git-tag [--prefix <prefix>]]
 version.current() {
     local source="auto"
     local file_path=""
+    local prefix="v"
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
@@ -114,6 +115,10 @@ version.current() {
             --from-git-tag)
                 source="git"
                 shift
+                ;;
+            --prefix)
+                prefix="$2"
+                shift 2
                 ;;
             *)
                 log.error "unknown option: $1"
@@ -148,8 +153,8 @@ version.current() {
                 log.error "no git tags found"
                 return 1
             }
-            # Strip leading 'v' if present
-            printf '%s' "${tag#v}"
+            # Strip tag prefix (default: v)
+            printf '%s' "${tag#"$prefix"}"
             return 0
             ;;
         auto)
@@ -165,7 +170,7 @@ version.current() {
                     log.error "cannot determine version"
                     return 1
                 }
-                printf '%s' "${tag#v}"
+                printf '%s' "${tag#"$prefix"}"
                 return 0
             fi
             log.error "cannot determine version: no package.json or git tags"

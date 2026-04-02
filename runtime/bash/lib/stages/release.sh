@@ -20,7 +20,7 @@ stages.release() {
     log.info "release strategy: $strategy, tag prefix: $tag_prefix"
 
     local current_version
-    current_version="$(version.current --from-git-tag --prefix "$tag_prefix" 2>/dev/null)" || {
+    current_version="$(version.current --from-git-tag --prefix "$tag_prefix")" || {
         log.info "no git tag found, using 0.0.0"
         current_version="0.0.0"
     }

@@ -120,7 +120,7 @@ condition.eval_deploy_env() {
     local env_name="$1"
 
     # Lazy-load config module if not yet loaded
-    if ! command -v config.get >/dev/null 2>&1; then
+    if ! declare -f config.get >/dev/null 2>&1; then
         brik.use config || {
             echo "error: config module is required for condition.eval_deploy_env" >&2
             return 1

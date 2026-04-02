@@ -2,6 +2,7 @@ Describe "stages.quality"
   Include "$BRIK_HOME/runtime/bash/lib/runtime/stage.sh"
   Include "$BRIK_HOME/runtime/bash/lib/core/_loader.sh"
   Include "$BRIK_HOME/runtime/bash/lib/core/config.sh"
+  Include "$BRIK_HOME/runtime/bash/lib/core/quality.sh"
   Include "$BRIK_HOME/runtime/bash/lib/stages/quality.sh"
 
   setup_env() {
@@ -104,7 +105,7 @@ YAML
       The output should equal "failed"
     End
 
-    It "logs lint tool name"
+    It "logs quality checks being run"
       run_quality_lint_log() {
         brik.use() { :; }
         quality.lint.run() { return 0; }
@@ -113,7 +114,7 @@ YAML
         stages.quality "$ctx"
       }
       When call run_quality_lint_log
-      The error should include "running lint: eslint"
+      The error should include "running quality check: lint"
     End
   End
 

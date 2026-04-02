@@ -21,7 +21,7 @@ Describe "stage.sh"
         When call stage.run "build" "success_logic"
         The status should be success
         The stderr should include "starting stage: build"
-        The stdout should be present
+        The stdout should include "running business logic"
       End
 
       It "creates a summary JSON"
@@ -52,8 +52,8 @@ Describe "stage.sh"
       It "propagates the exit code"
         When call stage.run "build" "failure_logic"
         The status should equal 5
-        The stderr should be present
-        The stdout should be present
+        The stderr should include "stage build failed"
+        The stdout should include "build broke"
       End
 
       It "still generates a summary on failure"
@@ -88,8 +88,8 @@ Describe "stage.sh"
       It "returns 2 when logic function is not defined"
         When call stage.run "build" "__nonexistent_function__"
         The status should equal 2
-        The stderr should be present
-        The stdout should be present
+        The stderr should include "starting stage: build"
+        The stdout should include "logic function not defined"
       End
     End
 
@@ -114,7 +114,7 @@ HOOKEOF
         It "aborts and returns the hook's exit code"
           When call stage.run "build" "my_logic"
           The status should equal 7
-          The stderr should be present
+          The stderr should include "pre-stage hook failed"
         End
 
         It "does not execute the logic function"
@@ -159,7 +159,7 @@ HOOKEOF
       It "passes a context file with BRIK_STAGE_NAME to the logic function"
         When call stage.run "build" "ctx_logic"
         The status should be success
-        The stderr should be present
+        The stderr should include "starting stage: build"
       End
     End
   End
@@ -168,7 +168,7 @@ HOOKEOF
     It "creates a log file and prints its path"
       When call stage.create_log_file "test"
       The status should be success
-      The output should be present
+      The output should include "/test-"
     End
   End
 
@@ -176,7 +176,7 @@ HOOKEOF
     It "returns 2 for undefined function"
       When call stage.execute "build" "__undefined__" "/tmp/ctx"
       The status should equal 2
-      The stderr should be present
+      The stderr should include "logic function not defined"
     End
   End
 End
