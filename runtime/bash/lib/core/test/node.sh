@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 # @module test.node
-# @requires jq or node
 # @description Test commands for Node.js projects.
 
 # Guard against double-sourcing

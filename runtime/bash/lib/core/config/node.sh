@@ -50,18 +50,13 @@ config.node.validate_coherence() {
         return 0
     fi
 
-    # Parse both fields in a single jq invocation
-    local jq_result
-    jq_result="$(jq -r '
-        [
-            ((.dependencies // {}) + (.devDependencies // {}) | has("jest")),
-            (.scripts.test // "")
-        ] | @tsv
-    ' "$package_json" 2>/dev/null)" || return 0
-
+    # Parse package.json fields
     local has_jest test_script
-    has_jest="$(printf '%s' "$jq_result" | cut -f1)"
-    test_script="$(printf '%s' "$jq_result" | cut -f2)"
+    has_jest="$(jq -r '(.dependencies // {}) + (.devDependencies // {}) | has("jest")' "$package_json" 2>/dev/null)" || {
+        log.warn "failed to parse ${package_json} - skipping coherence validation"
+        return 0
+    }
+    test_script="$(jq -r '.scripts.test // ""' "$package_json" 2>/dev/null)" || test_script=""
 
     # Determine source of the framework value
     local source="stack default"

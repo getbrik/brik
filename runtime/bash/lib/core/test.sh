@@ -66,7 +66,7 @@ _test._stack_for_framework() {
 
 # Run tests in a workspace.
 # Usage: test.run <workspace> [--suite <unit|integration|e2e>] [--report-dir <path>]
-#        [--framework <jest|junit|pytest|gradle|cargo|dotnet>]
+#        [--framework <jest|npm|junit|pytest|gradle|cargo|dotnet>]
 test.run() {
     local workspace="$1"
     shift

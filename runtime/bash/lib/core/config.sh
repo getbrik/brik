@@ -15,6 +15,21 @@ _BRIK_CORE_CONFIG_LOADED=1
 # Base directory for config sub-modules
 _BRIK_CONFIG_DIR="${BASH_SOURCE[0]%/*}/config"
 
+# Load a config sub-module by stack name.
+# Config sub-modules are co-located in _BRIK_CONFIG_DIR and have their own
+# double-sourcing guards, so direct sourcing is safe and avoids dependency
+# on the brik.use loader (which may be mocked or unavailable in tests).
+_config._load_module() {
+    local stack="$1"
+    local module_path="${_BRIK_CONFIG_DIR}/${stack}.sh"
+    if [[ -f "$module_path" ]]; then
+        # shellcheck source=/dev/null
+        . "$module_path"
+    else
+        return 1
+    fi
+}
+
 # Ensure runtime logging is available
 if [[ -z "${_BRIK_LOGGING_LOADED:-}" ]]; then
     local_runtime_dir="${BASH_SOURCE[0]%/*}/../runtime"
@@ -152,13 +167,7 @@ config.stack_default() {
     local setting="$2"
 
     # Load stack config module if available
-    local module_path="${_BRIK_CONFIG_DIR}/${stack}.sh"
-    if [[ -f "$module_path" ]]; then
-        # shellcheck source=/dev/null
-        . "$module_path"
-    else
-        return 1
-    fi
+    _config._load_module "$stack" || return 1
 
     local fn="config.${stack}.default"
     if declare -f "$fn" >/dev/null 2>&1; then
@@ -190,10 +199,7 @@ config.export_build_vars() {
 
     # Delegate version pinning to stack config module
     if [[ "$stack" != "auto" ]]; then
-        local module_path="${_BRIK_CONFIG_DIR}/${stack}.sh"
-        if [[ -f "$module_path" ]]; then
-            # shellcheck source=/dev/null
-            . "$module_path"
+        if _config._load_module "$stack"; then
             local fn="config.${stack}.export_build_vars"
             declare -f "$fn" >/dev/null 2>&1 && "$fn"
         fi
@@ -489,11 +495,8 @@ config.validate_coherence() {
         return 0
     fi
 
-    # Load and delegate to stack-specific coherence validator
-    local module_path="${_BRIK_CONFIG_DIR}/${stack}.sh"
-    if [[ -f "$module_path" ]]; then
-        # shellcheck source=/dev/null
-        . "$module_path"
+    # Delegate to stack-specific coherence validator
+    if _config._load_module "$stack"; then
         local fn="config.${stack}.validate_coherence"
         if declare -f "$fn" >/dev/null 2>&1; then
             "$fn" "$workspace" || return 7

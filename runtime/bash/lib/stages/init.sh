@@ -32,8 +32,11 @@ stages.init() {
 
     context.set "$context_file" "BRIK_STACK" "$stack"
 
-    # Export and validate config coherence
+    # Export config and override stack with the runtime-resolved value.
+    # config.export_build_vars re-reads .project.stack from brik.yml, which may
+    # be "auto". The init-resolved $stack (e.g. "node") must take precedence.
     config.export_all || return $?
+    export BRIK_BUILD_STACK="$stack"
     config.validate_coherence || return $?
 
     # Log project info

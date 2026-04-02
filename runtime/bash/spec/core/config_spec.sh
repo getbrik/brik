@@ -1526,6 +1526,48 @@ YAML
       End
     End
 
+    Describe "node + jest + no package.json"
+      setup_no_pkgjson() {
+        NO_PKGJSON_WS="$(mktemp -d)"
+        export BRIK_BUILD_STACK="node"
+        export BRIK_TEST_FRAMEWORK="jest"
+        export BRIK_WORKSPACE="$NO_PKGJSON_WS"
+      }
+      cleanup_no_pkgjson() {
+        rm -rf "$NO_PKGJSON_WS"
+        unset BRIK_BUILD_STACK BRIK_TEST_FRAMEWORK BRIK_WORKSPACE
+      }
+      Before 'setup_no_pkgjson'
+      After 'cleanup_no_pkgjson'
+
+      It "passes when package.json is absent"
+        When call config.validate_coherence
+        The status should be success
+      End
+    End
+
+    Describe "node + jest + malformed package.json"
+      setup_malformed() {
+        MALFORMED_WS="$(mktemp -d)"
+        printf 'not valid json{{{' > "${MALFORMED_WS}/package.json"
+        export BRIK_BUILD_STACK="node"
+        export BRIK_TEST_FRAMEWORK="jest"
+        export BRIK_WORKSPACE="$MALFORMED_WS"
+      }
+      cleanup_malformed() {
+        rm -rf "$MALFORMED_WS"
+        unset BRIK_BUILD_STACK BRIK_TEST_FRAMEWORK BRIK_WORKSPACE
+      }
+      Before 'setup_malformed'
+      After 'cleanup_malformed'
+
+      It "warns and passes on malformed package.json"
+        When call config.validate_coherence
+        The status should be success
+        The error should include "skipping coherence validation"
+      End
+    End
+
     Describe "node + jest mismatch from brik.yml"
       setup_explicit_jest() {
         EXPLICIT_WS="$(mktemp -d)"
