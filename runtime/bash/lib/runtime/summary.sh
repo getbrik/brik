@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck source-path=SCRIPTDIR
 # @module summary
 # @description Summary generation for the Brik runtime.
 #

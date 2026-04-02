@@ -19,7 +19,7 @@ jobs:
         run: |
           shellcheck --severity=warning bin/brik
           shellcheck --severity=warning -x runtime/bash/lib/runtime/*.sh
-          shellcheck --severity=warning -x runtime/bash/lib/core/*.sh runtime/bash/lib/core/build/*.sh
+          shellcheck --severity=warning -x runtime/bash/lib/core/*.sh runtime/bash/lib/core/**/*.sh
 
   test:
     runs-on: ubuntu-latest

@@ -9,6 +9,8 @@ _BRIK_CORE_QUALITY_CONTAINER_LOADED=1
 # Scan a container image for vulnerabilities.
 # Usage: quality.container.run <workspace> [--image <image>] [--severity <threshold>]
 quality.container.run() {
+    # workspace is part of the uniform quality.*.run <workspace> API but unused here
+    # shellcheck disable=SC2034
     local workspace="$1"
     shift
     local image="" severity="HIGH"

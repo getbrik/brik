@@ -62,8 +62,8 @@ git.tag() {
     runtime.require_tool git || return 3
 
     if [[ "$dry_run" == "true" ]]; then
-        log.info "[dry-run] git tag ${message:+-m '$message'} '$tag_name'"
-        [[ "$push" == "true" ]] && log.info "[dry-run] git push origin '$tag_name'"
+        log.info "[dry-run] git tag ${message:+-m \"$message\"} \"$tag_name\""
+        [[ "$push" == "true" ]] && log.info "[dry-run] git push origin \"$tag_name\""
         return 0
     fi
 

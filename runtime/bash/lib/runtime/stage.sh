@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck source-path=SCRIPTDIR
 # @module stage
 # @description Stage lifecycle orchestrator for the Brik runtime.
 #

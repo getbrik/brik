@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck source-path=SCRIPTDIR
 # @module _loader
 # @description Module loader for brik-lib. Provides brik.use for lazy loading.
 #

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck source-path=SCRIPTDIR
 # @module context
 # @description Execution context management for the Brik runtime.
 #

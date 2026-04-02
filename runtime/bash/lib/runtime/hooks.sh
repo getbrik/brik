@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck source-path=SCRIPTDIR
 # @module hooks
 # @description Hook system for the Brik runtime stage lifecycle.
 #

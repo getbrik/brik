@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck source-path=SCRIPTDIR
 # @module error
 # @description Error helpers and exit code constants for the Brik runtime.
 #

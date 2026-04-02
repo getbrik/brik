@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck source-path=SCRIPTDIR
 # @module tools
 # @description Dependency validation helpers for the Brik runtime.
 
