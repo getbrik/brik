@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck source-path=SCRIPTDIR
 # @module config
 # @description Reads brik.yml via yq and exports stage-relevant environment variables.
 #
@@ -8,7 +9,11 @@
 # Requires: yq (mikefarah/yq v4+)
 
 # Guard against double-sourcing (compatible with brik.use)
-[[ -n "${_BRIK_MODULE_CONFIG_LOADED:-}" ]] && return 0
+[[ -n "${_BRIK_CORE_CONFIG_LOADED:-}" ]] && return 0
+_BRIK_CORE_CONFIG_LOADED=1
+
+# Base directory for config sub-modules
+_BRIK_CONFIG_DIR="${BASH_SOURCE[0]%/*}/config"
 
 # Ensure runtime logging is available
 if [[ -z "${_BRIK_LOGGING_LOADED:-}" ]]; then
@@ -146,30 +151,21 @@ config.stack_default() {
     local stack="$1"
     local setting="$2"
 
-    case "${stack}:${setting}" in
-        node:build_command)     printf 'npm run build' ;;
-        node:test_framework)    printf 'jest' ;;
-        node:lint_tool)         printf 'eslint' ;;
-        node:format_tool)       printf 'prettier' ;;
-        java:build_command)     printf 'mvn package -DskipTests' ;;
-        java:test_framework)    printf 'junit' ;;
-        java:lint_tool)         printf 'checkstyle' ;;
-        java:format_tool)       printf 'google-java-format' ;;
-        python:build_command)   printf 'pip install .' ;;
-        python:test_framework)  printf 'pytest' ;;
-        python:lint_tool)       printf 'ruff' ;;
-        python:format_tool)     printf 'ruff format' ;;
-        dotnet:build_command)   printf 'dotnet build' ;;
-        dotnet:test_framework)  printf 'xunit' ;;
-        dotnet:lint_tool)       printf 'dotnet-format' ;;
-        dotnet:format_tool)     printf 'dotnet-format' ;;
-        rust:build_command)     printf 'cargo build' ;;
-        rust:test_framework)    printf 'cargo test' ;;
-        rust:lint_tool)         printf 'clippy' ;;
-        rust:format_tool)       printf 'rustfmt' ;;
-        *) return 1 ;;
-    esac
-    return 0
+    # Load stack config module if available
+    local module_path="${_BRIK_CONFIG_DIR}/${stack}.sh"
+    if [[ -f "$module_path" ]]; then
+        # shellcheck source=/dev/null
+        . "$module_path"
+    else
+        return 1
+    fi
+
+    local fn="config.${stack}.default"
+    if declare -f "$fn" >/dev/null 2>&1; then
+        "$fn" "$setting"
+        return $?
+    fi
+    return 1
 }
 
 # ---------------------------------------------------------------------------
@@ -192,26 +188,16 @@ config.export_build_vars() {
     build_cmd="$(config.get '.build.command' "$default_cmd")"
     export BRIK_BUILD_COMMAND="$build_cmd"
 
-    # Version pinning
-    local node_version
-    node_version="$(config.get '.build.node_version' '')"
-    [[ -n "$node_version" ]] && export BRIK_BUILD_NODE_VERSION="$node_version"
-
-    local java_version
-    java_version="$(config.get '.build.java_version' '')"
-    [[ -n "$java_version" ]] && export BRIK_BUILD_JAVA_VERSION="$java_version"
-
-    local python_version
-    python_version="$(config.get '.build.python_version' '')"
-    [[ -n "$python_version" ]] && export BRIK_BUILD_PYTHON_VERSION="$python_version"
-
-    local dotnet_version
-    dotnet_version="$(config.get '.build.dotnet_version' '')"
-    [[ -n "$dotnet_version" ]] && export BRIK_BUILD_DOTNET_VERSION="$dotnet_version"
-
-    local rust_version
-    rust_version="$(config.get '.build.rust_version' '')"
-    [[ -n "$rust_version" ]] && export BRIK_BUILD_RUST_VERSION="$rust_version"
+    # Delegate version pinning to stack config module
+    if [[ "$stack" != "auto" ]]; then
+        local module_path="${_BRIK_CONFIG_DIR}/${stack}.sh"
+        if [[ -f "$module_path" ]]; then
+            # shellcheck source=/dev/null
+            . "$module_path"
+            local fn="config.${stack}.export_build_vars"
+            declare -f "$fn" >/dev/null 2>&1 && "$fn"
+        fi
+    fi
 
     return 0
 }
@@ -383,7 +369,7 @@ config.export_package_vars() {
 # Sets: BRIK_DEPLOY_ENVIRONMENTS, BRIK_DEPLOY_<ENV>_*
 config.export_deploy_vars() {
     local env_keys
-    env_keys="$(config.get '.deploy.environments | keys | .[]' '')" 2>/dev/null || true
+    env_keys="$(config.get '.deploy.environments | keys | .[]' '' 2>/dev/null)" || true
     if [[ -z "$env_keys" ]]; then
         export BRIK_DEPLOY_ENVIRONMENTS=""
         return 0
@@ -478,6 +464,41 @@ config.export_release_vars() {
     local tag_prefix
     tag_prefix="$(config.get '.release.tag_prefix' 'v')"
     export BRIK_RELEASE_TAG_PREFIX="$tag_prefix"
+
+    return 0
+}
+
+# ---------------------------------------------------------------------------
+# Config coherence validation
+# ---------------------------------------------------------------------------
+
+# Validate that resolved config values are coherent with the actual project.
+# Called from init after config.export_all to fail fast on mismatches.
+# Returns 7 on coherence errors, 0 otherwise.
+config.validate_coherence() {
+    local stack="${BRIK_BUILD_STACK:-auto}"
+
+    if [[ -z "${BRIK_WORKSPACE:-}" ]]; then
+        log.warn "BRIK_WORKSPACE not set - skipping coherence validation"
+        return 0
+    fi
+
+    local workspace="$BRIK_WORKSPACE"
+
+    if [[ "$stack" == "auto" || "$stack" == "unknown" ]]; then
+        return 0
+    fi
+
+    # Load and delegate to stack-specific coherence validator
+    local module_path="${_BRIK_CONFIG_DIR}/${stack}.sh"
+    if [[ -f "$module_path" ]]; then
+        # shellcheck source=/dev/null
+        . "$module_path"
+        local fn="config.${stack}.validate_coherence"
+        if declare -f "$fn" >/dev/null 2>&1; then
+            "$fn" "$workspace" || return 7
+        fi
+    fi
 
     return 0
 }

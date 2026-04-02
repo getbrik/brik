@@ -293,6 +293,37 @@ MOCKEOF
       End
     End
 
+    Describe "with --framework npm"
+      setup_npm() {
+        TEST_WS="$(mktemp -d)"
+        MOCK_LOG="${TEST_WS}/mock_npm.log"
+        MOCK_BIN="$(mktemp -d)"
+        cat > "${MOCK_BIN}/npm" << MOCKEOF
+#!/usr/bin/env bash
+printf 'npm %s\n' "\$*" >> "$MOCK_LOG"
+exit 0
+MOCKEOF
+        chmod +x "${MOCK_BIN}/npm"
+        ORIG_PATH="$PATH"
+        export PATH="${MOCK_BIN}:${PATH}"
+      }
+      cleanup_npm() {
+        export PATH="$ORIG_PATH"
+        rm -rf "$TEST_WS" "$MOCK_BIN"
+      }
+      Before 'setup_npm'
+      After 'cleanup_npm'
+
+      It "runs npm test"
+        invoke_npm() {
+          test.run "$TEST_WS" --framework npm 2>/dev/null || return 1
+          grep -q "^npm test" "$MOCK_LOG"
+        }
+        When call invoke_npm
+        The status should be success
+      End
+    End
+
     Describe "with --framework dotnet"
       setup_dotnet() {
         TEST_WS="$(mktemp -d)"

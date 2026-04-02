@@ -823,7 +823,7 @@ YAML
   # =========================================================================
   # config.export_build_vars - dotnet/rust versions
   # =========================================================================
-  Describe "config.export_build_vars dotnet/rust versions"
+  Describe "config.export_build_vars dotnet version"
     setup_config() {
       TEMP_CONFIG="$(mktemp)"
       cat > "$TEMP_CONFIG" <<'YAML'
@@ -833,7 +833,6 @@ project:
   stack: dotnet
 build:
   dotnet_version: "8.0"
-  rust_version: "1.75"
 YAML
       export BRIK_CONFIG_FILE="$TEMP_CONFIG"
     }
@@ -849,6 +848,24 @@ YAML
       When call export_and_check
       The output should equal "8.0"
     End
+  End
+
+  Describe "config.export_build_vars rust version"
+    setup_config() {
+      TEMP_CONFIG="$(mktemp)"
+      cat > "$TEMP_CONFIG" <<'YAML'
+version: 1
+project:
+  name: test
+  stack: rust
+build:
+  rust_version: "1.75"
+YAML
+      export BRIK_CONFIG_FILE="$TEMP_CONFIG"
+    }
+    cleanup_config() { rm -f "$TEMP_CONFIG"; }
+    Before 'setup_config'
+    After 'cleanup_config'
 
     It "exports BRIK_BUILD_RUST_VERSION"
       export_and_check() {
@@ -1402,13 +1419,136 @@ YAML
 
     It "loads config module via brik.use"
       load_via_brik_use() {
-        # Reset guard to allow re-load
-        unset _BRIK_MODULE_CONFIG_LOADED 2>/dev/null || true
+        # Reset guards to allow re-load (loader guard + module guard)
+        unset _BRIK_MODULE_CONFIG_LOADED _BRIK_CORE_CONFIG_LOADED 2>/dev/null || true
         brik.use config
         declare -f config.read >/dev/null 2>&1 && echo "available" || echo "missing"
       }
       When call load_via_brik_use
       The output should equal "available"
+    End
+  End
+
+  # =========================================================================
+  # config.validate_coherence
+  # =========================================================================
+  Describe "config.validate_coherence"
+
+    Describe "node + jest in devDependencies"
+      setup_coherent_jest() {
+        COHERENT_WS="$(mktemp -d)"
+        printf '{"name":"test","devDependencies":{"jest":"^29.0.0"}}\n' > "${COHERENT_WS}/package.json"
+        COHERENT_CONFIG="$(mktemp)"
+        printf 'version: 1\nproject:\n  name: test\n  stack: node\ntest:\n  framework: jest\n' > "$COHERENT_CONFIG"
+        export BRIK_BUILD_STACK="node"
+        export BRIK_TEST_FRAMEWORK="jest"
+        export BRIK_WORKSPACE="$COHERENT_WS"
+        export BRIK_CONFIG_FILE="$COHERENT_CONFIG"
+      }
+      cleanup_coherent_jest() {
+        rm -rf "$COHERENT_WS" "$COHERENT_CONFIG"
+        unset BRIK_BUILD_STACK BRIK_TEST_FRAMEWORK BRIK_WORKSPACE BRIK_CONFIG_FILE
+      }
+      Before 'setup_coherent_jest'
+      After 'cleanup_coherent_jest'
+
+      It "passes when jest is in devDependencies"
+        When call config.validate_coherence
+        The status should be success
+      End
+    End
+
+    Describe "node + jest not in deps + custom test script"
+      setup_incoherent_jest() {
+        INCOHERENT_WS="$(mktemp -d)"
+        printf '{"name":"test","scripts":{"test":"node test/index.test.js"}}\n' > "${INCOHERENT_WS}/package.json"
+        INCOHERENT_CONFIG="$(mktemp)"
+        printf 'version: 1\nproject:\n  name: test\n  stack: node\n' > "$INCOHERENT_CONFIG"
+        export BRIK_BUILD_STACK="node"
+        export BRIK_TEST_FRAMEWORK="jest"
+        export BRIK_WORKSPACE="$INCOHERENT_WS"
+        export BRIK_CONFIG_FILE="$INCOHERENT_CONFIG"
+      }
+      cleanup_incoherent_jest() {
+        rm -rf "$INCOHERENT_WS" "$INCOHERENT_CONFIG"
+        unset BRIK_BUILD_STACK BRIK_TEST_FRAMEWORK BRIK_WORKSPACE BRIK_CONFIG_FILE
+      }
+      Before 'setup_incoherent_jest'
+      After 'cleanup_incoherent_jest'
+
+      It "fails with exit 7 and descriptive error"
+        When call config.validate_coherence
+        The status should equal 7
+        The error should include "config mismatch"
+        The error should include "jest is not in package.json"
+        The error should include "stack default"
+      End
+    End
+
+    Describe "node + framework=npm"
+      setup_npm_framework() {
+        NPM_WS="$(mktemp -d)"
+        printf '{"name":"test","scripts":{"test":"node test/index.test.js"}}\n' > "${NPM_WS}/package.json"
+        export BRIK_BUILD_STACK="node"
+        export BRIK_TEST_FRAMEWORK="npm"
+        export BRIK_WORKSPACE="$NPM_WS"
+      }
+      cleanup_npm_framework() {
+        rm -rf "$NPM_WS"
+        unset BRIK_BUILD_STACK BRIK_TEST_FRAMEWORK BRIK_WORKSPACE
+      }
+      Before 'setup_npm_framework'
+      After 'cleanup_npm_framework'
+
+      It "passes (no jest coherence check needed)"
+        When call config.validate_coherence
+        The status should be success
+      End
+    End
+
+    Describe "non-node stack"
+      setup_python_stack() {
+        PYTHON_WS="$(mktemp -d)"
+        export BRIK_BUILD_STACK="python"
+        export BRIK_TEST_FRAMEWORK="pytest"
+        export BRIK_WORKSPACE="$PYTHON_WS"
+      }
+      cleanup_python_stack() {
+        rm -rf "$PYTHON_WS"
+        unset BRIK_BUILD_STACK BRIK_TEST_FRAMEWORK BRIK_WORKSPACE
+      }
+      Before 'setup_python_stack'
+      After 'cleanup_python_stack'
+
+      It "passes (skip node-specific checks)"
+        When call config.validate_coherence
+        The status should be success
+      End
+    End
+
+    Describe "node + jest mismatch from brik.yml"
+      setup_explicit_jest() {
+        EXPLICIT_WS="$(mktemp -d)"
+        printf '{"name":"test","scripts":{"test":"mocha"}}\n' > "${EXPLICIT_WS}/package.json"
+        EXPLICIT_CONFIG="$(mktemp)"
+        printf 'version: 1\nproject:\n  name: test\n  stack: node\ntest:\n  framework: jest\n' > "$EXPLICIT_CONFIG"
+        export BRIK_BUILD_STACK="node"
+        export BRIK_TEST_FRAMEWORK="jest"
+        export BRIK_WORKSPACE="$EXPLICIT_WS"
+        export BRIK_CONFIG_FILE="$EXPLICIT_CONFIG"
+      }
+      cleanup_explicit_jest() {
+        rm -rf "$EXPLICIT_WS" "$EXPLICIT_CONFIG"
+        unset BRIK_BUILD_STACK BRIK_TEST_FRAMEWORK BRIK_WORKSPACE BRIK_CONFIG_FILE
+      }
+      Before 'setup_explicit_jest'
+      After 'cleanup_explicit_jest'
+
+      It "reports brik.yml as the source"
+        When call config.validate_coherence
+        The status should equal 7
+        The error should include "brik.yml"
+      End
     End
   End
 End

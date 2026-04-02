@@ -56,6 +56,9 @@ _test._cmd_for_framework() {
         cargo)
             cmd="cargo test"
             ;;
+        npm)
+            cmd="npm test"
+            ;;
         dotnet)
             cmd="dotnet test"
             ;;

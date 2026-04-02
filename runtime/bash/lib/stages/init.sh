@@ -32,6 +32,10 @@ stages.init() {
 
     context.set "$context_file" "BRIK_STACK" "$stack"
 
+    # Export and validate config coherence
+    config.export_all || return $?
+    config.validate_coherence || return $?
+
     # Log project info
     local project_name
     project_name="$(config.get '.project.name' 'unnamed')"
