@@ -3,7 +3,6 @@ version: 1
 project:
   name: my-python-app
   stack: python
-  description: Python service with pytest and ruff quality checks
 
 build:
   python_version: "3.12"

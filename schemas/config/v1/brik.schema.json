@@ -28,10 +28,6 @@
           "type": "string",
           "enum": ["node", "java", "python", "dotnet", "rust"]
         },
-        "description": {
-          "description": "Human-readable description of the project.",
-          "type": "string"
-        },
         "root": {
           "description": "Relative path to the service root directory. Used in monorepos where each service has its own brik.yml.",
           "type": "string"

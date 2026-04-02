@@ -31,7 +31,7 @@ Init -> Release -> Build -> Quality | Security -> Test -> Package -> Deploy -> N
 
 ```
 brik.yml           project configuration (stack, tools, thresholds)
-Shared Library     per platform (GitLab, Jenkins, GitHub Actions, Azure DevOps)
+Shared Library     per platform (GitLab, Jenkins, GitHub Actions)
 brik-lib           reusable CI/CD functions (Bash)
 Bash Runtime       stage lifecycle, logging, hooks, error handling
 ```

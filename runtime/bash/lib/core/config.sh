@@ -272,6 +272,10 @@ config.export_quality_vars() {
     format_tool="$(config.get '.quality.format.tool' "$default_format")"
     export BRIK_QUALITY_FORMAT_TOOL="$format_tool"
 
+    local format_check
+    format_check="$(config.get '.quality.format.check' 'false')"
+    export BRIK_QUALITY_FORMAT_CHECK="$format_check"
+
     local lint_config
     lint_config="$(config.get '.quality.lint.config' '')"
     [[ -n "$lint_config" ]] && export BRIK_QUALITY_LINT_CONFIG="$lint_config"

@@ -3,7 +3,6 @@ version: 1
 project:
   name: my-java-app
   stack: java
-  description: Java Maven service with strict quality gates
 
 build:
   java_version: "21"

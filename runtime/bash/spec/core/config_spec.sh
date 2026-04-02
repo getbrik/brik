@@ -740,6 +740,15 @@ YAML
         When call export_and_check
         The output should equal "prettier"
       End
+
+      It "defaults format_check to false"
+        export_and_check() {
+          config.export_quality_vars
+          printf '%s' "$BRIK_QUALITY_FORMAT_CHECK"
+        }
+        When call export_and_check
+        The output should equal "false"
+      End
     End
   End
 
@@ -880,6 +889,9 @@ quality:
   license:
     allowed: MIT,Apache-2.0
     denied: GPL-3.0
+  format:
+    tool: prettier
+    check: true
   container:
     image: myapp:latest
     severity: critical
@@ -889,6 +901,12 @@ YAML
     cleanup_config() { rm -f "$TEMP_CONFIG"; }
     Before 'setup_config'
     After 'cleanup_config'
+
+    It "exports BRIK_QUALITY_FORMAT_CHECK"
+      export_and_check() { config.export_quality_vars; printf '%s' "${BRIK_QUALITY_FORMAT_CHECK:-}"; }
+      When call export_and_check
+      The output should equal "true"
+    End
 
     It "exports BRIK_QUALITY_LINT_CONFIG"
       export_and_check() { config.export_quality_vars; printf '%s' "${BRIK_QUALITY_LINT_CONFIG:-}"; }
