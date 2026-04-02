@@ -102,13 +102,15 @@ test.run() {
         if [[ "$detected" == "node" ]]; then
             # Node.js - prefer npm test if a test script is defined
             local has_test_script=""
-            if command -v node >/dev/null 2>&1; then
+            if command -v jq >/dev/null 2>&1 && [[ -f "${workspace}/package.json" ]]; then
+                has_test_script="$(jq -r '.scripts.test // empty' "${workspace}/package.json" 2>/dev/null)"
+            elif command -v node >/dev/null 2>&1; then
                 has_test_script="$(node -e "
                     const p = require('${workspace}/package.json');
                     if (p.scripts && p.scripts.test) console.log('yes');
                 " 2>/dev/null || true)"
             fi
-            if [[ "$has_test_script" == "yes" ]]; then
+            if [[ -n "$has_test_script" ]]; then
                 test_cmd="npm test"
             elif command -v npx >/dev/null 2>&1; then
                 test_cmd="$(_test._cmd_for_framework "jest" "$workspace" "$report_dir")"
