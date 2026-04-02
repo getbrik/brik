@@ -1,27 +1,31 @@
 #!/usr/bin/env bash
 # @module test
 # @description Test execution functions for brik-lib.
+# Dispatches to stack-specific modules in test/<stack>.sh.
 
 # Guard against double-sourcing
 [[ -n "${_BRIK_CORE_TEST_LOADED:-}" ]] && return 0
 _BRIK_CORE_TEST_LOADED=1
 
-# Detect the test framework from workspace marker files.
-# Prints the framework name on stdout.
-# Returns 1 if no framework detected.
-_test._detect_framework() {
+# Directory containing stack-specific test modules
+_BRIK_TEST_DIR="${BASH_SOURCE[0]%/*}/test"
+
+# Detect the stack from workspace marker files.
+# Prints the stack name on stdout.
+# Returns 1 if no stack detected.
+_test._detect_stack() {
     local workspace="$1"
 
     if [[ -f "${workspace}/package.json" ]]; then
         printf 'node'
     elif [[ -f "${workspace}/build.gradle" || -f "${workspace}/build.gradle.kts" ]]; then
-        printf 'gradle'
+        printf 'java'
     elif [[ -f "${workspace}/pom.xml" ]]; then
-        printf 'maven'
+        printf 'java'
     elif [[ -f "${workspace}/pyproject.toml" || -f "${workspace}/setup.py" ]]; then
-        printf 'pytest'
+        printf 'python'
     elif [[ -f "${workspace}/Cargo.toml" ]]; then
-        printf 'cargo'
+        printf 'rust'
     elif ls "${workspace}"/*.csproj >/dev/null 2>&1 || ls "${workspace}"/*.sln >/dev/null 2>&1; then
         printf 'dotnet'
     else
@@ -30,46 +34,34 @@ _test._detect_framework() {
     return 0
 }
 
-# Build the test command for an explicit framework.
-# Prints the command on stdout.
-_test._cmd_for_framework() {
-    local framework="$1" workspace="$2" report_dir="$3"
-    local cmd=""
+# Load a stack-specific test module.
+# Returns 7 if module not found.
+_test._load_stack() {
+    local stack="$1"
+    local module_path="${_BRIK_TEST_DIR}/${stack}.sh"
 
-    case "$framework" in
-        jest)
-            cmd="npx jest"
-            [[ -n "$report_dir" ]] && cmd="$cmd --reporters=default --reporters=jest-junit"
-            ;;
-        junit|maven)
-            cmd="mvn test"
-            [[ -n "$report_dir" ]] && cmd="$cmd -Dsurefire.reportsDirectory=${report_dir}"
-            ;;
-        gradle)
-            cmd="gradle test"
-            [[ -x "${workspace}/gradlew" ]] && cmd="./gradlew test"
-            ;;
-        pytest)
-            cmd="python -m pytest"
-            [[ -n "$report_dir" ]] && cmd="$cmd --junitxml=${report_dir}/report.xml"
-            ;;
-        cargo)
-            cmd="cargo test"
-            ;;
-        npm)
-            cmd="npm test"
-            ;;
-        dotnet)
-            cmd="dotnet test"
-            ;;
-        *)
-            log.error "unsupported test framework: $framework"
-            return 7
-            ;;
+    if [[ -f "$module_path" ]]; then
+        # shellcheck source=/dev/null
+        . "$module_path"
+    else
+        log.error "no test module: $stack"
+        return 7
+    fi
+}
+
+# Map a framework name to its stack.
+# Prints the stack name on stdout.
+# Returns 1 for unknown frameworks.
+_test._stack_for_framework() {
+    case "$1" in
+        jest|npm)       printf 'node' ;;
+        junit|maven)    printf 'java' ;;
+        gradle)         printf 'java' ;;
+        pytest)         printf 'python' ;;
+        cargo)          printf 'rust' ;;
+        dotnet)         printf 'dotnet' ;;
+        *)              return 1 ;;
     esac
-
-    printf '%s' "$cmd"
-    return 0
 }
 
 # Run tests in a workspace.
@@ -91,38 +83,23 @@ test.run() {
 
     runtime.require_dir "$workspace" || return 6
 
-    # Detect test runner based on workspace (or use --framework override)
     local test_cmd=""
     if [[ -n "$framework" ]]; then
-        test_cmd="$(_test._cmd_for_framework "$framework" "$workspace" "$report_dir")" || return $?
+        local stack
+        stack="$(_test._stack_for_framework "$framework")" || {
+            log.error "unsupported test framework: $framework"
+            return 7
+        }
+        _test._load_stack "$stack"
+        test_cmd="$(test."${stack}".cmd "$framework" "$workspace" "$report_dir")" || return $?
     else
-        local detected
-        detected="$(_test._detect_framework "$workspace")" || {
+        local stack
+        stack="$(_test._detect_stack "$workspace")" || {
             log.error "cannot detect test framework for workspace: $workspace"
             return 3
         }
-
-        if [[ "$detected" == "node" ]]; then
-            # Node.js - prefer npm test if a test script is defined
-            local has_test_script=""
-            if command -v jq >/dev/null 2>&1 && [[ -f "${workspace}/package.json" ]]; then
-                has_test_script="$(jq -r '.scripts.test // empty' "${workspace}/package.json" 2>/dev/null)"
-            elif command -v node >/dev/null 2>&1; then
-                has_test_script="$(node -e "
-                    const p = require('${workspace}/package.json');
-                    if (p.scripts && p.scripts.test) console.log('yes');
-                " 2>/dev/null || true)"
-            fi
-            if [[ -n "$has_test_script" ]]; then
-                test_cmd="npm test"
-            elif command -v npx >/dev/null 2>&1; then
-                test_cmd="$(_test._cmd_for_framework "jest" "$workspace" "$report_dir")"
-            else
-                test_cmd="npm test"
-            fi
-        else
-            test_cmd="$(_test._cmd_for_framework "$detected" "$workspace" "$report_dir")" || return $?
-        fi
+        _test._load_stack "$stack"
+        test_cmd="$(test."${stack}".run_cmd "$workspace" "$report_dir")" || return $?
     fi
 
     log.info "running $suite tests: $test_cmd"
