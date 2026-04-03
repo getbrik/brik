@@ -62,4 +62,72 @@ Describe "brik doctor"
     End
   End
 
+  Describe "unknown option"
+    It "exits with code 2 for unknown option"
+      When run script "${BRIK_BIN}" doctor --badopt
+      The status should eq 2
+      The stderr should include "unknown option"
+    End
+  End
+
+  Describe "python stack detection"
+    setup_python_project() {
+      TEMP_DIR="$(mktemp -d)"
+      printf '[project]\nname = "test"\n' > "${TEMP_DIR}/pyproject.toml"
+    }
+    cleanup_python_project() { rm -rf "$TEMP_DIR"; }
+    Before 'setup_python_project'
+    After 'cleanup_python_project'
+
+    It "detects python stack from pyproject.toml"
+      When run script "${BRIK_BIN}" doctor --workspace "${TEMP_DIR}"
+      The output should include "python"
+    End
+  End
+
+  Describe "rust stack detection"
+    setup_rust_project() {
+      TEMP_DIR="$(mktemp -d)"
+      printf '[package]\nname = "test"\n' > "${TEMP_DIR}/Cargo.toml"
+    }
+    cleanup_rust_project() { rm -rf "$TEMP_DIR"; }
+    Before 'setup_rust_project'
+    After 'cleanup_rust_project'
+
+    It "detects rust stack from Cargo.toml"
+      When run script "${BRIK_BIN}" doctor --workspace "${TEMP_DIR}"
+      The output should include "rust"
+    End
+  End
+
+  Describe "dotnet stack detection"
+    setup_dotnet_project() {
+      TEMP_DIR="$(mktemp -d)"
+      printf '<Project Sdk="Microsoft.NET.Sdk"></Project>\n' > "${TEMP_DIR}/Test.csproj"
+    }
+    cleanup_dotnet_project() { rm -rf "$TEMP_DIR"; }
+    Before 'setup_dotnet_project'
+    After 'cleanup_dotnet_project'
+
+    It "detects dotnet stack from .csproj"
+      When run script "${BRIK_BIN}" doctor --workspace "${TEMP_DIR}"
+      The output should include "Detected stack: dotnet"
+      # dotnet may not be installed locally, so don't check exit status
+      The status should satisfy "true"
+    End
+  End
+
+  Describe "no stack detected"
+    setup_no_stack() { TEMP_DIR="$(mktemp -d)"; }
+    cleanup_no_stack() { rm -rf "$TEMP_DIR"; }
+    Before 'setup_no_stack'
+    After 'cleanup_no_stack'
+
+    It "reports no stack detected"
+      When run script "${BRIK_BIN}" doctor --workspace "${TEMP_DIR}"
+      The status should eq 0
+      The output should include "No stack detected"
+    End
+  End
+
 End

@@ -137,6 +137,29 @@ Describe "brik validate"
       The stderr should include "--config"
       The output should be blank
     End
+
+    It "exits with code 2 when --schema is missing its argument"
+      When run script "${BRIK_BIN}" validate --schema
+      The status should eq 2
+      The stderr should include "--schema"
+      The output should be blank
+    End
+  End
+
+  Describe "invalid YAML"
+    setup_invalid_yaml() {
+      TEMP_DIR="$(mktemp -d)"
+      printf 'invalid: yaml: [broken\n' > "${TEMP_DIR}/bad.yml"
+    }
+    cleanup_invalid_yaml() { rm -rf "$TEMP_DIR"; }
+    Before 'setup_invalid_yaml'
+    After 'cleanup_invalid_yaml'
+
+    It "exits with code 2 when YAML is unparseable"
+      When run script "${BRIK_BIN}" validate --config "${TEMP_DIR}/bad.yml"
+      The status should eq 2
+      The stderr should include "failed to parse"
+    End
   End
 
 End

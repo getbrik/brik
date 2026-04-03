@@ -146,4 +146,85 @@ Describe "brik init"
     End
   End
 
+  Describe "unsupported stack"
+    setup_unsupported_stack() { TEMP_DIR="$(mktemp -d)"; }
+    cleanup_unsupported_stack() { rm -rf "$TEMP_DIR"; }
+    Before 'setup_unsupported_stack'
+    After 'cleanup_unsupported_stack'
+
+    It "exits with code 2 for unsupported stack"
+      When run script "${BRIK_BIN}" init --stack fortran --platform gitlab --dir "${TEMP_DIR}" --non-interactive
+      The status should eq 2
+      The stderr should include "unsupported stack"
+    End
+  End
+
+  Describe "unsupported platform"
+    setup_unsupported_platform() { TEMP_DIR="$(mktemp -d)"; }
+    cleanup_unsupported_platform() { rm -rf "$TEMP_DIR"; }
+    Before 'setup_unsupported_platform'
+    After 'cleanup_unsupported_platform'
+
+    It "exits with code 2 for unsupported platform"
+      When run script "${BRIK_BIN}" init --stack node --platform aws --dir "${TEMP_DIR}" --non-interactive
+      The status should eq 2
+      The stderr should include "unsupported platform"
+    End
+  End
+
+  Describe "non-interactive with undetectable stack"
+    setup_undetectable() { TEMP_DIR="$(mktemp -d)"; }
+    cleanup_undetectable() { rm -rf "$TEMP_DIR"; }
+    Before 'setup_undetectable'
+    After 'cleanup_undetectable'
+
+    It "exits with code 2 when stack cannot be detected"
+      When run script "${BRIK_BIN}" init --platform gitlab --dir "${TEMP_DIR}" --non-interactive
+      The status should eq 2
+      The stderr should include "could not detect stack"
+    End
+  End
+
+  Describe "unknown option"
+    It "exits with code 2 for unknown option"
+      When run script "${BRIK_BIN}" init --badopt
+      The status should eq 2
+      The stderr should include "unknown option"
+    End
+  End
+
+  Describe "auto-detection from Cargo.toml (rust)"
+    setup_rust() {
+      TEMP_DIR="$(mktemp -d)"
+      printf '[package]\nname = "test"\n' > "${TEMP_DIR}/Cargo.toml"
+    }
+    cleanup_rust() { rm -rf "$TEMP_DIR"; }
+    Before 'setup_rust'
+    After 'cleanup_rust'
+
+    It "detects rust from Cargo.toml"
+      When run script "${BRIK_BIN}" init --platform gitlab --dir "${TEMP_DIR}" --non-interactive
+      The status should eq 0
+      The output should include "Detected stack: rust"
+      The contents of file "${TEMP_DIR}/brik.yml" should include "stack: rust"
+    End
+  End
+
+  Describe "auto-detection from .csproj (dotnet)"
+    setup_dotnet() {
+      TEMP_DIR="$(mktemp -d)"
+      printf '<Project Sdk="Microsoft.NET.Sdk"></Project>\n' > "${TEMP_DIR}/Test.csproj"
+    }
+    cleanup_dotnet() { rm -rf "$TEMP_DIR"; }
+    Before 'setup_dotnet'
+    After 'cleanup_dotnet'
+
+    It "detects dotnet from .csproj"
+      When run script "${BRIK_BIN}" init --platform gitlab --dir "${TEMP_DIR}" --non-interactive
+      The status should eq 0
+      The output should include "Detected stack: dotnet"
+      The contents of file "${TEMP_DIR}/brik.yml" should include "stack: dotnet"
+    End
+  End
+
 End

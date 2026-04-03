@@ -41,6 +41,47 @@ Describe "brik run stage"
     End
   End
 
+  Describe "brik run stage build --badopt"
+    It "shows an error for unknown option"
+      When run script "$BRIK_BIN" run stage build --badopt
+      The status should equal 2
+      The stderr should include "unknown option"
+    End
+  End
+
+  Describe "brik run stage build --config"
+    setup() {
+      MOCK_BIN="$(mktemp -d)"
+      cat > "${MOCK_BIN}/npm" << 'MOCKEOF'
+#!/usr/bin/env bash
+echo "mock npm: $*"
+exit 0
+MOCKEOF
+      chmod +x "${MOCK_BIN}/npm"
+      cat > "${MOCK_BIN}/node" << 'MOCKEOF'
+#!/usr/bin/env bash
+exit 0
+MOCKEOF
+      chmod +x "${MOCK_BIN}/node"
+      WORKSPACE="$(mktemp -d)"
+      printf '{"name":"cli-test","version":"1.0.0","scripts":{"build":"echo ok"}}\n' > "${WORKSPACE}/package.json"
+      mkdir -p "${WORKSPACE}/node_modules"
+      export PATH="${MOCK_BIN}:${PATH}"
+      export BRIK_LOG_DIR
+      BRIK_LOG_DIR="$(mktemp -d)"
+    }
+    cleanup() { rm -rf "$MOCK_BIN" "$WORKSPACE" "$BRIK_LOG_DIR"; }
+    Before 'setup'
+    After 'cleanup'
+
+    It "accepts --config option"
+      When run script "$BRIK_BIN" run stage build --workspace "$WORKSPACE" --config "${WORKSPACE}/brik.yml"
+      The status should be success
+      The stdout should be present
+      The stderr should include "stage build completed successfully"
+    End
+  End
+
   Describe "brik run stage build"
     setup() {
       MOCK_BIN="$(mktemp -d)"
