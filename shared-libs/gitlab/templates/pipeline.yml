@@ -19,7 +19,7 @@ variables:
   BRIK_LOG_DIR: "/tmp/brik/logs"
   BRIK_LOG_LEVEL: "info"
   BRIK_PLATFORM: "gitlab"
-  BRIK_CI_IMAGE: "alpine:3.21"
+  BRIK_CI_IMAGE: "alpine:3.21@sha256:c3f8e73fdb79deaebaa2037150150191b9dcbfba68b4a46d70103204c53f4709"
 
 # ---------------------------------------------------------------------------
 # Stages - Fixed Flow
