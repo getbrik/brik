@@ -512,21 +512,26 @@ MOCKEOF
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock.log"
         MOCK_BIN="$(mktemp -d)"
+        SAFE_BIN="$(mktemp -d)"
         cat > "${MOCK_BIN}/gradle" << MOCKEOF
 #!/usr/bin/env bash
 printf 'gradle %s\n' "\$*" >> "$MOCK_LOG"
 exit 0
 MOCKEOF
         chmod +x "${MOCK_BIN}/gradle"
+        # Build a clean PATH without mvn (CI runners have /usr/bin/mvn)
+        local cmd cmd_path
+        for cmd in bash date tput env basename dirname cat grep sed awk printf mkdir rm mktemp tee tr cut sort head tail wc; do
+          cmd_path="$(command -v "$cmd" 2>/dev/null)" && ln -sf "$cmd_path" "${SAFE_BIN}/${cmd}"
+        done
         ORIG_PATH="$PATH"
-        # Keep /usr/bin for date (needed by log.*) but ensure mvn is not found
-        export PATH="${MOCK_BIN}:/usr/bin:/bin"
+        export PATH="${MOCK_BIN}:${SAFE_BIN}"
         export BRIK_QUALITY_LINT_TOOL="checkstyle"
       }
       cleanup_checkstyle_gradle() {
         export PATH="$ORIG_PATH"
         unset BRIK_QUALITY_LINT_TOOL
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        rm -rf "$TEST_WS" "$MOCK_BIN" "$SAFE_BIN"
       }
       Before 'setup_checkstyle_gradle'
       After 'cleanup_checkstyle_gradle'
