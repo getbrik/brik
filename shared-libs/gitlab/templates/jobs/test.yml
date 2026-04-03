@@ -8,6 +8,12 @@ brik-test:
       artifacts: true
     - job: brik-build
       artifacts: true
+    - job: brik-quality
+      artifacts: false
+      optional: true
+    - job: brik-security
+      artifacts: false
+      optional: true
   script:
     - bash -c '. /tmp/brik-bootstrap.sh && brik.gitlab.run_stage test'
   artifacts:

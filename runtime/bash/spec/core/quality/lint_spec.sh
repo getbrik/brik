@@ -28,6 +28,7 @@ Describe "quality/lint.sh"
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock_npx.log"
         printf '{"name":"test"}\n' > "${TEST_WS}/package.json"
+        printf 'export default [];\n' > "${TEST_WS}/eslint.config.js"
         MOCK_BIN="$(mktemp -d)"
         cat > "${MOCK_BIN}/npx" << MOCKEOF
 #!/usr/bin/env bash
@@ -74,6 +75,7 @@ MOCKEOF
       setup_no_npx() {
         TEST_WS="$(mktemp -d)"
         printf '{"name":"test"}\n' > "${TEST_WS}/package.json"
+        printf 'export default [];\n' > "${TEST_WS}/eslint.config.js"
         MOCK_BIN="$(mktemp -d)"
         ORIG_PATH="$PATH"
         export PATH="${MOCK_BIN}"
@@ -209,6 +211,50 @@ MOCKEOF
       End
     End
 
+    Describe "Node.js without eslint config"
+      setup_no_eslint_cfg() {
+        TEST_WS="$(mktemp -d)"
+        printf '{"name":"test"}\n' > "${TEST_WS}/package.json"
+      }
+      cleanup_no_eslint_cfg() { rm -rf "$TEST_WS"; }
+      Before 'setup_no_eslint_cfg'
+      After 'cleanup_no_eslint_cfg'
+
+      It "skips lint when no eslint config found"
+        When call quality.lint.run "$TEST_WS"
+        The status should be success
+        The stderr should include "no eslint config found"
+      End
+    End
+
+    Describe "Tier 2: eslint without config skips"
+      setup_eslint_no_cfg() {
+        TEST_WS="$(mktemp -d)"
+        MOCK_BIN="$(mktemp -d)"
+        cat > "${MOCK_BIN}/npx" << 'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+        chmod +x "${MOCK_BIN}/npx"
+        ORIG_PATH="$PATH"
+        export PATH="${MOCK_BIN}:${PATH}"
+        export BRIK_QUALITY_LINT_TOOL="eslint"
+      }
+      cleanup_eslint_no_cfg() {
+        export PATH="$ORIG_PATH"
+        unset BRIK_QUALITY_LINT_TOOL
+        rm -rf "$TEST_WS" "$MOCK_BIN"
+      }
+      Before 'setup_eslint_no_cfg'
+      After 'cleanup_eslint_no_cfg'
+
+      It "skips eslint when no config found (Tier 2)"
+        When call quality.lint.run "$TEST_WS"
+        The status should be success
+        The stderr should include "no eslint config found"
+      End
+    End
+
     Describe "with unknown workspace"
       setup_empty() { TEST_WS="$(mktemp -d)"; }
       cleanup_empty() { rm -rf "$TEST_WS"; }
@@ -254,6 +300,7 @@ EOF
       setup_eslint_tool() {
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock.log"
+        printf 'export default [];\n' > "${TEST_WS}/eslint.config.js"
         MOCK_BIN="$(mktemp -d)"
         cat > "${MOCK_BIN}/npx" << MOCKEOF
 #!/usr/bin/env bash
@@ -286,6 +333,7 @@ MOCKEOF
     Describe "Tier 2: eslint npx missing"
       setup_eslint_no_npx() {
         TEST_WS="$(mktemp -d)"
+        printf 'export default [];\n' > "${TEST_WS}/eslint.config.js"
         MOCK_BIN="$(mktemp -d)"
         ORIG_PATH="$PATH"
         export PATH="${MOCK_BIN}"
@@ -787,6 +835,7 @@ MOCKEOF
       setup_fail() {
         TEST_WS="$(mktemp -d)"
         printf '{"name":"test"}\n' > "${TEST_WS}/package.json"
+        printf 'export default [];\n' > "${TEST_WS}/eslint.config.js"
         MOCK_BIN="$(mktemp -d)"
         cat > "${MOCK_BIN}/npx" << 'EOF'
 #!/usr/bin/env bash

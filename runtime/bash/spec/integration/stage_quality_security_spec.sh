@@ -14,6 +14,7 @@ Describe "Integration: Quality and Security stages"
       setup_pass() {
         TEST_WS="$(mktemp -d)"
         printf '{"name":"test"}\n' > "${TEST_WS}/package.json"
+        printf 'export default [];\n' > "${TEST_WS}/eslint.config.js"
         MOCK_BIN="$(mktemp -d)"
         MOCK_NPX_LOG="${TEST_WS}/mock_npx.log"
         MOCK_NPM_LOG="${TEST_WS}/mock_npm.log"
@@ -75,6 +76,7 @@ MOCKEOF
       setup_mixed() {
         TEST_WS="$(mktemp -d)"
         printf '{"name":"test"}\n' > "${TEST_WS}/package.json"
+        printf 'export default [];\n' > "${TEST_WS}/eslint.config.js"
         MOCK_BIN="$(mktemp -d)"
         # npx (eslint) fails
         cat > "${MOCK_BIN}/npx" << 'EOF'

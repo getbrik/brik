@@ -3,7 +3,8 @@
 </p>
 
 <p align="center">
-  <b>Portable CI/CD pipelines - configure what, not how. One brik.yml, any platform.</b>
+  <b>Brik, the portable pipeline standard.</b><br>
+  <b>Write once. Run everywhere.</b>
 </p>
 
 <p align="center">
@@ -19,66 +20,112 @@
 
 ## What is Brik
 
-CI/CD pipelines share the same logic across projects, yet every team rewrites it per
-platform. Brik fixes this: write one `brik.yml`, get a production-grade pipeline on
-any CI platform.
+Every team writes the same CI/CD logic -- build, test, lint, scan, deploy -- then
+rewrites it when switching platforms. Brik ends this cycle.
 
-- **One config, any platform** -- same `brik.yml` works on GitLab CI, Jenkins, GitHub Actions
-- **Sensible defaults** -- a 4-line config gets you build, test, lint, and security scanning
-- **Hundreds of tests** -- ShellSpec unit tests, ShellCheck linting, kcov coverage
+**Write once**: describe your project in a single `brik.yml` (stack, tools, thresholds).
+Brik handles the rest: a fixed pipeline with sensible defaults that works out of the box.
+
+**Run everywhere**: the same `brik.yml` produces a production-grade pipeline on
+GitLab CI, Jenkins, and GitHub Actions. No per-platform glue, no vendor lock-in.
+
+- **4 lines to start** -- a minimal config gets you build, test, lint, and security scanning
+- **Portable by design** -- Bash runtime runs identically on any CI platform
+- **Battle-tested** -- ShellSpec unit tests, end-to-end tests, ShellCheck linting, kcov coverage
+
+## How it works
+
+```mermaid
+flowchart LR
+    A["<b>1. brik.yml</b><br/>Your pipeline config"]
+    B["<b>2. brik init</b>"]
+    GL[".gitlab-ci.yml"]
+    GH[".github/workflows/ci.yml"]
+    JK["Jenkinsfile"]
+    LO["brik run"]
+    C["<b>3. Shared library</b><br/>Bash runtime<br/>(Git repo)"]
+    D["<b>4. CI/CD pipeline</b><br/>Build, test, lint,<br/>scan, deploy"]
+
+    A --> B
+    B --> GL
+    B --> GH
+    B --> JK
+    B --> LO
+    GL --> C
+    GH --> C
+    JK --> C
+    LO --> C
+    C --> D
+```
+
+1. **`brik.yml`** -- describe your project: stack, tools, thresholds. One file, platform-agnostic.
+2. **`brik init`** -- generates the bootstrap file for your CI platform: `.gitlab-ci.yml`, GitHub workflow, or `Jenkinsfile`. You can also run locally with `brik run` (requires Docker).
+3. **Shared library** -- portable Bash scripts hosted in a Git repository. Each bootstrap file references it. The library reads `brik.yml` and executes each stage.
+4. **Pipeline runs** -- build, test, lint, security scan, deploy -- with sensible defaults. Same result whether on CI or locally.
 
 ## Quick Start
 
-### Prerequisites
+<details>
+<summary><strong>Prerequisites (local usage only)</strong></summary>
 
-```bash
-brew install bash yq jq check-jsonschema
-```
+These tools are only needed to run `brik` commands locally (validate, doctor, run).
+On CI platforms, the shared library handles everything.
 
-### Scaffold a project
+| OS | Command |
+|----|---------|
+| macOS | `brew install bash yq jq check-jsonschema` |
+| Debian/Ubuntu | `sudo apt install -y bash jq` + [yq](https://github.com/mikefarah/yq) + `pip install check-jsonschema` |
+| Fedora/RHEL | `sudo dnf install -y bash jq` + [yq](https://github.com/mikefarah/yq) + `pip install check-jsonschema` |
+| Windows | `scoop install git bash yq jq python` + `pip install check-jsonschema` |
 
-```bash
-brik init --stack node --platform gitlab
-```
-
-This creates a `brik.yml` and a GitLab CI bootstrap file in your project.
-
-### Minimal configuration
-
-```yaml
-version: 1
-project:
-  name: my-app
-  stack: node
-```
-
-That's it. Push to GitLab and the shared library runs the full pipeline with
-stack-appropriate defaults for build, test, lint, and security.
+</details>
 
 ## Pipeline Flow
 
 Every Brik pipeline follows a fixed stage sequence:
 
-```
-                                     ┌───────────┐
-                                     │  Quality  │
-Init ─> Release ─> Build ─> ─────────┤           ├────────> Test ─> Package ─> Deploy ─> Notify
-                                     │ Security  │
-                                     └───────────┘
-                                      (parallel)
+```mermaid
+flowchart LR
+    init["Init"]
+    release["Release<br/><i>tag only</i>"]
+    build["Build"]
+    quality["Quality"]
+    security["Security"]
+    test["Test"]
+    package["Package<br/><i>tag only</i>"]
+    deploy["Deploy"]
+    notify["Notify"]
+
+    init --> release
+    init --> build
+    build --> quality
+    build --> security
+    quality -.->|quality gate| test
+    security -.->|quality gate| test
+    init --> test
+    build --> test
+    test --> package
+    test --> deploy
+    package -.-> deploy
+    deploy --> notify
 ```
 
 | Stage | Purpose | Default behavior |
 |-------|---------|------------------|
 | Init | Setup | Validate config, detect stack, export variables |
-| Release | Versioning | Determine version from git tags/commits |
+| Release | Versioning | Semantic version from git tags (tag push only) |
 | Build | Compile | Stack-specific build (npm, mvn, pip, dotnet, cargo) |
 | Quality | Code quality | Lint, format check, dependency audit, coverage |
 | Security | Security scans | Dependency scan, secret scan, container scan |
-| Test | Test suite | Stack-specific test runner (jest, junit, pytest, etc.) |
-| Package | Artifacts | Docker image build, archives |
-| Deploy | Deployment | Kubernetes, cloud, custom targets |
-| Notify | Notifications | Slack, email, webhooks |
+| Test | Test suite | Runs after quality/security gates pass |
+| Package | Artifacts | Docker image build (tag push only) |
+| Deploy | Deployment | Multi-environment, condition-based (branch/tag) |
+| Notify | Notifications | Pipeline summary (always runs) |
+
+The pipeline is fully deterministic -- no manual triggers. Quality and Security act
+as **quality gates**: Test only starts when they pass (or are disabled). Release and
+Package run automatically on tag pushes and are skipped on branches. Deploy always
+runs but the runtime evaluates per-environment conditions from `brik.yml`.
 
 Users do not define pipeline structure. They configure behavior within each stage
 via `brik.yml`.
@@ -226,15 +273,22 @@ shellcheck bin/brik
 
 ## Status
 
+**Done:**
 - [x] `brik.yml` JSON Schema v1
 - [x] Bash Runtime (`stage.run` lifecycle)
 - [x] 9 pipeline stages (init, release, build, quality, security, test, package, deploy, notify)
 - [x] 5 stacks (node, java, python, dotnet, rust)
-- [x] GitLab CI shared library
+- [x] GitLab CI shared library (enterprise-grade DAG with quality gates)
 - [x] CLI (validate, doctor, init, run, version)
-- [x] Hundreds of tests (ShellSpec + ShellCheck + kcov)
+- [x] 881 tests (ShellSpec + ShellCheck + kcov) + 13 E2E scenarios
+
+**Next:**
+- [ ] Type checking, coherence validators, security scanning execution
+- [ ] Local pipeline execution (`brik run pipeline`)
 - [ ] Jenkins shared library
 - [ ] GitHub Actions reusable workflows
+- [ ] Multi-environment deploy (Git Flow, trunk-based, GitHub Flow profiles)
+- [ ] Official Docker images (`ghcr.io/getbrik/brik-runner-*`)
 
 ## Related
 

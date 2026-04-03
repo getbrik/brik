@@ -8,10 +8,15 @@ brik-package:
       artifacts: true
     - job: brik-test
       artifacts: true
+    - job: brik-quality
+      artifacts: false
+      optional: true
+    - job: brik-security
+      artifacts: false
+      optional: true
   script:
     - bash -c '. /tmp/brik-bootstrap.sh && brik.gitlab.run_stage package'
   rules:
     - if: '$CI_COMMIT_TAG'
       when: on_success
-    - when: manual
-      allow_failure: true
+    - when: never

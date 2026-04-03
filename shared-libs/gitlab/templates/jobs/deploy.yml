@@ -1,14 +1,21 @@
 # Brik Deploy Stage
-# Deploys to target environment (conditional).
+# Deploys to target environments configured in brik.yml.
+# The runtime evaluates deploy.environments[].when conditions
+# and skips environments that don't match the current Git context.
+# If no deploy.environments is configured, the runtime skips gracefully.
 
 brik-deploy:
   stage: deploy
   needs:
     - job: brik-test
+    - job: brik-package
+      artifacts: false
+      optional: true
+    - job: brik-quality
+      artifacts: false
+      optional: true
+    - job: brik-security
+      artifacts: false
+      optional: true
   script:
     - bash -c '. /tmp/brik-bootstrap.sh && brik.gitlab.run_stage deploy'
-  rules:
-    - if: '$CI_COMMIT_TAG'
-      when: on_success
-    - when: manual
-      allow_failure: true

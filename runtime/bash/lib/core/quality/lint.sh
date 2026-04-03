@@ -42,6 +42,11 @@ quality.lint.run() {
         case "$tool" in
             eslint)
                 if command -v npx >/dev/null 2>&1; then
+                    if ! compgen -G "${workspace}/eslint.config.*" >/dev/null 2>&1 \
+                        && ! compgen -G "${workspace}/.eslintrc*" >/dev/null 2>&1; then
+                        log.warn "no eslint config found - skipping lint"
+                        return 0
+                    fi
                     lint_cmd="npx eslint ."
                     [[ "$fix" == "true" ]] && lint_cmd="$lint_cmd --fix"
                 else
@@ -103,6 +108,11 @@ quality.lint.run() {
     # Tier 3: auto-detect from workspace files
     if [[ -z "$lint_cmd" ]]; then
         if [[ -f "${workspace}/package.json" ]]; then
+            if ! compgen -G "${workspace}/eslint.config.*" >/dev/null 2>&1 \
+                && ! compgen -G "${workspace}/.eslintrc*" >/dev/null 2>&1; then
+                log.warn "no eslint config found - skipping lint"
+                return 0
+            fi
             if command -v npx >/dev/null 2>&1; then
                 lint_cmd="npx eslint ."
                 [[ "$fix" == "true" ]] && lint_cmd="$lint_cmd --fix"

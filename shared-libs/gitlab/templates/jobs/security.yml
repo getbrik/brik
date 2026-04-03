@@ -1,5 +1,10 @@
 # Brik Security Stage
 # Dependency and secret scanning. Runs in parallel with Quality (same GitLab stage).
+#
+# Note: the rules: check below only works when BRIK_SECURITY_ENABLED is set
+# as a CI/CD variable at the project/group level. Dotenv variables from
+# brik-init are NOT available at rules evaluation time (pipeline creation).
+# The runtime fallback in security.sh handles the dotenv-based check.
 
 brik-security:
   stage: quality
