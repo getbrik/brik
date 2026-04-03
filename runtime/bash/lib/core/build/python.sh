@@ -1,18 +1,20 @@
 #!/usr/bin/env bash
 # @module build.python
-# @requires pip or poetry or pipenv
-# @description Build Python projects (pip, poetry, pipenv).
+# @requires pip or poetry or pipenv or uv
+# @description Build Python projects (pip, poetry, pipenv, uv).
 
 # Guard against double-sourcing
 [[ -n "${_BRIK_CORE_BUILD_PYTHON_LOADED:-}" ]] && return 0
 _BRIK_CORE_BUILD_PYTHON_LOADED=1
 
 # Detect the package manager from marker files.
-# Prints pip, poetry, or pipenv on stdout.
+# Prints uv, pip, poetry, or pipenv on stdout.
 _build.python._detect_pm() {
     local workspace="$1"
 
-    if [[ -f "${workspace}/poetry.lock" ]]; then
+    if [[ -f "${workspace}/uv.lock" ]]; then
+        printf 'uv'
+    elif [[ -f "${workspace}/poetry.lock" ]]; then
         printf 'poetry'
     elif grep -q '\[tool\.poetry\]' "${workspace}/pyproject.toml" 2>/dev/null; then
         printf 'poetry'
@@ -24,7 +26,7 @@ _build.python._detect_pm() {
 }
 
 # Install dependencies and build.
-# Usage: build.python.run <workspace> [--tool <pip|poetry|pipenv>]
+# Usage: build.python.run <workspace> [--tool <uv|pip|poetry|pipenv>]
 build.python.run() {
     local workspace="$1"
     shift
@@ -49,6 +51,14 @@ build.python.run() {
     [[ -z "$pm" ]] && pm="$(_build.python._detect_pm "$workspace")"
 
     case "$pm" in
+        uv)
+            runtime.require_tool uv || return 3
+            log.info "building with uv"
+            (cd "$workspace" && uv sync && uv build) || {
+                log.error "build failed"
+                return 5
+            }
+            ;;
         pip)
             runtime.require_tool pip || return 3
             log.info "building with pip"

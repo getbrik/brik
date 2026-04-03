@@ -89,7 +89,7 @@ via `brik.yml`.
 |-------|-----------|-------|------|------|
 | **node** | `package.json` | npm/yarn/pnpm | jest/mocha/vitest | eslint |
 | **java** | `pom.xml` / `build.gradle` | mvn/gradle | junit | checkstyle |
-| **python** | `pyproject.toml` / `setup.py` | pip/poetry/pipenv | pytest | ruff/flake8 |
+| **python** | `pyproject.toml` / `setup.py` | pip/poetry/uv/pipenv | pytest | ruff/flake8 |
 | **dotnet** | `*.csproj` / `*.sln` | dotnet build | xunit/nunit | dotnet format |
 | **rust** | `Cargo.toml` | cargo build | cargo test | clippy |
 

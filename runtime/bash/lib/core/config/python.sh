@@ -14,7 +14,8 @@ config.python.default() {
     local setting="$1"
 
     case "$setting" in
-        build_command)  printf 'pip install .' ;;
+        build_command)  printf '' ;;
+        build_tool)     printf 'auto' ;;
         test_framework) printf 'pytest' ;;
         lint_tool)      printf 'ruff' ;;
         format_tool)    printf 'ruff format' ;;

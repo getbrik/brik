@@ -4,7 +4,10 @@
 brik-package:
   stage: package
   needs:
+    - job: brik-build
+      artifacts: true
     - job: brik-test
+      artifacts: true
   script:
     - bash -c '. /tmp/brik-bootstrap.sh && brik.gitlab.run_stage package'
   rules:

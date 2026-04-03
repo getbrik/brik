@@ -21,9 +21,10 @@ stages.quality() {
 
     # Build checks list from configured quality vars
     local checks=()
-    [[ -n "${BRIK_QUALITY_LINT_TOOL:-}" ]] && checks+=(lint)
-    [[ -n "${BRIK_QUALITY_SAST_TOOL:-}" ]] && checks+=(sast)
-    [[ -n "${BRIK_QUALITY_DEPS_TOOL:-}" ]] && checks+=(deps)
+    [[ -n "${BRIK_QUALITY_LINT_TOOL:-}" || -n "${BRIK_QUALITY_LINT_COMMAND:-}" ]] && checks+=(lint)
+    [[ -n "${BRIK_QUALITY_FORMAT_TOOL:-}" || -n "${BRIK_QUALITY_FORMAT_COMMAND:-}" ]] && checks+=(format)
+    [[ -n "${BRIK_QUALITY_SAST_TOOL:-}" || -n "${BRIK_QUALITY_SAST_COMMAND:-}" ]] && checks+=(sast)
+    [[ -n "${BRIK_QUALITY_DEPS_TOOL:-}" || -n "${BRIK_QUALITY_DEPS_COMMAND:-}" ]] && checks+=(deps)
     [[ -n "${BRIK_QUALITY_COVERAGE_THRESHOLD:-}" ]] && checks+=(coverage)
     [[ -n "${BRIK_QUALITY_LICENSE_ALLOWED:-}" || -n "${BRIK_QUALITY_LICENSE_DENIED:-}" ]] && checks+=(license)
     [[ -n "${BRIK_QUALITY_CONTAINER_IMAGE:-}" ]] && checks+=(container)

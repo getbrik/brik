@@ -38,7 +38,19 @@ security.run() {
         total=$((total + 1))
         brik.use "quality.deps" 2>/dev/null || true
         if declare -f quality.deps.run >/dev/null 2>&1; then
-            quality.deps.run "$workspace" --severity "$severity" || failed=$((failed + 1))
+            local dep_tool="${BRIK_SECURITY_DEPENDENCY_SCAN_TOOL:-}"
+            if [[ -n "$dep_tool" ]]; then
+                # Use specified tool as a command (e.g., grype, trivy, cargo-audit)
+                if command -v "$dep_tool" >/dev/null 2>&1; then
+                    log.info "dependency scan with tool: $dep_tool"
+                    (cd "$workspace" && "$dep_tool" .) || failed=$((failed + 1))
+                else
+                    log.warn "dependency scan tool not found: $dep_tool - falling back to quality.deps"
+                    quality.deps.run "$workspace" --severity "$severity" || failed=$((failed + 1))
+                fi
+            else
+                quality.deps.run "$workspace" --severity "$severity" || failed=$((failed + 1))
+            fi
         else
             log.warn "quality.deps module not available - skipping dependency scan"
         fi
@@ -46,9 +58,13 @@ security.run() {
 
     if [[ "$secret_scan" == "true" ]]; then
         total=$((total + 1))
+        local secret_tool="${BRIK_SECURITY_SECRET_SCAN_TOOL:-trivy}"
         brik.use "quality.sast" 2>/dev/null || true
-        if declare -f quality.sast.run >/dev/null 2>&1; then
-            quality.sast.run "$workspace" --tool trivy || failed=$((failed + 1))
+        if [[ "$secret_tool" != "trivy" ]] && command -v "$secret_tool" >/dev/null 2>&1; then
+            log.info "secret scan with tool: $secret_tool"
+            (cd "$workspace" && "$secret_tool" detect .) || failed=$((failed + 1))
+        elif declare -f quality.sast.run >/dev/null 2>&1; then
+            quality.sast.run "$workspace" --tool "$secret_tool" || failed=$((failed + 1))
         else
             log.warn "quality.sast module not available - skipping secret scan"
         fi

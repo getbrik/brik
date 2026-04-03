@@ -19,6 +19,7 @@ variables:
   BRIK_LOG_DIR: "/tmp/brik/logs"
   BRIK_LOG_LEVEL: "info"
   BRIK_PLATFORM: "gitlab"
+  BRIK_CI_IMAGE: "alpine:3.21"
 
 # ---------------------------------------------------------------------------
 # Stages - Fixed Flow
@@ -37,6 +38,7 @@ stages:
 # Default job configuration
 # ---------------------------------------------------------------------------
 default:
+  image: ${BRIK_CI_IMAGE}
   before_script:
     # Install yq if not present
     - |

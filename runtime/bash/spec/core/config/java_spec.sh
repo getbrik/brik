@@ -4,9 +4,9 @@ Describe "config/java.sh"
   Include "$BRIK_CORE_LIB/config/java.sh"
 
   Describe "config.java.default"
-    It "returns 'mvn package -DskipTests' for build_command"
+    It "returns empty string for build_command"
       When call config.java.default "build_command"
-      The output should equal "mvn package -DskipTests"
+      The output should equal ""
       The status should be success
     End
 

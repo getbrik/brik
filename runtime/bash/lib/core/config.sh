@@ -197,6 +197,14 @@ config.export_build_vars() {
     build_cmd="$(config.get '.build.command' "$default_cmd")"
     export BRIK_BUILD_COMMAND="$build_cmd"
 
+    # Build tool (Tier 2 of 3-tier resolution: command > tool > auto)
+    local build_tool
+    build_tool="$(config.get '.build.tool' '')"
+    if [[ -z "$build_tool" && "$stack" != "auto" ]]; then
+        build_tool="$(config.stack_default "$stack" "build_tool" 2>/dev/null || true)"
+    fi
+    export BRIK_BUILD_TOOL="$build_tool"
+
     # Delegate version pinning to stack config module
     if [[ "$stack" != "auto" ]]; then
         if _config._load_module "$stack"; then
@@ -235,6 +243,11 @@ config.export_test_vars() {
     local e2e_cmd
     e2e_cmd="$(config.get '.test.commands.e2e' '')"
     [[ -n "$e2e_cmd" ]] && export BRIK_TEST_COMMAND_E2E="$e2e_cmd"
+
+    # Test command override (Tier 1 of 3-tier resolution)
+    local test_cmd
+    test_cmd="$(config.get '.test.command' '')"
+    [[ -n "$test_cmd" ]] && export BRIK_TEST_COMMAND="$test_cmd"
 
     return 0
 }
@@ -316,6 +329,23 @@ config.export_quality_vars() {
     container_severity="$(config.get '.quality.container.severity' '')"
     [[ -n "$container_severity" ]] && export BRIK_QUALITY_CONTAINER_SEVERITY="$container_severity"
 
+    # Quality command overrides (Tier 1 of 3-tier resolution)
+    local lint_cmd
+    lint_cmd="$(config.get '.quality.lint.command' '')"
+    [[ -n "$lint_cmd" ]] && export BRIK_QUALITY_LINT_COMMAND="$lint_cmd"
+
+    local format_cmd
+    format_cmd="$(config.get '.quality.format.command' '')"
+    [[ -n "$format_cmd" ]] && export BRIK_QUALITY_FORMAT_COMMAND="$format_cmd"
+
+    local sast_cmd
+    sast_cmd="$(config.get '.quality.sast.command' '')"
+    [[ -n "$sast_cmd" ]] && export BRIK_QUALITY_SAST_COMMAND="$sast_cmd"
+
+    local deps_cmd
+    deps_cmd="$(config.get '.quality.deps.command' '')"
+    [[ -n "$deps_cmd" ]] && export BRIK_QUALITY_DEPS_COMMAND="$deps_cmd"
+
     return 0
 }
 
@@ -341,6 +371,19 @@ config.export_security_vars() {
     local container_scan
     container_scan="$(config.get '.security.container_scan' '')"
     [[ -n "$container_scan" ]] && export BRIK_SECURITY_CONTAINER_SCAN="$container_scan"
+
+    # Security tool fields (Tier 2 of 3-tier resolution)
+    local dep_scan_tool
+    dep_scan_tool="$(config.get '.security.dependency_scan_tool' '')"
+    [[ -n "$dep_scan_tool" ]] && export BRIK_SECURITY_DEPENDENCY_SCAN_TOOL="$dep_scan_tool"
+
+    local secret_scan_tool
+    secret_scan_tool="$(config.get '.security.secret_scan_tool' '')"
+    [[ -n "$secret_scan_tool" ]] && export BRIK_SECURITY_SECRET_SCAN_TOOL="$secret_scan_tool"
+
+    local container_scan_tool
+    container_scan_tool="$(config.get '.security.container_scan_tool' '')"
+    [[ -n "$container_scan_tool" ]] && export BRIK_SECURITY_CONTAINER_SCAN_TOOL="$container_scan_tool"
 
     return 0
 }

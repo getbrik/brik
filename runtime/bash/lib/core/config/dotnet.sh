@@ -14,7 +14,8 @@ config.dotnet.default() {
     local setting="$1"
 
     case "$setting" in
-        build_command)  printf 'dotnet build' ;;
+        build_command)  printf '' ;;
+        build_tool)     printf 'auto' ;;
         test_framework) printf 'xunit' ;;
         lint_tool)      printf 'dotnet-format' ;;
         format_tool)    printf 'dotnet-format' ;;

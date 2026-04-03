@@ -4,9 +4,9 @@ Describe "config/python.sh"
   Include "$BRIK_CORE_LIB/config/python.sh"
 
   Describe "config.python.default"
-    It "returns 'pip install .' for build_command"
+    It "returns empty string for build_command (delegates to tool detection)"
       When call config.python.default "build_command"
-      The output should equal "pip install ."
+      The output should equal ""
       The status should be success
     End
 

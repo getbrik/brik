@@ -22,6 +22,17 @@ quality.deps.run() {
 
     runtime.require_dir "$workspace" || return 6
 
+    # Tier 1: explicit command override
+    if [[ -n "${BRIK_QUALITY_DEPS_COMMAND:-}" ]]; then
+        log.info "scanning dependencies (command override): $BRIK_QUALITY_DEPS_COMMAND"
+        (cd "$workspace" && eval "$BRIK_QUALITY_DEPS_COMMAND") || {
+            log.error "dependency vulnerabilities found"
+            return 10
+        }
+        log.info "dependency scan passed"
+        return 0
+    fi
+
     local scan_cmd=""
 
     if [[ -f "${workspace}/package.json" ]]; then

@@ -10,8 +10,14 @@ brik-build:
     - bash -c '. /tmp/brik-bootstrap.sh && brik.gitlab.run_stage build'
   artifacts:
     paths:
-      - node_modules/
       - dist/
       - build/
       - target/
+      - bin/
+      - "*.whl"
+      - "*.tar.gz"
+    exclude:
+      - node_modules/
+      - .venv/
+      - __pycache__/
     expire_in: 1 hour

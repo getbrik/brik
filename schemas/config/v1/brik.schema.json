@@ -94,7 +94,12 @@
       "additionalProperties": false,
       "properties": {
         "command": {
-          "description": "Build command to execute. Overrides the stack default.",
+          "description": "Build command to execute. Overrides both tool selection and stack defaults (Tier 1).",
+          "type": "string",
+          "minLength": 1
+        },
+        "tool": {
+          "description": "Build tool to use (e.g. npm, yarn, pnpm, maven, gradle, poetry, uv, pip, pipenv, cargo, dotnet). Overrides auto-detection from lock/marker files (Tier 2). Ignored when command is set.",
           "type": "string",
           "minLength": 1
         },
@@ -129,6 +134,11 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "command": {
+          "description": "Test command to execute. Overrides framework-derived and stack-default commands (Tier 1). For per-suite override, use commands.unit/integration/e2e instead.",
+          "type": "string",
+          "minLength": 1
+        },
         "framework": {
           "description": "Test framework to use. Overrides the stack default (e.g. jest for node, junit for java, pytest for python).",
           "type": "string",
@@ -172,8 +182,13 @@
           "type": "object",
           "additionalProperties": false,
           "properties": {
+            "command": {
+              "description": "Lint command to execute. Overrides tool-based and stack-default lint commands (Tier 1).",
+              "type": "string",
+              "minLength": 1
+            },
             "tool": {
-              "description": "Lint tool to use (e.g. eslint, checkstyle, ruff, clippy). Overrides the stack default.",
+              "description": "Lint tool to use (e.g. eslint, biome, oxlint, checkstyle, ruff, flake8, pylint, clippy, dotnet-format). Overrides the stack default (Tier 2).",
               "type": "string",
               "minLength": 1
             },
@@ -194,8 +209,13 @@
           "type": "object",
           "additionalProperties": false,
           "properties": {
+            "command": {
+              "description": "Format check command to execute. Overrides tool-based and stack-default format commands (Tier 1).",
+              "type": "string",
+              "minLength": 1
+            },
             "tool": {
-              "description": "Formatter to use (e.g. prettier, google-java-format, ruff format, rustfmt). Overrides the stack default.",
+              "description": "Formatter to use (e.g. prettier, biome, ruff format, black, rustfmt, dotnet-format). Overrides the stack default (Tier 2).",
               "type": "string",
               "minLength": 1
             },
@@ -211,8 +231,13 @@
           "type": "object",
           "additionalProperties": false,
           "properties": {
+            "command": {
+              "description": "SAST command to execute. Overrides tool selection (Tier 1).",
+              "type": "string",
+              "minLength": 1
+            },
             "tool": {
-              "description": "SAST tool to use (e.g. semgrep, sonarqube, codeql).",
+              "description": "SAST tool to use (e.g. semgrep, trivy, sonarqube, codeql). Overrides auto-detection (Tier 2).",
               "type": "string",
               "minLength": 1
             },
@@ -228,6 +253,11 @@
           "type": "object",
           "additionalProperties": false,
           "properties": {
+            "command": {
+              "description": "Dependency scan command. Overrides tool-based scanning (Tier 1).",
+              "type": "string",
+              "minLength": 1
+            },
             "severity": {
               "description": "Minimum severity level that causes the dependency scan to fail.",
               "type": "string",
@@ -313,6 +343,21 @@
         "container_scan": {
           "description": "Whether to scan the built Docker image for OS and application vulnerabilities. Typically meaningful only when package.docker is configured.",
           "type": "boolean"
+        },
+        "dependency_scan_tool": {
+          "description": "Tool for dependency vulnerability scanning (e.g. npm-audit, pip-audit, safety, trivy, grype, cargo-audit). Auto-detected from stack when omitted.",
+          "type": "string",
+          "minLength": 1
+        },
+        "secret_scan_tool": {
+          "description": "Tool for secret scanning (e.g. gitleaks, trufflehog, trivy). Defaults to trivy if available.",
+          "type": "string",
+          "minLength": 1
+        },
+        "container_scan_tool": {
+          "description": "Tool for container image scanning (e.g. trivy, grype). Auto-detected when omitted.",
+          "type": "string",
+          "minLength": 1
         },
         "severity_threshold": {
           "description": "Minimum vulnerability severity that causes the security stage to fail. Vulnerabilities below this level are reported but do not block the pipeline.",

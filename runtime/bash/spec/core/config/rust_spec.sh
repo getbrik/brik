@@ -4,9 +4,9 @@ Describe "config/rust.sh"
   Include "$BRIK_CORE_LIB/config/rust.sh"
 
   Describe "config.rust.default"
-    It "returns 'cargo build' for build_command"
+    It "returns empty string for build_command"
       When call config.rust.default "build_command"
-      The output should equal "cargo build"
+      The output should equal ""
       The status should be success
     End
 

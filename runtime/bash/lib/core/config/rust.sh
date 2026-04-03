@@ -14,7 +14,8 @@ config.rust.default() {
     local setting="$1"
 
     case "$setting" in
-        build_command)  printf 'cargo build' ;;
+        build_command)  printf '' ;;
+        build_tool)     printf 'auto' ;;
         test_framework) printf 'cargo test' ;;
         lint_tool)      printf 'clippy' ;;
         format_tool)    printf 'rustfmt' ;;

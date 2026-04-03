@@ -14,7 +14,8 @@ config.java.default() {
     local setting="$1"
 
     case "$setting" in
-        build_command)  printf 'mvn package -DskipTests' ;;
+        build_command)  printf '' ;;
+        build_tool)     printf 'auto' ;;
         test_framework) printf 'junit' ;;
         lint_tool)      printf 'checkstyle' ;;
         format_tool)    printf 'google-java-format' ;;

@@ -407,7 +407,7 @@ YAML
   Describe "config.stack_default"
     It "returns node build_command"
       When call config.stack_default "node" "build_command"
-      The output should equal "npm run build"
+      The output should equal ""
     End
 
     It "returns node format_tool"
@@ -417,7 +417,7 @@ YAML
 
     It "returns java build_command"
       When call config.stack_default "java" "build_command"
-      The output should equal "mvn package -DskipTests"
+      The output should equal ""
     End
 
     It "returns java format_tool"
@@ -437,7 +437,7 @@ YAML
 
     It "returns dotnet build_command"
       When call config.stack_default "dotnet" "build_command"
-      The output should equal "dotnet build"
+      The output should equal ""
     End
 
     It "returns dotnet format_tool"
@@ -531,13 +531,13 @@ YAML
       Before 'setup_config'
       After 'cleanup_config'
 
-      It "falls back to npm run build for node stack"
+      It "falls back to empty build command for node stack"
         export_and_check() {
           config.export_build_vars
-          printf '%s' "$BRIK_BUILD_COMMAND"
+          printf '%s' "${BRIK_BUILD_COMMAND:-}"
         }
         When call export_and_check
-        The output should equal "npm run build"
+        The output should equal ""
       End
     End
 

@@ -31,7 +31,7 @@ build.node.install() {
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
-            --package-manager) pm="$2"; shift 2 ;;
+            --package-manager|--tool) pm="$2"; shift 2 ;;
             *) log.error "unknown option: $1"; return 2 ;;
         esac
     done
@@ -76,7 +76,7 @@ build.node.run() {
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
-            --package-manager) pm="$2"; shift 2 ;;
+            --package-manager|--tool) pm="$2"; shift 2 ;;
             *) log.error "unknown option: $1"; return 2 ;;
         esac
     done

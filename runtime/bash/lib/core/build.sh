@@ -80,6 +80,12 @@ build.run() {
         return 7
     fi
 
-    "$build_fn" "$workspace"
+    # Pass BRIK_BUILD_TOOL to stack module if set and not 'auto'
+    local tool_args=()
+    if [[ -n "${BRIK_BUILD_TOOL:-}" && "${BRIK_BUILD_TOOL}" != "auto" ]]; then
+        tool_args=(--tool "$BRIK_BUILD_TOOL")
+    fi
+
+    "$build_fn" "$workspace" "${tool_args[@]}"
     return $?
 }

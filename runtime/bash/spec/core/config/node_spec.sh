@@ -4,9 +4,9 @@ Describe "config/node.sh"
   Include "$BRIK_CORE_LIB/config/node.sh"
 
   Describe "config.node.default"
-    It "returns 'npm run build' for build_command"
+    It "returns empty string for build_command"
       When call config.node.default "build_command"
-      The output should equal "npm run build"
+      The output should equal ""
       The status should be success
     End
 

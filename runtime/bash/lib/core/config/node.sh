@@ -14,7 +14,8 @@ config.node.default() {
     local setting="$1"
 
     case "$setting" in
-        build_command)  printf 'npm run build' ;;
+        build_command)  printf '' ;;
+        build_tool)     printf 'auto' ;;
         test_framework) printf 'jest' ;;
         lint_tool)      printf 'eslint' ;;
         format_tool)    printf 'prettier' ;;

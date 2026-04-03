@@ -23,6 +23,17 @@ quality.sast.run() {
 
     runtime.require_dir "$workspace" || return 6
 
+    # Tier 1: explicit command override
+    if [[ -n "${BRIK_QUALITY_SAST_COMMAND:-}" ]]; then
+        log.info "running SAST (command override): $BRIK_QUALITY_SAST_COMMAND"
+        (cd "$workspace" && eval "$BRIK_QUALITY_SAST_COMMAND") || {
+            log.error "SAST findings detected"
+            return 10
+        }
+        log.info "SAST passed"
+        return 0
+    fi
+
     # Auto-detect tool if not specified
     if [[ -z "$tool" ]]; then
         if command -v semgrep >/dev/null 2>&1; then

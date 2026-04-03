@@ -187,19 +187,25 @@ MOCKEOF
       End
     End
 
-    Describe "with Java workspace"
+    Describe "with Java workspace and no mvn"
       setup_java_lint() {
         TEST_WS="$(mktemp -d)"
         printf '<project/>\n' > "${TEST_WS}/pom.xml"
+        MOCK_BIN="$(mktemp -d)"
+        ORIG_PATH="$PATH"
+        export PATH="${MOCK_BIN}"
       }
-      cleanup_java_lint() { rm -rf "$TEST_WS"; }
+      cleanup_java_lint() {
+        export PATH="$ORIG_PATH"
+        rm -rf "$TEST_WS" "$MOCK_BIN"
+      }
       Before 'setup_java_lint'
       After 'cleanup_java_lint'
 
-      It "skips Java with warning"
+      It "skips Java when mvn not found"
         When call quality.lint.run "$TEST_WS"
         The status should be success
-        The stderr should include "not yet supported"
+        The stderr should include "mvn not found"
       End
     End
 

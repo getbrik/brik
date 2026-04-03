@@ -4,9 +4,9 @@ Describe "config/dotnet.sh"
   Include "$BRIK_CORE_LIB/config/dotnet.sh"
 
   Describe "config.dotnet.default"
-    It "returns 'dotnet build' for build_command"
+    It "returns empty string for build_command"
       When call config.dotnet.default "build_command"
-      The output should equal "dotnet build"
+      The output should equal ""
       The status should be success
     End
 

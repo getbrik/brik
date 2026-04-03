@@ -54,13 +54,12 @@ _test._load_stack() {
 # Returns 1 for unknown frameworks.
 _test._stack_for_framework() {
     case "$1" in
-        jest|npm)       printf 'node' ;;
-        junit|maven)    printf 'java' ;;
-        gradle)         printf 'java' ;;
-        pytest)         printf 'python' ;;
-        cargo)          printf 'rust' ;;
-        dotnet)         printf 'dotnet' ;;
-        *)              return 1 ;;
+        jest|npm|vitest|mocha)      printf 'node' ;;
+        junit|maven|gradle)         printf 'java' ;;
+        pytest|unittest|tox)        printf 'python' ;;
+        cargo)                      printf 'rust' ;;
+        dotnet|xunit|nunit)         printf 'dotnet' ;;
+        *)                          return 1 ;;
     esac
 }
 
@@ -82,6 +81,18 @@ test.run() {
     done
 
     runtime.require_dir "$workspace" || return 6
+
+    # Tier 1: explicit command override
+    if [[ -n "${BRIK_TEST_COMMAND:-}" ]]; then
+        log.info "running $suite tests (command override): $BRIK_TEST_COMMAND"
+        (cd "$workspace" && eval "$BRIK_TEST_COMMAND") || {
+            local exit_code=$?
+            log.error "tests failed with exit code $exit_code"
+            return 10
+        }
+        log.info "tests passed"
+        return 0
+    fi
 
     local test_cmd=""
     if [[ -n "$framework" ]]; then
