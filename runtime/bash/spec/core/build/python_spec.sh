@@ -82,10 +82,10 @@ Describe "build/python.sh"
       End
     End
 
-    Describe "with mock pip and pyproject.toml"
+    Describe "with mock pip and pyproject.toml (python -m build available)"
       setup_pip() {
         TEST_WS="$(mktemp -d)"
-        MOCK_LOG="${TEST_WS}/mock_pip.log"
+        MOCK_LOG="${TEST_WS}/mock.log"
         printf '[project]\nname = "test"\n' > "${TEST_WS}/pyproject.toml"
         MOCK_BIN="$(mktemp -d)"
         cat > "${MOCK_BIN}/pip" << MOCKEOF
@@ -93,7 +93,12 @@ Describe "build/python.sh"
 printf 'pip %s\n' "\$*" >> "$MOCK_LOG"
 exit 0
 MOCKEOF
-        chmod +x "${MOCK_BIN}/pip"
+        cat > "${MOCK_BIN}/python" << MOCKEOF
+#!/usr/bin/env bash
+printf 'python %s\n' "\$*" >> "$MOCK_LOG"
+exit 0
+MOCKEOF
+        chmod +x "${MOCK_BIN}/pip" "${MOCK_BIN}/python"
         ORIG_PATH="$PATH"
         export PATH="${MOCK_BIN}:${PATH}"
       }
@@ -110,12 +115,49 @@ MOCKEOF
         The stderr should include "build completed successfully"
       End
 
-      It "runs pip install -e . with pyproject.toml"
+      It "runs python -m build with pyproject.toml"
         invoke_pip_check() {
           build.python.run "$TEST_WS" 2>/dev/null || return 1
-          grep -qx "pip install -e \." "$MOCK_LOG"
+          grep -q "python -m build" "$MOCK_LOG"
         }
         When call invoke_pip_check
+        The status should be success
+      End
+    End
+
+    Describe "with mock pip fallback (python -m build unavailable)"
+      setup_pip_fallback() {
+        TEST_WS="$(mktemp -d)"
+        MOCK_LOG="${TEST_WS}/mock.log"
+        printf '[project]\nname = "test"\n' > "${TEST_WS}/pyproject.toml"
+        MOCK_BIN="$(mktemp -d)"
+        cat > "${MOCK_BIN}/pip" << MOCKEOF
+#!/usr/bin/env bash
+printf 'pip %s\n' "\$*" >> "$MOCK_LOG"
+exit 0
+MOCKEOF
+        cat > "${MOCK_BIN}/python" << 'MOCKEOF'
+#!/usr/bin/env bash
+# Simulate build module not installed
+exit 1
+MOCKEOF
+        chmod +x "${MOCK_BIN}/pip" "${MOCK_BIN}/python"
+        ORIG_PATH="$PATH"
+        export PATH="${MOCK_BIN}:${PATH}"
+      }
+      cleanup_pip_fallback() {
+        export PATH="$ORIG_PATH"
+        rm -rf "$TEST_WS" "$MOCK_BIN"
+      }
+      Before 'setup_pip_fallback'
+      After 'cleanup_pip_fallback'
+
+      It "falls back to pip wheel . -w dist/"
+        invoke_pip_fallback() {
+          build.python.run "$TEST_WS" 2>/dev/null || return 1
+          grep -q "pip wheel \. -w dist/" "$MOCK_LOG"
+        }
+        When call invoke_pip_fallback
         The status should be success
       End
     End
@@ -123,7 +165,7 @@ MOCKEOF
     Describe "with mock pip and setup.py"
       setup_pip_setup() {
         TEST_WS="$(mktemp -d)"
-        MOCK_LOG="${TEST_WS}/mock_pip.log"
+        MOCK_LOG="${TEST_WS}/mock.log"
         printf 'from setuptools import setup\nsetup(name="test")\n' > "${TEST_WS}/setup.py"
         MOCK_BIN="$(mktemp -d)"
         cat > "${MOCK_BIN}/pip" << MOCKEOF
@@ -131,7 +173,12 @@ MOCKEOF
 printf 'pip %s\n' "\$*" >> "$MOCK_LOG"
 exit 0
 MOCKEOF
-        chmod +x "${MOCK_BIN}/pip"
+        cat > "${MOCK_BIN}/python" << MOCKEOF
+#!/usr/bin/env bash
+printf 'python %s\n' "\$*" >> "$MOCK_LOG"
+exit 0
+MOCKEOF
+        chmod +x "${MOCK_BIN}/pip" "${MOCK_BIN}/python"
         ORIG_PATH="$PATH"
         export PATH="${MOCK_BIN}:${PATH}"
       }
@@ -142,10 +189,10 @@ MOCKEOF
       Before 'setup_pip_setup'
       After 'cleanup_pip_setup'
 
-      It "runs pip install . (not -e) with setup.py"
+      It "runs python -m build with setup.py"
         invoke_pip_setup_check() {
           build.python.run "$TEST_WS" 2>/dev/null || return 1
-          grep -qx "pip install \." "$MOCK_LOG"
+          grep -q "python -m build" "$MOCK_LOG"
         }
         When call invoke_pip_setup_check
         The status should be success
@@ -215,17 +262,17 @@ MOCKEOF
       Before 'setup_pipenv'
       After 'cleanup_pipenv'
 
-      It "runs pipenv install"
+      It "runs pipenv install then pipenv run python -m build"
         invoke_pipenv_check() {
           build.python.run "$TEST_WS" 2>/dev/null || return 1
-          grep -qx "pipenv install" "$MOCK_LOG"
+          grep -q "^pipenv install" "$MOCK_LOG" && grep -q "^pipenv run python -m build" "$MOCK_LOG"
         }
         When call invoke_pipenv_check
         The status should be success
       End
     End
 
-    Describe "with failing pip"
+    Describe "with failing pip (both python -m build and pip wheel fail)"
       setup_fail() {
         TEST_WS="$(mktemp -d)"
         printf '[project]\nname = "test"\n' > "${TEST_WS}/pyproject.toml"
@@ -234,7 +281,11 @@ MOCKEOF
 #!/usr/bin/env bash
 exit 1
 EOF
-        chmod +x "${MOCK_BIN}/pip"
+        cat > "${MOCK_BIN}/python" << 'EOF'
+#!/usr/bin/env bash
+exit 1
+EOF
+        chmod +x "${MOCK_BIN}/pip" "${MOCK_BIN}/python"
         ORIG_PATH="$PATH"
         export PATH="${MOCK_BIN}:${PATH}"
       }
@@ -245,7 +296,7 @@ EOF
       Before 'setup_fail'
       After 'cleanup_fail'
 
-      It "returns 5 when pip fails"
+      It "returns 5 when both build methods fail"
         When call build.python.run "$TEST_WS"
         The status should equal 5
         The stderr should include "build failed"
@@ -300,17 +351,17 @@ EOF
       Before 'setup_pipenv_fail'
       After 'cleanup_pipenv_fail'
 
-      It "returns 5 when pipenv fails"
+      It "returns 5 when pipenv install fails"
         When call build.python.run "$TEST_WS"
         The status should equal 5
-        The stderr should include "build failed"
+        The stderr should include "dependency install failed"
       End
     End
 
     Describe "explicit --tool override"
       setup_tool_override() {
         TEST_WS="$(mktemp -d)"
-        MOCK_LOG="${TEST_WS}/mock_pip.log"
+        MOCK_LOG="${TEST_WS}/mock.log"
         printf '[tool.poetry]\nname = "test"\n\n[project]\nname = "test"\n' > "${TEST_WS}/pyproject.toml"
         touch "${TEST_WS}/poetry.lock"
         MOCK_BIN="$(mktemp -d)"
@@ -319,7 +370,12 @@ EOF
 printf 'pip %s\n' "\$*" >> "$MOCK_LOG"
 exit 0
 MOCKEOF
-        chmod +x "${MOCK_BIN}/pip"
+        cat > "${MOCK_BIN}/python" << MOCKEOF
+#!/usr/bin/env bash
+printf 'python %s\n' "\$*" >> "$MOCK_LOG"
+exit 0
+MOCKEOF
+        chmod +x "${MOCK_BIN}/pip" "${MOCK_BIN}/python"
         ORIG_PATH="$PATH"
         export PATH="${MOCK_BIN}:${PATH}"
       }
@@ -333,7 +389,7 @@ MOCKEOF
       It "forces pip on a poetry project when --tool pip specified"
         invoke_override() {
           build.python.run "$TEST_WS" --tool pip 2>/dev/null || return 1
-          grep -q "^pip " "$MOCK_LOG"
+          grep -q "python -m build" "$MOCK_LOG"
         }
         When call invoke_override
         The status should be success

@@ -9,7 +9,7 @@ _BRIK_CORE_TEST_PYTHON_LOADED=1
 
 # Build the test command for a given Python framework.
 # Usage: test.python.cmd <framework> <workspace> <report_dir>
-# Frameworks: pytest
+# Frameworks: pytest, unittest, tox
 test.python.cmd() {
     local framework="$1" workspace="$2" report_dir="$3"
     local cmd=""
@@ -18,6 +18,12 @@ test.python.cmd() {
         pytest)
             cmd="python -m pytest"
             [[ -n "$report_dir" ]] && cmd="$cmd --junitxml=${report_dir}/report.xml"
+            ;;
+        unittest)
+            cmd="python -m unittest discover"
+            ;;
+        tox)
+            cmd="tox"
             ;;
         *)
             log.error "unsupported Python test framework: $framework"

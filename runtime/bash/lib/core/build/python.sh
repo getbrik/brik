@@ -62,16 +62,13 @@ build.python.run() {
         pip)
             runtime.require_tool pip || return 3
             log.info "building with pip"
-            if [[ -f "${workspace}/pyproject.toml" ]]; then
-                (cd "$workspace" && pip install -e .) || {
-                    log.error "build failed"
-                    return 5
-                }
+            if (cd "$workspace" && python -m build) 2>/dev/null; then
+                : # python -m build succeeded
+            elif (cd "$workspace" && pip wheel . -w dist/) 2>/dev/null; then
+                : # pip wheel fallback succeeded
             else
-                (cd "$workspace" && pip install .) || {
-                    log.error "build failed"
-                    return 5
-                }
+                log.error "build failed"
+                return 5
             fi
             ;;
         poetry)
@@ -86,9 +83,17 @@ build.python.run() {
             runtime.require_tool pipenv || return 3
             log.info "building with pipenv"
             (cd "$workspace" && pipenv install) || {
-                log.error "build failed"
+                log.error "dependency install failed"
                 return 5
             }
+            if (cd "$workspace" && pipenv run python -m build) 2>/dev/null; then
+                : # pipenv run python -m build succeeded
+            elif (cd "$workspace" && pipenv run pip wheel . -w dist/) 2>/dev/null; then
+                : # pipenv run pip wheel fallback succeeded
+            else
+                log.error "build failed"
+                return 5
+            fi
             ;;
         *)
             log.error "unsupported Python package manager: $pm"
