@@ -32,3 +32,19 @@ config.dotnet.export_build_vars() {
     [[ -n "$dotnet_version" ]] && export BRIK_BUILD_DOTNET_VERSION="$dotnet_version"
     return 0
 }
+
+# Validate .NET project coherence.
+# A .csproj or .sln file must exist for a .NET project.
+# Usage: config.dotnet.validate_coherence <workspace>
+config.dotnet.validate_coherence() {
+    local workspace="$1"
+
+    if ! compgen -G "${workspace}/*.csproj" >/dev/null 2>&1 \
+        && ! compgen -G "${workspace}/*.sln" >/dev/null 2>&1; then
+        log.error "config mismatch: stack is 'dotnet' but no .csproj or .sln file found"
+        log.error "fix: create a .csproj or .sln file, or change project.stack in brik.yml"
+        return 7
+    fi
+
+    return 0
+}

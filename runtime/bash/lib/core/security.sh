@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # @module security
-# @uses quality.deps quality.sast quality.container
+# @uses quality.deps quality.secret_scan quality.container
 # @description Security stage facade. Composes quality sub-modules for security scanning.
 
 # Guard against double-sourcing
@@ -58,15 +58,15 @@ security.run() {
 
     if [[ "$secret_scan" == "true" ]]; then
         total=$((total + 1))
-        local secret_tool="${BRIK_SECURITY_SECRET_SCAN_TOOL:-trivy}"
-        brik.use "quality.sast" 2>/dev/null || true
-        if [[ "$secret_tool" != "trivy" ]] && command -v "$secret_tool" >/dev/null 2>&1; then
-            log.info "secret scan with tool: $secret_tool"
-            (cd "$workspace" && "$secret_tool" detect .) || failed=$((failed + 1))
-        elif declare -f quality.sast.run >/dev/null 2>&1; then
-            quality.sast.run "$workspace" --tool "$secret_tool" || failed=$((failed + 1))
+        # Bridge security tool config to quality module
+        local secret_tool="${BRIK_SECURITY_SECRET_SCAN_TOOL:-}"
+        [[ -n "$secret_tool" ]] && export BRIK_QUALITY_SECRET_SCAN_TOOL="$secret_tool"
+
+        brik.use "quality.secret_scan" 2>/dev/null || true
+        if declare -f quality.secret_scan.run >/dev/null 2>&1; then
+            quality.secret_scan.run "$workspace" || failed=$((failed + 1))
         else
-            log.warn "quality.sast module not available - skipping secret scan"
+            log.warn "quality.secret_scan module not available - skipping secret scan"
         fi
     fi
 

@@ -86,4 +86,38 @@ YAML
       End
     End
   End
+
+  Describe "config.rust.validate_coherence"
+
+    Describe "Cargo.toml present"
+      setup_cargo() {
+        CARGO_WS="$(mktemp -d)"
+        printf '[package]\nname = "test"\n' > "${CARGO_WS}/Cargo.toml"
+      }
+      cleanup_cargo() { rm -rf "$CARGO_WS"; }
+      Before 'setup_cargo'
+      After 'cleanup_cargo'
+
+      It "passes when Cargo.toml exists"
+        When call config.rust.validate_coherence "$CARGO_WS"
+        The status should be success
+      End
+    End
+
+    Describe "Cargo.toml absent"
+      setup_no_cargo() {
+        NO_CARGO_WS="$(mktemp -d)"
+      }
+      cleanup_no_cargo() { rm -rf "$NO_CARGO_WS"; }
+      Before 'setup_no_cargo'
+      After 'cleanup_no_cargo'
+
+      It "fails with exit 7"
+        When call config.rust.validate_coherence "$NO_CARGO_WS"
+        The status should equal 7
+        The stderr should include "config mismatch"
+        The stderr should include "Cargo.toml"
+      End
+    End
+  End
 End

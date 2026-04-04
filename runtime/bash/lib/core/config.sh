@@ -346,6 +346,15 @@ config.export_quality_vars() {
     deps_cmd="$(config.get '.quality.deps.command' '')"
     [[ -n "$deps_cmd" ]] && export BRIK_QUALITY_DEPS_COMMAND="$deps_cmd"
 
+    # Type check tool and command (Tier 2 / Tier 1)
+    local type_check_tool
+    type_check_tool="$(config.get '.quality.type_check.tool' '')"
+    [[ -n "$type_check_tool" ]] && export BRIK_QUALITY_TYPE_CHECK_TOOL="$type_check_tool"
+
+    local type_check_cmd
+    type_check_cmd="$(config.get '.quality.type_check.command' '')"
+    [[ -n "$type_check_cmd" ]] && export BRIK_QUALITY_TYPE_CHECK_COMMAND="$type_check_cmd"
+
     return 0
 }
 

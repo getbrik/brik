@@ -32,3 +32,33 @@ config.java.export_build_vars() {
     [[ -n "$java_version" ]] && export BRIK_BUILD_JAVA_VERSION="$java_version"
     return 0
 }
+
+# Validate Java build tool coherence.
+# If build tool is explicitly set, verify the matching project file exists.
+# Usage: config.java.validate_coherence <workspace>
+config.java.validate_coherence() {
+    local workspace="$1"
+    local tool="${BRIK_BUILD_TOOL:-}"
+
+    # Only validate when tool is explicitly set (not auto)
+    [[ -z "$tool" || "$tool" == "auto" ]] && return 0
+
+    case "$tool" in
+        maven)
+            if [[ ! -f "${workspace}/pom.xml" ]]; then
+                log.error "config mismatch: build.tool is 'maven' but pom.xml not found"
+                log.error "fix: create a pom.xml, or change build.tool in brik.yml"
+                return 7
+            fi
+            ;;
+        gradle)
+            if [[ ! -f "${workspace}/build.gradle" ]] && [[ ! -f "${workspace}/build.gradle.kts" ]]; then
+                log.error "config mismatch: build.tool is 'gradle' but neither build.gradle nor build.gradle.kts found"
+                log.error "fix: create a build.gradle, or change build.tool in brik.yml"
+                return 7
+            fi
+            ;;
+    esac
+
+    return 0
+}

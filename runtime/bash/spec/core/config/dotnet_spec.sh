@@ -86,4 +86,53 @@ YAML
       End
     End
   End
+
+  Describe "config.dotnet.validate_coherence"
+
+    Describe ".csproj present"
+      setup_csproj() {
+        CSPROJ_WS="$(mktemp -d)"
+        printf '<Project Sdk="Microsoft.NET.Sdk"></Project>\n' > "${CSPROJ_WS}/Test.csproj"
+      }
+      cleanup_csproj() { rm -rf "$CSPROJ_WS"; }
+      Before 'setup_csproj'
+      After 'cleanup_csproj'
+
+      It "passes when .csproj exists"
+        When call config.dotnet.validate_coherence "$CSPROJ_WS"
+        The status should be success
+      End
+    End
+
+    Describe ".sln present"
+      setup_sln() {
+        SLN_WS="$(mktemp -d)"
+        printf 'Microsoft Visual Studio Solution File\n' > "${SLN_WS}/Test.sln"
+      }
+      cleanup_sln() { rm -rf "$SLN_WS"; }
+      Before 'setup_sln'
+      After 'cleanup_sln'
+
+      It "passes when .sln exists"
+        When call config.dotnet.validate_coherence "$SLN_WS"
+        The status should be success
+      End
+    End
+
+    Describe "no .csproj or .sln"
+      setup_no_dotnet() {
+        NO_DOTNET_WS="$(mktemp -d)"
+      }
+      cleanup_no_dotnet() { rm -rf "$NO_DOTNET_WS"; }
+      Before 'setup_no_dotnet'
+      After 'cleanup_no_dotnet'
+
+      It "fails with exit 7"
+        When call config.dotnet.validate_coherence "$NO_DOTNET_WS"
+        The status should equal 7
+        The stderr should include "config mismatch"
+        The stderr should include ".csproj or .sln"
+      End
+    End
+  End
 End

@@ -40,14 +40,15 @@ Describe "security.sh"
       setup_mocks() {
         TEST_WS="$(mktemp -d)"
         MOCK_DEPS_LOG="${TEST_WS}/deps_args.log"
-        MOCK_SAST_LOG="${TEST_WS}/sast_args.log"
+        MOCK_SECRET_LOG="${TEST_WS}/secret_args.log"
         MOCK_CONTAINER_LOG="${TEST_WS}/container_args.log"
         eval "quality.deps.run() { printf '%s\n' \"\$*\" > \"$MOCK_DEPS_LOG\"; return 0; }"
-        eval "quality.sast.run() { printf '%s\n' \"\$*\" > \"$MOCK_SAST_LOG\"; return 0; }"
+        eval "quality.secret_scan.run() { printf '%s\n' \"\$*\" > \"$MOCK_SECRET_LOG\"; return 0; }"
         eval "quality.container.run() { printf '%s\n' \"\$*\" > \"$MOCK_CONTAINER_LOG\"; return 0; }"
       }
       cleanup_mocks() {
-        unset -f quality.deps.run quality.sast.run quality.container.run 2>/dev/null
+        unset -f quality.deps.run quality.secret_scan.run quality.container.run 2>/dev/null
+        unset BRIK_QUALITY_SECRET_SCAN_TOOL BRIK_SECURITY_SECRET_SCAN_TOOL 2>/dev/null
         rm -rf "$TEST_WS"
       }
       Before 'setup_mocks'
@@ -83,12 +84,22 @@ Describe "security.sh"
         The status should be success
       End
 
-      It "passes --tool trivy to sast scan"
-        invoke_check_sast_tool() {
+      It "delegates to quality.secret_scan.run"
+        invoke_check_secret() {
           security.run "$TEST_WS" 2>/dev/null || return 1
-          grep -q "\-\-tool trivy" "$MOCK_SAST_LOG"
+          [[ -f "$MOCK_SECRET_LOG" ]]
         }
-        When call invoke_check_sast_tool
+        When call invoke_check_secret
+        The status should be success
+      End
+
+      It "bridges BRIK_SECURITY_SECRET_SCAN_TOOL to quality module"
+        invoke_check_bridge() {
+          export BRIK_SECURITY_SECRET_SCAN_TOOL="gitleaks"
+          security.run "$TEST_WS" 2>/dev/null || return 1
+          [[ "${BRIK_QUALITY_SECRET_SCAN_TOOL:-}" == "gitleaks" ]]
+        }
+        When call invoke_check_bridge
         The status should be success
       End
     End
@@ -97,10 +108,10 @@ Describe "security.sh"
       setup_selective() {
         TEST_WS="$(mktemp -d)"
         quality.deps.run() { return 0; }
-        quality.sast.run() { return 0; }
+        quality.secret_scan.run() { return 0; }
       }
       cleanup_selective() {
-        unset -f quality.deps.run quality.sast.run 2>/dev/null
+        unset -f quality.deps.run quality.secret_scan.run 2>/dev/null
         rm -rf "$TEST_WS"
       }
       Before 'setup_selective'
@@ -117,10 +128,10 @@ Describe "security.sh"
       setup_fail() {
         TEST_WS="$(mktemp -d)"
         quality.deps.run() { return 10; }
-        quality.sast.run() { return 0; }
+        quality.secret_scan.run() { return 0; }
       }
       cleanup_fail() {
-        unset -f quality.deps.run quality.sast.run 2>/dev/null
+        unset -f quality.deps.run quality.secret_scan.run 2>/dev/null
         rm -rf "$TEST_WS"
       }
       Before 'setup_fail'

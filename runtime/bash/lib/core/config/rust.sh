@@ -32,3 +32,18 @@ config.rust.export_build_vars() {
     [[ -n "$rust_version" ]] && export BRIK_BUILD_RUST_VERSION="$rust_version"
     return 0
 }
+
+# Validate Rust project coherence.
+# Cargo.toml must always exist for a Rust project.
+# Usage: config.rust.validate_coherence <workspace>
+config.rust.validate_coherence() {
+    local workspace="$1"
+
+    if [[ ! -f "${workspace}/Cargo.toml" ]]; then
+        log.error "config mismatch: stack is 'rust' but Cargo.toml not found"
+        log.error "fix: create a Cargo.toml, or change project.stack in brik.yml"
+        return 7
+    fi
+
+    return 0
+}

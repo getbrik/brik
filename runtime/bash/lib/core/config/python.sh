@@ -32,3 +32,49 @@ config.python.export_build_vars() {
     [[ -n "$python_version" ]] && export BRIK_BUILD_PYTHON_VERSION="$python_version"
     return 0
 }
+
+# Validate Python build tool coherence.
+# If build tool is explicitly set, verify the matching project file exists.
+# Usage: config.python.validate_coherence <workspace>
+config.python.validate_coherence() {
+    local workspace="$1"
+    local tool="${BRIK_BUILD_TOOL:-}"
+
+    # Only validate when tool is explicitly set (not auto)
+    [[ -z "$tool" || "$tool" == "auto" ]] && return 0
+
+    case "$tool" in
+        uv)
+            if [[ ! -f "${workspace}/pyproject.toml" ]] && [[ ! -f "${workspace}/uv.lock" ]]; then
+                log.error "config mismatch: build.tool is 'uv' but neither pyproject.toml nor uv.lock found"
+                log.error "fix: create a pyproject.toml, or change build.tool in brik.yml"
+                return 7
+            fi
+            ;;
+        poetry)
+            if [[ ! -f "${workspace}/pyproject.toml" ]] && [[ ! -f "${workspace}/poetry.lock" ]]; then
+                log.error "config mismatch: build.tool is 'poetry' but neither pyproject.toml nor poetry.lock found"
+                log.error "fix: create a pyproject.toml, or change build.tool in brik.yml"
+                return 7
+            fi
+            ;;
+        pipenv)
+            if [[ ! -f "${workspace}/Pipfile" ]]; then
+                log.error "config mismatch: build.tool is 'pipenv' but Pipfile not found"
+                log.error "fix: create a Pipfile, or change build.tool in brik.yml"
+                return 7
+            fi
+            ;;
+        pip)
+            if [[ ! -f "${workspace}/requirements.txt" ]] \
+                && [[ ! -f "${workspace}/setup.py" ]] \
+                && [[ ! -f "${workspace}/pyproject.toml" ]]; then
+                log.error "config mismatch: build.tool is 'pip' but no requirements.txt, setup.py, or pyproject.toml found"
+                log.error "fix: create a requirements.txt or setup.py, or change build.tool in brik.yml"
+                return 7
+            fi
+            ;;
+    esac
+
+    return 0
+}

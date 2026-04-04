@@ -270,6 +270,23 @@
             }
           }
         },
+        "type_check": {
+          "description": "Type checking configuration.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "command": {
+              "description": "Type check command to execute. Overrides tool selection (Tier 1).",
+              "type": "string",
+              "minLength": 1
+            },
+            "tool": {
+              "description": "Type checker to use (e.g. tsc, mypy, pyright). Overrides auto-detection (Tier 2).",
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
         "coverage": {
           "description": "Test coverage threshold enforcement.",
           "type": "object",
