@@ -37,7 +37,7 @@ else
 fi
 readonly BRIK_HOME
 
-readonly BRIK_VERSION="0.1.0"
+readonly BRIK_VERSION="0.2.0"
 readonly BRIK_SCHEMA_VERSION="v1"
 readonly BRIK_RUNTIME="bash"
 readonly BRIK_REF="v${BRIK_VERSION}"
