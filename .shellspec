@@ -6,6 +6,6 @@
 --env LC_NUMERIC=C
 
 ## Default kcov (coverage) options
---kcov-options "--include-path=./bin,./runtime/bash/lib,./shared-libs/gitlab/scripts,./shared-libs/local/scripts --path-strip-level=1"
+--kcov-options "--include-path=./bin,./runtime/bash/lib,./shared-libs/gitlab/scripts,./shared-libs/jenkins/scripts,./shared-libs/local/scripts --path-strip-level=1"
 --kcov-options "--include-pattern=.sh,/bin/brik"
---kcov-options "--exclude-path=./runtime/bash/spec,./shared-libs/gitlab/spec,./shared-libs/local/spec"
+--kcov-options "--exclude-path=./runtime/bash/spec,./shared-libs/gitlab/spec,./shared-libs/jenkins/spec,./shared-libs/local/spec"
