@@ -5,7 +5,7 @@
 #
 # Usage: brik <command> [options]
 # Commands: validate, doctor, init, run, version, help
-# shellcheck disable=SC1091,SC2317
+# shellcheck disable=SC1091
 set -euo pipefail
 
 # ---------------------------------------------------------------------------
@@ -13,13 +13,15 @@ set -euo pipefail
 # ---------------------------------------------------------------------------
 _brik_resolve_home() {
     local source="${BASH_SOURCE[0]}"
+    local dir=""
+    local bin_dir=""
+
     while [[ -L "${source}" ]]; do
-        local dir
         dir="$(cd -P "$(dirname "${source}")" && pwd)"
         source="$(readlink "${source}")"
         [[ "${source}" != /* ]] && source="${dir}/${source}"
     done
-    local bin_dir
+
     bin_dir="$(cd -P "$(dirname "${source}")" && pwd)"
     dirname "${bin_dir}"
 }
@@ -35,11 +37,10 @@ else
 fi
 readonly BRIK_HOME
 
-BRIK_VERSION="0.1.0"
-BRIK_SCHEMA_VERSION="v1"
-BRIK_RUNTIME="bash"
-
-readonly BRIK_VERSION BRIK_SCHEMA_VERSION BRIK_RUNTIME
+readonly BRIK_VERSION="0.1.0"
+readonly BRIK_SCHEMA_VERSION="v1"
+readonly BRIK_RUNTIME="bash"
+readonly BRIK_REF="v${BRIK_VERSION}"
 
 readonly DEFAULT_CONFIG="brik.yml"
 readonly DEFAULT_SCHEMA="${BRIK_HOME}/schemas/config/v1/brik.schema.json"
@@ -53,28 +54,74 @@ readonly EXIT_NOT_FOUND=7
 # Utility functions
 # ---------------------------------------------------------------------------
 
-# Print a message to stdout
 brik_print() {
-    printf '%s\n' "$*"
+    printf '%s\n' "$1"
 }
 
-# Print a message to stderr
 brik_error() {
-    printf 'error: %s\n' "$*" >&2
+    printf 'error: %s\n' "$1" >&2
+}
+
+brik_hint() {
+    printf 'hint: %s\n' "$1" >&2
+}
+
+brik_usage_error() {
+    brik_error "$1"
+    brik_error "Run 'brik help' for usage."
+    return "${EXIT_INVALID}"
+}
+
+brik_require_arg() {
+    local opt="$1"
+    local val="${2-}"
+    if [[ -z "${val}" ]]; then
+        brik_error "${opt} requires a value"
+        return "${EXIT_INVALID}"
+    fi
+}
+
+brik_require_file() {
+    local path="$1"
+    local label="${2:-file}"
+    if [[ ! -f "${path}" ]]; then
+        brik_error "${label} not found: ${path}"
+        return "${EXIT_NOT_FOUND}"
+    fi
+}
+
+brik_require_dir() {
+    local path="$1"
+    local label="${2:-directory}"
+    if [[ ! -d "${path}" ]]; then
+        brik_error "${label} not found: ${path}"
+        return "${EXIT_NOT_FOUND}"
+    fi
 }
 
 # Check that a required tool is available on PATH.
-# Prints a helpful message and returns 1 if the tool is missing.
 brik_require_tool() {
     local tool="$1"
     local hint="${2:-}"
+
     if ! command -v "${tool}" >/dev/null 2>&1; then
         brik_error "'${tool}' is required but not found on PATH."
         if [[ -n "${hint}" ]]; then
-            printf 'hint: %s\n' "${hint}" >&2
+            brik_hint "${hint}"
         fi
-        return 1
+        return "${EXIT_INVALID}"
     fi
+}
+
+brik_tool_version() {
+    local tool="$1"
+    local version="installed"
+
+    if command -v "${tool}" >/dev/null 2>&1; then
+        version="$("${tool}" --version 2>/dev/null | head -n 1)" || true
+    fi
+
+    printf '%s\n' "${version}"
 }
 
 # ---------------------------------------------------------------------------
@@ -154,60 +201,39 @@ EOF
 cmd_validate() {
     local config_path="${DEFAULT_CONFIG}"
     local schema_path="${DEFAULT_SCHEMA}"
+    local json_output=""
+    local validation_output=""
 
-    # Parse arguments
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --config)
-                if [[ $# -lt 2 || -z "$2" ]]; then
-                    brik_error "--config requires a path argument"
-                    return "${EXIT_INVALID}"
-                fi
+                brik_require_arg "--config" "${2-}" || return "$?"
                 config_path="$2"
                 shift 2
                 ;;
             --schema)
-                if [[ $# -lt 2 || -z "$2" ]]; then
-                    brik_error "--schema requires a path argument"
-                    return "${EXIT_INVALID}"
-                fi
+                brik_require_arg "--schema" "${2-}" || return "$?"
                 schema_path="$2"
                 shift 2
                 ;;
             *)
-                brik_error "unknown option: $1"
-                brik_error "Run 'brik help' for usage."
-                return "${EXIT_INVALID}"
+                brik_usage_error "unknown option: $1" || return "$?"
                 ;;
         esac
     done
 
-    # Verify config file exists
-    if [[ ! -f "${config_path}" ]]; then
-        brik_error "config file not found: ${config_path}"
-        return "${EXIT_NOT_FOUND}"
-    fi
+    brik_require_file "${config_path}" "config file" || return "$?"
+    brik_require_file "${schema_path}" "schema file" || return "$?"
 
-    # Verify schema file exists
-    if [[ ! -f "${schema_path}" ]]; then
-        brik_error "schema file not found: ${schema_path}"
-        return "${EXIT_NOT_FOUND}"
-    fi
-
-    # Check required tools
     brik_require_tool "yq" "Install yq (mikefarah/yq): https://github.com/mikefarah/yq" || return "${EXIT_INVALID}"
     brik_require_tool "check-jsonschema" "Install check-jsonschema: pip install check-jsonschema" || return "${EXIT_INVALID}"
 
-    # Step 1: convert YAML to JSON
-    local json_output
     if ! json_output="$(yq -o json "${config_path}" 2>&1)"; then
         brik_error "failed to parse ${config_path} as YAML"
         printf '%s\n' "${json_output}" >&2
         return "${EXIT_INVALID}"
     fi
 
-    # Step 2: validate JSON against schema
-    local validation_output
     if ! validation_output="$(printf '%s\n' "${json_output}" | check-jsonschema --schemafile "${schema_path}" - 2>&1)"; then
         brik_error "${config_path} is invalid"
         printf '%s\n' "${validation_output}" >&2
@@ -226,15 +252,16 @@ cmd_validate() {
 # Returns the detected stack name or "unknown".
 _brik_detect_stack() {
     local workspace="${1:-.}"
+
     if [[ -f "${workspace}/package.json" ]]; then
         printf 'node'
-    elif [[ -f "${workspace}/pom.xml" ]] || [[ -f "${workspace}/build.gradle" ]]; then
+    elif [[ -f "${workspace}/pom.xml" || -f "${workspace}/build.gradle" ]]; then
         printf 'java'
-    elif [[ -f "${workspace}/requirements.txt" ]] || [[ -f "${workspace}/setup.py" ]] || [[ -f "${workspace}/pyproject.toml" ]]; then
+    elif [[ -f "${workspace}/requirements.txt" || -f "${workspace}/setup.py" || -f "${workspace}/pyproject.toml" ]]; then
         printf 'python'
     elif [[ -f "${workspace}/Cargo.toml" ]]; then
         printf 'rust'
-    elif [[ -f "${workspace}/${workspace}".csproj ]] || ls "${workspace}"/*.csproj >/dev/null 2>&1 || [[ -f "${workspace}/${workspace}".sln ]] || ls "${workspace}"/*.sln >/dev/null 2>&1; then
+    elif compgen -G "${workspace}"/*.csproj >/dev/null || compgen -G "${workspace}"/*.sln >/dev/null; then
         printf 'dotnet'
     else
         printf 'unknown'
@@ -246,21 +273,31 @@ cmd_doctor() {
     local passed=0
     local failed=0
     local warned=0
+    local tool_name=""
+    local tool_hint=""
+    local tool_version=""
+    local stack=""
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
-            --workspace) workspace="$2"; shift 2 ;;
-            *) brik_error "unknown option: $1"; return "${EXIT_INVALID}" ;;
+            --workspace)
+                brik_require_arg "--workspace" "${2-}" || return "$?"
+                workspace="$2"
+                shift 2
+                ;;
+            *)
+                brik_usage_error "unknown option: $1" || return "$?"
+                ;;
         esac
     done
+
+    brik_require_dir "${workspace}" "workspace directory" || return "$?"
 
     brik_print "brik doctor - checking prerequisites"
     brik_print "======================================"
     brik_print ""
 
-    # Check bash version
-    local bash_major="${BASH_VERSINFO[0]}"
-    if [[ "${bash_major}" -ge 4 ]]; then
+    if [[ "${BASH_VERSINFO[0]}" -ge 4 ]]; then
         brik_print "  [OK]      bash ${BASH_VERSION} (>= 4 required)"
         passed=$((passed + 1))
     else
@@ -268,16 +305,15 @@ cmd_doctor() {
         failed=$((failed + 1))
     fi
 
-    # Check core tools
-    local tool_name tool_hint
     for tool_name in yq jq; do
         case "${tool_name}" in
             yq) tool_hint="https://github.com/mikefarah/yq" ;;
             jq) tool_hint="https://jqlang.github.io/jq/" ;;
+            *) tool_hint="" ;;
         esac
+
         if command -v "${tool_name}" >/dev/null 2>&1; then
-            local tool_version
-            tool_version="$("${tool_name}" --version 2>/dev/null | head -1)" || tool_version="installed"
+            tool_version="$(brik_tool_version "${tool_name}")"
             brik_print "  [OK]      ${tool_name} (${tool_version})"
             passed=$((passed + 1))
         else
@@ -286,7 +322,6 @@ cmd_doctor() {
         fi
     done
 
-    # Check optional tools
     if command -v check-jsonschema >/dev/null 2>&1; then
         brik_print "  [OK]      check-jsonschema"
         passed=$((passed + 1))
@@ -303,20 +338,19 @@ cmd_doctor() {
         warned=$((warned + 1))
     fi
 
-    # Detect stack and check stack-specific tools
     brik_print ""
-    local stack
     stack="$(_brik_detect_stack "${workspace}")"
+
     if [[ "${stack}" != "unknown" ]]; then
         brik_print "  Detected stack: ${stack} (from ${workspace})"
         brik_print ""
+
         case "${stack}" in
             node)
                 for tool_name in node npm; do
                     if command -v "${tool_name}" >/dev/null 2>&1; then
-                        local ver
-                        ver="$("${tool_name}" --version 2>/dev/null | head -1)"
-                        brik_print "  [OK]      ${tool_name} (${ver})"
+                        tool_version="$(brik_tool_version "${tool_name}")"
+                        brik_print "  [OK]      ${tool_name} (${tool_version})"
                         passed=$((passed + 1))
                     else
                         brik_print "  [MISSING] ${tool_name}"
@@ -327,7 +361,8 @@ cmd_doctor() {
             java)
                 for tool_name in java mvn; do
                     if command -v "${tool_name}" >/dev/null 2>&1; then
-                        brik_print "  [OK]      ${tool_name}"
+                        tool_version="$(brik_tool_version "${tool_name}")"
+                        brik_print "  [OK]      ${tool_name} (${tool_version})"
                         passed=$((passed + 1))
                     else
                         brik_print "  [MISSING] ${tool_name}"
@@ -338,7 +373,8 @@ cmd_doctor() {
             python)
                 for tool_name in python3 pip3; do
                     if command -v "${tool_name}" >/dev/null 2>&1; then
-                        brik_print "  [OK]      ${tool_name}"
+                        tool_version="$(brik_tool_version "${tool_name}")"
+                        brik_print "  [OK]      ${tool_name} (${tool_version})"
                         passed=$((passed + 1))
                     else
                         brik_print "  [MISSING] ${tool_name}"
@@ -349,7 +385,8 @@ cmd_doctor() {
             rust)
                 for tool_name in rustc cargo; do
                     if command -v "${tool_name}" >/dev/null 2>&1; then
-                        brik_print "  [OK]      ${tool_name}"
+                        tool_version="$(brik_tool_version "${tool_name}")"
+                        brik_print "  [OK]      ${tool_name} (${tool_version})"
                         passed=$((passed + 1))
                     else
                         brik_print "  [MISSING] ${tool_name}"
@@ -359,7 +396,8 @@ cmd_doctor() {
                 ;;
             dotnet)
                 if command -v dotnet >/dev/null 2>&1; then
-                    brik_print "  [OK]      dotnet"
+                    tool_version="$(brik_tool_version dotnet)"
+                    brik_print "  [OK]      dotnet (${tool_version})"
                     passed=$((passed + 1))
                 else
                     brik_print "  [MISSING] dotnet"
@@ -371,9 +409,9 @@ cmd_doctor() {
         brik_print "  No stack detected in ${workspace}"
     fi
 
-    # Summary
     brik_print ""
     brik_print "======================================"
+
     local summary="${passed} checks passed"
     if [[ "${failed}" -gt 0 ]]; then
         summary="${summary}, ${failed} missing"
@@ -384,8 +422,9 @@ cmd_doctor() {
     brik_print "${summary}"
 
     if [[ "${failed}" -gt 0 ]]; then
-        return 1
+        return "${EXIT_INVALID}"
     fi
+
     return "${EXIT_OK}"
 }
 
@@ -397,24 +436,42 @@ cmd_init() {
     local platform="gitlab"
     local target_dir="."
     local non_interactive=false
+    local project_name=""
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
-            --stack) stack="$2"; shift 2 ;;
-            --platform) platform="$2"; shift 2 ;;
-            --dir) target_dir="$2"; shift 2 ;;
-            --non-interactive) non_interactive=true; shift ;;
-            *) brik_error "unknown option: $1"; return "${EXIT_INVALID}" ;;
+            --stack)
+                brik_require_arg "--stack" "${2-}" || return "$?"
+                stack="$2"
+                shift 2
+                ;;
+            --platform)
+                brik_require_arg "--platform" "${2-}" || return "$?"
+                platform="$2"
+                shift 2
+                ;;
+            --dir)
+                brik_require_arg "--dir" "${2-}" || return "$?"
+                target_dir="$2"
+                shift 2
+                ;;
+            --non-interactive)
+                non_interactive=true
+                shift
+                ;;
+            *)
+                brik_usage_error "unknown option: $1" || return "$?"
+                ;;
         esac
     done
 
-    # Refuse to overwrite existing brik.yml
+    brik_require_dir "${target_dir}" "target directory" || return "$?"
+
     if [[ -f "${target_dir}/brik.yml" ]]; then
         brik_error "brik.yml already exists in ${target_dir}"
         return "${EXIT_INVALID}"
     fi
 
-    # Auto-detect stack if not specified
     if [[ -z "${stack}" ]]; then
         stack="$(_brik_detect_stack "${target_dir}")"
         if [[ "${stack}" == "unknown" ]]; then
@@ -428,7 +485,6 @@ cmd_init() {
         brik_print "Detected stack: ${stack}"
     fi
 
-    # Validate stack
     case "${stack}" in
         node|java|python|rust|dotnet) ;;
         *)
@@ -438,7 +494,6 @@ cmd_init() {
             ;;
     esac
 
-    # Validate platform
     case "${platform}" in
         gitlab|github|jenkins) ;;
         *)
@@ -448,14 +503,9 @@ cmd_init() {
             ;;
     esac
 
-    # Derive project name from directory
-    local project_name
     project_name="$(basename "$(cd "${target_dir}" && pwd)")"
 
-    # Generate brik.yml
     _brik_generate_config "${target_dir}" "${project_name}" "${stack}"
-
-    # Generate platform bootstrap file
     _brik_generate_bootstrap "${target_dir}" "${platform}"
 
     brik_print "Created brik.yml and ${platform} bootstrap in ${target_dir}"
@@ -471,7 +521,7 @@ _brik_generate_config() {
 version: 1
 
 project:
-  name: ${project_name}
+  name: "${project_name}"
   stack: ${stack}
 YAML
 }
@@ -482,16 +532,16 @@ _brik_generate_bootstrap() {
 
     case "${platform}" in
         gitlab)
-            cat > "${target_dir}/.gitlab-ci.yml" <<'YAML'
+            cat > "${target_dir}/.gitlab-ci.yml" <<YAML
 include:
   - project: 'brik/gitlab-templates'
-    ref: v0.1.0
+    ref: ${BRIK_REF}
     file: '/templates/pipeline.yml'
 YAML
             ;;
         github)
             mkdir -p "${target_dir}/.github/workflows"
-            cat > "${target_dir}/.github/workflows/ci.yml" <<'YAML'
+            cat > "${target_dir}/.github/workflows/ci.yml" <<YAML
 name: Brik Pipeline
 on:
   push:
@@ -501,14 +551,14 @@ on:
 
 jobs:
   brik:
-    uses: getbrik/brik/.github/workflows/brik-pipeline.yml@v0.1.0
+    uses: getbrik/brik/.github/workflows/brik-pipeline.yml@${BRIK_REF}
     with:
       config: brik.yml
 YAML
             ;;
         jenkins)
-            cat > "${target_dir}/Jenkinsfile" <<'GROOVY'
-@Library('brik@v0.1.0') _
+            cat > "${target_dir}/Jenkinsfile" <<GROOVY
+@Library('brik@${BRIK_REF}') _
 brikPipeline()
 GROOVY
             ;;
@@ -531,8 +581,7 @@ cmd_run() {
         stage)    cmd_run_stage "$@" ;;
         pipeline) cmd_run_pipeline "$@" ;;
         *)
-            brik_error "unknown run subcommand: ${subcmd}"
-            return "${EXIT_INVALID}"
+            brik_usage_error "unknown run subcommand: ${subcmd}" || return "$?"
             ;;
     esac
 }
@@ -540,8 +589,10 @@ cmd_run() {
 # Source the local wrapper and run setup.
 # Accepts optional overrides for workspace and config via environment.
 _setup_local_env() {
+    local wrapper="${BRIK_HOME}/shared-libs/local/scripts/local-wrapper.sh"
+    brik_require_file "${wrapper}" "local wrapper" || return "$?"
     # shellcheck source=../shared-libs/local/scripts/local-wrapper.sh
-    . "${BRIK_HOME}/shared-libs/local/scripts/local-wrapper.sh"
+    . "${wrapper}"
 
     local rc
     set +e
@@ -562,35 +613,34 @@ _brik_run_runtime() {
 }
 
 cmd_run_stage() {
+    local stage_name=""
+    local config_path=""
+    local workspace=""
+
     if [[ $# -eq 0 ]]; then
         brik_error "'brik run stage' requires a stage name"
         return "${EXIT_INVALID}"
     fi
 
-    local stage_name="$1"
+    stage_name="$1"
     shift
-    local config_path=""
-    local workspace
     workspace="$(pwd)"
 
-    # Parse optional arguments
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --config)
-                if [[ $# -lt 2 || -z "$2" ]]; then
-                    brik_error "--config requires a path argument"
-                    return "${EXIT_INVALID}"
-                fi
-                config_path="$2"; shift 2
+                brik_require_arg "--config" "${2-}" || return "$?"
+                config_path="$2"
+                shift 2
                 ;;
             --workspace)
-                if [[ $# -lt 2 || -z "$2" ]]; then
-                    brik_error "--workspace requires a path argument"
-                    return "${EXIT_INVALID}"
-                fi
-                workspace="$2"; shift 2
+                brik_require_arg "--workspace" "${2-}" || return "$?"
+                workspace="$2"
+                shift 2
                 ;;
-            *) brik_error "unknown option: $1"; return "${EXIT_INVALID}" ;;
+            *)
+                brik_usage_error "unknown option: $1" || return "$?"
+                ;;
         esac
     done
 
@@ -604,6 +654,7 @@ cmd_run_stage() {
     export BRIK_WORKSPACE="${workspace}"
     export BRIK_CONFIG_FILE="${config_path}"
     export BRIK_LOG_DIR="${BRIK_LOG_DIR:-/tmp/brik/logs}"
+    mkdir -p "${BRIK_LOG_DIR}"
 
     _setup_local_env || return "$?"
 
@@ -612,30 +663,30 @@ cmd_run_stage() {
 
 cmd_run_pipeline() {
     local config_path=""
-    local workspace
-    workspace="$(pwd)"
+    local workspace=""
     local -a pipeline_flags=()
 
-    # Separate CLI options from pipeline flags
+    workspace="$(pwd)"
+
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --config)
-                if [[ $# -lt 2 || -z "$2" ]]; then
-                    brik_error "--config requires a path argument"
-                    return "${EXIT_INVALID}"
-                fi
-                config_path="$2"; shift 2
+                brik_require_arg "--config" "${2-}" || return "$?"
+                config_path="$2"
+                shift 2
                 ;;
             --workspace)
-                if [[ $# -lt 2 || -z "$2" ]]; then
-                    brik_error "--workspace requires a path argument"
-                    return "${EXIT_INVALID}"
-                fi
-                workspace="$2"; shift 2
+                brik_require_arg "--workspace" "${2-}" || return "$?"
+                workspace="$2"
+                shift 2
                 ;;
             --continue-on-error|--with-release|--with-package|--with-deploy)
-                pipeline_flags+=("$1"); shift ;;
-            *) brik_error "unknown option: $1"; return "${EXIT_INVALID}" ;;
+                pipeline_flags+=("$1")
+                shift
+                ;;
+            *)
+                brik_usage_error "unknown option: $1" || return "$?"
+                ;;
         esac
     done
 
@@ -649,6 +700,7 @@ cmd_run_pipeline() {
     export BRIK_WORKSPACE="${workspace}"
     export BRIK_CONFIG_FILE="${config_path}"
     export BRIK_LOG_DIR="${BRIK_LOG_DIR:-/tmp/brik/logs}"
+    mkdir -p "${BRIK_LOG_DIR}"
 
     _setup_local_env || return "$?"
 
@@ -659,12 +711,14 @@ cmd_run_pipeline() {
 # Main dispatch
 # ---------------------------------------------------------------------------
 main() {
+    local command=""
+
     if [[ $# -eq 0 ]]; then
         cmd_help
         exit "${EXIT_OK}"
     fi
 
-    local command="$1"
+    command="$1"
     shift
 
     case "${command}" in
@@ -688,14 +742,12 @@ main() {
             cmd_version
             exit "${EXIT_OK}"
             ;;
-        help | --help | -h)
+        help|--help|-h)
             cmd_help
             exit "${EXIT_OK}"
             ;;
         *)
-            brik_error "unknown command: ${command}"
-            brik_error "Run 'brik help' for usage."
-            exit "${EXIT_INVALID}"
+            brik_usage_error "unknown command: ${command}" || exit "$?"
             ;;
     esac
 }
