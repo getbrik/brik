@@ -86,11 +86,7 @@ config.get() {
     fi
 
     local value
-    if [[ -n "$default_value" ]]; then
-        value="$(yq "${yq_path} // \"${default_value}\"" "$config_file" 2>/dev/null)"
-    else
-        value="$(yq "${yq_path}" "$config_file" 2>/dev/null)"
-    fi
+    value="$(yq "${yq_path}" "$config_file" 2>/dev/null)"
 
     # yq returns "null" for missing keys
     if [[ "$value" == "null" || -z "$value" ]]; then

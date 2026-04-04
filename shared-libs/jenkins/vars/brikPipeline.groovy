@@ -24,8 +24,23 @@ def call(Map params = [:]) {
         timeout(time: timeoutMinutes, unit: 'MINUTES') {
             checkout scm
 
-            // Jenkins clones Global Libraries into ${WORKSPACE}@libs/<name>/
-            def brikHome = params.brikHome ?: "${env.WORKSPACE}@libs/brik"
+            // Jenkins clones Global Libraries into ${WORKSPACE}@libs/<hash>/
+            // Discover the actual checkout path by finding the directory with vars/
+            def brikHome = params.brikHome ?: sh(
+                script: '''#!/bin/bash
+                    libs_dir="${WORKSPACE}@libs"
+                    if [ -d "$libs_dir" ]; then
+                        for d in "$libs_dir"/*/; do
+                            if [ -d "${d}vars" ]; then
+                                printf '%s' "${d%/}"
+                                exit 0
+                            fi
+                        done
+                    fi
+                    printf '%s' "${libs_dir}/brik"
+                ''',
+                returnStdout: true
+            ).trim()
 
             try {
                 stage('Init')    { brikStage('init', brikHome) }
