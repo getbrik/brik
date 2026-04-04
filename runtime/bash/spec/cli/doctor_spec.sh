@@ -117,6 +117,38 @@ Describe "brik doctor"
     End
   End
 
+  Describe "java stack detection from pom.xml"
+    setup_maven_project() {
+      TEMP_DIR="$(mktemp -d)"
+      printf '<project><modelVersion>4.0.0</modelVersion></project>\n' > "${TEMP_DIR}/pom.xml"
+    }
+    cleanup_maven_project() { rm -rf "$TEMP_DIR"; }
+    Before 'setup_maven_project'
+    After 'cleanup_maven_project'
+
+    It "detects java stack from pom.xml"
+      When run script "${BRIK_BIN}" doctor --workspace "${TEMP_DIR}"
+      The output should include "java"
+      The status should satisfy "true"
+    End
+  End
+
+  Describe "java stack detection from build.gradle"
+    setup_gradle_project() {
+      TEMP_DIR="$(mktemp -d)"
+      printf 'plugins { id "java" }\n' > "${TEMP_DIR}/build.gradle"
+    }
+    cleanup_gradle_project() { rm -rf "$TEMP_DIR"; }
+    Before 'setup_gradle_project'
+    After 'cleanup_gradle_project'
+
+    It "detects java stack from build.gradle"
+      When run script "${BRIK_BIN}" doctor --workspace "${TEMP_DIR}"
+      The output should include "java"
+      The status should satisfy "true"
+    End
+  End
+
   Describe "no stack detected"
     setup_no_stack() { TEMP_DIR="$(mktemp -d)"; }
     cleanup_no_stack() { rm -rf "$TEMP_DIR"; }

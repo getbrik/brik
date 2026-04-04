@@ -232,5 +232,26 @@ MOCKEOF
       The status should equal 2
       The stderr should include "unknown"
     End
+
+    It "accepts --with-release flag"
+      When run script "$BRIK_BIN" run pipeline --workspace "$WORKSPACE" --config "$CONFIG" --with-release
+      The status should be success
+      The stdout should include "Pipeline Summary"
+      The stderr should be present
+    End
+
+    It "accepts --with-deploy flag"
+      When run script "$BRIK_BIN" run pipeline --workspace "$WORKSPACE" --config "$CONFIG" --with-deploy
+      The status should be success
+      The stdout should include "Pipeline Summary"
+      The stderr should be present
+    End
+
+    It "accepts --continue-on-error flag"
+      When run script "$BRIK_BIN" run pipeline --workspace "$WORKSPACE" --config "$CONFIG" --continue-on-error
+      The status should be success
+      The stdout should include "Pipeline Summary"
+      The stderr should be present
+    End
   End
 End
