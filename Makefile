@@ -1,4 +1,4 @@
-.PHONY: help lint test test-quick coverage validate check clean
+.PHONY: help lint test test-quick coverage validate check clean install uninstall
 
 help: ## Show available targets
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F ':.*## ' '{printf "  %-14s %s\n", $$1, $$2}'
@@ -22,6 +22,19 @@ validate: ## Validate example brik.yml files
 	bin/brik validate --config examples/mono-dotnet/brik.yml
 
 check: lint coverage validate ## Full pre-commit gate (lint + coverage + validate)
+
+install: ## Install brik symlink into /usr/local/bin (dev mode)
+	@if [ -f /usr/local/bin/brik ] && [ ! -L /usr/local/bin/brik ]; then \
+		echo "error: /usr/local/bin/brik exists and is not a symlink"; \
+		echo "hint: remove it first or set BRIK_HOME to override"; \
+		exit 1; \
+	fi
+	ln -sf "$(CURDIR)/bin/brik" /usr/local/bin/brik
+	@echo "installed: /usr/local/bin/brik -> $(CURDIR)/bin/brik"
+
+uninstall: ## Remove brik symlink from /usr/local/bin
+	rm -f /usr/local/bin/brik
+	@echo "removed: /usr/local/bin/brik"
 
 clean: ## Remove generated files
 	rm -rf coverage/

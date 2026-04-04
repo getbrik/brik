@@ -63,7 +63,17 @@ flowchart LR
 3. **Shared library** -- portable Bash scripts hosted in a Git repository. Each bootstrap file references it. The library reads `brik.yml` and executes each stage.
 4. **Pipeline runs** -- build, test, lint, security scan, deploy -- with sensible defaults. Same result whether on CI or locally.
 
-## Quick Start
+## Install
+
+```bash
+# One-liner (recommended)
+curl -fsSL https://raw.githubusercontent.com/getbrik/brik/main/scripts/install.sh | bash
+
+# Homebrew (macOS/Linux)
+brew install getbrik/tap/brik
+```
+
+After installation, run `brik doctor` to check your environment.
 
 <details>
 <summary><strong>Prerequisites (local usage only)</strong></summary>
@@ -193,6 +203,9 @@ security:
 | `brik doctor` | Check prerequisites (tools, stack detection) |
 | `brik init` | Scaffold `brik.yml` and platform bootstrap file |
 | `brik run stage <name>` | Execute a pipeline stage locally |
+| `brik run pipeline` | Execute the full pipeline locally |
+| `brik self-update` | Update brik to the latest version |
+| `brik self-uninstall` | Remove brik from your system |
 | `brik version` | Print version, schema, and runtime info |
 | `brik help` | Print usage information |
 
@@ -202,8 +215,10 @@ Key options:
 brik validate --config path/to/brik.yml
 brik doctor --workspace ./my-project
 brik init --stack node --platform gitlab
-brik init --non-interactive
 brik run stage build --config brik.yml --workspace .
+brik run pipeline --with-package --continue-on-error
+brik self-update --channel edge
+brik version --verbose
 ```
 
 ## Platform Support
@@ -279,8 +294,8 @@ shellcheck bin/brik
 - [x] 9 pipeline stages (init, release, build, quality, security, test, package, deploy, notify)
 - [x] 5 stacks (node, java, python, dotnet, rust)
 - [x] GitLab CI shared library (enterprise-grade DAG with quality gates)
-- [x] CLI (validate, doctor, init, run, version)
-- [x] 881 tests (ShellSpec + ShellCheck + kcov) + 13 E2E scenarios
+- [x] CLI (validate, doctor, init, run, self-update, self-uninstall, version)
+- [x] 1006 tests (ShellSpec + ShellCheck + kcov) + 13 E2E scenarios
 
 **Next:**
 - [ ] Type checking, coherence validators, security scanning execution

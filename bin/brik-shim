@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# brik-shim - Lightweight shim that delegates to the real brik CLI.
+# Installed to /usr/local/bin/brik (or ~/.local/bin/brik) by the installer.
+# The real CLI lives in BRIK_HOME (default: ~/.brik).
+set -euo pipefail
+
+BRIK_HOME="${BRIK_HOME:-${HOME}/.brik}"
+export BRIK_HOME
+
+if [ ! -f "${BRIK_HOME}/bin/brik" ]; then
+    printf 'brik: runtime not found at %s\n' "${BRIK_HOME}" >&2
+    printf 'hint: reinstall with: curl -fsSL https://raw.githubusercontent.com/getbrik/brik/main/scripts/install.sh | bash\n' >&2
+    exit 1
+fi
+
+exec "${BRIK_HOME}/bin/brik" "$@"

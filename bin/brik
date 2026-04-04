@@ -4,7 +4,7 @@
 # Does NOT participate in the production CI/CD flow - shared libraries do that.
 #
 # Usage: brik <command> [options]
-# Commands: validate, doctor, init, run, version, help
+# Commands: validate, doctor, init, run, self-update, self-uninstall, version, help
 # shellcheck disable=SC1091
 set -euo pipefail
 
@@ -127,10 +127,42 @@ brik_tool_version() {
 # ---------------------------------------------------------------------------
 # Command: version
 # ---------------------------------------------------------------------------
+
+_brik_detect_install_method() {
+    if command -v brew >/dev/null 2>&1 && brew list brik >/dev/null 2>&1; then
+        printf 'brew'
+    elif [[ -d "${BRIK_HOME}/.git" ]]; then
+        if [[ "${BRIK_HOME}" != "${HOME}/.brik" ]]; then
+            printf 'source'
+        else
+            printf 'git'
+        fi
+    else
+        printf 'unknown'
+    fi
+}
+
 cmd_version() {
+    local verbose=false
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --verbose) verbose=true; shift ;;
+            *) brik_usage_error "unknown option: $1" || return "$?" ;;
+        esac
+    done
+
     brik_print "brik ${BRIK_VERSION}"
     brik_print "schema: ${BRIK_SCHEMA_VERSION}"
     brik_print "runtime: ${BRIK_RUNTIME}"
+
+    if [[ "${verbose}" == true ]]; then
+        brik_print "home: ${BRIK_HOME}"
+        brik_print "install: $(_brik_detect_install_method)"
+        local commit_sha=""
+        commit_sha="$(git -C "${BRIK_HOME}" rev-parse --short HEAD 2>/dev/null || echo "unknown")"
+        brik_print "commit: ${commit_sha}"
+    fi
 }
 
 # ---------------------------------------------------------------------------
@@ -144,11 +176,13 @@ Usage:
   brik <command> [options]
 
 Commands:
-  validate    Validate brik.yml against the JSON Schema
-  doctor      Check prerequisites (tools, stack detection)
-  init        Scaffold brik.yml and platform bootstrap file
+  validate       Validate brik.yml against the JSON Schema
+  doctor         Check prerequisites (tools, stack detection)
+  init           Scaffold brik.yml and platform bootstrap file
   run stage      Execute a single pipeline stage locally
   run pipeline   Execute the full pipeline locally
+  self-update    Update brik to the latest version
+  self-uninstall Remove brik from your system
   version        Print brik version information
   help           Print this help message
 
@@ -177,6 +211,16 @@ Options for run pipeline:
   --with-package          Include the package stage
   --with-deploy           Include deploy and notify stages
 
+Options for self-update:
+  --channel <name>        Update channel: stable (default), edge
+  --version <tag>         Update to a specific version tag
+
+Options for self-uninstall:
+  --force                 Skip confirmation prompt
+
+Options for version:
+  --verbose               Show additional info (home, install method, commit)
+
 Stages:
   init, release, build, quality, security, test, package, deploy, notify
 
@@ -191,7 +235,11 @@ Examples:
   brik run stage quality --workspace ./my-project
   brik run pipeline
   brik run pipeline --with-package --continue-on-error
+  brik self-update
+  brik self-update --channel edge
+  brik self-update --version v0.2.0
   brik version
+  brik version --verbose
 EOF
 }
 
@@ -566,6 +614,180 @@ GROOVY
 }
 
 # ---------------------------------------------------------------------------
+# Command: self-update
+# ---------------------------------------------------------------------------
+
+cmd_self_update() {
+    local channel="stable"
+    local target_version=""
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --channel)
+                brik_require_arg "--channel" "${2-}" || return "$?"
+                channel="$2"
+                shift 2
+                ;;
+            --version)
+                brik_require_arg "--version" "${2-}" || return "$?"
+                target_version="$2"
+                shift 2
+                ;;
+            *)
+                brik_usage_error "unknown option: $1" || return "$?"
+                ;;
+        esac
+    done
+
+    case "${channel}" in
+        stable|edge) ;;
+        *)
+            brik_error "invalid channel: ${channel}"
+            brik_error "Supported channels: stable, edge"
+            return "${EXIT_INVALID}"
+            ;;
+    esac
+
+    # Detect installation method
+    local method=""
+    method="$(_brik_detect_install_method)"
+
+    case "${method}" in
+        git)
+            _brik_self_update_git "${channel}" "${target_version}"
+            ;;
+        brew)
+            brik_print "updating via Homebrew..."
+            brew upgrade getbrik/tap/brik
+            ;;
+        *)
+            brik_error "cannot self-update: unknown installation method"
+            brik_error "reinstall with: curl -fsSL https://raw.githubusercontent.com/getbrik/brik/main/scripts/install.sh | bash"
+            return "${EXIT_INVALID}"
+            ;;
+    esac
+
+    brik_print ""
+    brik_print "update complete"
+    local new_version=""
+    new_version="$("${BRIK_HOME}/bin/brik" version 2>/dev/null | head -n 1)" || true
+    if [[ -n "${new_version}" ]]; then
+        brik_print "${new_version}"
+    fi
+}
+
+_brik_self_update_git() {
+    local channel="$1"
+    local target_version="$2"
+
+    if [[ ! -d "${BRIK_HOME}/.git" ]]; then
+        brik_error "not a git installation: ${BRIK_HOME}"
+        return "${EXIT_INVALID}"
+    fi
+
+    # Warn if working tree is dirty
+    if [[ -n "$(git -C "${BRIK_HOME}" status --porcelain 2>/dev/null)" ]]; then
+        brik_error "working tree is dirty in ${BRIK_HOME}"
+        brik_hint "do not modify files in ${BRIK_HOME} manually"
+        return "${EXIT_INVALID}"
+    fi
+
+    local git_output=""
+
+    brik_print "fetching updates..."
+    if ! git_output="$(git -C "${BRIK_HOME}" fetch --tags origin 2>&1)"; then
+        brik_error "failed to fetch from remote"
+        printf '%s\n' "${git_output}" >&2
+        return "${EXIT_INVALID}"
+    fi
+
+    if [[ -n "${target_version}" ]]; then
+        brik_print "switching to ${target_version}..."
+        if ! git_output="$(git -C "${BRIK_HOME}" checkout "${target_version}" 2>&1)"; then
+            brik_error "version ${target_version} not found"
+            printf '%s\n' "${git_output}" >&2
+            return "${EXIT_INVALID}"
+        fi
+    elif [[ "${channel}" == "edge" ]]; then
+        brik_print "switching to edge (main branch)..."
+        git -C "${BRIK_HOME}" checkout main 2>/dev/null || true
+        if ! git_output="$(git -C "${BRIK_HOME}" pull --ff-only origin main 2>&1)"; then
+            brik_error "failed to pull latest changes"
+            printf '%s\n' "${git_output}" >&2
+            return "${EXIT_INVALID}"
+        fi
+    else
+        # stable: checkout latest tag
+        local latest=""
+        latest="$(git -C "${BRIK_HOME}" describe --tags --abbrev=0 origin/main 2>/dev/null)" || true
+        if [[ -z "${latest}" ]]; then
+            brik_error "no tags found - try: brik self-update --channel edge"
+            return "${EXIT_INVALID}"
+        fi
+        brik_print "switching to ${latest}..."
+        if ! git_output="$(git -C "${BRIK_HOME}" checkout "${latest}" 2>&1)"; then
+            brik_error "failed to checkout ${latest}"
+            printf '%s\n' "${git_output}" >&2
+            return "${EXIT_INVALID}"
+        fi
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# Command: self-uninstall
+# ---------------------------------------------------------------------------
+
+cmd_self_uninstall() {
+    local force=false
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --force) force=true; shift ;;
+            *) brik_usage_error "unknown option: $1" || return "$?" ;;
+        esac
+    done
+
+    if [[ "${force}" != true ]]; then
+        printf 'Are you sure? This will remove Brik from your system. [y/N] '
+        local answer=""
+        read -r answer
+        case "${answer}" in
+            y|Y|yes|YES) ;;
+            *)
+                brik_print "cancelled"
+                return "${EXIT_OK}"
+                ;;
+        esac
+    fi
+
+    # Remove shim or symlink from known locations
+    for candidate in "/usr/local/bin/brik" "${HOME}/.local/bin/brik"; do
+        if [[ -f "${candidate}" || -L "${candidate}" ]]; then
+            brik_print "removing: ${candidate}"
+            rm -f "${candidate}" 2>/dev/null || {
+                brik_error "failed to remove ${candidate} - try with sudo"
+            }
+        fi
+    done
+
+    # Validate before deleting runtime
+    local home_to_remove="${BRIK_HOME}"
+    if [[ -z "${home_to_remove}" || "${home_to_remove}" == "/" ]]; then
+        brik_error "refusing to remove suspicious path: ${home_to_remove}"
+        return "${EXIT_INVALID}"
+    fi
+    if [[ ! -f "${home_to_remove}/bin/brik" ]]; then
+        brik_error "path does not look like a brik installation: ${home_to_remove}"
+        return "${EXIT_INVALID}"
+    fi
+
+    brik_print "removing runtime: ${home_to_remove}"
+    rm -rf "${home_to_remove}"
+    brik_print ""
+    brik_print "brik has been removed"
+}
+
+# ---------------------------------------------------------------------------
 # Command: run
 # ---------------------------------------------------------------------------
 cmd_run() {
@@ -738,9 +960,17 @@ main() {
             cmd_run "$@"
             exit "$?"
             ;;
+        self-update)
+            cmd_self_update "$@"
+            exit "$?"
+            ;;
+        self-uninstall)
+            cmd_self_uninstall "$@"
+            exit "$?"
+            ;;
         version)
-            cmd_version
-            exit "${EXIT_OK}"
+            cmd_version "$@"
+            exit "$?"
             ;;
         help|--help|-h)
             cmd_help
