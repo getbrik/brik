@@ -97,6 +97,8 @@ Describe "brik self-update"
 
       # Init a git repo and make it dirty
       git -C "${FAKE_GIT_HOME}" init -q
+      git -C "${FAKE_GIT_HOME}" config user.email "test@test.com"
+      git -C "${FAKE_GIT_HOME}" config user.name "Test"
       git -C "${FAKE_GIT_HOME}" add -A
       git -C "${FAKE_GIT_HOME}" commit -q -m "init"
       printf 'dirty\n' > "${FAKE_GIT_HOME}/dirty.txt"
@@ -142,6 +144,8 @@ Describe "brik self-update"
 
       # Init a clean git repo with an origin remote but no tags
       git -C "${FAKE_NT_HOME}" init -q
+      git -C "${FAKE_NT_HOME}" config user.email "test@test.com"
+      git -C "${FAKE_NT_HOME}" config user.name "Test"
       git -C "${FAKE_NT_HOME}" add -A
       git -C "${FAKE_NT_HOME}" commit -q -m "init"
       BARE_REPO="$(mktemp -d)"
