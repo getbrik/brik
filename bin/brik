@@ -100,9 +100,10 @@ Commands:
   validate    Validate brik.yml against the JSON Schema
   doctor      Check prerequisites (tools, stack detection)
   init        Scaffold brik.yml and platform bootstrap file
-  run stage   Execute a pipeline stage locally
-  version     Print brik version information
-  help        Print this help message
+  run stage      Execute a single pipeline stage locally
+  run pipeline   Execute the full pipeline locally
+  version        Print brik version information
+  help           Print this help message
 
 Options for validate:
   --config <path>   Path to brik.yml (default: brik.yml in current directory)
@@ -118,8 +119,19 @@ Options for init:
   --non-interactive    Skip prompts, fail if stack cannot be auto-detected
 
 Options for run stage:
-  --config <path>      Path to brik.yml (default: brik.yml in current directory)
+  --config <path>      Path to brik.yml (default: brik.yml in workspace)
   --workspace <path>   Path to project workspace (default: current directory)
+
+Options for run pipeline:
+  --config <path>         Path to brik.yml (default: brik.yml in workspace)
+  --workspace <path>      Path to project workspace (default: current directory)
+  --continue-on-error     Continue pipeline despite stage failure
+  --with-release          Include the release stage
+  --with-package          Include the package stage
+  --with-deploy           Include deploy and notify stages
+
+Stages:
+  init, release, build, quality, security, test, package, deploy, notify
 
 Examples:
   brik validate
@@ -129,7 +141,9 @@ Examples:
   brik init
   brik init --stack node --platform gitlab
   brik run stage build
-  brik run stage test --workspace ./my-project
+  brik run stage quality --workspace ./my-project
+  brik run pipeline
+  brik run pipeline --with-package --continue-on-error
   brik version
 EOF
 }
@@ -502,11 +516,11 @@ GROOVY
 }
 
 # ---------------------------------------------------------------------------
-# Command: run stage
+# Command: run
 # ---------------------------------------------------------------------------
 cmd_run() {
     if [[ $# -eq 0 ]]; then
-        brik_error "'brik run' requires a subcommand. Usage: brik run stage <name>"
+        brik_error "'brik run' requires a subcommand. Usage: brik run {stage|pipeline}"
         return "${EXIT_INVALID}"
     fi
 
@@ -514,12 +528,37 @@ cmd_run() {
     shift
 
     case "${subcmd}" in
-        stage) cmd_run_stage "$@" ;;
+        stage)    cmd_run_stage "$@" ;;
+        pipeline) cmd_run_pipeline "$@" ;;
         *)
             brik_error "unknown run subcommand: ${subcmd}"
             return "${EXIT_INVALID}"
             ;;
     esac
+}
+
+# Source the local wrapper and run setup.
+# Accepts optional overrides for workspace and config via environment.
+_setup_local_env() {
+    # shellcheck source=../shared-libs/local/scripts/local-wrapper.sh
+    . "${BRIK_HOME}/shared-libs/local/scripts/local-wrapper.sh"
+
+    local rc
+    set +e
+    brik.local.setup
+    rc=$?
+    set -e
+    return "$rc"
+}
+
+# Run a command with set -e disabled; return its exit code.
+_brik_run_runtime() {
+    local rc
+    set +e
+    "$@"
+    rc=$?
+    set -e
+    return "$rc"
 }
 
 cmd_run_stage() {
@@ -530,70 +569,90 @@ cmd_run_stage() {
 
     local stage_name="$1"
     shift
-    local config_path="${DEFAULT_CONFIG}"
+    local config_path=""
     local workspace
     workspace="$(pwd)"
 
     # Parse optional arguments
     while [[ $# -gt 0 ]]; do
         case "$1" in
-            --config) config_path="$2"; shift 2 ;;
-            --workspace) workspace="$2"; shift 2 ;;
+            --config)
+                if [[ $# -lt 2 || -z "$2" ]]; then
+                    brik_error "--config requires a path argument"
+                    return "${EXIT_INVALID}"
+                fi
+                config_path="$2"; shift 2
+                ;;
+            --workspace)
+                if [[ $# -lt 2 || -z "$2" ]]; then
+                    brik_error "--workspace requires a path argument"
+                    return "${EXIT_INVALID}"
+                fi
+                workspace="$2"; shift 2
+                ;;
             *) brik_error "unknown option: $1"; return "${EXIT_INVALID}" ;;
         esac
     done
 
-    # Export environment for the runtime
+    # Default config path: look in workspace directory
+    if [[ -z "$config_path" ]]; then
+        config_path="${workspace}/${DEFAULT_CONFIG}"
+    fi
+
+    # Export environment for the local wrapper
     export BRIK_PROJECT_DIR="${workspace}"
     export BRIK_WORKSPACE="${workspace}"
     export BRIK_CONFIG_FILE="${config_path}"
     export BRIK_LOG_DIR="${BRIK_LOG_DIR:-/tmp/brik/logs}"
 
-    # Load runtime (set +e to avoid conflict with runtime's no-set-e policy)
-    # shellcheck source=../runtime/bash/lib/runtime/stage.sh
-    . "${BRIK_HOME}/runtime/bash/lib/runtime/stage.sh"
-    # shellcheck source=../runtime/bash/lib/core/_loader.sh
-    . "${BRIK_HOME}/runtime/bash/lib/core/_loader.sh"
+    _setup_local_env || return "$?"
 
-    # Map stage names to logic functions
-    local logic_function=""
-    case "${stage_name}" in
-        build)
-            brik.use build
-            brik.use build.node 2>/dev/null || true
-            logic_function="_brik_build_logic"
-            ;;
-        test)
-            brik.use test
-            logic_function="_brik_test_logic"
-            ;;
-        *)
-            brik_error "unsupported stage: ${stage_name}"
-            brik_error "Supported stages: build, test"
-            return "${EXIT_INVALID}"
-            ;;
-    esac
+    _brik_run_runtime brik.local.run_stage "$stage_name"
+}
 
-    # Define logic wrapper functions
-    # shellcheck disable=SC2329
-    _brik_build_logic() {
-        build.run "${BRIK_WORKSPACE}"
-        return $?
-    }
+cmd_run_pipeline() {
+    local config_path=""
+    local workspace
+    workspace="$(pwd)"
+    local -a pipeline_flags=()
 
-    # shellcheck disable=SC2329
-    _brik_test_logic() {
-        test.run "${BRIK_WORKSPACE}"
-        return $?
-    }
+    # Separate CLI options from pipeline flags
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --config)
+                if [[ $# -lt 2 || -z "$2" ]]; then
+                    brik_error "--config requires a path argument"
+                    return "${EXIT_INVALID}"
+                fi
+                config_path="$2"; shift 2
+                ;;
+            --workspace)
+                if [[ $# -lt 2 || -z "$2" ]]; then
+                    brik_error "--workspace requires a path argument"
+                    return "${EXIT_INVALID}"
+                fi
+                workspace="$2"; shift 2
+                ;;
+            --continue-on-error|--with-release|--with-package|--with-deploy)
+                pipeline_flags+=("$1"); shift ;;
+            *) brik_error "unknown option: $1"; return "${EXIT_INVALID}" ;;
+        esac
+    done
 
-    # Disable set -e for stage.run (runtime does its own error handling)
-    set +e
-    stage.run "${stage_name}" "${logic_function}" "${workspace}" "${config_path}"
-    local result=$?
-    set -e
+    # Default config path: look in workspace directory
+    if [[ -z "$config_path" ]]; then
+        config_path="${workspace}/${DEFAULT_CONFIG}"
+    fi
 
-    return "${result}"
+    # Export environment for the local wrapper
+    export BRIK_PROJECT_DIR="${workspace}"
+    export BRIK_WORKSPACE="${workspace}"
+    export BRIK_CONFIG_FILE="${config_path}"
+    export BRIK_LOG_DIR="${BRIK_LOG_DIR:-/tmp/brik/logs}"
+
+    _setup_local_env || return "$?"
+
+    _brik_run_runtime brik.local.run_pipeline "${pipeline_flags[@]}"
 }
 
 # ---------------------------------------------------------------------------
