@@ -21,7 +21,7 @@ validate: ## Validate example brik.yml files
 	bin/brik validate --config examples/python-pytest/brik.yml
 	bin/brik validate --config examples/mono-dotnet/brik.yml
 
-check: lint test validate ## Full pre-commit gate (lint + test + validate)
+check: lint coverage validate ## Full pre-commit gate (lint + coverage + validate)
 
 clean: ## Remove generated files
 	rm -rf coverage/
