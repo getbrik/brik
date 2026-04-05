@@ -94,6 +94,12 @@ Describe "local-wrapper.sh"
         The output should equal "available"
       End
 
+      It "calls setup.prepare_env during setup"
+        When call brik.local.setup
+        The status should be success
+        The error should include "preparing runtime environment"
+      End
+
       It "exports BRIK_PROJECT_NAME from config"
         setup_and_check() {
           brik.local.setup >/dev/null 2>&1

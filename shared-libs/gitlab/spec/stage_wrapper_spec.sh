@@ -87,6 +87,12 @@ Describe "stage-wrapper.sh"
         The output should equal "available"
       End
 
+      It "calls setup.prepare_env during setup"
+        When call brik.gitlab.setup "$BRIK_HOME"
+        The status should be success
+        The error should include "preparing runtime environment"
+      End
+
       It "exports BRIK_PROJECT_NAME from config"
         setup_and_check() {
           brik.gitlab.setup "$BRIK_HOME" >/dev/null 2>&1

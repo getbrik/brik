@@ -30,6 +30,8 @@ _stage._load_runtime() {
     [[ -z "${_BRIK_HOOKS_LOADED:-}" ]] && . "${runtime_dir}/hooks.sh"
     # shellcheck source=summary.sh
     [[ -z "${_BRIK_SUMMARY_LOADED:-}" ]] && . "${runtime_dir}/summary.sh"
+    # shellcheck source=setup.sh
+    [[ -z "${_BRIK_SETUP_LOADED:-}" ]] && . "${runtime_dir}/setup.sh"
 }
 
 _stage._load_runtime

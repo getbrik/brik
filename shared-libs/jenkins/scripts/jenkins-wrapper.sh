@@ -115,6 +115,11 @@ brik.jenkins.setup() {
         log.warn "some config exports failed, continuing with defaults"
     }
 
+    # Prepare runtime environment (install prerequisites + stack)
+    setup.prepare_env "${BRIK_BUILD_STACK:-}" || {
+        log.warn "runtime preparation failed, some stages may fail"
+    }
+
     log.info "brik jenkins setup complete (BRIK_HOME=$BRIK_HOME)"
     return 0
 }
