@@ -58,6 +58,10 @@
       "description": "Package stage configuration for building and publishing artefacts such as Docker images.",
       "$ref": "#/$defs/package"
     },
+    "publish": {
+      "description": "Publish stage configuration for publishing artefacts to registries (npm, Docker, Maven, PyPI, Cargo, NuGet).",
+      "$ref": "#/$defs/publish"
+    },
     "deploy": {
       "description": "Deploy stage configuration. Defines one or more named environments with conditions and deployment targets.",
       "$ref": "#/$defs/deploy"
@@ -86,6 +90,29 @@
           "description": "Prefix for release tags (e.g. 'v'). Default is 'v'.",
           "type": "string",
           "default": "v"
+        },
+        "changelog": {
+          "description": "Changelog generation configuration.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "description": "Whether to generate a changelog on release. Default is true.",
+              "type": "boolean",
+              "default": true
+            },
+            "format": {
+              "description": "Changelog format.",
+              "type": "string",
+              "enum": ["conventional", "keep-a-changelog"],
+              "default": "conventional"
+            },
+            "file": {
+              "description": "Path to the changelog file. Default is CHANGELOG.md.",
+              "type": "string",
+              "default": "CHANGELOG.md"
+            }
+          }
         }
       }
     },
@@ -423,6 +450,148 @@
               "additionalProperties": {
                 "type": "string"
               }
+            }
+          }
+        }
+      }
+    },
+    "publish": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "npm": {
+          "description": "Publish to npm registry.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "registry": {
+              "description": "npm registry URL. Default is https://registry.npmjs.org.",
+              "type": "string",
+              "format": "uri"
+            },
+            "tag": {
+              "description": "Distribution tag for the published package. Default is latest.",
+              "type": "string",
+              "default": "latest"
+            },
+            "access": {
+              "description": "Package access level for scoped packages.",
+              "type": "string",
+              "enum": ["public", "restricted"]
+            },
+            "token_var": {
+              "description": "Name of the environment variable holding the npm auth token. Never put the token value here.",
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "docker": {
+          "description": "Push Docker image to a container registry.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "image": {
+              "description": "Full image name including registry and repository (e.g. ghcr.io/org/app).",
+              "type": "string",
+              "minLength": 1
+            },
+            "registry": {
+              "description": "Container registry URL for docker login.",
+              "type": "string",
+              "minLength": 1
+            },
+            "tags": {
+              "description": "List of tags to push. If empty, uses BRIK_VERSION.",
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "minItems": 1,
+              "uniqueItems": true
+            },
+            "username_var": {
+              "description": "Name of the environment variable holding the registry username.",
+              "type": "string",
+              "minLength": 1
+            },
+            "password_var": {
+              "description": "Name of the environment variable holding the registry password or token.",
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "maven": {
+          "description": "Publish to a Maven repository.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "repository": {
+              "description": "Maven repository URL.",
+              "type": "string",
+              "format": "uri"
+            },
+            "username_var": {
+              "description": "Name of the environment variable holding the repository username.",
+              "type": "string",
+              "minLength": 1
+            },
+            "password_var": {
+              "description": "Name of the environment variable holding the repository password.",
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "pypi": {
+          "description": "Publish to PyPI or a compatible registry.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "repository": {
+              "description": "PyPI repository URL. Default is https://upload.pypi.org/legacy/.",
+              "type": "string",
+              "format": "uri"
+            },
+            "token_var": {
+              "description": "Name of the environment variable holding the PyPI API token.",
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "cargo": {
+          "description": "Publish to crates.io or a compatible registry.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "registry": {
+              "description": "Cargo registry name. Default is crates-io.",
+              "type": "string"
+            },
+            "token_var": {
+              "description": "Name of the environment variable holding the crates.io API token.",
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "nuget": {
+          "description": "Publish to NuGet or a compatible feed.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "source": {
+              "description": "NuGet source URL. Default is https://api.nuget.org/v3/index.json.",
+              "type": "string",
+              "format": "uri"
+            },
+            "api_key_var": {
+              "description": "Name of the environment variable holding the NuGet API key.",
+              "type": "string",
+              "minLength": 1
             }
           }
         }

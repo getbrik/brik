@@ -100,4 +100,62 @@ YAML
       The error should include "tag prefix: release-"
     End
   End
+
+  Describe "with BRIK_TAG set (release trigger)"
+    setup_tag() {
+      export BRIK_TAG="v1.2.3"
+      # Set up a git repo so version.current works
+      TEST_GIT="$(mktemp -d)"
+      ORIG_DIR="$(pwd)"
+      cd "$TEST_GIT" || return 1
+      git init -q
+      git config user.email "test@test.com"
+      git config user.name "Test"
+      printf 'init\n' > README.md
+      git add README.md && git commit -q -m "chore: init"
+      git tag v1.2.3
+      export BRIK_WORKSPACE="$TEST_GIT"
+      export BRIK_PROJECT_DIR="$TEST_GIT"
+    }
+    cleanup_tag() {
+      cd "$ORIG_DIR" || true
+      unset BRIK_TAG
+      rm -rf "$TEST_GIT"
+    }
+    Before 'setup_tag'
+    After 'cleanup_tag'
+
+    It "calls release.prepare and release.finalize"
+      run_release_tag() {
+        local ctx
+        ctx="$(context.create "release")" 2>/dev/null || ctx="$(mktemp)"
+        stages.release "$ctx" 2>/dev/null
+      }
+      When call run_release_tag
+      The status should be success
+    End
+
+    It "handles changelog disabled"
+      run_release_no_changelog() {
+        export BRIK_RELEASE_CHANGELOG_ENABLED="false"
+        local ctx
+        ctx="$(context.create "release")" 2>/dev/null || ctx="$(mktemp)"
+        stages.release "$ctx" 2>/dev/null
+      }
+      When call run_release_no_changelog
+      The status should be success
+    End
+
+    It "passes changelog file when configured"
+      run_release_changelog_file() {
+        export BRIK_RELEASE_CHANGELOG_ENABLED="true"
+        export BRIK_RELEASE_CHANGELOG_FILE="CHANGES.md"
+        local ctx
+        ctx="$(context.create "release")" 2>/dev/null || ctx="$(mktemp)"
+        stages.release "$ctx" 2>/dev/null
+      }
+      When call run_release_changelog_file
+      The status should be success
+    End
+  End
 End

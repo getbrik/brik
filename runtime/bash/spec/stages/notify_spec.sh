@@ -2,6 +2,7 @@ Describe "stages.notify"
   Include "$BRIK_HOME/runtime/bash/lib/runtime/stage.sh"
   Include "$BRIK_HOME/runtime/bash/lib/core/_loader.sh"
   Include "$BRIK_HOME/runtime/bash/lib/core/config.sh"
+  Include "$BRIK_HOME/runtime/bash/lib/core/notify.sh"
   Include "$BRIK_HOME/runtime/bash/lib/stages/notify.sh"
 
   setup_env() {
@@ -96,20 +97,32 @@ project:
 notify:
   slack:
     channel: "#builds"
-    on: failure
+    on: always
 YAML
       config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
+      # Mock notify module as loaded + mock notify.send
+      eval "_BRIK_MODULE_NOTIFY_LOADED=1"
+      export _BRIK_MODULE_NOTIFY_LOADED
+      NOTIFY_SEND_LOG="$(mktemp)"
+      eval "notify.send() { printf '%s\n' \"\$*\" >> \"$NOTIFY_SEND_LOG\"; return 0; }"
+    }
+    cleanup_slack() {
+      unset -f notify.send 2>/dev/null
+      unset _BRIK_MODULE_NOTIFY_LOADED
+      rm -f "$NOTIFY_SEND_LOG"
     }
     Before 'setup_slack'
+    After 'cleanup_slack'
 
-    It "logs slack channel notification"
+    It "sends slack notification"
       run_notify_slack() {
         local ctx
         ctx="$(context.create "notify")" 2>/dev/null || ctx="$(mktemp)"
-        stages.notify "$ctx" >/dev/null
+        stages.notify "$ctx" >/dev/null 2>/dev/null
+        grep -q "\-\-channel slack" "$NOTIFY_SEND_LOG"
       }
       When call run_notify_slack
-      The error should include "would notify slack channel: #builds"
+      The status should be success
     End
   End
 
@@ -125,17 +138,28 @@ notify:
     on: always
 YAML
       config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
+      eval "_BRIK_MODULE_NOTIFY_LOADED=1"
+      export _BRIK_MODULE_NOTIFY_LOADED
+      NOTIFY_SEND_LOG="$(mktemp)"
+      eval "notify.send() { printf '%s\n' \"\$*\" >> \"$NOTIFY_SEND_LOG\"; return 0; }"
+    }
+    cleanup_email() {
+      unset -f notify.send 2>/dev/null
+      unset _BRIK_MODULE_NOTIFY_LOADED
+      rm -f "$NOTIFY_SEND_LOG"
     }
     Before 'setup_email'
+    After 'cleanup_email'
 
-    It "logs email notification"
+    It "sends email notification"
       run_notify_email() {
         local ctx
         ctx="$(context.create "notify")" 2>/dev/null || ctx="$(mktemp)"
-        stages.notify "$ctx" >/dev/null
+        stages.notify "$ctx" >/dev/null 2>/dev/null
+        grep -q "\-\-channel email" "$NOTIFY_SEND_LOG"
       }
       When call run_notify_email
-      The error should include "would notify email: team@example.com"
+      The status should be success
     End
   End
 
@@ -148,20 +172,31 @@ project:
 notify:
   webhook:
     url: https://hooks.example.com/notify
-    on: success
+    on: always
 YAML
       config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
+      eval "_BRIK_MODULE_NOTIFY_LOADED=1"
+      export _BRIK_MODULE_NOTIFY_LOADED
+      NOTIFY_SEND_LOG="$(mktemp)"
+      eval "notify.send() { printf '%s\n' \"\$*\" >> \"$NOTIFY_SEND_LOG\"; return 0; }"
+    }
+    cleanup_webhook() {
+      unset -f notify.send 2>/dev/null
+      unset _BRIK_MODULE_NOTIFY_LOADED
+      rm -f "$NOTIFY_SEND_LOG"
     }
     Before 'setup_webhook'
+    After 'cleanup_webhook'
 
-    It "logs webhook notification"
+    It "sends webhook notification"
       run_notify_webhook() {
         local ctx
         ctx="$(context.create "notify")" 2>/dev/null || ctx="$(mktemp)"
-        stages.notify "$ctx" >/dev/null
+        stages.notify "$ctx" >/dev/null 2>/dev/null
+        grep -q "\-\-channel webhook" "$NOTIFY_SEND_LOG"
       }
       When call run_notify_webhook
-      The error should include "would notify webhook: https://hooks.example.com/notify"
+      The status should be success
     End
   End
 End

@@ -40,11 +40,39 @@ stages.package() {
     build.docker.run "${docker_args[@]}"
     local result=$?
 
-    if [[ $result -eq 0 ]]; then
-        context.set "$context_file" "BRIK_PACKAGE_STATUS" "success"
-    else
+    if [[ $result -ne 0 ]]; then
         context.set "$context_file" "BRIK_PACKAGE_STATUS" "failed"
+        return "$result"
     fi
 
-    return "$result"
+    # Publish if configured
+    config.export_publish_vars
+    if [[ -n "${BRIK_PUBLISH_DOCKER_IMAGE:-}" || -n "${BRIK_PUBLISH_NPM_TOKEN_VAR:-}" ]]; then
+        brik.use publish
+
+        # Publish Docker image if configured
+        if [[ -n "${BRIK_PUBLISH_DOCKER_IMAGE:-}" ]]; then
+            log.info "publishing docker image"
+            local rc=0
+            publish.run --target docker || rc=$?
+            if [[ $rc -ne 0 ]]; then
+                context.set "$context_file" "BRIK_PACKAGE_STATUS" "failed"
+                return "$rc"
+            fi
+        fi
+
+        # Publish npm package if configured
+        if [[ -n "${BRIK_PUBLISH_NPM_TOKEN_VAR:-}" ]]; then
+            log.info "publishing npm package"
+            local rc=0
+            publish.run --target npm || rc=$?
+            if [[ $rc -ne 0 ]]; then
+                context.set "$context_file" "BRIK_PACKAGE_STATUS" "failed"
+                return "$rc"
+            fi
+        fi
+    fi
+
+    context.set "$context_file" "BRIK_PACKAGE_STATUS" "success"
+    return 0
 }

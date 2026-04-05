@@ -125,4 +125,105 @@ YAML
       The error should include "building image: registry.example.com/myapp:1.0.0"
     End
   End
+
+  Describe "with docker publish config"
+    setup_publish_docker() {
+      cat > "$BRIK_CONFIG_FILE" <<'YAML'
+version: 1
+project:
+  name: test
+  stack: node
+package:
+  docker:
+    image: registry.example.com/myapp
+publish:
+  docker:
+    image: registry.example.com/myapp
+YAML
+      config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
+    }
+    Before 'setup_publish_docker'
+
+    It "publishes docker image after build"
+      run_publish_docker() {
+        brik.use() { :; }
+        build.docker.run() { return 0; }
+        local PUBLISH_CALLED=""
+        publish.run() { PUBLISH_CALLED="$*"; return 0; }
+        local ctx
+        ctx="$(context.create "package")" 2>/dev/null || ctx="$(mktemp)"
+        stages.package "$ctx" 2>/dev/null
+        printf '%s' "$PUBLISH_CALLED"
+      }
+      When call run_publish_docker
+      The output should include "--target docker"
+    End
+
+    It "sets failed when docker publish fails"
+      run_publish_docker_fail() {
+        brik.use() { :; }
+        build.docker.run() { return 0; }
+        publish.run() { return 1; }
+        local ctx
+        ctx="$(context.create "package")" 2>/dev/null || ctx="$(mktemp)"
+        stages.package "$ctx" 2>/dev/null || true
+        grep "^BRIK_PACKAGE_STATUS=" "$ctx" | cut -d= -f2
+      }
+      When call run_publish_docker_fail
+      The output should equal "failed"
+    End
+  End
+
+  Describe "with npm publish config"
+    setup_publish_npm() {
+      cat > "$BRIK_CONFIG_FILE" <<'YAML'
+version: 1
+project:
+  name: test
+  stack: node
+package:
+  docker:
+    image: registry.example.com/myapp
+publish:
+  npm:
+    token_var: NPM_TOKEN
+YAML
+      config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
+    }
+    Before 'setup_publish_npm'
+
+    It "publishes npm package after build"
+      run_publish_npm() {
+        brik.use() { :; }
+        build.docker.run() { return 0; }
+        local PUBLISH_CALLS=""
+        publish.run() { PUBLISH_CALLS="${PUBLISH_CALLS}$* "; return 0; }
+        local ctx
+        ctx="$(context.create "package")" 2>/dev/null || ctx="$(mktemp)"
+        stages.package "$ctx" 2>/dev/null
+        printf '%s' "$PUBLISH_CALLS"
+      }
+      When call run_publish_npm
+      The output should include "--target npm"
+    End
+
+    It "sets failed when npm publish fails"
+      run_publish_npm_fail() {
+        brik.use() { :; }
+        build.docker.run() { return 0; }
+        publish.run() {
+          case "$*" in
+            *docker*) return 0 ;;
+            *npm*) return 1 ;;
+          esac
+        }
+        local ctx
+        ctx="$(context.create "package")" 2>/dev/null || ctx="$(mktemp)"
+        stages.package "$ctx" 2>/dev/null || true
+        grep "^BRIK_PACKAGE_STATUS=" "$ctx" | cut -d= -f2
+      }
+      When call run_publish_npm_fail
+      The output should equal "failed"
+    End
+  End
 End

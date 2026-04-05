@@ -519,6 +519,85 @@ config.export_release_vars() {
     tag_prefix="$(config.get '.release.tag_prefix' 'v')"
     export BRIK_RELEASE_TAG_PREFIX="$tag_prefix"
 
+    local val
+    val="$(config.get '.release.changelog.enabled' 'true')"
+    export BRIK_RELEASE_CHANGELOG_ENABLED="$val"
+
+    val="$(config.get '.release.changelog.format' 'conventional')"
+    export BRIK_RELEASE_CHANGELOG_FORMAT="$val"
+
+    val="$(config.get '.release.changelog.file' 'CHANGELOG.md')"
+    export BRIK_RELEASE_CHANGELOG_FILE="$val"
+
+    return 0
+}
+
+# Export publish-related variables from brik.yml.
+# Sets: BRIK_PUBLISH_NPM_*, BRIK_PUBLISH_DOCKER_*, BRIK_PUBLISH_MAVEN_*,
+#       BRIK_PUBLISH_PYPI_*, BRIK_PUBLISH_CARGO_*, BRIK_PUBLISH_NUGET_*
+config.export_publish_vars() {
+    local val
+
+    # npm
+    val="$(config.get '.publish.npm.registry' '')"
+    [[ -n "$val" ]] && export BRIK_PUBLISH_NPM_REGISTRY="$val"
+
+    val="$(config.get '.publish.npm.tag' '')"
+    [[ -n "$val" ]] && export BRIK_PUBLISH_NPM_TAG="$val"
+
+    val="$(config.get '.publish.npm.access' '')"
+    [[ -n "$val" ]] && export BRIK_PUBLISH_NPM_ACCESS="$val"
+
+    val="$(config.get '.publish.npm.token_var' '')"
+    [[ -n "$val" ]] && export BRIK_PUBLISH_NPM_TOKEN_VAR="$val"
+
+    # docker
+    val="$(config.get '.publish.docker.image' '')"
+    [[ -n "$val" ]] && export BRIK_PUBLISH_DOCKER_IMAGE="$val"
+
+    val="$(config.get '.publish.docker.registry' '')"
+    [[ -n "$val" ]] && export BRIK_PUBLISH_DOCKER_REGISTRY="$val"
+
+    val="$(config.get '.publish.docker.tags | join(",")' '')"
+    [[ -n "$val" ]] && export BRIK_PUBLISH_DOCKER_TAGS="$val"
+
+    val="$(config.get '.publish.docker.username_var' '')"
+    [[ -n "$val" ]] && export BRIK_PUBLISH_DOCKER_USERNAME_VAR="$val"
+
+    val="$(config.get '.publish.docker.password_var' '')"
+    [[ -n "$val" ]] && export BRIK_PUBLISH_DOCKER_PASSWORD_VAR="$val"
+
+    # maven
+    val="$(config.get '.publish.maven.repository' '')"
+    [[ -n "$val" ]] && export BRIK_PUBLISH_MAVEN_REPOSITORY="$val"
+
+    val="$(config.get '.publish.maven.username_var' '')"
+    [[ -n "$val" ]] && export BRIK_PUBLISH_MAVEN_USERNAME_VAR="$val"
+
+    val="$(config.get '.publish.maven.password_var' '')"
+    [[ -n "$val" ]] && export BRIK_PUBLISH_MAVEN_PASSWORD_VAR="$val"
+
+    # pypi
+    val="$(config.get '.publish.pypi.repository' '')"
+    [[ -n "$val" ]] && export BRIK_PUBLISH_PYPI_REPOSITORY="$val"
+
+    val="$(config.get '.publish.pypi.token_var' '')"
+    [[ -n "$val" ]] && export BRIK_PUBLISH_PYPI_TOKEN_VAR="$val"
+
+    # cargo
+    val="$(config.get '.publish.cargo.registry' '')"
+    [[ -n "$val" ]] && export BRIK_PUBLISH_CARGO_REGISTRY="$val"
+
+    val="$(config.get '.publish.cargo.token_var' '')"
+    [[ -n "$val" ]] && export BRIK_PUBLISH_CARGO_TOKEN_VAR="$val"
+
+    # nuget
+    val="$(config.get '.publish.nuget.source' '')"
+    [[ -n "$val" ]] && export BRIK_PUBLISH_NUGET_SOURCE="$val"
+
+    val="$(config.get '.publish.nuget.api_key_var' '')"
+    [[ -n "$val" ]] && export BRIK_PUBLISH_NUGET_API_KEY_VAR="$val"
+
     return 0
 }
 
@@ -579,6 +658,7 @@ config.export_all() {
     config.export_notify_vars
     config.export_hooks_vars
     config.export_release_vars
+    config.export_publish_vars
 
     return 0
 }

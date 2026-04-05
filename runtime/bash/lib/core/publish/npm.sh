@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+# @module publish.npm
+# @requires npm
+# @description Publish a Node.js package to an npm registry.
+
+# Guard against double-sourcing
+[[ -n "${_BRIK_CORE_PUBLISH_NPM_LOADED:-}" ]] && return 0
+_BRIK_CORE_PUBLISH_NPM_LOADED=1
+
+# Publish to npm registry.
+# Usage: publish.npm.run [--registry <url>] [--tag <tag>] [--access <public|restricted>]
+#        [--token-var <VAR>] [--dry-run]
+# Reads defaults from BRIK_PUBLISH_NPM_* environment variables.
+publish.npm.run() {
+    local registry="${BRIK_PUBLISH_NPM_REGISTRY:-}"
+    local tag="${BRIK_PUBLISH_NPM_TAG:-latest}"
+    local access="${BRIK_PUBLISH_NPM_ACCESS:-}"
+    local token_var="${BRIK_PUBLISH_NPM_TOKEN_VAR:-}"
+    local dry_run="${BRIK_DRY_RUN:-}"
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --registry) registry="$2"; shift 2 ;;
+            --tag) tag="$2"; shift 2 ;;
+            --access) access="$2"; shift 2 ;;
+            --token-var) token_var="$2"; shift 2 ;;
+            --dry-run) dry_run="true"; shift ;;
+            --target) shift 2 ;;
+            *) log.error "unknown option: $1"; return 2 ;;
+        esac
+    done
+
+    runtime.require_tool npm || return 3
+    runtime.require_file "package.json" || return 6
+
+    # Build npm publish command
+    local -a cmd=(npm publish)
+    [[ -n "$registry" ]] && cmd+=(--registry "$registry")
+    [[ -n "$tag" ]] && cmd+=(--tag "$tag")
+    [[ -n "$access" ]] && cmd+=(--access "$access")
+
+    # Set auth token if configured
+    if [[ -n "$token_var" ]]; then
+        _publish._require_secret_var "$token_var" "npm token" || return $?
+        export NPM_TOKEN="${!token_var}"
+    fi
+
+    if [[ "$dry_run" == "true" ]]; then
+        cmd+=(--dry-run)
+        log.info "[dry-run] ${cmd[*]}"
+    else
+        log.info "publishing npm package: ${cmd[*]}"
+    fi
+
+    "${cmd[@]}" || {
+        log.error "npm publish failed"
+        return 5
+    }
+
+    log.info "npm publish completed successfully"
+    return 0
+}
