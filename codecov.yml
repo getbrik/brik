@@ -1,0 +1,15 @@
+coverage:
+  status:
+    project:
+      default:
+        target: 80%
+    patch:
+      default:
+        target: 80%
+
+ignore:
+  - "runtime/bash/spec/**"
+  - "shared-libs/*/spec/**"
+  - "testdata/**"
+  - "examples/**"
+  - "scripts/**"
