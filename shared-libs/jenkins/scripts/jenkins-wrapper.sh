@@ -144,6 +144,13 @@ brik.jenkins.run_stage() {
         return 4
     fi
 
+    # Show the logo once, before the first stage
+    if [[ "$stage_name" == "init" ]]; then
+        local _brik_ver="${BRIK_VERSION:-}"
+        [[ -z "$_brik_ver" ]] && _brik_ver="$(sed -n 's/^readonly BRIK_VERSION="\(.*\)"/\1/p' "${BRIK_HOME}/bin/brik" 2>/dev/null || true)"
+        banner.brik "$_brik_ver"
+    fi
+
     local logic_function=""
 
     case "$stage_name" in

@@ -25,13 +25,13 @@ def call(Map params = [:]) {
             checkout scm
 
             // Jenkins clones Global Libraries into ${WORKSPACE}@libs/<hash>/
-            // Discover the actual checkout path by finding the directory with vars/
+            // Discover the repo root by finding the directory with runtime/
             def brikHome = params.brikHome ?: sh(
                 script: '''#!/bin/bash
                     libs_dir="${WORKSPACE}@libs"
                     if [ -d "$libs_dir" ]; then
                         for d in "$libs_dir"/*/; do
-                            if [ -d "${d}vars" ]; then
+                            if [ -d "${d}runtime" ]; then
                                 printf '%s' "${d%/}"
                                 exit 0
                             fi

@@ -32,6 +32,8 @@ _stage._load_runtime() {
     [[ -z "${_BRIK_SUMMARY_LOADED:-}" ]] && . "${runtime_dir}/summary.sh"
     # shellcheck source=setup.sh
     [[ -z "${_BRIK_SETUP_LOADED:-}" ]] && . "${runtime_dir}/setup.sh"
+    # shellcheck source=banner.sh
+    [[ -z "${_BRIK_BANNER_LOADED:-}" ]] && . "${runtime_dir}/banner.sh"
 }
 
 _stage._load_runtime
@@ -107,6 +109,7 @@ stage.run() {
     local log_file=""
     local exit_code=0
 
+    banner.stage "$stage_name"
     log.info "starting stage: $stage_name"
 
     # Create execution context

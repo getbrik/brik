@@ -13,7 +13,7 @@
 # Variables
 # ---------------------------------------------------------------------------
 variables:
-  BRIK_VERSION: "v0.1.0"
+  BRIK_LIB_REF: "v0.1.0"
   BRIK_REPO: "${CI_SERVER_URL}/brik/brik.git"
   BRIK_HOME: "/opt/brik"
   BRIK_LOG_DIR: "/tmp/brik/logs"
@@ -84,8 +84,8 @@ default:
     # Clone the Brik runtime if not already present
     - |
       if [ ! -d "${BRIK_HOME}" ]; then
-        echo "[brik] Cloning Brik runtime (${BRIK_VERSION})..."
-        git clone --depth 1 --branch "${BRIK_VERSION}" "${BRIK_REPO}" "${BRIK_HOME}" 2>/dev/null \
+        echo "[brik] Cloning Brik runtime (${BRIK_LIB_REF})..."
+        git clone --depth 1 --branch "${BRIK_LIB_REF}" "${BRIK_REPO}" "${BRIK_HOME}" 2>/dev/null \
           || git clone --depth 1 "${BRIK_REPO}" "${BRIK_HOME}"
       fi
     # Prepare Brik bootstrap script (sourced by each job via bash)
