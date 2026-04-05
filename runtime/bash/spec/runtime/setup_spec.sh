@@ -36,6 +36,19 @@ Describe "setup.sh"
     chmod +x "${MOCK_BIN}/${name}"
   }
 
+  # Preserve essential system commands in MOCK_BIN as symlinks.
+  # Call BEFORE restricting PATH so that filtered directories do not
+  # remove commands needed by the code under test (mkdir, date, tr, etc.).
+  preserve_essential_cmds() {
+    local cmd cmd_path
+    for cmd in mkdir chmod date tr rm cat basename dirname; do
+      cmd_path="$(command -v "$cmd" 2>/dev/null)" || true
+      if [[ -n "$cmd_path" && ! -e "${MOCK_BIN}/${cmd}" ]]; then
+        ln -s "$cmd_path" "${MOCK_BIN}/${cmd}"
+      fi
+    done
+  }
+
   # ---------------------------------------------------------------------------
   # _setup._is_virtualized
   # ---------------------------------------------------------------------------
@@ -415,6 +428,8 @@ Describe "setup.sh"
         export BRIK_PLATFORM="local"
         export BRIK_HOME
         BRIK_HOME="$(mktemp -d)"
+        create_mock "wget"
+        preserve_essential_cmds
         # Restrict PATH so yq is NOT found, but keep system tools
         # Remove any directory containing yq from PATH
         local p=""
@@ -424,7 +439,6 @@ Describe "setup.sh"
           p="${p:+${p}:}${d}"
         done
         PATH="${MOCK_BIN}:${p}"
-        create_mock "wget"
       }
       Before 'setup_yq_local'
       After 'cleanup_mock_bin'
@@ -683,6 +697,7 @@ Describe "setup.sh"
         create_mock "chmod"
         printf '#!/bin/sh\ntrue\n' > "${MOCK_BIN}/mytool"
         chmod +x "${MOCK_BIN}/mytool"
+        preserve_essential_cmds
         # Remove wget from PATH
         local p=""
         local IFS=":"
@@ -710,6 +725,7 @@ Describe "setup.sh"
         setup_mock_bin
         export BRIK_HOME
         BRIK_HOME="$(mktemp -d)"
+        preserve_essential_cmds
         # Strip wget and curl from PATH
         local p=""
         local IFS=":"
