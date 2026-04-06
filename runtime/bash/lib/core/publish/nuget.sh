@@ -61,10 +61,31 @@ publish.nuget.run() {
         export NUGET_API_KEY="${!api_key_var}"
     fi
 
+    # Create temporary NuGet.Config for HTTP sources (NuGet requires HTTPS by default)
+    local tmp_nuget_config=""
+    if [[ -n "$source" ]] && [[ "$source" == http://* ]]; then
+        tmp_nuget_config="$(mktemp)"
+        cat > "$tmp_nuget_config" <<'NUGET_CONFIG'
+<?xml version="1.0" encoding="utf-8"?>
+<configuration>
+  <packageSources>
+    <clear />
+    <add key="brik" value="BRIK_SOURCE_PLACEHOLDER" allowInsecureConnections="true" />
+  </packageSources>
+</configuration>
+NUGET_CONFIG
+        sed -i "s|BRIK_SOURCE_PLACEHOLDER|${source}|" "$tmp_nuget_config" 2>/dev/null || \
+            sed -i '' "s|BRIK_SOURCE_PLACEHOLDER|${source}|" "$tmp_nuget_config"
+    fi
+
     local pkg rc=0
     for pkg in "${nupkgs[@]}"; do
         local -a cmd=(dotnet nuget push "$pkg")
-        [[ -n "$source" ]] && cmd+=(--source "$source")
+        if [[ -n "$tmp_nuget_config" ]]; then
+            cmd+=(--configfile "$tmp_nuget_config" --source "brik")
+        elif [[ -n "$source" ]]; then
+            cmd+=(--source "$source")
+        fi
         [[ -n "$api_key_var" ]] && cmd+=(--api-key "$NUGET_API_KEY")
 
         if [[ "$dry_run" == "true" ]]; then
@@ -74,13 +95,15 @@ publish.nuget.run() {
             "${cmd[@]}" || {
                 log.error "nuget push failed for $pkg"
                 unset NUGET_API_KEY 2>/dev/null || true
+                rm -f "$tmp_nuget_config" 2>/dev/null || true
                 return 5
             }
         fi
     done
 
-    # Cleanup credentials from environment
+    # Cleanup credentials and temp files
     unset NUGET_API_KEY 2>/dev/null || true
+    rm -f "$tmp_nuget_config" 2>/dev/null || true
 
     log.info "nuget publish completed successfully"
     return 0
