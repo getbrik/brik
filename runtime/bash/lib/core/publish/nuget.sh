@@ -95,7 +95,7 @@ publish.nuget.run() {
         chmod 600 "$tmp_nuget_config"
     fi
 
-    local pkg rc=0
+    local pkg
     for pkg in "${nupkgs[@]}"; do
         local -a cmd=(dotnet nuget push "$pkg")
         if [[ -n "$tmp_nuget_config" ]]; then
@@ -104,6 +104,8 @@ publish.nuget.run() {
             [[ -z "$use_config_auth" ]] && [[ -n "$api_key_var" ]] && cmd+=(--api-key "$NUGET_API_KEY")
         elif [[ -n "$source" ]]; then
             cmd+=(--source "$source")
+            [[ -n "$api_key_var" ]] && cmd+=(--api-key "$NUGET_API_KEY")
+        else
             [[ -n "$api_key_var" ]] && cmd+=(--api-key "$NUGET_API_KEY")
         fi
 

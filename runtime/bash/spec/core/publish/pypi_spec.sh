@@ -197,6 +197,168 @@ MOCKEOF
       End
     End
 
+    Describe "twine with basic auth (user:password)"
+      setup_basic_auth() {
+        TEST_WS="$(mktemp -d)"
+        MOCK_LOG="${TEST_WS}/mock_twine.log"
+        mkdir -p "${TEST_WS}/dist"
+        printf 'pkg\n' > "${TEST_WS}/dist/test-1.0.0.tar.gz"
+        MOCK_BIN="$(mktemp -d)"
+        cat > "${MOCK_BIN}/twine" << MOCKEOF
+#!/usr/bin/env bash
+printf 'twine %s\n' "\$*" >> "$MOCK_LOG"
+exit 0
+MOCKEOF
+        chmod +x "${MOCK_BIN}/twine"
+        ORIG_PATH="$PATH"
+        export PATH="${MOCK_BIN}:/usr/bin:/bin"
+        ORIG_DIR="$(pwd)"
+        cd "$TEST_WS" || return 1
+      }
+      cleanup_basic_auth() {
+        cd "$ORIG_DIR" || true
+        export PATH="$ORIG_PATH"
+        unset TWINE_USERNAME TWINE_PASSWORD MY_BASIC_TOKEN 2>/dev/null
+        rm -rf "$TEST_WS" "$MOCK_BIN"
+      }
+      Before 'setup_basic_auth'
+      After 'cleanup_basic_auth'
+
+      It "sets TWINE_USERNAME and TWINE_PASSWORD from user:password format"
+        invoke_basic() {
+          export MY_BASIC_TOKEN="admin:secret123"
+          publish.pypi.run --token-var "MY_BASIC_TOKEN" 2>/dev/null || return 1
+          # Token should NOT appear in CLI args
+          ! grep -q "admin" "$MOCK_LOG"
+        }
+        When call invoke_basic
+        The status should be success
+      End
+    End
+
+    Describe "twine with auto-build"
+      setup_autobuild() {
+        TEST_WS="$(mktemp -d)"
+        MOCK_LOG="${TEST_WS}/mock_twine.log"
+        # No dist/ directory - triggers auto-build
+        MOCK_BIN="$(mktemp -d)"
+        cat > "${MOCK_BIN}/twine" << MOCKEOF
+#!/usr/bin/env bash
+printf 'twine %s\n' "\$*" >> "$MOCK_LOG"
+exit 0
+MOCKEOF
+        chmod +x "${MOCK_BIN}/twine"
+        cat > "${MOCK_BIN}/python" << MOCKEOF
+#!/usr/bin/env bash
+# Simulate python -m build creating dist files
+if [[ "\$2" == "build" ]]; then
+  mkdir -p "$TEST_WS/dist"
+  printf 'pkg\n' > "$TEST_WS/dist/test-1.0.0.tar.gz"
+fi
+exit 0
+MOCKEOF
+        chmod +x "${MOCK_BIN}/python"
+        ORIG_PATH="$PATH"
+        export PATH="${MOCK_BIN}:/usr/bin:/bin"
+        ORIG_DIR="$(pwd)"
+        cd "$TEST_WS" || return 1
+      }
+      cleanup_autobuild() {
+        cd "$ORIG_DIR" || true
+        export PATH="$ORIG_PATH"
+        rm -rf "$TEST_WS" "$MOCK_BIN"
+      }
+      Before 'setup_autobuild'
+      After 'cleanup_autobuild'
+
+      It "auto-builds distribution when dist/ is empty"
+        invoke_autobuild() {
+          publish.pypi.run 2>/dev/null || return 1
+          grep -q "twine upload" "$MOCK_LOG"
+        }
+        When call invoke_autobuild
+        The status should be success
+      End
+    End
+
+    Describe "twine publish failure"
+      setup_fail_twine() {
+        TEST_WS="$(mktemp -d)"
+        mkdir -p "${TEST_WS}/dist"
+        printf 'pkg\n' > "${TEST_WS}/dist/test-1.0.0.tar.gz"
+        MOCK_BIN="$(mktemp -d)"
+        cat > "${MOCK_BIN}/twine" << 'FAILEOF'
+#!/usr/bin/env bash
+exit 1
+FAILEOF
+        chmod +x "${MOCK_BIN}/twine"
+        ORIG_PATH="$PATH"
+        export PATH="${MOCK_BIN}:/usr/bin:/bin"
+        ORIG_DIR="$(pwd)"
+        cd "$TEST_WS" || return 1
+      }
+      cleanup_fail_twine() {
+        cd "$ORIG_DIR" || true
+        export PATH="$ORIG_PATH"
+        rm -rf "$TEST_WS" "$MOCK_BIN"
+      }
+      Before 'setup_fail_twine'
+      After 'cleanup_fail_twine'
+
+      It "returns 5 when twine upload fails"
+        When call publish.pypi.run
+        The status should equal 5
+        The stderr should include "pypi publish failed"
+      End
+    End
+
+    Describe "CI auto-install of twine"
+      setup_ci_install() {
+        TEST_WS="$(mktemp -d)"
+        MOCK_BIN="$(mktemp -d)"
+        # Mock pip to "install" twine
+        cat > "${MOCK_BIN}/pip" << MOCKEOF
+#!/usr/bin/env bash
+# Simulate installing twine by creating a mock twine
+cat > "${MOCK_BIN}/twine" << 'INNER'
+#!/usr/bin/env bash
+exit 0
+INNER
+chmod +x "${MOCK_BIN}/twine"
+exit 0
+MOCKEOF
+        chmod +x "${MOCK_BIN}/pip"
+        cat > "${MOCK_BIN}/python" << MOCKEOF
+#!/usr/bin/env bash
+if [[ "\$2" == "build" ]]; then
+  mkdir -p "$TEST_WS/dist"
+  printf 'pkg\n' > "$TEST_WS/dist/test-1.0.0.tar.gz"
+fi
+exit 0
+MOCKEOF
+        chmod +x "${MOCK_BIN}/python"
+        ORIG_PATH="$PATH"
+        export PATH="${MOCK_BIN}:/usr/bin:/bin"
+        export CI="true"
+        ORIG_DIR="$(pwd)"
+        cd "$TEST_WS" || return 1
+      }
+      cleanup_ci_install() {
+        cd "$ORIG_DIR" || true
+        export PATH="$ORIG_PATH"
+        unset CI 2>/dev/null
+        rm -rf "$TEST_WS" "$MOCK_BIN"
+      }
+      Before 'setup_ci_install'
+      After 'cleanup_ci_install'
+
+      It "auto-installs twine in CI and publishes"
+        When call publish.pypi.run
+        The status should be success
+        The stderr should include "installing twine"
+      End
+    End
+
     Describe "no publish tool"
       setup_no_tool() {
         TEST_WS="$(mktemp -d)"

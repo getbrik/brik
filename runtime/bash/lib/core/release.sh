@@ -36,6 +36,11 @@ release.prepare() {
 
     runtime.require_tool git || return 3
 
+    # Resolve changelog path relative to workspace
+    if [[ "$changelog_file" != /* ]]; then
+        changelog_file="${BRIK_WORKSPACE:-.}/${changelog_file}"
+    fi
+
     # Generate changelog if requested
     if [[ "$generate_changelog" == "true" ]]; then
         brik.use changelog
