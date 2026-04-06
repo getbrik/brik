@@ -364,14 +364,18 @@ MOCKEOF
         TEST_WS="$(mktemp -d)"
         MOCK_BIN="$(mktemp -d)"
         ORIG_PATH="$PATH"
-        # Empty PATH - no tools
+        ORIG_CI="${CI:-}"
+        # Empty PATH - no tools (no pip/twine/uv/poetry)
         export PATH="${MOCK_BIN}:/usr/bin:/bin"
+        # Unset CI to prevent auto-install of twine
+        unset CI
         ORIG_DIR="$(pwd)"
         cd "$TEST_WS" || return 1
       }
       cleanup_no_tool() {
         cd "$ORIG_DIR" || true
         export PATH="$ORIG_PATH"
+        [[ -n "$ORIG_CI" ]] && export CI="$ORIG_CI"
         rm -rf "$TEST_WS" "$MOCK_BIN"
       }
       Before 'setup_no_tool'
