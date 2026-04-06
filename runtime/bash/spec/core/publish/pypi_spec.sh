@@ -57,11 +57,12 @@ MOCKEOF
         The status should be success
       End
 
-      It "passes token via --password"
+      It "sets TWINE_USERNAME and TWINE_PASSWORD env vars (not CLI args)"
         invoke_token() {
           export MY_PYPI_TOKEN="pypi-token-123"
           publish.pypi.run --token-var "MY_PYPI_TOKEN" 2>/dev/null || return 1
-          grep -q "__token__" "$MOCK_LOG" && grep -q "pypi-token-123" "$MOCK_LOG"
+          # Token should NOT appear in CLI args (security: env vars only)
+          ! grep -q "pypi-token-123" "$MOCK_LOG"
         }
         When call invoke_token
         The status should be success
@@ -184,11 +185,12 @@ MOCKEOF
         The status should be success
       End
 
-      It "passes token to uv"
+      It "sets UV_PUBLISH_TOKEN env var (not CLI arg)"
         invoke_uv_token() {
           export MY_PYPI_TOKEN="pypi-uv-token"
           publish.pypi.run --token-var "MY_PYPI_TOKEN" 2>/dev/null || return 1
-          grep -q "\-\-token" "$MOCK_LOG"
+          # Token should NOT appear in CLI args (security: env var only)
+          ! grep -q "pypi-uv-token" "$MOCK_LOG"
         }
         When call invoke_uv_token
         The status should be success

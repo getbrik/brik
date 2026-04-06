@@ -84,11 +84,12 @@ MOCKEOF
         The status should be success
       End
 
-      It "passes token"
+      It "sets CARGO_REGISTRY_TOKEN from token_var"
         invoke_token() {
           export MY_CARGO_TOKEN="cargo-token-123"
           publish.cargo.run --token-var "MY_CARGO_TOKEN" 2>/dev/null || return 1
-          grep -q "\-\-token cargo-token-123" "$MOCK_LOG"
+          # Token should NOT appear in CLI args (security: env var only)
+          ! grep -q "cargo-token-123" "$MOCK_LOG"
         }
         When call invoke_token
         The status should be success

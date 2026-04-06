@@ -226,4 +226,279 @@ YAML
       The output should equal "failed"
     End
   End
+
+  Describe "with maven publish config"
+    setup_publish_maven() {
+      cat > "$BRIK_CONFIG_FILE" <<'YAML'
+version: 1
+project:
+  name: test
+  stack: java
+package:
+  docker:
+    image: registry.example.com/myapp
+publish:
+  maven:
+    repository: https://nexus.example.com/repository/maven-releases/
+    username_var: MAVEN_USER
+    password_var: MAVEN_PASSWORD
+YAML
+      config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
+    }
+    Before 'setup_publish_maven'
+
+    It "publishes maven artifact after build"
+      run_publish_maven() {
+        brik.use() { :; }
+        build.docker.run() { return 0; }
+        local PUBLISH_CALLS=""
+        publish.run() { PUBLISH_CALLS="${PUBLISH_CALLS}$* "; return 0; }
+        local ctx
+        ctx="$(context.create "package")" 2>/dev/null || ctx="$(mktemp)"
+        stages.package "$ctx" 2>/dev/null
+        printf '%s' "$PUBLISH_CALLS"
+      }
+      When call run_publish_maven
+      The output should include "--target maven"
+    End
+
+    It "sets failed when maven publish fails"
+      run_publish_maven_fail() {
+        brik.use() { :; }
+        build.docker.run() { return 0; }
+        publish.run() {
+          case "$*" in
+            *docker*) return 0 ;;
+            *maven*) return 1 ;;
+          esac
+        }
+        local ctx
+        ctx="$(context.create "package")" 2>/dev/null || ctx="$(mktemp)"
+        stages.package "$ctx" 2>/dev/null || true
+        grep "^BRIK_PACKAGE_STATUS=" "$ctx" | cut -d= -f2
+      }
+      When call run_publish_maven_fail
+      The output should equal "failed"
+    End
+  End
+
+  Describe "with pypi publish config"
+    setup_publish_pypi() {
+      cat > "$BRIK_CONFIG_FILE" <<'YAML'
+version: 1
+project:
+  name: test
+  stack: python
+package:
+  docker:
+    image: registry.example.com/myapp
+publish:
+  pypi:
+    token_var: PYPI_TOKEN
+    repository: https://nexus.example.com/repository/pypi-hosted/
+YAML
+      config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
+    }
+    Before 'setup_publish_pypi'
+
+    It "publishes pypi package after build"
+      run_publish_pypi() {
+        brik.use() { :; }
+        build.docker.run() { return 0; }
+        local PUBLISH_CALLS=""
+        publish.run() { PUBLISH_CALLS="${PUBLISH_CALLS}$* "; return 0; }
+        local ctx
+        ctx="$(context.create "package")" 2>/dev/null || ctx="$(mktemp)"
+        stages.package "$ctx" 2>/dev/null
+        printf '%s' "$PUBLISH_CALLS"
+      }
+      When call run_publish_pypi
+      The output should include "--target pypi"
+    End
+
+    It "sets failed when pypi publish fails"
+      run_publish_pypi_fail() {
+        brik.use() { :; }
+        build.docker.run() { return 0; }
+        publish.run() {
+          case "$*" in
+            *docker*) return 0 ;;
+            *pypi*) return 1 ;;
+          esac
+        }
+        local ctx
+        ctx="$(context.create "package")" 2>/dev/null || ctx="$(mktemp)"
+        stages.package "$ctx" 2>/dev/null || true
+        grep "^BRIK_PACKAGE_STATUS=" "$ctx" | cut -d= -f2
+      }
+      When call run_publish_pypi_fail
+      The output should equal "failed"
+    End
+  End
+
+  Describe "with cargo publish config"
+    setup_publish_cargo() {
+      cat > "$BRIK_CONFIG_FILE" <<'YAML'
+version: 1
+project:
+  name: test
+  stack: rust
+package:
+  docker:
+    image: registry.example.com/myapp
+publish:
+  cargo:
+    token_var: CARGO_TOKEN
+YAML
+      config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
+    }
+    Before 'setup_publish_cargo'
+
+    It "publishes cargo crate after build"
+      run_publish_cargo() {
+        brik.use() { :; }
+        build.docker.run() { return 0; }
+        local PUBLISH_CALLS=""
+        publish.run() { PUBLISH_CALLS="${PUBLISH_CALLS}$* "; return 0; }
+        local ctx
+        ctx="$(context.create "package")" 2>/dev/null || ctx="$(mktemp)"
+        stages.package "$ctx" 2>/dev/null
+        printf '%s' "$PUBLISH_CALLS"
+      }
+      When call run_publish_cargo
+      The output should include "--target cargo"
+    End
+
+    It "sets failed when cargo publish fails"
+      run_publish_cargo_fail() {
+        brik.use() { :; }
+        build.docker.run() { return 0; }
+        publish.run() {
+          case "$*" in
+            *docker*) return 0 ;;
+            *cargo*) return 1 ;;
+          esac
+        }
+        local ctx
+        ctx="$(context.create "package")" 2>/dev/null || ctx="$(mktemp)"
+        stages.package "$ctx" 2>/dev/null || true
+        grep "^BRIK_PACKAGE_STATUS=" "$ctx" | cut -d= -f2
+      }
+      When call run_publish_cargo_fail
+      The output should equal "failed"
+    End
+  End
+
+  Describe "with nuget publish config"
+    setup_publish_nuget() {
+      cat > "$BRIK_CONFIG_FILE" <<'YAML'
+version: 1
+project:
+  name: test
+  stack: dotnet
+package:
+  docker:
+    image: registry.example.com/myapp
+publish:
+  nuget:
+    api_key_var: NUGET_API_KEY
+    source: https://nexus.example.com/repository/nuget-hosted/
+YAML
+      config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
+    }
+    Before 'setup_publish_nuget'
+
+    It "publishes nuget package after build"
+      run_publish_nuget() {
+        brik.use() { :; }
+        build.docker.run() { return 0; }
+        local PUBLISH_CALLS=""
+        publish.run() { PUBLISH_CALLS="${PUBLISH_CALLS}$* "; return 0; }
+        local ctx
+        ctx="$(context.create "package")" 2>/dev/null || ctx="$(mktemp)"
+        stages.package "$ctx" 2>/dev/null
+        printf '%s' "$PUBLISH_CALLS"
+      }
+      When call run_publish_nuget
+      The output should include "--target nuget"
+    End
+
+    It "sets failed when nuget publish fails"
+      run_publish_nuget_fail() {
+        brik.use() { :; }
+        build.docker.run() { return 0; }
+        publish.run() {
+          case "$*" in
+            *docker*) return 0 ;;
+            *nuget*) return 1 ;;
+          esac
+        }
+        local ctx
+        ctx="$(context.create "package")" 2>/dev/null || ctx="$(mktemp)"
+        stages.package "$ctx" 2>/dev/null || true
+        grep "^BRIK_PACKAGE_STATUS=" "$ctx" | cut -d= -f2
+      }
+      When call run_publish_nuget_fail
+      The output should equal "failed"
+    End
+  End
+
+  Describe "with multiple publish targets"
+    setup_publish_multi() {
+      cat > "$BRIK_CONFIG_FILE" <<'YAML'
+version: 1
+project:
+  name: test
+  stack: node
+package:
+  docker:
+    image: registry.example.com/myapp
+publish:
+  docker:
+    image: registry.example.com/myapp
+  npm:
+    token_var: NPM_TOKEN
+YAML
+      config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
+    }
+    Before 'setup_publish_multi'
+
+    It "publishes both docker and npm"
+      run_publish_multi() {
+        brik.use() { :; }
+        build.docker.run() { return 0; }
+        local PUBLISH_CALLS=""
+        publish.run() { PUBLISH_CALLS="${PUBLISH_CALLS}$* "; return 0; }
+        local ctx
+        ctx="$(context.create "package")" 2>/dev/null || ctx="$(mktemp)"
+        stages.package "$ctx" 2>/dev/null
+        printf '%s' "$PUBLISH_CALLS"
+      }
+      When call run_publish_multi
+      The output should include "--target docker"
+      The output should include "--target npm"
+    End
+
+    It "stops on first publish failure (fail-fast)"
+      run_publish_failfast() {
+        brik.use() { :; }
+        build.docker.run() { return 0; }
+        local PUBLISH_CALLS=""
+        publish.run() {
+          PUBLISH_CALLS="${PUBLISH_CALLS}$* "
+          case "$*" in
+            *docker*) return 1 ;;
+            *) return 0 ;;
+          esac
+        }
+        local ctx
+        ctx="$(context.create "package")" 2>/dev/null || ctx="$(mktemp)"
+        stages.package "$ctx" 2>/dev/null || true
+        printf '%s' "$PUBLISH_CALLS"
+      }
+      When call run_publish_failfast
+      The output should include "--target docker"
+      The output should not include "--target npm"
+    End
+  End
 End

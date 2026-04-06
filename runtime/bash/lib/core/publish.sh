@@ -18,6 +18,11 @@ _publish._require_secret_var() {
         return 7
     fi
 
+    if [[ ! "$var_name" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
+        log.error "$label variable name '$var_name' is not a valid identifier"
+        return 7
+    fi
+
     if [[ -z "${!var_name:-}" ]]; then
         log.error "$label variable '$var_name' is not set or empty"
         return 7

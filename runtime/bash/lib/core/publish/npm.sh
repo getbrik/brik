@@ -52,10 +52,16 @@ publish.npm.run() {
         log.info "publishing npm package: ${cmd[*]}"
     fi
 
-    "${cmd[@]}" || {
+    "${cmd[@]}"
+    local rc=$?
+
+    # Cleanup token from environment
+    unset NPM_TOKEN 2>/dev/null || true
+
+    if [[ $rc -ne 0 ]]; then
         log.error "npm publish failed"
         return 5
-    }
+    fi
 
     log.info "npm publish completed successfully"
     return 0

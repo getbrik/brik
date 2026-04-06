@@ -11,6 +11,7 @@ _BRIK_CORE_PUBLISH_MAVEN_LOADED=1
 # Usage: publish.maven.run [--repository <url>] [--username-var <VAR>]
 #        [--password-var <VAR>] [--dry-run]
 # Reads defaults from BRIK_PUBLISH_MAVEN_* environment variables.
+# Auth: uses a temporary settings.xml (chmod 600) to avoid CLI credential exposure.
 publish.maven.run() {
     local repository="${BRIK_PUBLISH_MAVEN_REPOSITORY:-}"
     local username_var="${BRIK_PUBLISH_MAVEN_USERNAME_VAR:-}"
@@ -41,7 +42,7 @@ publish.maven.run() {
 
     runtime.require_tool "$tool" || return 3
 
-    # Set credentials if provided
+    # Validate credentials if provided
     if [[ -n "$username_var" ]]; then
         _publish._require_secret_var "$username_var" "maven username" || return $?
     fi
@@ -50,11 +51,29 @@ publish.maven.run() {
     fi
 
     local -a cmd
+    local tmp_settings=""
+
     if [[ "$tool" == "mvn" ]]; then
         cmd=(mvn deploy -B)
         [[ -n "$repository" ]] && cmd+=(-DaltDeploymentRepository="brik::default::${repository}")
-        [[ -n "$username_var" ]] && cmd+=(-Dusername="${!username_var}")
-        [[ -n "$password_var" ]] && cmd+=(-Dpassword="${!password_var}")
+
+        # Write temporary settings.xml with credentials (never pass via CLI args)
+        if [[ -n "$username_var" && -n "$password_var" ]]; then
+            tmp_settings="$(mktemp)"
+            chmod 600 "$tmp_settings"
+            cat > "$tmp_settings" <<SETTINGS_XML
+<settings>
+  <servers>
+    <server>
+      <id>brik</id>
+      <username>${!username_var}</username>
+      <password>${!password_var}</password>
+    </server>
+  </servers>
+</settings>
+SETTINGS_XML
+            cmd+=(--settings "$tmp_settings")
+        fi
     else
         cmd=(gradle publish)
         [[ -n "$repository" ]] && cmd+=(-PmavenRepository="$repository")
@@ -62,14 +81,21 @@ publish.maven.run() {
 
     if [[ "$dry_run" == "true" ]]; then
         log.info "[dry-run] ${cmd[*]}"
+        rm -f "$tmp_settings" 2>/dev/null || true
         return 0
     fi
 
     log.info "publishing to maven: ${cmd[*]}"
-    "${cmd[@]}" || {
+    "${cmd[@]}"
+    local rc=$?
+
+    # Cleanup temporary settings file
+    rm -f "$tmp_settings" 2>/dev/null || true
+
+    if [[ $rc -ne 0 ]]; then
         log.error "maven publish failed"
         return 5
-    }
+    fi
 
     log.info "maven publish completed successfully"
     return 0

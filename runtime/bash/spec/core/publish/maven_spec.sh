@@ -86,6 +86,78 @@ MOCKEOF
         The status should be success
         The stderr should include "maven publish completed"
       End
+
+      It "writes temporary settings.xml with credentials"
+        invoke_creds() {
+          export MY_MVN_USER="admin"
+          export MY_MVN_PASS="secret123"
+          publish.maven.run --username-var "MY_MVN_USER" --password-var "MY_MVN_PASS" 2>/dev/null || return 1
+          grep -q "\-\-settings" "$MOCK_LOG"
+        }
+        When call invoke_creds
+        The status should be success
+      End
+
+      It "cleans up settings.xml after publish"
+        invoke_creds_cleanup() {
+          export MY_MVN_USER="admin"
+          export MY_MVN_PASS="secret123"
+          publish.maven.run --username-var "MY_MVN_USER" --password-var "MY_MVN_PASS" 2>/dev/null || return 1
+          # Extract settings file path from mock log
+          local settings_path
+          settings_path="$(grep -o '\-\-settings [^ ]*' "$MOCK_LOG" | awk '{print $2}')"
+          # File should have been deleted after publish
+          [[ ! -f "$settings_path" ]]
+        }
+        When call invoke_creds_cleanup
+        The status should be success
+      End
+
+      It "returns 7 when username_var references unset variable"
+        When call publish.maven.run --username-var "NONEXISTENT_VAR_12345"
+        The status should equal 7
+        The stderr should include "is not set or empty"
+      End
+
+      It "returns 7 when password_var references unset variable"
+        invoke_bad_pass() {
+          export MY_MVN_USER="admin"
+          publish.maven.run --username-var "MY_MVN_USER" --password-var "NONEXISTENT_VAR_12345"
+        }
+        When call invoke_bad_pass
+        The status should equal 7
+        The stderr should include "is not set or empty"
+      End
+    End
+
+    Describe "with failing mvn"
+      setup_fail_mvn() {
+        TEST_WS="$(mktemp -d)"
+        printf '<project/>\n' > "${TEST_WS}/pom.xml"
+        MOCK_BIN="$(mktemp -d)"
+        cat > "${MOCK_BIN}/mvn" << 'MOCKEOF'
+#!/usr/bin/env bash
+exit 1
+MOCKEOF
+        chmod +x "${MOCK_BIN}/mvn"
+        ORIG_PATH="$PATH"
+        export PATH="${MOCK_BIN}:${PATH}"
+        ORIG_DIR="$(pwd)"
+        cd "$TEST_WS" || return 1
+      }
+      cleanup_fail_mvn() {
+        cd "$ORIG_DIR" || true
+        export PATH="$ORIG_PATH"
+        rm -rf "$TEST_WS" "$MOCK_BIN"
+      }
+      Before 'setup_fail_mvn'
+      After 'cleanup_fail_mvn'
+
+      It "returns 5 when mvn deploy fails"
+        When call publish.maven.run
+        The status should equal 5
+        The stderr should include "maven publish failed"
+      End
     End
 
     Describe "with gradle project"

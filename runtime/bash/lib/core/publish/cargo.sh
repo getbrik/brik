@@ -10,6 +10,7 @@ _BRIK_CORE_PUBLISH_CARGO_LOADED=1
 # Publish to crates.io.
 # Usage: publish.cargo.run [--registry <name>] [--token-var <VAR>] [--dry-run]
 # Reads defaults from BRIK_PUBLISH_CARGO_* environment variables.
+# Auth: uses CARGO_REGISTRY_TOKEN env var (not CLI args) to avoid process listing exposure.
 publish.cargo.run() {
     local registry="${BRIK_PUBLISH_CARGO_REGISTRY:-}"
     local token_var="${BRIK_PUBLISH_CARGO_TOKEN_VAR:-}"
@@ -28,13 +29,14 @@ publish.cargo.run() {
     runtime.require_tool cargo || return 3
     runtime.require_file "Cargo.toml" || return 6
 
-    local -a cmd=(cargo publish)
-    [[ -n "$registry" ]] && cmd+=(--registry "$registry")
-
+    # Set token via environment variable (never passed as CLI arg)
     if [[ -n "$token_var" ]]; then
         _publish._require_secret_var "$token_var" "cargo token" || return $?
-        cmd+=(--token "${!token_var}")
+        export CARGO_REGISTRY_TOKEN="${!token_var}"
     fi
+
+    local -a cmd=(cargo publish)
+    [[ -n "$registry" ]] && cmd+=(--registry "$registry")
 
     if [[ "$dry_run" == "true" ]]; then
         cmd+=(--dry-run)
@@ -43,10 +45,16 @@ publish.cargo.run() {
         log.info "publishing to crates.io: ${cmd[*]}"
     fi
 
-    "${cmd[@]}" || {
+    "${cmd[@]}"
+    local rc=$?
+
+    # Cleanup token from environment
+    unset CARGO_REGISTRY_TOKEN 2>/dev/null || true
+
+    if [[ $rc -ne 0 ]]; then
         log.error "cargo publish failed"
         return 5
-    }
+    fi
 
     log.info "cargo publish completed successfully"
     return 0

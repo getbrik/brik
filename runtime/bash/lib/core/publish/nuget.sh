@@ -10,6 +10,7 @@ _BRIK_CORE_PUBLISH_NUGET_LOADED=1
 # Publish to NuGet.
 # Usage: publish.nuget.run [--source <url>] [--api-key-var <VAR>] [--dry-run]
 # Reads defaults from BRIK_PUBLISH_NUGET_* environment variables.
+# Auth: uses NUGET_API_KEY env var to avoid CLI credential exposure.
 publish.nuget.run() {
     local source="${BRIK_PUBLISH_NUGET_SOURCE:-}"
     local api_key_var="${BRIK_PUBLISH_NUGET_API_KEY_VAR:-}"
@@ -45,24 +46,30 @@ publish.nuget.run() {
 
     if [[ -n "$api_key_var" ]]; then
         _publish._require_secret_var "$api_key_var" "nuget api key" || return $?
+        # Set API key via environment variable (not CLI arg)
+        export NUGET_API_KEY="${!api_key_var}"
     fi
 
-    local pkg
+    local pkg rc=0
     for pkg in "${nupkgs[@]}"; do
         local -a cmd=(dotnet nuget push "$pkg")
         [[ -n "$source" ]] && cmd+=(--source "$source")
-        [[ -n "$api_key_var" ]] && cmd+=(--api-key "${!api_key_var}")
+        [[ -n "$api_key_var" ]] && cmd+=(--api-key "$NUGET_API_KEY")
 
         if [[ "$dry_run" == "true" ]]; then
-            log.info "[dry-run] ${cmd[*]}"
+            log.info "[dry-run] dotnet nuget push $pkg${source:+ --source $source} --api-key ***"
         else
-            log.info "publishing: ${cmd[*]}"
+            log.info "publishing: dotnet nuget push $pkg${source:+ --source $source} --api-key ***"
             "${cmd[@]}" || {
                 log.error "nuget push failed for $pkg"
+                unset NUGET_API_KEY 2>/dev/null || true
                 return 5
             }
         fi
     done
+
+    # Cleanup credentials from environment
+    unset NUGET_API_KEY 2>/dev/null || true
 
     log.info "nuget publish completed successfully"
     return 0

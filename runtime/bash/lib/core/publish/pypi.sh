@@ -10,6 +10,8 @@ _BRIK_CORE_PUBLISH_PYPI_LOADED=1
 # Publish to PyPI.
 # Usage: publish.pypi.run [--repository <url>] [--token-var <VAR>] [--dry-run]
 # Reads defaults from BRIK_PUBLISH_PYPI_* environment variables.
+# Auth: uses environment variables (UV_PUBLISH_TOKEN, TWINE_USERNAME/TWINE_PASSWORD,
+#        POETRY_PYPI_TOKEN_PYPI) to avoid CLI credential exposure.
 publish.pypi.run() {
     local repository="${BRIK_PUBLISH_PYPI_REPOSITORY:-}"
     local token_var="${BRIK_PUBLISH_PYPI_TOKEN_VAR:-}"
@@ -38,7 +40,7 @@ publish.pypi.run() {
         return 3
     fi
 
-    # Set token if provided
+    # Validate token if provided
     if [[ -n "$token_var" ]]; then
         _publish._require_secret_var "$token_var" "pypi token" || return $?
     fi
@@ -53,7 +55,8 @@ publish.pypi.run() {
         uv)
             cmd=(uv publish)
             [[ -n "$repository" ]] && cmd+=(--publish-url "$repository")
-            [[ -n "$token_var" ]] && cmd+=(--token "${!token_var}")
+            # Auth via environment variable (not CLI arg)
+            [[ -n "$token_var" ]] && export UV_PUBLISH_TOKEN="${!token_var}"
             ;;
         twine)
             local -a dist_files=(dist/*)
@@ -63,21 +66,42 @@ publish.pypi.run() {
             fi
             cmd=(twine upload "${dist_files[@]}")
             [[ -n "$repository" ]] && cmd+=(--repository-url "$repository")
-            [[ -n "$token_var" ]] && { cmd+=(--username __token__); cmd+=(--password "${!token_var}"); }
+            # Auth via environment variables (not CLI args)
+            if [[ -n "$token_var" ]]; then
+                export TWINE_USERNAME="__token__"
+                export TWINE_PASSWORD="${!token_var}"
+            fi
             ;;
     esac
 
     if [[ "$dry_run" == "true" ]]; then
         log.info "[dry-run] ${cmd[*]}"
+        _publish._pypi_cleanup_env "$tool"
         return 0
     fi
 
-    log.info "publishing to pypi via $tool: ${cmd[*]}"
-    "${cmd[@]}" || {
+    log.info "publishing to pypi via $tool (credentials via environment)"
+    "${cmd[@]}"
+    local rc=$?
+
+    # Cleanup credentials from environment
+    _publish._pypi_cleanup_env "$tool"
+
+    if [[ $rc -ne 0 ]]; then
         log.error "pypi publish failed"
         return 5
-    }
+    fi
 
     log.info "pypi publish completed successfully"
     return 0
+}
+
+# Cleanup PyPI-related credentials from the environment.
+_publish._pypi_cleanup_env() {
+    local tool="$1"
+    case "$tool" in
+        poetry) unset POETRY_PYPI_TOKEN_PYPI 2>/dev/null || true ;;
+        uv)     unset UV_PUBLISH_TOKEN 2>/dev/null || true ;;
+        twine)  unset TWINE_USERNAME TWINE_PASSWORD 2>/dev/null || true ;;
+    esac
 }

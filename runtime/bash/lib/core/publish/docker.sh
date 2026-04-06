@@ -86,7 +86,9 @@ publish.docker.run() {
 
     # Logout if we logged in
     if [[ -n "$username_var" && -n "$password_var" && "$dry_run" != "true" ]]; then
-        docker logout ${registry:+"$registry"} >/dev/null 2>&1 || true
+        if ! docker logout ${registry:+"$registry"} >/dev/null 2>&1; then
+            log.warn "docker logout failed - credentials may persist in ~/.docker/config.json"
+        fi
     fi
 
     log.info "docker publish completed successfully"

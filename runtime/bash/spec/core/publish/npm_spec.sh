@@ -141,11 +141,12 @@ MOCKEOF
         The status should be success
       End
 
-      It "sets NPM_TOKEN from token_var"
+      It "sets NPM_TOKEN from token_var and cleans up after publish"
         invoke_token() {
           export MY_NPM_TOKEN="secret-token-123"
           publish.npm.run --token-var "MY_NPM_TOKEN" 2>/dev/null || return 1
-          [[ "$NPM_TOKEN" == "secret-token-123" ]]
+          # NPM_TOKEN should be unset after publish (cleanup)
+          [[ -z "${NPM_TOKEN:-}" ]]
         }
         When call invoke_token
         The status should be success
