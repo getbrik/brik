@@ -136,7 +136,7 @@ _setup._install_via_apk() {
     case "$name" in
         node)   packages="nodejs npm" ;;
         python) packages="python3 py3-pip py3-setuptools" ;;
-        java)   packages="${version:+openjdk${version}-jdk}"; packages="${packages:-openjdk21-jdk}" ;;
+        java)   packages="${version:+openjdk${version}-jdk}"; packages="${packages:-openjdk21-jdk}"; packages="$packages maven" ;;
         rust)   packages="rust cargo" ;;
         dotnet) packages="${version:+dotnet${version%%.*}-sdk}"; packages="${packages:-dotnet8-sdk}" ;;
         jq)     packages="jq" ;;

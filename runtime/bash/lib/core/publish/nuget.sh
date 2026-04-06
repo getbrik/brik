@@ -40,8 +40,19 @@ publish.nuget.run() {
     eval "$prev_globstar" 2>/dev/null || true
 
     if [[ ${#nupkgs[@]} -eq 0 ]]; then
-        log.error "no .nupkg files found"
-        return 6
+        # Auto-pack if no .nupkg files found
+        log.info "no .nupkg files found, running dotnet pack"
+        dotnet pack --configuration Release --output ./nupkg 2>&1 || {
+            log.error "dotnet pack failed"
+            return 6
+        }
+        for f in ./nupkg/*.nupkg; do
+            [[ -f "$f" ]] && nupkgs+=("$f")
+        done
+        if [[ ${#nupkgs[@]} -eq 0 ]]; then
+            log.error "no .nupkg files found after dotnet pack"
+            return 6
+        fi
     fi
 
     if [[ -n "$api_key_var" ]]; then
