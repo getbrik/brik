@@ -44,13 +44,21 @@ _bootstrap_install_yq() {
 
     _url="https://github.com/mikefarah/yq/releases/download/${_yq_version}/yq_${_os}_${_arch}"
 
+    local _downloaded=0
     if command -v wget >/dev/null 2>&1; then
-        wget -qO /usr/local/bin/yq "$_url" && chmod +x /usr/local/bin/yq
-    elif command -v curl >/dev/null 2>&1; then
-        curl -sSL -o /usr/local/bin/yq "$_url" && chmod +x /usr/local/bin/yq
-    else
-        echo "[brik] WARNING: cannot download yq (no wget or curl)" >&2
-        return 1
+        wget -qO /usr/local/bin/yq "$_url" 2>/dev/null && chmod +x /usr/local/bin/yq && _downloaded=1
+    fi
+    if [[ $_downloaded -eq 0 ]] && command -v curl >/dev/null 2>&1; then
+        curl -sSL -o /usr/local/bin/yq "$_url" 2>/dev/null && chmod +x /usr/local/bin/yq && _downloaded=1
+    fi
+    if [[ $_downloaded -eq 0 ]]; then
+        echo "[brik] Binary download failed, falling back to package manager..." >&2
+        local _mgr
+        _mgr="$(_bootstrap_detect_pkg_manager)"
+        case "$_mgr" in
+            apk) apk add --no-cache yq ;;
+            *) echo "[brik] WARNING: cannot install yq" >&2; return 1 ;;
+        esac
     fi
 }
 

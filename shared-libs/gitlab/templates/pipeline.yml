@@ -57,7 +57,12 @@ default:
           echo "[brik] Installing yq..."
           _yq_v="${BRIK_YQ_VERSION:-v4.44.1}" _arch="$(uname -m)" _os="$(uname -s | tr '[:upper:]' '[:lower:]')"
           case "$_arch" in x86_64) _arch="amd64" ;; aarch64) _arch="arm64" ;; esac
-          wget -qO /usr/local/bin/yq "https://github.com/mikefarah/yq/releases/download/${_yq_v}/yq_${_os}_${_arch}" && chmod +x /usr/local/bin/yq
+          wget -qO /usr/local/bin/yq "https://github.com/mikefarah/yq/releases/download/${_yq_v}/yq_${_os}_${_arch}" 2>/dev/null && chmod +x /usr/local/bin/yq || {
+            echo "[brik] wget failed, falling back to apk..."
+            case "$_mgr" in
+              apk) apk add --no-cache yq ;;
+            esac
+          }
         fi
         for _t in jq git bash; do
           if ! command -v "$_t" >/dev/null 2>&1; then
