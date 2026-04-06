@@ -62,20 +62,37 @@ publish.nuget.run() {
     fi
 
     # Create temporary NuGet.Config for HTTP sources (NuGet requires HTTPS by default)
+    # Also supports basic auth for Nexus/Artifactory when api_key is in "user:password" format
     local tmp_nuget_config=""
+    local use_config_auth=""
     if [[ -n "$source" ]] && [[ "$source" == http://* ]]; then
         tmp_nuget_config="$(mktemp)"
-        cat > "$tmp_nuget_config" <<'NUGET_CONFIG'
-<?xml version="1.0" encoding="utf-8"?>
-<configuration>
-  <packageSources>
-    <clear />
-    <add key="brik" value="BRIK_SOURCE_PLACEHOLDER" allowInsecureConnections="true" />
-  </packageSources>
-</configuration>
-NUGET_CONFIG
-        sed -i "s|BRIK_SOURCE_PLACEHOLDER|${source}|" "$tmp_nuget_config" 2>/dev/null || \
-            sed -i '' "s|BRIK_SOURCE_PLACEHOLDER|${source}|" "$tmp_nuget_config"
+        local nuget_username="" nuget_password=""
+        if [[ -n "$api_key_var" ]] && [[ "${!api_key_var}" == *:* ]]; then
+            # Basic auth format (user:password) for Nexus/Artifactory
+            nuget_username="${!api_key_var%%:*}"
+            nuget_password="${!api_key_var#*:}"
+            use_config_auth="true"
+        fi
+        # Build NuGet.Config with source and optional credentials
+        {
+            echo '<?xml version="1.0" encoding="utf-8"?>'
+            echo '<configuration>'
+            echo '  <packageSources>'
+            echo '    <clear />'
+            echo "    <add key=\"brik\" value=\"${source}\" allowInsecureConnections=\"true\" />"
+            echo '  </packageSources>'
+            if [[ -n "$use_config_auth" ]]; then
+                echo '  <packageSourceCredentials>'
+                echo '    <brik>'
+                echo "      <add key=\"Username\" value=\"${nuget_username}\" />"
+                echo "      <add key=\"ClearTextPassword\" value=\"${nuget_password}\" />"
+                echo '    </brik>'
+                echo '  </packageSourceCredentials>'
+            fi
+            echo '</configuration>'
+        } > "$tmp_nuget_config"
+        chmod 600 "$tmp_nuget_config"
     fi
 
     local pkg rc=0
@@ -83,10 +100,12 @@ NUGET_CONFIG
         local -a cmd=(dotnet nuget push "$pkg")
         if [[ -n "$tmp_nuget_config" ]]; then
             cmd+=(--configfile "$tmp_nuget_config" --source "brik")
+            # Skip --api-key when using config-based auth
+            [[ -z "$use_config_auth" ]] && [[ -n "$api_key_var" ]] && cmd+=(--api-key "$NUGET_API_KEY")
         elif [[ -n "$source" ]]; then
             cmd+=(--source "$source")
+            [[ -n "$api_key_var" ]] && cmd+=(--api-key "$NUGET_API_KEY")
         fi
-        [[ -n "$api_key_var" ]] && cmd+=(--api-key "$NUGET_API_KEY")
 
         if [[ "$dry_run" == "true" ]]; then
             log.info "[dry-run] dotnet nuget push $pkg${source:+ --source $source} --api-key ***"
