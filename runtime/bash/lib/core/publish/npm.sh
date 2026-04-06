@@ -43,6 +43,20 @@ publish.npm.run() {
     if [[ -n "$token_var" ]]; then
         _publish._require_secret_var "$token_var" "npm token" || return $?
         export NPM_TOKEN="${!token_var}"
+
+        # Generate .npmrc for registry auth
+        # Write to both project .npmrc and user ~/.npmrc for maximum compatibility
+        if [[ -n "$registry" ]]; then
+            local registry_path
+            registry_path="${registry#http:}"
+            registry_path="${registry_path#https:}"
+            local npmrc_content
+            npmrc_content="${registry_path}:_auth=${NPM_TOKEN}
+${registry_path}:always-auth=true"
+            echo "$npmrc_content" >> .npmrc
+            echo "$npmrc_content" >> "${HOME}/.npmrc"
+            log.info "configured .npmrc for registry authentication"
+        fi
     fi
 
     if [[ "$dry_run" == "true" ]]; then

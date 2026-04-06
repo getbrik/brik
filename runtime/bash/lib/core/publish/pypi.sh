@@ -36,8 +36,18 @@ publish.pypi.run() {
     elif command -v twine >/dev/null 2>&1; then
         tool="twine"
     else
-        log.error "no publish tool found (poetry, uv, or twine)"
-        return 3
+        # Auto-install twine + build in CI environments
+        if [[ -n "${CI:-}" ]]; then
+            log.info "installing twine and build tools"
+            pip install --quiet twine build 2>/dev/null || {
+                log.error "failed to install twine"
+                return 3
+            }
+            tool="twine"
+        else
+            log.error "no publish tool found (poetry, uv, or twine)"
+            return 3
+        fi
     fi
 
     # Validate token if provided
@@ -59,17 +69,35 @@ publish.pypi.run() {
             [[ -n "$token_var" ]] && export UV_PUBLISH_TOKEN="${!token_var}"
             ;;
         twine)
+            # Build distribution if dist/ is empty
             local -a dist_files=(dist/*)
             if [[ ${#dist_files[@]} -eq 0 ]] || [[ "${dist_files[0]}" == "dist/*" ]]; then
-                log.error "no distribution files found in dist/"
-                return 5
+                log.info "building distribution package"
+                python -m build --outdir dist/ . 2>&1 || {
+                    log.error "failed to build distribution"
+                    return 5
+                }
+                dist_files=(dist/*)
+                if [[ ${#dist_files[@]} -eq 0 ]] || [[ "${dist_files[0]}" == "dist/*" ]]; then
+                    log.error "no distribution files found in dist/ after build"
+                    return 5
+                fi
             fi
             cmd=(twine upload "${dist_files[@]}")
             [[ -n "$repository" ]] && cmd+=(--repository-url "$repository")
             # Auth via environment variables (not CLI args)
+            # Support both token auth (PyPI.org) and basic auth (Nexus/Artifactory)
             if [[ -n "$token_var" ]]; then
-                export TWINE_USERNAME="__token__"
-                export TWINE_PASSWORD="${!token_var}"
+                local token_value="${!token_var}"
+                if [[ "$token_value" == *:* ]]; then
+                    # Format user:password - basic auth (Nexus, Artifactory)
+                    export TWINE_USERNAME="${token_value%%:*}"
+                    export TWINE_PASSWORD="${token_value#*:}"
+                else
+                    # Token auth (PyPI.org)
+                    export TWINE_USERNAME="__token__"
+                    export TWINE_PASSWORD="$token_value"
+                fi
             fi
             ;;
     esac
