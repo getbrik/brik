@@ -19,7 +19,7 @@ variables:
   BRIK_LOG_DIR: "/tmp/brik/logs"
   BRIK_LOG_LEVEL: "info"
   BRIK_PLATFORM: "gitlab"
-  BRIK_CI_IMAGE: "alpine:3.21@sha256:c3f8e73fdb79deaebaa2037150150191b9dcbfba68b4a46d70103204c53f4709"
+  BRIK_CI_IMAGE: "ghcr.io/getbrik/brik-runner-base:latest"
 
 # ---------------------------------------------------------------------------
 # Stages - Fixed Flow
@@ -40,9 +40,11 @@ stages:
 default:
   image: ${BRIK_CI_IMAGE}
   before_script:
-    # Bootstrap prerequisites (yq, jq, git, bash) before BRIK_HOME is available
+    # Bootstrap prerequisites (yq, jq, git, bash) - skip if brik-runner image
     - |
-      if [ -f "${BRIK_HOME}/scripts/bootstrap-prereqs.sh" ]; then
+      if [ -f "/.brik-runner" ]; then
+        echo "[brik] brik-runner image detected, skipping prerequisite install"
+      elif [ -f "${BRIK_HOME}/scripts/bootstrap-prereqs.sh" ]; then
         . "${BRIK_HOME}/scripts/bootstrap-prereqs.sh"
         bootstrap_prereqs
       else
@@ -75,16 +77,6 @@ default:
             esac
           fi
         done
-      fi
-    # Install Docker CLI if socket is available (needed for package stage)
-    - |
-      if [ -S /var/run/docker.sock ] && ! command -v docker >/dev/null 2>&1; then
-        echo "[brik] Installing Docker CLI..."
-        if command -v apk >/dev/null 2>&1; then
-          apk add --no-cache docker-cli
-        elif command -v apt-get >/dev/null 2>&1; then
-          apt-get update -qq && apt-get install -y -qq docker.io
-        fi
       fi
     # Clone the Brik runtime if not already present
     - |

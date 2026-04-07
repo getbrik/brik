@@ -24,6 +24,16 @@ _BRIK_SETUP_LOADED=1
 [[ -z "${_BRIK_LOGGING_LOADED:-}" ]] && . "${BASH_SOURCE[0]%/*}/logging.sh"
 
 # ---------------------------------------------------------------------------
+# brik-runner image detection
+# ---------------------------------------------------------------------------
+
+# Check if running inside a brik-runner Docker image.
+# Returns 0 (true) if the marker file exists, 1 (false) otherwise.
+_setup._is_brik_runner() {
+    [[ -f "/.brik-runner" ]]
+}
+
+# ---------------------------------------------------------------------------
 # Environment detection
 # ---------------------------------------------------------------------------
 
@@ -382,6 +392,11 @@ setup.install_yq() {
 # Install core prerequisites: yq, jq, git, bash.
 # Strategy depends on BRIK_PLATFORM (virtualized vs local).
 setup.install_prerequisites() {
+    if _setup._is_brik_runner; then
+        log.info "brik-runner image detected, prerequisites already installed"
+        return 0
+    fi
+
     # Ensure BRIK_HOME/bin is on PATH for local self-hosted binaries
     if ! _setup._is_virtualized; then
         _setup._ensure_brik_bin || true
@@ -447,6 +462,11 @@ setup.install_stack() {
     if [[ -z "$stack" ]]; then
         log.error "stack name is required"
         return 2
+    fi
+
+    if _setup._is_brik_runner; then
+        log.info "brik-runner image detected, stack tools already installed"
+        return 0
     fi
 
     # Read version from env var (e.g., BRIK_BUILD_NODE_VERSION)

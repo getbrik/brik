@@ -184,6 +184,10 @@ config.export_build_vars() {
     stack="$(config.get '.project.stack' 'auto')"
     export BRIK_BUILD_STACK="$stack"
 
+    local stack_version
+    stack_version="$(config.get '.project.stack_version' '')"
+    export BRIK_BUILD_STACK_VERSION="$stack_version"
+
     local default_cmd=""
     if [[ "$stack" != "auto" ]]; then
         default_cmd="$(config.stack_default "$stack" "build_command" 2>/dev/null || true)"
@@ -602,6 +606,39 @@ config.export_publish_vars() {
 }
 
 # ---------------------------------------------------------------------------
+# Runner image resolution
+# ---------------------------------------------------------------------------
+
+# Export runner image variable from stack + version.
+# Sets: BRIK_RUNNER_IMAGE
+config.export_runner_vars() {
+    local stack="${BRIK_BUILD_STACK:-auto}"
+    local version="${BRIK_BUILD_STACK_VERSION:-}"
+
+    if [[ "$stack" == "auto" || -z "$stack" ]]; then
+        export BRIK_RUNNER_IMAGE="${BRIK_RUNNER_REGISTRY:-ghcr.io/getbrik}/brik-runner-base:latest"
+        return 0
+    fi
+
+    # Source runner-images if not already loaded
+    local runner_file="${BASH_SOURCE[0]%/*}/../runtime/runner-images.sh"
+    if [[ -f "$runner_file" && -z "${_BRIK_RUNNER_IMAGES_LOADED:-}" ]]; then
+        # shellcheck source=../runtime/runner-images.sh
+        . "$runner_file"
+    fi
+
+    local image
+    if image="$(runner.resolve_image "$stack" "$version")"; then
+        export BRIK_RUNNER_IMAGE="$image"
+    else
+        log.warn "no runner image found for stack '$stack' version '${version:-default}', using base"
+        export BRIK_RUNNER_IMAGE="${BRIK_RUNNER_REGISTRY:-ghcr.io/getbrik}/brik-runner-base:latest"
+    fi
+
+    return 0
+}
+
+# ---------------------------------------------------------------------------
 # Config coherence validation
 # ---------------------------------------------------------------------------
 
@@ -650,6 +687,7 @@ config.export_all() {
     export BRIK_PROJECT_ROOT="$project_root"
 
     config.export_build_vars
+    config.export_runner_vars
     config.export_test_vars
     config.export_quality_vars
     config.export_security_vars

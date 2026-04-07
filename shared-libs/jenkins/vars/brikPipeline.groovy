@@ -6,9 +6,10 @@
  *   brikPipeline()
  *
  * Parameters:
- *   brikHome    - Override path to Brik shared library (default: auto-detected)
- *   nodeLabel   - Jenkins agent label to run on (default: empty = any agent)
- *   timeoutMin  - Pipeline timeout in minutes (default: 60)
+ *   brikHome        - Override path to Brik shared library (default: auto-detected)
+ *   nodeLabel       - Jenkins agent label to run on (default: empty = any agent)
+ *   timeoutMin      - Pipeline timeout in minutes (default: 60)
+ *   useDockerAgent  - Run stages in resolved brik-runner Docker container (default: false)
  *
  * The fixed flow:
  *   Init -> Release -> Build -> Quality || Security -> Test -> Package -> Deploy -> Notify
@@ -19,6 +20,7 @@
 def call(Map params = [:]) {
     def label = params.nodeLabel ?: ''
     def timeoutMinutes = params.timeoutMin ?: 60
+    def useDocker = params.useDockerAgent ?: false
 
     node(label) {
         timeout(time: timeoutMinutes, unit: 'MINUTES') {
@@ -43,19 +45,45 @@ def call(Map params = [:]) {
                 returnStdout: true
             ).trim()
 
+            // Resolve runner image after init when Docker agent mode is enabled
+            def resolvedImage = ''
+
             try {
-                stage('Init')    { brikStage('init', brikHome) }
-                stage('Release') { brikStage('release', brikHome) }
-                stage('Build')   { brikStage('build', brikHome) }
+                // Init stage always runs on the Jenkins agent (needs brik.yml)
+                stage('Init') { brikStage('init', brikHome) }
+
+                if (useDocker) {
+                    resolvedImage = sh(
+                        script: """#!/bin/bash
+                            . "${brikHome}/runtime/bash/lib/runtime/runner-images.sh"
+                            STACK=\$(yq '.project.stack // "auto"' brik.yml 2>/dev/null || echo "auto")
+                            VERSION=\$(yq '.project.stack_version // ""' brik.yml 2>/dev/null || echo "")
+                            runner.resolve_image "\$STACK" "\$VERSION" 2>/dev/null || echo ""
+                        """,
+                        returnStdout: true
+                    ).trim()
+                }
+
+                // Helper closure: run stage in Docker container or directly
+                def runStage = { name ->
+                    if (useDocker && resolvedImage) {
+                        docker.image(resolvedImage).inside { brikStage(name, brikHome) }
+                    } else {
+                        brikStage(name, brikHome)
+                    }
+                }
+
+                stage('Release') { runStage('release') }
+                stage('Build')   { runStage('build') }
                 stage('Quality & Security') {
                     parallel(
-                        'Quality': { brikStage('quality', brikHome) },
-                        'Security': { brikStage('security', brikHome) }
+                        'Quality': { runStage('quality') },
+                        'Security': { runStage('security') }
                     )
                 }
-                stage('Test')    { brikStage('test', brikHome) }
-                stage('Package') { brikStage('package', brikHome) }
-                stage('Deploy')  { brikStage('deploy', brikHome) }
+                stage('Test')    { runStage('test') }
+                stage('Package') { runStage('package') }
+                stage('Deploy')  { runStage('deploy') }
             } finally {
                 stage('Notify') { brikStage('notify', brikHome) }
             }

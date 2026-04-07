@@ -3,6 +3,7 @@ version: 1
 project:
   name: my-python-app
   stack: python
+  stack_version: "3.13"
 
 build:
   python_version: "3.12"

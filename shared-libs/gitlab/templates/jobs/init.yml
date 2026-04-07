@@ -14,15 +14,28 @@ brik-init:
     # Note: after_script runs in a separate shell, so we read brik.yml directly
     - |
       STACK="auto"
+      STACK_VERSION=""
       if command -v yq >/dev/null 2>&1 && [ -f brik.yml ]; then
         STACK="$(yq '.project.stack // "auto"' brik.yml)"
+        STACK_VERSION="$(yq '.project.stack_version // ""' brik.yml)"
       fi
       PROJECT_NAME="unnamed"
       if command -v yq >/dev/null 2>&1 && [ -f brik.yml ]; then
         PROJECT_NAME="$(yq '.project.name // "unnamed"' brik.yml)"
       fi
+      # Resolve runner image from stack + version
+      BRIK_HOME="${BRIK_HOME:-/opt/brik}"
+      RUNNER_IMAGE=""
+      if [ -f "${BRIK_HOME}/runtime/bash/lib/runtime/runner-images.sh" ]; then
+        . "${BRIK_HOME}/runtime/bash/lib/runtime/runner-images.sh"
+        RUNNER_IMAGE="$(runner.resolve_image "$STACK" "$STACK_VERSION" 2>/dev/null)" || true
+      fi
+      [ -z "$RUNNER_IMAGE" ] && RUNNER_IMAGE="ghcr.io/getbrik/brik-runner-base:latest"
+      echo "[brik:init] stack=${STACK} version=${STACK_VERSION:-<default>} -> image=${RUNNER_IMAGE}"
       {
         echo "BRIK_BUILD_STACK=${STACK}"
+        echo "BRIK_BUILD_STACK_VERSION=${STACK_VERSION}"
+        echo "BRIK_CI_IMAGE=${RUNNER_IMAGE}"
         echo "BRIK_PROJECT_NAME=${PROJECT_NAME}"
         echo "BRIK_QUALITY_ENABLED=${BRIK_QUALITY_ENABLED:-true}"
         echo "BRIK_SECURITY_ENABLED=${BRIK_SECURITY_ENABLED:-false}"
