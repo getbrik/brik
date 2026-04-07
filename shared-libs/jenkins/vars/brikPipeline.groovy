@@ -9,7 +9,7 @@
  *   brikHome        - Override path to Brik shared library (default: auto-detected)
  *   nodeLabel       - Jenkins agent label to run on (default: empty = any agent)
  *   timeoutMin      - Pipeline timeout in minutes (default: 60)
- *   useDockerAgent  - Run stages in resolved brik-runner Docker container (default: false)
+ *   useDockerAgent  - Run stages in resolved brik-runner Docker container (default: true)
  *
  * The fixed flow:
  *   Init -> Release -> Build -> Quality || Security -> Test -> Package -> Deploy -> Notify
@@ -20,9 +20,10 @@
 def call(Map params = [:]) {
     def label = params.nodeLabel ?: ''
     def timeoutMinutes = params.timeoutMin ?: 60
-    def useDocker = params.useDockerAgent ?: false
+    def useDocker = params.useDockerAgent != null ? params.useDockerAgent : true
 
     node(label) {
+        ansiColor('xterm') {
         timeout(time: timeoutMinutes, unit: 'MINUTES') {
             cleanWs()
             checkout scm
@@ -62,12 +63,17 @@ def call(Map params = [:]) {
                         """,
                         returnStdout: true
                     ).trim()
+
+                    if (resolvedImage) {
+                        docker.image(resolvedImage).pull()
+                    }
                 }
 
                 // Helper closure: run stage in Docker container or directly
+                def dockerArgs = "-e HOME=${env.WORKSPACE} --memory=2g -v /var/run/docker.sock:/var/run/docker.sock -v /usr/bin/docker:/usr/bin/docker"
                 def runStage = { name ->
                     if (useDocker && resolvedImage) {
-                        docker.image(resolvedImage).inside { brikStage(name, brikHome) }
+                        docker.image(resolvedImage).inside(dockerArgs) { brikStage(name, brikHome) }
                     } else {
                         brikStage(name, brikHome)
                     }
@@ -87,6 +93,7 @@ def call(Map params = [:]) {
             } finally {
                 stage('Notify') { brikStage('notify', brikHome) }
             }
+        }
         }
     }
 }

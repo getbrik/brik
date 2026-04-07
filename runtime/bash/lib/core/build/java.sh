@@ -54,7 +54,7 @@ build.java.run() {
             log.info "building with Maven: mvn $goals"
             # $goals intentionally word-splits
             # shellcheck disable=SC2086
-            (cd "$workspace" && mvn $goals) || {
+            (cd "$workspace" && mvn -B $goals) || {
                 log.error "build failed"
                 return 5
             }

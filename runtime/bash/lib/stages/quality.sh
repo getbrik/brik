@@ -16,6 +16,7 @@ _quality.install_deps() {
             fi
             ;;
         python)
+            export PATH="${HOME}/.local/bin:${PATH}"
             local pip_flags="--quiet"
             if pip install --help 2>&1 | grep -q -- '--break-system-packages'; then
                 pip_flags="$pip_flags --break-system-packages"

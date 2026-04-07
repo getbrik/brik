@@ -112,7 +112,7 @@ _doc._run_javadoc() {
     local -a cmd
     if [[ -f "pom.xml" ]]; then
         runtime.require_tool mvn || return 3
-        cmd=(mvn javadoc:javadoc)
+        cmd=(mvn -B javadoc:javadoc)
         [[ -n "$output" ]] && cmd+=(-Dreportoutputdirectory="$output")
     elif [[ -f "build.gradle" || -f "build.gradle.kts" ]]; then
         runtime.require_tool gradle || return 3

@@ -16,7 +16,7 @@ test.java.cmd() {
 
     case "$framework" in
         junit|maven)
-            cmd="mvn test"
+            cmd="mvn -B test"
             [[ -n "$report_dir" ]] && cmd="$cmd -Dsurefire.reportsDirectory=${report_dir}"
             ;;
         gradle)

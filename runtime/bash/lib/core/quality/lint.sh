@@ -82,7 +82,7 @@ quality.lint.run() {
                 ;;
             checkstyle)
                 if command -v mvn >/dev/null 2>&1; then
-                    lint_cmd="mvn checkstyle:check"
+                    lint_cmd="mvn -B checkstyle:check"
                 elif command -v gradle >/dev/null 2>&1; then
                     lint_cmd="gradle checkstyleMain"
                 else
@@ -137,7 +137,7 @@ quality.lint.run() {
             fi
         elif [[ -f "${workspace}/pom.xml" ]]; then
             if command -v mvn >/dev/null 2>&1; then
-                lint_cmd="mvn checkstyle:check"
+                lint_cmd="mvn -B checkstyle:check"
             else
                 log.warn "mvn not found for Java linting - skipping"
                 return 0
