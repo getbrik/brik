@@ -2,6 +2,49 @@
 # @module stages/quality
 # @description Quality stage - delegates to quality.run() for all checks.
 
+# Install project dependencies so quality tools are available.
+# Idempotent: skips if deps are already present.
+_quality.install_deps() {
+    local workspace="$1"
+    local stack="${BRIK_BUILD_STACK:-}"
+
+    case "$stack" in
+        node)
+            if [[ ! -d "${workspace}/node_modules" ]]; then
+                log.info "installing node dependencies for quality tools"
+                (cd "$workspace" && npm ci --ignore-scripts 2>/dev/null) || true
+            fi
+            ;;
+        python)
+            local pip_flags="--quiet"
+            if pip install --help 2>&1 | grep -q -- '--break-system-packages'; then
+                pip_flags="$pip_flags --break-system-packages"
+            fi
+            if [[ -f "${workspace}/pyproject.toml" ]]; then
+                log.info "installing python dev dependencies for quality tools"
+                # shellcheck disable=SC2086
+                (cd "$workspace" && pip install -e ".[dev]" $pip_flags 2>/dev/null) || true
+            elif [[ -f "${workspace}/requirements-dev.txt" ]]; then
+                log.info "installing python dev dependencies for quality tools"
+                # shellcheck disable=SC2086
+                (cd "$workspace" && pip install -r requirements-dev.txt $pip_flags 2>/dev/null) || true
+            fi
+            ;;
+        rust)
+            if command -v rustup >/dev/null 2>&1; then
+                if ! command -v cargo-clippy >/dev/null 2>&1; then
+                    log.info "installing rustup component: clippy"
+                    rustup component add clippy 2>/dev/null || true
+                fi
+                if ! command -v rustfmt >/dev/null 2>&1; then
+                    log.info "installing rustup component: rustfmt"
+                    rustup component add rustfmt 2>/dev/null || true
+                fi
+            fi
+            ;;
+    esac
+}
+
 # Quality stage: run configured quality checks via brik-lib.
 # Usage: stages.quality <context_file>
 stages.quality() {
@@ -16,6 +59,11 @@ stages.quality() {
     fi
 
     brik.use quality
+
+    # Ensure project dependencies are available (quality tools may be dev deps).
+    # On CI platforms like GitLab, each stage runs in a fresh container and
+    # node_modules/.venv are not carried over from the build stage.
+    _quality.install_deps "${BRIK_WORKSPACE}"
 
     log.info "quality stage - running checks"
 

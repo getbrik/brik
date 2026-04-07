@@ -62,6 +62,13 @@ build.python.run() {
         pip)
             runtime.require_tool pip || return 3
             log.info "building with pip"
+            # Install project + deps so test/quality stages have them available
+            local pip_install_flags="--quiet"
+            if pip install --help 2>&1 | grep -q -- '--break-system-packages'; then
+                pip_install_flags="$pip_install_flags --break-system-packages"
+            fi
+            # shellcheck disable=SC2086
+            (cd "$workspace" && pip install . $pip_install_flags) || log.warn "pip install . failed (non-fatal)"
             if (cd "$workspace" && python -m build) 2>/dev/null; then
                 : # python -m build succeeded
             elif (cd "$workspace" && pip wheel . -w dist/) 2>/dev/null; then

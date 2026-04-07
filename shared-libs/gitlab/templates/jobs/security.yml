@@ -19,4 +19,3 @@ brik-security:
     - if: '$BRIK_SECURITY_ENABLED == "false"'
       when: never
     - when: on_success
-  allow_failure: true

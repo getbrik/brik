@@ -226,7 +226,7 @@ brik version --verbose
 | Platform | Status | Integration |
 |----------|--------|-------------|
 | **GitLab CI** | Functional | Shared library with pipeline template |
-| **Jenkins** | PoC | Jenkins Shared Library |
+| **Jenkins** | Functional | Jenkins Shared Library (CasC + Gitea) |
 | **GitHub Actions** | Planned | Reusable workflows |
 
 ## Architecture
@@ -300,7 +300,7 @@ shellcheck bin/brik
 **Next:**
 - [ ] Type checking, coherence validators, security scanning execution
 - [ ] Local pipeline execution (`brik run pipeline`)
-- [ ] Jenkins shared library
+- [x] Jenkins shared library (fixed flow, CasC, E2E tested)
 - [ ] GitHub Actions reusable workflows
 - [ ] Multi-environment deploy (Git Flow, trunk-based, GitHub Flow profiles)
 - [ ] Official Docker images (`ghcr.io/getbrik/brik-runner-*`)

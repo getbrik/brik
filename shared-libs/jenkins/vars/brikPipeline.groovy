@@ -22,6 +22,7 @@ def call(Map params = [:]) {
 
     node(label) {
         timeout(time: timeoutMinutes, unit: 'MINUTES') {
+            cleanWs()
             checkout scm
 
             // Jenkins clones Global Libraries into ${WORKSPACE}@libs/<hash>/
