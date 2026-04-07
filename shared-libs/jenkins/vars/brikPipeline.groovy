@@ -78,7 +78,11 @@ def call(Map params = [:]) {
                     returnStdout: true
                 ).trim()
                 def networkArg = dockerNetwork ? "--network ${dockerNetwork}" : ''
-                def dockerArgs = "-e HOME=${env.WORKSPACE} --memory=2g -v /var/run/docker.sock:/var/run/docker.sock ${networkArg}"
+                // Export global node env vars to a file so Docker containers can access them
+                sh 'env | grep -E "^(NEXUS_|BRIK_|REGISTRY_)" > "${WORKSPACE}/.brik-env" 2>/dev/null || true'
+                def envFile = "${env.WORKSPACE}/.brik-env"
+                def globalEnvArgs = fileExists(envFile) && readFile(envFile).trim() ? "--env-file ${envFile}" : ''
+                def dockerArgs = "-e HOME=${env.WORKSPACE} --memory=2g -v /var/run/docker.sock:/var/run/docker.sock ${networkArg} ${globalEnvArgs}"
                 def runStage = { name ->
                     if (useDocker && resolvedImage) {
                         docker.image(resolvedImage).inside(dockerArgs) { brikStage(name, brikHome) }
