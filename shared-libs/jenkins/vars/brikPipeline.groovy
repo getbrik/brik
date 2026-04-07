@@ -10,6 +10,7 @@
  *   nodeLabel       - Jenkins agent label to run on (default: empty = any agent)
  *   timeoutMin      - Pipeline timeout in minutes (default: 60)
  *   useDockerAgent  - Run stages in resolved brik-runner Docker container (default: true)
+ *   dockerNetwork   - Docker network for runner containers (default: auto-detected from Jenkins container)
  *
  * The fixed flow:
  *   Init -> Release -> Build -> Quality || Security -> Test -> Package -> Deploy -> Notify
@@ -70,7 +71,12 @@ def call(Map params = [:]) {
                 }
 
                 // Helper closure: run stage in Docker container or directly
-                def dockerArgs = "-e HOME=${env.WORKSPACE} --memory=2g -v /var/run/docker.sock:/var/run/docker.sock"
+                def dockerNetwork = params.dockerNetwork ?: sh(
+                    script: 'docker inspect $(hostname) --format "{{range .NetworkSettings.Networks}}{{.NetworkID}}{{end}}" 2>/dev/null | head -1',
+                    returnStdout: true
+                ).trim()
+                def networkArg = dockerNetwork ? "--network ${dockerNetwork}" : ''
+                def dockerArgs = "-e HOME=${env.WORKSPACE} --memory=2g -v /var/run/docker.sock:/var/run/docker.sock ${networkArg}"
                 def runStage = { name ->
                     if (useDocker && resolvedImage) {
                         docker.image(resolvedImage).inside(dockerArgs) { brikStage(name, brikHome) }
