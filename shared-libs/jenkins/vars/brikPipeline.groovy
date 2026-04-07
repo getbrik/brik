@@ -70,7 +70,7 @@ def call(Map params = [:]) {
                 }
 
                 // Helper closure: run stage in Docker container or directly
-                def dockerArgs = "-e HOME=${env.WORKSPACE} --memory=2g -v /var/run/docker.sock:/var/run/docker.sock -v /usr/bin/docker:/usr/bin/docker"
+                def dockerArgs = "-e HOME=${env.WORKSPACE} --memory=2g -v /var/run/docker.sock:/var/run/docker.sock"
                 def runStage = { name ->
                     if (useDocker && resolvedImage) {
                         docker.image(resolvedImage).inside(dockerArgs) { brikStage(name, brikHome) }
