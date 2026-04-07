@@ -43,6 +43,7 @@ publish.pypi.run() {
                 log.error "failed to install twine"
                 return 3
             }
+            export PATH="${HOME}/.local/bin:${PATH}"
             tool="twine"
         else
             log.error "no publish tool found (poetry, uv, or twine)"
