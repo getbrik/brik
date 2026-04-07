@@ -72,7 +72,9 @@ def call(Map params = [:]) {
 
                 // Helper closure: run stage in Docker container or directly
                 def dockerNetwork = params.dockerNetwork ?: sh(
-                    script: 'docker inspect $(hostname) --format "{{range .NetworkSettings.Networks}}{{.NetworkID}}{{end}}" 2>/dev/null | head -1',
+                    script: '''CID=$(grep -oP 'containers/\\K[a-f0-9]+' /proc/self/mountinfo 2>/dev/null | head -1)
+                        [ -n "$CID" ] && docker inspect "$CID" --format '{{range .NetworkSettings.Networks}}{{.NetworkID}}{{end}}' 2>/dev/null | head -1 || echo ''
+                    ''',
                     returnStdout: true
                 ).trim()
                 def networkArg = dockerNetwork ? "--network ${dockerNetwork}" : ''
