@@ -45,8 +45,12 @@ publish.docker.run() {
         tags="${BRIK_VERSION:-latest}"
     fi
 
-    # Login to registry if credentials are provided
+    # Isolate credentials in a temporary directory
+    local _docker_config_dir=""
     if [[ -n "$username_var" && -n "$password_var" ]]; then
+        _docker_config_dir="$(mktemp -d)"
+        export DOCKER_CONFIG="$_docker_config_dir"
+
         _publish._require_secret_var "$username_var" "docker username" || return $?
         _publish._require_secret_var "$password_var" "docker password" || return $?
 
@@ -59,6 +63,8 @@ publish.docker.run() {
             printf '%s' "${!password_var}" | docker login ${login_registry:+"$login_registry"} \
                 --username "${!username_var}" --password-stdin || {
                 log.error "docker login failed"
+                rm -rf "$_docker_config_dir"
+                unset DOCKER_CONFIG
                 return 5
             }
         fi
@@ -84,11 +90,11 @@ publish.docker.run() {
     done
     IFS="${old_ifs}"
 
-    # Logout if we logged in
-    if [[ -n "$username_var" && -n "$password_var" && "$dry_run" != "true" ]]; then
-        if ! docker logout ${registry:+"$registry"} >/dev/null 2>&1; then
-            log.warn "docker logout failed - credentials may persist in ~/.docker/config.json"
-        fi
+    # Clean up credentials
+    if [[ -n "$_docker_config_dir" ]]; then
+        docker logout ${registry:+"$registry"} >/dev/null 2>&1 || true
+        rm -rf "$_docker_config_dir"
+        unset DOCKER_CONFIG
     fi
 
     log.info "docker publish completed successfully"
