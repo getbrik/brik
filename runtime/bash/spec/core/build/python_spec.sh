@@ -358,6 +358,93 @@ EOF
       End
     End
 
+    Describe "pip install . for project installation"
+      setup_pip_install() {
+        TEST_WS="$(mktemp -d)"
+        MOCK_LOG="${TEST_WS}/mock.log"
+        printf '[project]\nname = "test"\n' > "${TEST_WS}/pyproject.toml"
+        MOCK_BIN="$(mktemp -d)"
+        cat > "${MOCK_BIN}/pip" << MOCKEOF
+#!/usr/bin/env bash
+printf 'pip %s\n' "\$*" >> "$MOCK_LOG"
+exit 0
+MOCKEOF
+        cat > "${MOCK_BIN}/python" << MOCKEOF
+#!/usr/bin/env bash
+printf 'python %s\n' "\$*" >> "$MOCK_LOG"
+exit 0
+MOCKEOF
+        chmod +x "${MOCK_BIN}/pip" "${MOCK_BIN}/python"
+        ORIG_PATH="$PATH"
+        export PATH="${MOCK_BIN}:${PATH}"
+      }
+      cleanup_pip_install() {
+        export PATH="$ORIG_PATH"
+        rm -rf "$TEST_WS" "$MOCK_BIN"
+      }
+      Before 'setup_pip_install'
+      After 'cleanup_pip_install'
+
+      It "runs pip install . before building"
+        invoke_pip_install_check() {
+          build.python.run "$TEST_WS" 2>/dev/null || return 1
+          grep -q "pip install \." "$MOCK_LOG"
+        }
+        When call invoke_pip_install_check
+        The status should be success
+      End
+
+      It "runs pip install . before python -m build"
+        invoke_pip_install_order() {
+          build.python.run "$TEST_WS" 2>/dev/null || return 1
+          local install_line build_line
+          install_line="$(grep -n "pip install \." "$MOCK_LOG" | head -1 | cut -d: -f1)"
+          build_line="$(grep -n "python -m build" "$MOCK_LOG" | head -1 | cut -d: -f1)"
+          [[ "$install_line" -lt "$build_line" ]]
+        }
+        When call invoke_pip_install_order
+        The status should be success
+      End
+    End
+
+    Describe "pip install . failure is non-fatal"
+      setup_pip_install_fail() {
+        TEST_WS="$(mktemp -d)"
+        MOCK_LOG="${TEST_WS}/mock.log"
+        printf '[project]\nname = "test"\n' > "${TEST_WS}/pyproject.toml"
+        MOCK_BIN="$(mktemp -d)"
+        # pip install . fails, but pip wheel succeeds
+        cat > "${MOCK_BIN}/pip" << MOCKEOF
+#!/usr/bin/env bash
+printf 'pip %s\n' "\$*" >> "$MOCK_LOG"
+if echo "\$*" | grep -q "install \."; then
+  exit 1
+fi
+exit 0
+MOCKEOF
+        cat > "${MOCK_BIN}/python" << 'MOCKEOF'
+#!/usr/bin/env bash
+# python -m build fails so pip wheel fallback is used
+exit 1
+MOCKEOF
+        chmod +x "${MOCK_BIN}/pip" "${MOCK_BIN}/python"
+        ORIG_PATH="$PATH"
+        export PATH="${MOCK_BIN}:${PATH}"
+      }
+      cleanup_pip_install_fail() {
+        export PATH="$ORIG_PATH"
+        rm -rf "$TEST_WS" "$MOCK_BIN"
+      }
+      Before 'setup_pip_install_fail'
+      After 'cleanup_pip_install_fail'
+
+      It "succeeds even when pip install . fails"
+        When call build.python.run "$TEST_WS"
+        The status should be success
+        The stderr should include "build completed successfully"
+      End
+    End
+
     Describe "explicit --tool override"
       setup_tool_override() {
         TEST_WS="$(mktemp -d)"
