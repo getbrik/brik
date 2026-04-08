@@ -1,6 +1,7 @@
 Describe "Integration: Quality and Security stages"
   Include "$BRIK_RUNTIME_LIB/logging.sh"
   Include "$BRIK_RUNTIME_LIB/tools.sh"
+  Include "$BRIK_CORE_LIB/quality/_tools.sh"
   Include "$BRIK_CORE_LIB/_loader.sh"
   Include "$BRIK_CORE_LIB/quality.sh"
   Include "$BRIK_CORE_LIB/quality/lint.sh"
@@ -112,14 +113,14 @@ EOF
     End
   End
 
-  Describe "security.run composing quality sub-modules"
+  Describe "security.run composing security sub-modules"
     Describe "with mocked tools"
       setup_security() {
         TEST_WS="$(mktemp -d)"
         MOCK_BIN="$(mktemp -d)"
         MOCK_NPM_LOG="${TEST_WS}/mock_npm.log"
-        MOCK_TRIVY_LOG="${TEST_WS}/mock_trivy.log"
-        # Mock npm for deps scan
+        MOCK_GITLEAKS_LOG="${TEST_WS}/mock_gitleaks.log"
+        # Mock npm for deps scan (via security.deps -> quality.deps)
         cat > "${MOCK_BIN}/npm" << MOCKEOF
 #!/usr/bin/env bash
 printf 'npm %s\n' "\$*" >> "$MOCK_NPM_LOG"
@@ -127,13 +128,13 @@ exit 0
 MOCKEOF
         chmod +x "${MOCK_BIN}/npm"
         printf '{"name":"test"}\n' > "${TEST_WS}/package.json"
-        # Mock trivy for secret scan
-        cat > "${MOCK_BIN}/trivy" << MOCKEOF
+        # Mock gitleaks for secret scan
+        cat > "${MOCK_BIN}/gitleaks" << MOCKEOF
 #!/usr/bin/env bash
-printf 'trivy %s\n' "\$*" >> "$MOCK_TRIVY_LOG"
+printf 'gitleaks %s\n' "\$*" >> "$MOCK_GITLEAKS_LOG"
 exit 0
 MOCKEOF
-        chmod +x "${MOCK_BIN}/trivy"
+        chmod +x "${MOCK_BIN}/gitleaks"
         ORIG_PATH="$PATH"
         export PATH="${MOCK_BIN}:${PATH}"
       }
@@ -144,27 +145,18 @@ MOCKEOF
       Before 'setup_security'
       After 'cleanup_security'
 
-      It "runs dependency and secret scans via quality modules"
+      It "runs dependency and secret scans via security modules"
         When call security.run "$TEST_WS"
         The status should be success
         The stderr should include "2/2 scans passed"
       End
 
-      It "deps scan invokes npm audit"
-        invoke_check_npm() {
+      It "secret scan invokes gitleaks"
+        invoke_check_gitleaks() {
           security.run "$TEST_WS" 2>/dev/null || return 1
-          grep -q "^npm audit" "$MOCK_NPM_LOG"
+          grep -q "^gitleaks detect" "$MOCK_GITLEAKS_LOG"
         }
-        When call invoke_check_npm
-        The status should be success
-      End
-
-      It "secret scan invokes trivy"
-        invoke_check_trivy() {
-          security.run "$TEST_WS" 2>/dev/null || return 1
-          grep -q "^trivy fs" "$MOCK_TRIVY_LOG"
-        }
-        When call invoke_check_trivy
+        When call invoke_check_gitleaks
         The status should be success
       End
     End
@@ -180,12 +172,18 @@ MOCKEOF
 exit 0
 EOF
         chmod +x "${MOCK_BIN}/npm"
-        # Mock trivy for both sast and container
-        cat > "${MOCK_BIN}/trivy" << 'EOF'
+        # Mock gitleaks for secret scan
+        cat > "${MOCK_BIN}/gitleaks" << 'EOF'
 #!/usr/bin/env bash
 exit 0
 EOF
-        chmod +x "${MOCK_BIN}/trivy"
+        chmod +x "${MOCK_BIN}/gitleaks"
+        # Mock grype for container scan
+        cat > "${MOCK_BIN}/grype" << 'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+        chmod +x "${MOCK_BIN}/grype"
         ORIG_PATH="$PATH"
         export PATH="${MOCK_BIN}:${PATH}"
       }

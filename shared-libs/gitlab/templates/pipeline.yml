@@ -20,6 +20,8 @@ variables:
   BRIK_LOG_LEVEL: "info"
   BRIK_PLATFORM: "gitlab"
   BRIK_CI_IMAGE: "ghcr.io/getbrik/brik-runner-base:latest"
+  BRIK_QUALITY_IMAGE: "ghcr.io/getbrik/brik-runner-quality:latest"
+  BRIK_SECURITY_IMAGE: "ghcr.io/getbrik/brik-runner-security:latest"
   # Cache relocation: redirect tool caches into $CI_PROJECT_DIR (GitLab constraint)
   PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
   MAVEN_OPTS: "-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository"

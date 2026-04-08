@@ -197,7 +197,7 @@ security:
   secret_scan: true
   secret_scan_tool: gitleaks
   container_scan: true
-  container_scan_tool: trivy
+  container_scan_tool: grype
 YAML
       export BRIK_CONFIG_FILE="$TEMP_CONFIG"
     }
@@ -236,7 +236,7 @@ YAML
         printf '%s' "${BRIK_SECURITY_CONTAINER_SCAN_TOOL:-UNSET}"
       }
       When call export_and_check
-      The output should equal "trivy"
+      The output should equal "grype"
     End
   End
 

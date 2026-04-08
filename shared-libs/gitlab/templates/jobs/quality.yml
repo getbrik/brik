@@ -8,6 +8,7 @@
 
 brik-quality:
   stage: quality
+  image: "${BRIK_QUALITY_IMAGE}"
   needs:
     - job: brik-init
       artifacts: true

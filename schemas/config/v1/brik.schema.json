@@ -268,7 +268,7 @@
               "minLength": 1
             },
             "tool": {
-              "description": "SAST tool to use (e.g. semgrep, trivy, sonarqube, codeql). Overrides auto-detection (Tier 2).",
+              "description": "SAST tool to use (e.g. semgrep, sonarqube, codeql). Overrides auto-detection (Tier 2).",
               "type": "string",
               "minLength": 1
             },
@@ -295,7 +295,7 @@
               "enum": ["critical", "high", "medium", "low"]
             },
             "tool": {
-              "description": "Dependency scanning tool to use (e.g. npm-audit, pip-audit, trivy).",
+              "description": "Dependency scanning tool to use (e.g. npm-audit, pip-audit, osv-scanner).",
               "type": "string",
               "minLength": 1
             }
@@ -393,17 +393,17 @@
           "type": "boolean"
         },
         "dependency_scan_tool": {
-          "description": "Tool for dependency vulnerability scanning (e.g. npm-audit, pip-audit, safety, trivy, grype, cargo-audit). Auto-detected from stack when omitted.",
+          "description": "Tool for dependency vulnerability scanning (e.g. npm-audit, pip-audit, safety, osv-scanner, grype, cargo-audit). Auto-detected from stack when omitted.",
           "type": "string",
           "minLength": 1
         },
         "secret_scan_tool": {
-          "description": "Tool for secret scanning (e.g. gitleaks, trufflehog, trivy). Defaults to trivy if available.",
+          "description": "Tool for secret scanning (e.g. gitleaks, trufflehog). Defaults to gitleaks if available.",
           "type": "string",
           "minLength": 1
         },
         "container_scan_tool": {
-          "description": "Tool for container image scanning (e.g. trivy, grype). Auto-detected when omitted.",
+          "description": "Tool for container image scanning (e.g. grype, dockle). Auto-detected when omitted.",
           "type": "string",
           "minLength": 1
         },
