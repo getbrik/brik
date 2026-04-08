@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # @module security
-# @uses quality.deps quality.secret_scan quality.container
-# @description Security stage facade. Composes quality sub-modules for security scanning.
+# @uses security.deps security.secret_scan security.container
+# @description Security stage facade. Delegates to dedicated security sub-modules.
 
 # Guard against double-sourcing
 [[ -n "${_BRIK_CORE_SECURITY_LOADED:-}" ]] && return 0
@@ -36,50 +36,55 @@ security.run() {
 
     if [[ "$dep_scan" == "true" ]]; then
         total=$((total + 1))
-        brik.use "quality.deps" 2>/dev/null || true
-        if declare -f quality.deps.run >/dev/null 2>&1; then
-            local dep_tool="${BRIK_SECURITY_DEPENDENCY_SCAN_TOOL:-}"
-            if [[ -n "$dep_tool" ]]; then
-                # Use specified tool as a command (e.g., grype, trivy, cargo-audit)
-                if command -v "$dep_tool" >/dev/null 2>&1; then
-                    log.info "dependency scan with tool: $dep_tool"
-                    (cd "$workspace" && "$dep_tool" .) || failed=$((failed + 1))
-                else
-                    log.warn "dependency scan tool not found: $dep_tool - falling back to quality.deps"
-                    quality.deps.run "$workspace" --severity "$severity" || failed=$((failed + 1))
-                fi
-            else
-                quality.deps.run "$workspace" --severity "$severity" || failed=$((failed + 1))
+        # Source security.deps module (skip if already defined, e.g. mocked)
+        if ! declare -f security.deps.run >/dev/null 2>&1; then
+            local sec_deps_path="${BASH_SOURCE[0]%/*}/security/deps.sh"
+            if [[ -f "$sec_deps_path" ]]; then
+                # shellcheck source=security/deps.sh
+                . "$sec_deps_path"
             fi
+        fi
+        if declare -f security.deps.run >/dev/null 2>&1; then
+            security.deps.run "$workspace" --severity "$severity" || failed=$((failed + 1))
         else
-            log.warn "quality.deps module not available - skipping dependency scan"
+            log.warn "security.deps module not available - skipping dependency scan"
         fi
     fi
 
     if [[ "$secret_scan" == "true" ]]; then
         total=$((total + 1))
-        # Bridge security tool config to quality module
-        local secret_tool="${BRIK_SECURITY_SECRET_SCAN_TOOL:-}"
-        [[ -n "$secret_tool" ]] && export BRIK_QUALITY_SECRET_SCAN_TOOL="$secret_tool"
-
-        brik.use "quality.secret_scan" 2>/dev/null || true
-        if declare -f quality.secret_scan.run >/dev/null 2>&1; then
-            quality.secret_scan.run "$workspace" || failed=$((failed + 1))
+        # Source security.secret_scan module (skip if already defined, e.g. mocked)
+        if ! declare -f security.secret_scan.run >/dev/null 2>&1; then
+            local sec_secret_path="${BASH_SOURCE[0]%/*}/security/secret_scan.sh"
+            if [[ -f "$sec_secret_path" ]]; then
+                # shellcheck source=security/secret_scan.sh
+                . "$sec_secret_path"
+            fi
+        fi
+        if declare -f security.secret_scan.run >/dev/null 2>&1; then
+            security.secret_scan.run "$workspace" || failed=$((failed + 1))
         else
-            log.warn "quality.secret_scan module not available - skipping secret scan"
+            log.warn "security.secret_scan module not available - skipping secret scan"
         fi
     fi
 
     if [[ "$container_scan" == "true" ]]; then
         total=$((total + 1))
-        brik.use "quality.container" 2>/dev/null || true
-        if declare -f quality.container.run >/dev/null 2>&1; then
+        # Source security.container module (skip if already defined, e.g. mocked)
+        if ! declare -f security.container.run >/dev/null 2>&1; then
+            local sec_container_path="${BASH_SOURCE[0]%/*}/security/container.sh"
+            if [[ -f "$sec_container_path" ]]; then
+                # shellcheck source=security/container.sh
+                . "$sec_container_path"
+            fi
+        fi
+        if declare -f security.container.run >/dev/null 2>&1; then
             local container_args=("$workspace")
             [[ -n "$image" ]] && container_args+=(--image "$image")
             container_args+=(--severity "$severity")
-            quality.container.run "${container_args[@]}" || failed=$((failed + 1))
+            security.container.run "${container_args[@]}" || failed=$((failed + 1))
         else
-            log.warn "quality.container module not available - skipping container scan"
+            log.warn "security.container module not available - skipping container scan"
         fi
     fi
 

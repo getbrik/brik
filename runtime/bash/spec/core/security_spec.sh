@@ -1,6 +1,7 @@
 Describe "security.sh"
   Include "$BRIK_RUNTIME_LIB/logging.sh"
   Include "$BRIK_RUNTIME_LIB/tools.sh"
+  Include "$BRIK_CORE_LIB/quality/_tools.sh"
   Include "$BRIK_CORE_LIB/security.sh"
 
   Describe "security.run"
@@ -36,19 +37,18 @@ Describe "security.sh"
       End
     End
 
-    Describe "with mock quality modules"
+    Describe "with mock security modules"
       setup_mocks() {
         TEST_WS="$(mktemp -d)"
         MOCK_DEPS_LOG="${TEST_WS}/deps_args.log"
         MOCK_SECRET_LOG="${TEST_WS}/secret_args.log"
         MOCK_CONTAINER_LOG="${TEST_WS}/container_args.log"
-        eval "quality.deps.run() { printf '%s\n' \"\$*\" > \"$MOCK_DEPS_LOG\"; return 0; }"
-        eval "quality.secret_scan.run() { printf '%s\n' \"\$*\" > \"$MOCK_SECRET_LOG\"; return 0; }"
-        eval "quality.container.run() { printf '%s\n' \"\$*\" > \"$MOCK_CONTAINER_LOG\"; return 0; }"
+        eval "security.deps.run() { printf '%s\n' \"\$*\" > \"$MOCK_DEPS_LOG\"; return 0; }"
+        eval "security.secret_scan.run() { printf '%s\n' \"\$*\" > \"$MOCK_SECRET_LOG\"; return 0; }"
+        eval "security.container.run() { printf '%s\n' \"\$*\" > \"$MOCK_CONTAINER_LOG\"; return 0; }"
       }
       cleanup_mocks() {
-        unset -f quality.deps.run quality.secret_scan.run quality.container.run 2>/dev/null
-        unset BRIK_QUALITY_SECRET_SCAN_TOOL BRIK_SECURITY_SECRET_SCAN_TOOL 2>/dev/null
+        unset -f security.deps.run security.secret_scan.run security.container.run 2>/dev/null
         rm -rf "$TEST_WS"
       }
       Before 'setup_mocks'
@@ -84,7 +84,7 @@ Describe "security.sh"
         The status should be success
       End
 
-      It "delegates to quality.secret_scan.run"
+      It "delegates to security.secret_scan.run"
         invoke_check_secret() {
           security.run "$TEST_WS" 2>/dev/null || return 1
           [[ -f "$MOCK_SECRET_LOG" ]]
@@ -92,26 +92,16 @@ Describe "security.sh"
         When call invoke_check_secret
         The status should be success
       End
-
-      It "bridges BRIK_SECURITY_SECRET_SCAN_TOOL to quality module"
-        invoke_check_bridge() {
-          export BRIK_SECURITY_SECRET_SCAN_TOOL="gitleaks"
-          security.run "$TEST_WS" 2>/dev/null || return 1
-          [[ "${BRIK_QUALITY_SECRET_SCAN_TOOL:-}" == "gitleaks" ]]
-        }
-        When call invoke_check_bridge
-        The status should be success
-      End
     End
 
     Describe "selective disable: only deps"
       setup_selective() {
         TEST_WS="$(mktemp -d)"
-        quality.deps.run() { return 0; }
-        quality.secret_scan.run() { return 0; }
+        security.deps.run() { return 0; }
+        security.secret_scan.run() { return 0; }
       }
       cleanup_selective() {
-        unset -f quality.deps.run quality.secret_scan.run 2>/dev/null
+        unset -f security.deps.run security.secret_scan.run 2>/dev/null
         rm -rf "$TEST_WS"
       }
       Before 'setup_selective'
@@ -127,11 +117,11 @@ Describe "security.sh"
     Describe "with failing scan"
       setup_fail() {
         TEST_WS="$(mktemp -d)"
-        quality.deps.run() { return 10; }
-        quality.secret_scan.run() { return 0; }
+        security.deps.run() { return 10; }
+        security.secret_scan.run() { return 0; }
       }
       cleanup_fail() {
-        unset -f quality.deps.run quality.secret_scan.run 2>/dev/null
+        unset -f security.deps.run security.secret_scan.run 2>/dev/null
         rm -rf "$TEST_WS"
       }
       Before 'setup_fail'
