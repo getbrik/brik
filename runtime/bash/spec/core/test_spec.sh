@@ -142,7 +142,7 @@ MOCKEOF
       It "detects Java and invokes mvn test"
         invoke_mvn() {
           test.run "$TEST_WS" 2>/dev/null || return 1
-          grep -q "^mvn test" "$MOCK_LOG"
+          grep -q "^mvn -B test" "$MOCK_LOG"
         }
         When call invoke_mvn
         The status should be success

@@ -296,7 +296,7 @@ MOCKEOF
         invoke_mvn_run() {
           printf '<project/>\n' > pom.xml
           doc.generate --tool javadoc 2>/dev/null || return 1
-          grep -q "mvn javadoc" "$MOCK_LOG"
+          grep -q "mvn -B javadoc" "$MOCK_LOG"
         }
         When call invoke_mvn_run
         The status should be success

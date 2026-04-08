@@ -6,17 +6,17 @@ Describe "test/java.sh"
   Describe "test.java.cmd"
     It "returns mvn test for maven framework"
       When call test.java.cmd "maven" "/workspace" ""
-      The output should equal "mvn test"
+      The output should equal "mvn -B test"
     End
 
     It "returns mvn test for junit framework"
       When call test.java.cmd "junit" "/workspace" ""
-      The output should equal "mvn test"
+      The output should equal "mvn -B test"
     End
 
     It "adds surefire report dir when report_dir is provided"
       When call test.java.cmd "maven" "/workspace" "/reports"
-      The output should equal "mvn test -Dsurefire.reportsDirectory=/reports"
+      The output should equal "mvn -B test -Dsurefire.reportsDirectory=/reports"
     End
 
     It "returns gradle test for gradle framework"
@@ -60,12 +60,12 @@ Describe "test/java.sh"
 
       It "auto-detects maven from pom.xml"
         When call test.java.run_cmd "$TEST_WS" ""
-        The output should equal "mvn test"
+        The output should equal "mvn -B test"
       End
 
       It "passes report_dir to maven"
         When call test.java.run_cmd "$TEST_WS" "/reports"
-        The output should equal "mvn test -Dsurefire.reportsDirectory=/reports"
+        The output should equal "mvn -B test -Dsurefire.reportsDirectory=/reports"
       End
     End
 

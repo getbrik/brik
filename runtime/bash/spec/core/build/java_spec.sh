@@ -135,7 +135,7 @@ MOCKEOF
       It "passes default goals: package -DskipTests"
         invoke_and_check_log() {
           build.java.run "$TEST_WS" 2>/dev/null || return 1
-          grep -qx "mvn package -DskipTests" "$MOCK_LOG"
+          grep -qx "mvn -B package -DskipTests" "$MOCK_LOG"
         }
         When call invoke_and_check_log
         The status should be success
@@ -144,7 +144,7 @@ MOCKEOF
       It "passes custom goals"
         invoke_custom_goals() {
           build.java.run "$TEST_WS" --goals "clean install" 2>/dev/null || return 1
-          grep -qx "mvn clean install" "$MOCK_LOG"
+          grep -qx "mvn -B clean install" "$MOCK_LOG"
         }
         When call invoke_custom_goals
         The status should be success

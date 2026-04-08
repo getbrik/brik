@@ -548,7 +548,7 @@ MOCKEOF
       It "runs mvn checkstyle:check"
         invoke_checkstyle_mvn() {
           quality.lint.run "$TEST_WS" 2>/dev/null || return 1
-          grep -q "mvn checkstyle" "$MOCK_LOG"
+          grep -q "mvn -B checkstyle" "$MOCK_LOG"
         }
         When call invoke_checkstyle_mvn
         The status should be success
