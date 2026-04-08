@@ -1,10 +1,19 @@
 #!/usr/bin/env bash
 # @module quality.container
-# @description Container image vulnerability scanning.
+# @uses quality._tools
+# @description Container image vulnerability scanning via tool registry.
 
 # Guard against double-sourcing
 [[ -n "${_BRIK_CORE_QUALITY_CONTAINER_LOADED:-}" ]] && return 0
 _BRIK_CORE_QUALITY_CONTAINER_LOADED=1
+
+# Source tool registry if not already loaded
+# shellcheck source=_tools.sh
+[[ -z "${_BRIK_CORE_QUALITY_TOOLS_LOADED:-}" ]] && . "${BASH_SOURCE[0]%/*}/_tools.sh"
+
+# Register container scanners (priority: lower = preferred)
+quality.tool.register container grype  grype  "grype {image} --fail-on {severity}" 10
+quality.tool.register container dockle dockle "dockle {image}"                     20
 
 # Scan a container image for vulnerabilities.
 # Usage: quality.container.run <workspace> [--image <image>] [--severity <threshold>]
@@ -27,18 +36,15 @@ quality.container.run() {
         image="${BRIK_PROJECT_NAME:-project}:${BRIK_VERSION:-latest}"
     fi
 
-    local scan_cmd=""
-    if command -v trivy >/dev/null 2>&1; then
-        scan_cmd="trivy image --severity $severity $image"
-    elif command -v grype >/dev/null 2>&1; then
-        scan_cmd="grype $image"
-    else
-        log.warn "no container scanner available (install trivy or grype) - skipping"
+    local resolved
+    resolved="$(quality.tool.resolve container)" || {
+        log.warn "no container scanner available (install grype) - skipping"
         return 0
-    fi
+    }
 
-    log.info "scanning container image: $scan_cmd"
-    eval "$scan_cmd" || {
+    log.info "scanning container image with ${resolved}"
+    quality.tool.exec container "$resolved" \
+        image="$image" severity="${severity,,}" || {
         log.error "container vulnerabilities found in: $image"
         return 10
     }

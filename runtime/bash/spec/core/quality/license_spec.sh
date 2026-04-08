@@ -1,6 +1,7 @@
 Describe "quality/license.sh"
   Include "$BRIK_RUNTIME_LIB/logging.sh"
   Include "$BRIK_RUNTIME_LIB/tools.sh"
+  Include "$BRIK_CORE_LIB/quality/_tools.sh"
   Include "$BRIK_CORE_LIB/quality/license.sh"
 
   Describe "quality.license.run"
@@ -99,7 +100,7 @@ MOCKEOF
       End
     End
 
-    Describe "license_finder has priority over trivy"
+    Describe "license_finder has priority over syft"
       setup_priority() {
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock_lf.log"
@@ -110,12 +111,12 @@ printf 'license_finder %s\n' "\$*" >> "$MOCK_LOG"
 exit 0
 MOCKEOF
         chmod +x "${MOCK_BIN}/license_finder"
-        cat > "${MOCK_BIN}/trivy" << MOCKEOF
+        cat > "${MOCK_BIN}/syft" << MOCKEOF
 #!/usr/bin/env bash
-printf 'trivy %s\n' "\$*" >> "$MOCK_LOG"
+printf 'syft %s\n' "\$*" >> "$MOCK_LOG"
 exit 0
 MOCKEOF
-        chmod +x "${MOCK_BIN}/trivy"
+        chmod +x "${MOCK_BIN}/syft"
         ORIG_PATH="$PATH"
         export PATH="${MOCK_BIN}:${PATH}"
       }
@@ -129,42 +130,42 @@ MOCKEOF
       It "prefers license_finder when both available"
         invoke_priority() {
           quality.license.run "$TEST_WS" 2>/dev/null || return 1
-          grep -q "^license_finder" "$MOCK_LOG" && ! grep -q "^trivy" "$MOCK_LOG"
+          grep -q "^license_finder" "$MOCK_LOG" && ! grep -q "^syft" "$MOCK_LOG"
         }
         When call invoke_priority
         The status should be success
       End
     End
 
-    Describe "with mock trivy (no license_finder)"
-      setup_trivy() {
+    Describe "with mock syft (no license_finder)"
+      setup_syft() {
         TEST_WS="$(mktemp -d)"
-        MOCK_LOG="${TEST_WS}/mock_trivy.log"
+        MOCK_LOG="${TEST_WS}/mock_syft.log"
         MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/trivy" << MOCKEOF
+        cat > "${MOCK_BIN}/syft" << MOCKEOF
 #!/usr/bin/env bash
-printf 'trivy %s\n' "\$*" >> "$MOCK_LOG"
+printf 'syft %s\n' "\$*" >> "$MOCK_LOG"
 exit 0
 MOCKEOF
-        chmod +x "${MOCK_BIN}/trivy"
+        chmod +x "${MOCK_BIN}/syft"
         ln -sf "$(command -v bash)" "${MOCK_BIN}/bash"
         ln -sf "$(command -v grep)" "${MOCK_BIN}/grep"
         ORIG_PATH="$PATH"
         export PATH="${MOCK_BIN}"
       }
-      cleanup_trivy() {
+      cleanup_syft() {
         export PATH="$ORIG_PATH"
         rm -rf "$TEST_WS" "$MOCK_BIN"
       }
-      Before 'setup_trivy'
-      After 'cleanup_trivy'
+      Before 'setup_syft'
+      After 'cleanup_syft'
 
-      It "falls back to trivy for license scanning"
-        invoke_trivy() {
+      It "falls back to syft for license scanning"
+        invoke_syft() {
           quality.license.run "$TEST_WS" 2>/dev/null || return 1
-          grep -q "^trivy fs.*license" "$MOCK_LOG"
+          grep -q "^syft scan" "$MOCK_LOG"
         }
-        When call invoke_trivy
+        When call invoke_syft
         The status should be success
       End
     End

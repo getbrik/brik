@@ -1,10 +1,19 @@
 #!/usr/bin/env bash
 # @module quality.deps
-# @description Dependency vulnerability scanning.
+# @uses quality._tools
+# @description Dependency vulnerability scanning via tool registry.
 
 # Guard against double-sourcing
 [[ -n "${_BRIK_CORE_QUALITY_DEPS_LOADED:-}" ]] && return 0
 _BRIK_CORE_QUALITY_DEPS_LOADED=1
+
+# Source tool registry if not already loaded
+# shellcheck source=_tools.sh
+[[ -z "${_BRIK_CORE_QUALITY_TOOLS_LOADED:-}" ]] && . "${BASH_SOURCE[0]%/*}/_tools.sh"
+
+# Register universal fallback scanners (stack-specific tools detected inline)
+quality.tool.register deps osv-scanner osv-scanner "osv-scanner scan --format table ." 10
+quality.tool.register deps grype       grype       "grype dir:{workspace}"              20
 
 # Run dependency scanning on a workspace.
 # Usage: quality.deps.run <workspace> [--severity <low|medium|high|critical>]
@@ -35,6 +44,7 @@ quality.deps.run() {
 
     local scan_cmd=""
 
+    # Stack-specific detection (unchanged)
     if [[ -f "${workspace}/package.json" ]]; then
         if command -v npm >/dev/null 2>&1; then
             scan_cmd="npm audit --audit-level=$severity"
@@ -47,14 +57,21 @@ quality.deps.run() {
         fi
     fi
 
-    # Fallback to trivy for any stack
+    # Fallback: universal scanner via registry (replaces trivy)
     if [[ -z "$scan_cmd" ]]; then
-        if command -v trivy >/dev/null 2>&1; then
-            scan_cmd="trivy fs --scanners vuln --severity ${severity^^} ."
-        else
+        local resolved
+        resolved="$(quality.tool.resolve deps)" || {
             log.warn "no dependency scanner available - skipping"
             return 0
-        fi
+        }
+        log.info "scanning dependencies with ${resolved}"
+        (cd "$workspace" && quality.tool.exec deps "$resolved" \
+            workspace="$workspace" severity="${severity^^}") || {
+            log.error "dependency vulnerabilities found"
+            return 10
+        }
+        log.info "dependency scan passed"
+        return 0
     fi
 
     log.info "scanning dependencies: $scan_cmd"

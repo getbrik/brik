@@ -1,13 +1,21 @@
 #!/usr/bin/env bash
 # @module quality.sast
-# @description Static Application Security Testing.
+# @uses quality._tools
+# @description Static Application Security Testing via tool registry.
 
 # Guard against double-sourcing
 [[ -n "${_BRIK_CORE_QUALITY_SAST_LOADED:-}" ]] && return 0
 _BRIK_CORE_QUALITY_SAST_LOADED=1
 
+# Source tool registry if not already loaded
+# shellcheck source=_tools.sh
+[[ -z "${_BRIK_CORE_QUALITY_TOOLS_LOADED:-}" ]] && . "${BASH_SOURCE[0]%/*}/_tools.sh"
+
+# Register SAST scanners
+quality.tool.register sast semgrep semgrep "semgrep scan --config auto ." 10
+
 # Run SAST on a workspace.
-# Usage: quality.sast.run <workspace> [--tool <semgrep|trivy|custom>] [--command <cmd>]
+# Usage: quality.sast.run <workspace> [--tool <semgrep|custom>] [--command <cmd>]
 quality.sast.run() {
     local workspace="$1"
     shift
@@ -38,10 +46,8 @@ quality.sast.run() {
     if [[ -z "$tool" ]]; then
         if command -v semgrep >/dev/null 2>&1; then
             tool="semgrep"
-        elif command -v trivy >/dev/null 2>&1; then
-            tool="trivy"
         else
-            log.warn "no SAST tool available (install semgrep or trivy) - skipping"
+            log.warn "no SAST tool available (install semgrep) - skipping"
             return 0
         fi
     fi
@@ -51,10 +57,6 @@ quality.sast.run() {
         semgrep)
             runtime.require_tool semgrep || return 3
             sast_cmd="semgrep scan --config auto ."
-            ;;
-        trivy)
-            runtime.require_tool trivy || return 3
-            sast_cmd="trivy fs --scanners vuln,secret ."
             ;;
         custom)
             if [[ -z "$custom_cmd" ]]; then

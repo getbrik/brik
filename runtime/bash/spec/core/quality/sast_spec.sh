@@ -1,6 +1,7 @@
 Describe "quality/sast.sh"
   Include "$BRIK_RUNTIME_LIB/logging.sh"
   Include "$BRIK_RUNTIME_LIB/tools.sh"
+  Include "$BRIK_CORE_LIB/quality/_tools.sh"
   Include "$BRIK_CORE_LIB/quality/sast.sh"
 
   Describe "quality.sast.run"
@@ -113,71 +114,6 @@ MOCKEOF
       End
     End
 
-    Describe "explicit --tool trivy"
-      setup_explicit_trivy() {
-        TEST_WS="$(mktemp -d)"
-        MOCK_LOG="${TEST_WS}/mock_trivy.log"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/trivy" << MOCKEOF
-#!/usr/bin/env bash
-printf 'trivy %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/trivy"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
-      }
-      cleanup_explicit_trivy() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
-      }
-      Before 'setup_explicit_trivy'
-      After 'cleanup_explicit_trivy'
-
-      It "uses trivy fs when --tool trivy specified"
-        invoke_explicit_trivy() {
-          quality.sast.run "$TEST_WS" --tool trivy 2>/dev/null || return 1
-          grep -q "^trivy fs" "$MOCK_LOG"
-        }
-        When call invoke_explicit_trivy
-        The status should be success
-      End
-    End
-
-    Describe "with mock trivy fallback (no semgrep)"
-      setup_trivy() {
-        TEST_WS="$(mktemp -d)"
-        MOCK_LOG="${TEST_WS}/mock_trivy.log"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/trivy" << MOCKEOF
-#!/usr/bin/env bash
-printf 'trivy %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/trivy"
-        ln -sf "$(command -v bash)" "${MOCK_BIN}/bash"
-        ln -sf "$(command -v grep)" "${MOCK_BIN}/grep"
-        ORIG_PATH="$PATH"
-        # Only trivy in PATH, no semgrep
-        export PATH="${MOCK_BIN}"
-      }
-      cleanup_trivy() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
-      }
-      Before 'setup_trivy'
-      After 'cleanup_trivy'
-
-      It "falls back to trivy when semgrep not available"
-        invoke_trivy_fallback() {
-          quality.sast.run "$TEST_WS" 2>/dev/null || return 1
-          grep -q "^trivy fs" "$MOCK_LOG"
-        }
-        When call invoke_trivy_fallback
-        The status should be success
-      End
-    End
-
     Describe "with no SAST tool"
       setup_none() {
         TEST_WS="$(mktemp -d)"
@@ -195,7 +131,7 @@ MOCKEOF
       It "skips gracefully when no tool available"
         When call quality.sast.run "$TEST_WS"
         The status should be success
-        The stderr should include "skipping"
+        The stderr should include "install semgrep"
       End
     End
 

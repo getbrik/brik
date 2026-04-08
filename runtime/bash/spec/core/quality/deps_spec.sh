@@ -1,6 +1,7 @@
 Describe "quality/deps.sh"
   Include "$BRIK_RUNTIME_LIB/logging.sh"
   Include "$BRIK_RUNTIME_LIB/tools.sh"
+  Include "$BRIK_CORE_LIB/quality/_tools.sh"
   Include "$BRIK_CORE_LIB/quality/deps.sh"
 
   Describe "quality.deps.run"
@@ -146,44 +147,35 @@ MOCKEOF
       End
     End
 
-    Describe "trivy fallback for unknown stack"
-      setup_trivy() {
+    Describe "osv-scanner fallback for unknown stack"
+      setup_osv() {
         TEST_WS="$(mktemp -d)"
-        MOCK_LOG="${TEST_WS}/mock_trivy.log"
+        MOCK_LOG="${TEST_WS}/mock_osv.log"
         MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/trivy" << MOCKEOF
+        cat > "${MOCK_BIN}/osv-scanner" << MOCKEOF
 #!/usr/bin/env bash
-printf 'trivy %s\n' "\$*" >> "$MOCK_LOG"
+printf 'osv-scanner %s\n' "\$*" >> "$MOCK_LOG"
 exit 0
 MOCKEOF
-        chmod +x "${MOCK_BIN}/trivy"
+        chmod +x "${MOCK_BIN}/osv-scanner"
         ln -sf "$(command -v bash)" "${MOCK_BIN}/bash"
         ln -sf "$(command -v grep)" "${MOCK_BIN}/grep"
         ORIG_PATH="$PATH"
         export PATH="${MOCK_BIN}"
       }
-      cleanup_trivy() {
+      cleanup_osv() {
         export PATH="$ORIG_PATH"
         rm -rf "$TEST_WS" "$MOCK_BIN"
       }
-      Before 'setup_trivy'
-      After 'cleanup_trivy'
+      Before 'setup_osv'
+      After 'cleanup_osv'
 
-      It "falls back to trivy fs for unknown workspace"
-        invoke_trivy() {
+      It "falls back to osv-scanner for unknown workspace"
+        invoke_osv() {
           quality.deps.run "$TEST_WS" 2>/dev/null || return 1
-          grep -q "^trivy fs" "$MOCK_LOG"
+          grep -q "^osv-scanner scan" "$MOCK_LOG"
         }
-        When call invoke_trivy
-        The status should be success
-      End
-
-      It "passes uppercased severity to trivy"
-        invoke_trivy_sev() {
-          quality.deps.run "$TEST_WS" --severity critical 2>/dev/null || return 1
-          grep -q "CRITICAL" "$MOCK_LOG"
-        }
-        When call invoke_trivy_sev
+        When call invoke_osv
         The status should be success
       End
     End

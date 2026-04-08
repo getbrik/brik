@@ -1,11 +1,20 @@
 #!/usr/bin/env bash
 # @module quality.secret_scan
+# @uses quality._tools
 # @description Secret scanning using dedicated secret detection tools.
 # 3-tier resolution: BRIK_QUALITY_SECRET_SCAN_COMMAND > BRIK_QUALITY_SECRET_SCAN_TOOL > auto-detect
 
 # Guard against double-sourcing
 [[ -n "${_BRIK_CORE_QUALITY_SECRET_SCAN_LOADED:-}" ]] && return 0
 _BRIK_CORE_QUALITY_SECRET_SCAN_LOADED=1
+
+# Source tool registry if not already loaded
+# shellcheck source=_tools.sh
+[[ -z "${_BRIK_CORE_QUALITY_TOOLS_LOADED:-}" ]] && . "${BASH_SOURCE[0]%/*}/_tools.sh"
+
+# Register secret scanners
+quality.tool.register secret_scan gitleaks  gitleaks  "gitleaks detect --source ." 10
+quality.tool.register secret_scan trufflehog trufflehog "trufflehog filesystem ."  20
 
 # Run secret scanning on a workspace.
 # Usage: quality.secret_scan.run <workspace>
@@ -54,17 +63,9 @@ quality.secret_scan.run() {
                     return 3
                 fi
                 ;;
-            trivy)
-                if command -v trivy >/dev/null 2>&1; then
-                    scan_cmd="trivy fs --scanners secret ."
-                else
-                    log.error "trivy not found"
-                    return 3
-                fi
-                ;;
             *)
-                # Treat unknown tool name as raw command
-                scan_cmd="$tool"
+                log.error "unknown secret scan tool: $tool (valid: gitleaks, trufflehog)"
+                return 7
                 ;;
         esac
     fi
@@ -73,10 +74,10 @@ quality.secret_scan.run() {
     if [[ -z "$scan_cmd" ]]; then
         if command -v gitleaks >/dev/null 2>&1; then
             scan_cmd="gitleaks detect --source ."
-        elif command -v trivy >/dev/null 2>&1; then
-            scan_cmd="trivy fs --scanners secret ."
+        elif command -v trufflehog >/dev/null 2>&1; then
+            scan_cmd="trufflehog filesystem ."
         else
-            log.warn "no secret scanning tool available (install gitleaks or trivy) - skipping"
+            log.warn "no secret scanning tool available (install gitleaks or trufflehog) - skipping"
             return 0
         fi
     fi

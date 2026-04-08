@@ -1,6 +1,7 @@
 Describe "quality/secret_scan.sh"
   Include "$BRIK_RUNTIME_LIB/logging.sh"
   Include "$BRIK_RUNTIME_LIB/tools.sh"
+  Include "$BRIK_CORE_LIB/quality/_tools.sh"
   Include "$BRIK_CORE_LIB/quality/secret_scan.sh"
 
   Describe "quality.secret_scan.run"
@@ -168,39 +169,6 @@ MOCKEOF
       End
     End
 
-    Describe "Tier 2: trivy present"
-      setup_trivy() {
-        TEST_WS="$(mktemp -d)"
-        MOCK_LOG="${TEST_WS}/mock.log"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/trivy" << MOCKEOF
-#!/usr/bin/env bash
-printf 'trivy %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/trivy"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
-        export BRIK_QUALITY_SECRET_SCAN_TOOL="trivy"
-      }
-      cleanup_trivy() {
-        export PATH="$ORIG_PATH"
-        unset BRIK_QUALITY_SECRET_SCAN_TOOL
-        rm -rf "$TEST_WS" "$MOCK_BIN"
-      }
-      Before 'setup_trivy'
-      After 'cleanup_trivy'
-
-      It "runs trivy fs --scanners secret"
-        invoke_trivy() {
-          quality.secret_scan.run "$TEST_WS" 2>/dev/null || return 1
-          grep -q "trivy fs --scanners secret" "$MOCK_LOG"
-        }
-        When call invoke_trivy
-        The status should be success
-      End
-    End
-
     Describe "Tier 3: auto-detect gitleaks"
       setup_auto_gitleaks() {
         TEST_WS="$(mktemp -d)"
@@ -232,6 +200,39 @@ MOCKEOF
       End
     End
 
+    Describe "Tier 3: auto-detect trufflehog (no gitleaks)"
+      setup_auto_trufflehog() {
+        TEST_WS="$(mktemp -d)"
+        MOCK_LOG="${TEST_WS}/mock.log"
+        MOCK_BIN="$(mktemp -d)"
+        cat > "${MOCK_BIN}/trufflehog" << MOCKEOF
+#!/usr/bin/env bash
+printf 'trufflehog %s\n' "\$*" >> "$MOCK_LOG"
+exit 0
+MOCKEOF
+        chmod +x "${MOCK_BIN}/trufflehog"
+        ln -sf "$(command -v bash)" "${MOCK_BIN}/bash"
+        ln -sf "$(command -v grep)" "${MOCK_BIN}/grep"
+        ORIG_PATH="$PATH"
+        export PATH="${MOCK_BIN}"
+      }
+      cleanup_auto_trufflehog() {
+        export PATH="$ORIG_PATH"
+        rm -rf "$TEST_WS" "$MOCK_BIN"
+      }
+      Before 'setup_auto_trufflehog'
+      After 'cleanup_auto_trufflehog'
+
+      It "auto-detects trufflehog when gitleaks unavailable"
+        invoke_auto_tf() {
+          quality.secret_scan.run "$TEST_WS" 2>/dev/null || return 1
+          grep -q "trufflehog filesystem" "$MOCK_LOG"
+        }
+        When call invoke_auto_tf
+        The status should be success
+      End
+    End
+
     Describe "Tier 3: no tool available"
       setup_no_tools() {
         TEST_WS="$(mktemp -d)"
@@ -249,7 +250,7 @@ MOCKEOF
       It "skips when no tool available"
         When call quality.secret_scan.run "$TEST_WS"
         The status should be success
-        The stderr should include "no secret scanning tool available"
+        The stderr should include "install gitleaks or trufflehog"
       End
     End
 

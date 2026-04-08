@@ -1,6 +1,7 @@
 Describe "quality/container.sh"
   Include "$BRIK_RUNTIME_LIB/logging.sh"
   Include "$BRIK_RUNTIME_LIB/tools.sh"
+  Include "$BRIK_CORE_LIB/quality/_tools.sh"
   Include "$BRIK_CORE_LIB/quality/container.sh"
 
   Describe "quality.container.run"
@@ -38,38 +39,38 @@ Describe "quality/container.sh"
       End
     End
 
-    Describe "with mock trivy"
-      setup_trivy() {
+    Describe "with mock grype"
+      setup_grype() {
         TEST_WS="$(mktemp -d)"
-        MOCK_LOG="${TEST_WS}/mock_trivy.log"
+        MOCK_LOG="${TEST_WS}/mock_grype.log"
         MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/trivy" << MOCKEOF
+        cat > "${MOCK_BIN}/grype" << MOCKEOF
 #!/usr/bin/env bash
-printf 'trivy %s\n' "\$*" >> "$MOCK_LOG"
+printf 'grype %s\n' "\$*" >> "$MOCK_LOG"
 exit 0
 MOCKEOF
-        chmod +x "${MOCK_BIN}/trivy"
+        chmod +x "${MOCK_BIN}/grype"
         ORIG_PATH="$PATH"
         export PATH="${MOCK_BIN}:${PATH}"
       }
-      cleanup_trivy() {
+      cleanup_grype() {
         export PATH="$ORIG_PATH"
         unset BRIK_PROJECT_NAME BRIK_VERSION 2>/dev/null
         rm -rf "$TEST_WS" "$MOCK_BIN"
       }
-      Before 'setup_trivy'
-      After 'cleanup_trivy'
+      Before 'setup_grype'
+      After 'cleanup_grype'
 
-      It "scans with trivy image command"
-        invoke_trivy() {
+      It "scans with grype command"
+        invoke_grype() {
           quality.container.run "$TEST_WS" --image "myapp:1.0" 2>/dev/null || return 1
-          grep -q "^trivy image" "$MOCK_LOG"
+          grep -q "^grype" "$MOCK_LOG"
         }
-        When call invoke_trivy
+        When call invoke_grype
         The status should be success
       End
 
-      It "passes image name to trivy"
+      It "passes image name to grype"
         invoke_image() {
           quality.container.run "$TEST_WS" --image "myapp:1.0" 2>/dev/null || return 1
           grep -q "myapp:1.0" "$MOCK_LOG"
@@ -78,19 +79,10 @@ MOCKEOF
         The status should be success
       End
 
-      It "uses default severity HIGH"
-        invoke_default_sev() {
-          quality.container.run "$TEST_WS" --image "myapp:1.0" 2>/dev/null || return 1
-          grep -q "\-\-severity HIGH" "$MOCK_LOG"
-        }
-        When call invoke_default_sev
-        The status should be success
-      End
-
-      It "uppercases custom severity"
+      It "passes fail-on severity to grype"
         invoke_severity() {
           quality.container.run "$TEST_WS" --image "myapp:1.0" --severity critical 2>/dev/null || return 1
-          grep -q "\-\-severity CRITICAL" "$MOCK_LOG"
+          grep -q "\-\-fail-on critical" "$MOCK_LOG"
         }
         When call invoke_severity
         The status should be success
@@ -114,35 +106,35 @@ MOCKEOF
       End
     End
 
-    Describe "grype fallback (no trivy)"
-      setup_grype() {
+    Describe "dockle fallback (no grype)"
+      setup_dockle() {
         TEST_WS="$(mktemp -d)"
-        MOCK_LOG="${TEST_WS}/mock_grype.log"
+        MOCK_LOG="${TEST_WS}/mock_dockle.log"
         MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/grype" << MOCKEOF
+        cat > "${MOCK_BIN}/dockle" << MOCKEOF
 #!/usr/bin/env bash
-printf 'grype %s\n' "\$*" >> "$MOCK_LOG"
+printf 'dockle %s\n' "\$*" >> "$MOCK_LOG"
 exit 0
 MOCKEOF
-        chmod +x "${MOCK_BIN}/grype"
+        chmod +x "${MOCK_BIN}/dockle"
         ln -sf "$(command -v bash)" "${MOCK_BIN}/bash"
         ln -sf "$(command -v grep)" "${MOCK_BIN}/grep"
         ORIG_PATH="$PATH"
         export PATH="${MOCK_BIN}"
       }
-      cleanup_grype() {
+      cleanup_dockle() {
         export PATH="$ORIG_PATH"
         rm -rf "$TEST_WS" "$MOCK_BIN"
       }
-      Before 'setup_grype'
-      After 'cleanup_grype'
+      Before 'setup_dockle'
+      After 'cleanup_dockle'
 
-      It "falls back to grype when trivy not available"
-        invoke_grype() {
+      It "falls back to dockle when grype not available"
+        invoke_dockle() {
           quality.container.run "$TEST_WS" --image "myapp:1.0" 2>/dev/null || return 1
-          grep -q "^grype myapp:1.0" "$MOCK_LOG"
+          grep -q "^dockle myapp:1.0" "$MOCK_LOG"
         }
-        When call invoke_grype
+        When call invoke_dockle
         The status should be success
       End
     End
@@ -151,11 +143,11 @@ MOCKEOF
       setup_fail() {
         TEST_WS="$(mktemp -d)"
         MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/trivy" << 'EOF'
+        cat > "${MOCK_BIN}/grype" << 'EOF'
 #!/usr/bin/env bash
 exit 1
 EOF
-        chmod +x "${MOCK_BIN}/trivy"
+        chmod +x "${MOCK_BIN}/grype"
         ORIG_PATH="$PATH"
         export PATH="${MOCK_BIN}:${PATH}"
       }
