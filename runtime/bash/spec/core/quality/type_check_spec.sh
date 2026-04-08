@@ -323,7 +323,7 @@ MOCKEOF
       End
     End
 
-    Describe "Tier 2: unknown tool as raw command"
+    Describe "Tier 2: custom tool found on PATH"
       setup_raw() {
         TEST_WS="$(mktemp -d)"
         MOCK_BIN="$(mktemp -d)"
@@ -344,10 +344,29 @@ EOF
       Before 'setup_raw'
       After 'cleanup_raw'
 
-      It "uses unknown tool name as raw command"
+      It "uses custom tool binary as command"
         When call quality.type_check.run "$TEST_WS"
         The status should be success
         The stderr should include "type check passed"
+      End
+    End
+
+    Describe "Tier 2: unknown tool not found"
+      setup_missing_tc() {
+        TEST_WS="$(mktemp -d)"
+        export BRIK_QUALITY_TYPE_CHECK_TOOL="nonexistent-checker"
+      }
+      cleanup_missing_tc() {
+        unset BRIK_QUALITY_TYPE_CHECK_TOOL
+        rm -rf "$TEST_WS"
+      }
+      Before 'setup_missing_tc'
+      After 'cleanup_missing_tc'
+
+      It "returns 7 for unknown tool not on PATH"
+        When call quality.type_check.run "$TEST_WS"
+        The status should equal 7
+        The stderr should include "unknown type check tool"
       End
     End
 

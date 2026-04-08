@@ -112,8 +112,12 @@ quality.format.run() {
             return 0
             ;;
         *)
-            # Treat unknown tool name as raw command
-            fmt_cmd="$tool"
+            if command -v "$tool" >/dev/null 2>&1; then
+                fmt_cmd="$tool"
+            else
+                log.error "unknown format tool: $tool"
+                return 7
+            fi
             ;;
     esac
 

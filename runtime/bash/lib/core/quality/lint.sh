@@ -99,8 +99,12 @@ quality.lint.run() {
                 fi
                 ;;
             *)
-                # Treat unknown tool name as raw command
-                lint_cmd="$tool"
+                if command -v "$tool" >/dev/null 2>&1; then
+                    lint_cmd="$tool"
+                else
+                    log.error "unknown lint tool: $tool"
+                    return 7
+                fi
                 ;;
         esac
     fi

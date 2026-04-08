@@ -452,7 +452,7 @@ MOCKEOF
       End
     End
 
-    Describe "Tier 2: unknown tool as raw command"
+    Describe "Tier 2: custom tool found on PATH"
       setup_raw_cmd() {
         TEST_WS="$(mktemp -d)"
         MOCK_BIN="$(mktemp -d)"
@@ -473,10 +473,29 @@ EOF
       Before 'setup_raw_cmd'
       After 'cleanup_raw_cmd'
 
-      It "uses unknown tool name as raw command"
+      It "uses custom tool binary as command"
         When call quality.format.run "$TEST_WS"
         The status should be success
         The stderr should include "format check passed"
+      End
+    End
+
+    Describe "Tier 2: unknown tool not found"
+      setup_missing_fmt() {
+        TEST_WS="$(mktemp -d)"
+        export BRIK_QUALITY_FORMAT_TOOL="nonexistent-formatter"
+      }
+      cleanup_missing_fmt() {
+        unset BRIK_QUALITY_FORMAT_TOOL
+        rm -rf "$TEST_WS"
+      }
+      Before 'setup_missing_fmt'
+      After 'cleanup_missing_fmt'
+
+      It "returns 7 for unknown tool not on PATH"
+        When call quality.format.run "$TEST_WS"
+        The status should equal 7
+        The stderr should include "unknown format tool"
       End
     End
 

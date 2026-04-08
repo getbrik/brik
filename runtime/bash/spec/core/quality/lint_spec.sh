@@ -673,7 +673,7 @@ MOCKEOF
       End
     End
 
-    Describe "Tier 2: unknown tool as raw command"
+    Describe "Tier 2: custom tool found on PATH"
       setup_raw_lint() {
         TEST_WS="$(mktemp -d)"
         MOCK_BIN="$(mktemp -d)"
@@ -694,10 +694,29 @@ EOF
       Before 'setup_raw_lint'
       After 'cleanup_raw_lint'
 
-      It "uses unknown tool name as raw command"
+      It "uses custom tool binary as command"
         When call quality.lint.run "$TEST_WS"
         The status should be success
         The stderr should include "lint passed"
+      End
+    End
+
+    Describe "Tier 2: unknown tool not found"
+      setup_missing_tool() {
+        TEST_WS="$(mktemp -d)"
+        export BRIK_QUALITY_LINT_TOOL="nonexistent-linter"
+      }
+      cleanup_missing_tool() {
+        unset BRIK_QUALITY_LINT_TOOL
+        rm -rf "$TEST_WS"
+      }
+      Before 'setup_missing_tool'
+      After 'cleanup_missing_tool'
+
+      It "returns 7 for unknown tool not on PATH"
+        When call quality.lint.run "$TEST_WS"
+        The status should equal 7
+        The stderr should include "unknown lint tool"
       End
     End
 

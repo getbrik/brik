@@ -63,8 +63,12 @@ quality.type_check.run() {
                 fi
                 ;;
             *)
-                # Treat unknown tool name as raw command
-                check_cmd="$tool"
+                if command -v "$tool" >/dev/null 2>&1; then
+                    check_cmd="$tool"
+                else
+                    log.error "unknown type check tool: $tool"
+                    return 7
+                fi
                 ;;
         esac
     fi
