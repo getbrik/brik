@@ -47,7 +47,9 @@ build.node.install() {
     # Use ci/frozen lockfile for reproducible installs when lock file exists
     case "$pm" in
         npm)
-            [[ -f "${workspace}/package-lock.json" ]] && install_cmd="ci"
+            if [[ -f "${workspace}/package-lock.json" ]]; then
+                install_cmd="ci --cache .npm --prefer-offline"
+            fi
             ;;
         yarn)
             [[ -f "${workspace}/yarn.lock" ]] && install_cmd="install --frozen-lockfile"

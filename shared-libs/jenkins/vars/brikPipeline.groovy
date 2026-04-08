@@ -26,7 +26,22 @@ def call(Map params = [:]) {
     node(label) {
         ansiColor('xterm') {
         timeout(time: timeoutMinutes, unit: 'MINUTES') {
-            cleanWs()
+            // Selective cleanup: remove build outputs but preserve dependency caches
+            // for inter-build performance. checkout scm overwrites source files.
+            cleanWs(
+                deleteDirs: true,
+                patterns: [
+                    [pattern: '.npm/**', type: 'EXCLUDE'],
+                    [pattern: '.cache/**', type: 'EXCLUDE'],
+                    [pattern: '.m2/**', type: 'EXCLUDE'],
+                    [pattern: '.gradle/**', type: 'EXCLUDE'],
+                    [pattern: '.cargo/**', type: 'EXCLUDE'],
+                    [pattern: '.nuget/**', type: 'EXCLUDE'],
+                    [pattern: '.venv/**', type: 'EXCLUDE'],
+                    [pattern: '.git/**', type: 'EXCLUDE'],
+                    [pattern: 'node_modules/**', type: 'EXCLUDE'],
+                ]
+            )
             checkout scm
 
             // Jenkins clones Global Libraries into ${WORKSPACE}@libs/<hash>/
@@ -82,7 +97,10 @@ def call(Map params = [:]) {
                 sh 'env | grep -E "^(NEXUS_|BRIK_|REGISTRY_)" > "${WORKSPACE}/.brik-env" 2>/dev/null || true'
                 def envFile = "${env.WORKSPACE}/.brik-env"
                 def globalEnvArgs = fileExists(envFile) && readFile(envFile).trim() ? "--env-file ${envFile}" : ''
-                def dockerArgs = "-e HOME=${env.WORKSPACE} --memory=2g -v /var/run/docker.sock:/var/run/docker.sock ${networkArg} ${globalEnvArgs}"
+                // HOME=$WORKSPACE redirects npm, pip, cargo, nuget caches into workspace.
+                // Java needs explicit overrides: JVM user.home ignores $HOME (uses getpwuid).
+                def javaEnvArgs = "-e MAVEN_OPTS=\"-Dmaven.repo.local=${env.WORKSPACE}/.m2/repository\" -e GRADLE_USER_HOME=${env.WORKSPACE}/.gradle"
+                def dockerArgs = "-e HOME=${env.WORKSPACE} ${javaEnvArgs} --memory=2g -v /var/run/docker.sock:/var/run/docker.sock ${networkArg} ${globalEnvArgs}"
                 def runStage = { name ->
                     if (useDocker && resolvedImage) {
                         docker.image(resolvedImage).inside(dockerArgs) { brikStage(name, brikHome) }

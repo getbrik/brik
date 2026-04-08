@@ -20,6 +20,12 @@ variables:
   BRIK_LOG_LEVEL: "info"
   BRIK_PLATFORM: "gitlab"
   BRIK_CI_IMAGE: "ghcr.io/getbrik/brik-runner-base:latest"
+  # Cache relocation: redirect tool caches into $CI_PROJECT_DIR (GitLab constraint)
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+  MAVEN_OPTS: "-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository"
+  GRADLE_USER_HOME: "$CI_PROJECT_DIR/.gradle"
+  CARGO_HOME: "$CI_PROJECT_DIR/.cargo"
+  NUGET_PACKAGES: "$CI_PROJECT_DIR/.nuget/packages"
 
 # ---------------------------------------------------------------------------
 # Stages - Fixed Flow

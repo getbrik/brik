@@ -1,11 +1,32 @@
 # Brik Build Stage
 # Compiles/builds the project via brik-lib.
+#
+# Cache strategy: dependency download caches are saved here (pull-push).
+# Downstream stages (test, quality, security) use pull-only policy.
+# All cache paths are listed -- only those populated by the active stack are cached.
+# Node uses --cache .npm (no env var needed); other stacks use env vars from pipeline.yml.
 
 brik-build:
   stage: build
   needs:
     - job: brik-init
       artifacts: true
+  cache:
+    key: "${BRIK_BUILD_STACK}-${CI_COMMIT_REF_SLUG}"
+    paths:
+      - .npm/
+      - .cache/pip
+      - .m2/repository
+      - .gradle/caches
+      - .gradle/wrapper
+      - .cargo/registry
+      - .cargo/git
+      - .nuget/packages
+    fallback_keys:
+      - "${BRIK_BUILD_STACK}-${CI_DEFAULT_BRANCH}"
+      - "${BRIK_BUILD_STACK}-default"
+    policy: pull-push
+    when: always
   script:
     - bash -c '. /tmp/brik-bootstrap.sh && brik.gitlab.run_stage build'
   artifacts:

@@ -13,6 +13,21 @@ brik-security:
       artifacts: true
     - job: brik-build
       artifacts: true
+  cache:
+    key: "${BRIK_BUILD_STACK}-${CI_COMMIT_REF_SLUG}"
+    paths:
+      - .npm/
+      - .cache/pip
+      - .m2/repository
+      - .gradle/caches
+      - .gradle/wrapper
+      - .cargo/registry
+      - .cargo/git
+      - .nuget/packages
+    fallback_keys:
+      - "${BRIK_BUILD_STACK}-${CI_DEFAULT_BRANCH}"
+      - "${BRIK_BUILD_STACK}-default"
+    policy: pull
   script:
     - bash -c '. /tmp/brik-bootstrap.sh && brik.gitlab.run_stage security'
   rules:

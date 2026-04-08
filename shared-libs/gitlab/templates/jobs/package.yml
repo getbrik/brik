@@ -1,9 +1,12 @@
 # Brik Package Stage
-# Container build (conditional - only if package section configured).
+# Container build + publish (conditional - only if package section configured).
+# Needs brik-init for BRIK_CI_IMAGE (stack runner) so publish tools (npm, pip, mvn, dotnet) are available.
 
 brik-package:
   stage: package
   needs:
+    - job: brik-init
+      artifacts: true
     - job: brik-build
       artifacts: true
     - job: brik-test
@@ -14,6 +17,21 @@ brik-package:
     - job: brik-security
       artifacts: false
       optional: true
+  cache:
+    key: "${BRIK_BUILD_STACK}-${CI_COMMIT_REF_SLUG}"
+    paths:
+      - .npm/
+      - .cache/pip
+      - .m2/repository
+      - .gradle/caches
+      - .gradle/wrapper
+      - .cargo/registry
+      - .cargo/git
+      - .nuget/packages
+    fallback_keys:
+      - "${BRIK_BUILD_STACK}-${CI_DEFAULT_BRANCH}"
+      - "${BRIK_BUILD_STACK}-default"
+    policy: pull
   script:
     # Install Docker CLI if socket is available (needed for docker build/push)
     - |

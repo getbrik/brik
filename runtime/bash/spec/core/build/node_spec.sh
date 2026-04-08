@@ -56,10 +56,10 @@ MOCKEOF
       Before 'setup_npm'
       After 'cleanup_npm'
 
-      It "runs npm ci when package-lock.json exists"
+      It "runs npm ci with cache flags when package-lock.json exists"
         verify_ci() {
           build.node.install "$TEST_WS" 2>/dev/null
-          grep -qx "ci" "$MOCK_LOG"
+          grep -q "ci --cache .npm --prefer-offline" "$MOCK_LOG"
         }
         When call verify_ci
         The status should be success

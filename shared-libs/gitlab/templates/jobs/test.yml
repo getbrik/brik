@@ -14,6 +14,21 @@ brik-test:
     - job: brik-security
       artifacts: false
       optional: true
+  cache:
+    key: "${BRIK_BUILD_STACK}-${CI_COMMIT_REF_SLUG}"
+    paths:
+      - .npm/
+      - .cache/pip
+      - .m2/repository
+      - .gradle/caches
+      - .gradle/wrapper
+      - .cargo/registry
+      - .cargo/git
+      - .nuget/packages
+    fallback_keys:
+      - "${BRIK_BUILD_STACK}-${CI_DEFAULT_BRANCH}"
+      - "${BRIK_BUILD_STACK}-default"
+    policy: pull
   script:
     - bash -c '. /tmp/brik-bootstrap.sh && brik.gitlab.run_stage test'
   artifacts:
