@@ -72,6 +72,64 @@ MOCKEOF
       End
     End
 
+    Describe "Tier 2: osv-scanner no package sources"
+      setup_no_sources() {
+        TEST_WS="$(mktemp -d)"
+        MOCK_BIN="$(mktemp -d)"
+        cat > "${MOCK_BIN}/osv-scanner" << 'MOCKEOF'
+#!/usr/bin/env bash
+echo "No package sources found, --help for usage information."
+exit 128
+MOCKEOF
+        chmod +x "${MOCK_BIN}/osv-scanner"
+        ORIG_PATH="$PATH"
+        export PATH="${MOCK_BIN}:${PATH}"
+        export BRIK_SECURITY_DEPS_TOOL="osv-scanner"
+      }
+      cleanup_no_sources() {
+        export PATH="$ORIG_PATH"
+        unset BRIK_SECURITY_DEPS_TOOL
+        rm -rf "$TEST_WS" "$MOCK_BIN"
+      }
+      Before 'setup_no_sources'
+      After 'cleanup_no_sources'
+
+      It "skips when osv-scanner finds no package sources"
+        When call security.deps.run "$TEST_WS"
+        The status should be success
+        The stderr should include "no package sources found"
+      End
+    End
+
+    Describe "Tier 2: tool finds vulnerabilities"
+      setup_vuln() {
+        TEST_WS="$(mktemp -d)"
+        MOCK_BIN="$(mktemp -d)"
+        cat > "${MOCK_BIN}/osv-scanner" << 'MOCKEOF'
+#!/usr/bin/env bash
+echo "Found 3 vulnerabilities"
+exit 1
+MOCKEOF
+        chmod +x "${MOCK_BIN}/osv-scanner"
+        ORIG_PATH="$PATH"
+        export PATH="${MOCK_BIN}:${PATH}"
+        export BRIK_SECURITY_DEPS_TOOL="osv-scanner"
+      }
+      cleanup_vuln() {
+        export PATH="$ORIG_PATH"
+        unset BRIK_SECURITY_DEPS_TOOL
+        rm -rf "$TEST_WS" "$MOCK_BIN"
+      }
+      Before 'setup_vuln'
+      After 'cleanup_vuln'
+
+      It "returns 10 when vulnerabilities found"
+        When call security.deps.run "$TEST_WS"
+        The status should equal 10
+        The stderr should include "security dependency vulnerabilities found"
+      End
+    End
+
     Describe "Tier 2: tool not found"
       setup_missing() {
         TEST_WS="$(mktemp -d)"
