@@ -1,8 +1,10 @@
-# Brik Test Stage
-# Runs tests via brik-lib. Runs in parallel with lint/sast/scan in verify stage.
+# Brik SAST Stage
+# Static analysis: SAST (semgrep), license scanning, IaC (checkov).
+# Runs in the analysis image (Python/Ruby runtime).
 
-brik-test:
+brik-sast:
   stage: verify
+  image: "${BRIK_ANALYSIS_IMAGE}"
   needs:
     - job: brik-init
       artifacts: true
@@ -24,12 +26,5 @@ brik-test:
       - "${BRIK_BUILD_STACK}-default"
     policy: pull
   script:
-    - bash -c '. /tmp/brik-bootstrap.sh && brik.gitlab.run_stage test'
-  artifacts:
-    when: always
-    reports:
-      junit: reports/*.xml
-    paths:
-      - coverage/
-      - reports/
-    expire_in: 1 week
+    - bash -c '. /tmp/brik-bootstrap.sh && brik.gitlab.run_stage sast'
+  # No rules: SAST is non-negotiable (always runs with defaults)

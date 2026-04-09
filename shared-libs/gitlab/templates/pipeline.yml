@@ -1,7 +1,7 @@
 # Brik GitLab CI Pipeline Template
 #
 # This is the main entry point for Brik pipelines on GitLab CI.
-# It implements the fixed flow: Init -> Release -> Build -> Quality||Security -> Test -> Package -> Deploy -> Notify
+# It implements the fixed flow: Init -> Release -> Build -> Lint||SAST||Scan||Test -> Package -> Container Scan -> Deploy -> Notify
 #
 # Usage in your .gitlab-ci.yml:
 #   include:
@@ -20,8 +20,8 @@ variables:
   BRIK_LOG_LEVEL: "info"
   BRIK_PLATFORM: "gitlab"
   BRIK_CI_IMAGE: "ghcr.io/getbrik/brik-runner-base:latest"
-  BRIK_QUALITY_IMAGE: "ghcr.io/getbrik/brik-runner-quality:latest"
-  BRIK_SECURITY_IMAGE: "ghcr.io/getbrik/brik-runner-security:latest"
+  BRIK_ANALYSIS_IMAGE: "ghcr.io/getbrik/brik-runner-analysis:latest"
+  BRIK_SCANNER_IMAGE: "ghcr.io/getbrik/brik-runner-scanner:latest"
   # Cache relocation: redirect tool caches into $CI_PROJECT_DIR (GitLab constraint)
   PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
   MAVEN_OPTS: "-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository"
@@ -36,9 +36,9 @@ stages:
   - init
   - release
   - build
-  - quality
-  - test
+  - verify
   - package
+  - post-verify
   - deploy
   - notify
 
@@ -110,9 +110,11 @@ include:
   - local: '/templates/jobs/init.yml'
   - local: '/templates/jobs/release.yml'
   - local: '/templates/jobs/build.yml'
-  - local: '/templates/jobs/quality.yml'
-  - local: '/templates/jobs/security.yml'
+  - local: '/templates/jobs/lint.yml'
+  - local: '/templates/jobs/sast.yml'
+  - local: '/templates/jobs/scan.yml'
   - local: '/templates/jobs/test.yml'
   - local: '/templates/jobs/package.yml'
+  - local: '/templates/jobs/container-scan.yml'
   - local: '/templates/jobs/deploy.yml'
   - local: '/templates/jobs/notify.yml'

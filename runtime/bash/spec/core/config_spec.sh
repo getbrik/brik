@@ -96,15 +96,17 @@ project:
 build:
   command: npm run build
 quality:
-  enabled: true
-  coverage:
-    threshold: 90
   lint:
+    enabled: true
     tool: eslint
   format:
     tool: prettier
+test:
+  coverage:
+    threshold: 90
 security:
-  enabled: false
+  sast:
+    tool: semgrep
   severity_threshold: medium
 YAML
       export BRIK_CONFIG_FILE="$TEMP_CONFIG"
@@ -124,7 +126,7 @@ YAML
     End
 
     It "reads a numeric value as string"
-      When call config.get '.quality.coverage.threshold'
+      When call config.get '.test.coverage.threshold'
       The output should equal "90"
     End
 
@@ -192,19 +194,19 @@ YAML
       End
     End
 
-    Describe "quality stage"
-      Describe "when quality.enabled is true"
+    Describe "lint stage"
+      Describe "when quality.lint.enabled is true"
         setup_quality_on() {
           TEMP_CONFIG="$(mktemp)"
-          printf 'version: 1\nquality:\n  enabled: true\n' > "$TEMP_CONFIG"
+          printf 'version: 1\nquality:\n  lint:\n    enabled: true\n' > "$TEMP_CONFIG"
           export BRIK_CONFIG_FILE="$TEMP_CONFIG"
         }
         cleanup() { rm -f "$TEMP_CONFIG"; }
         Before 'setup_quality_on'
         After 'cleanup'
 
-        It "is enabled when quality.enabled is true"
-          When call config.stage_enabled "quality"
+        It "is enabled when quality.lint.enabled is true"
+          When call config.stage_enabled "lint"
           The status should be success
         End
       End
@@ -220,59 +222,96 @@ YAML
         After 'cleanup'
 
         It "is enabled by default when quality section is absent"
-          When call config.stage_enabled "quality"
+          When call config.stage_enabled "lint"
           The status should be success
         End
       End
 
-      Describe "when quality.enabled is false"
+      Describe "when quality.lint.enabled is false"
         setup_quality_off() {
           TEMP_CONFIG="$(mktemp)"
-          printf 'version: 1\nquality:\n  enabled: false\n' > "$TEMP_CONFIG"
+          printf 'version: 1\nquality:\n  lint:\n    enabled: false\n' > "$TEMP_CONFIG"
           export BRIK_CONFIG_FILE="$TEMP_CONFIG"
         }
         cleanup() { rm -f "$TEMP_CONFIG"; }
         Before 'setup_quality_off'
         After 'cleanup'
 
-        It "is disabled when quality.enabled is false"
-          When call config.stage_enabled "quality"
+        It "is disabled when quality.lint.enabled is false"
+          When call config.stage_enabled "lint"
           The status should equal 1
         End
       End
     End
 
-    Describe "security stage"
-      Describe "when security.enabled is false"
-        setup_sec_off() {
+    Describe "sast and scan stages"
+      setup_config() {
+        TEMP_CONFIG="$(mktemp)"
+        printf 'version: 1\nproject:\n  name: test\n' > "$TEMP_CONFIG"
+        export BRIK_CONFIG_FILE="$TEMP_CONFIG"
+      }
+      cleanup() { rm -f "$TEMP_CONFIG"; }
+      Before 'setup_config'
+      After 'cleanup'
+
+      It "returns 0 for sast (always enabled)"
+        When call config.stage_enabled "sast"
+        The status should be success
+      End
+
+      It "returns 0 for scan (always enabled)"
+        When call config.stage_enabled "scan"
+        The status should be success
+      End
+    End
+
+    Describe "container_scan stage"
+      Describe "when container image is configured"
+        setup_container() {
           TEMP_CONFIG="$(mktemp)"
-          printf 'version: 1\nsecurity:\n  enabled: false\n' > "$TEMP_CONFIG"
+          printf 'version: 1\nsecurity:\n  container:\n    image: myapp:latest\n' > "$TEMP_CONFIG"
           export BRIK_CONFIG_FILE="$TEMP_CONFIG"
         }
         cleanup() { rm -f "$TEMP_CONFIG"; }
-        Before 'setup_sec_off'
+        Before 'setup_container'
         After 'cleanup'
 
-        It "is disabled when security.enabled is false"
-          When call config.stage_enabled "security"
-          The status should equal 1
+        It "is enabled when security.container.image is set"
+          When call config.stage_enabled "container_scan"
+          The status should be success
         End
       End
 
-      Describe "when security section is absent"
-        setup_no_sec() {
+      Describe "when container image is not configured"
+        setup_no_container() {
           TEMP_CONFIG="$(mktemp)"
           printf 'version: 1\nproject:\n  name: test\n' > "$TEMP_CONFIG"
           export BRIK_CONFIG_FILE="$TEMP_CONFIG"
         }
         cleanup() { rm -f "$TEMP_CONFIG"; }
-        Before 'setup_no_sec'
+        Before 'setup_no_container'
         After 'cleanup'
 
-        It "is disabled by default when security section is absent"
-          When call config.stage_enabled "security"
+        It "is disabled when security.container.image is not set"
+          When call config.stage_enabled "container_scan"
           The status should equal 1
         End
+      End
+    End
+
+    Describe "verify stage"
+      setup_config() {
+        TEMP_CONFIG="$(mktemp)"
+        printf 'version: 1\n' > "$TEMP_CONFIG"
+        export BRIK_CONFIG_FILE="$TEMP_CONFIG"
+      }
+      cleanup() { rm -f "$TEMP_CONFIG"; }
+      Before 'setup_config'
+      After 'cleanup'
+
+      It "returns 0 for verify (always enabled)"
+        When call config.stage_enabled "verify"
+        The status should be success
       End
     End
 
@@ -668,8 +707,8 @@ project:
   name: test
   stack: node
 quality:
-  enabled: true
   lint:
+    enabled: true
     tool: eslint
   format:
     tool: prettier
@@ -680,10 +719,10 @@ YAML
       Before 'setup_config'
       After 'cleanup_config'
 
-      It "exports BRIK_QUALITY_ENABLED as true"
+      It "exports BRIK_LINT_ENABLED as true"
         export_and_check() {
           config.export_quality_vars
-          printf '%s' "$BRIK_QUALITY_ENABLED"
+          printf '%s' "$BRIK_LINT_ENABLED"
         }
         When call export_and_check
         The output should equal "true"
@@ -762,7 +801,26 @@ YAML
         cat > "$TEMP_CONFIG" <<'YAML'
 version: 1
 security:
-  enabled: true
+  sast:
+    tool: semgrep
+    ruleset: auto
+    command: semgrep scan
+  deps:
+    tool: npm-audit
+    severity: high
+    command: npm audit
+  secrets:
+    tool: gitleaks
+    command: gitleaks detect
+  license:
+    allowed: MIT,Apache-2.0
+    denied: GPL-3.0
+  container:
+    image: myapp:latest
+    severity: critical
+  iac:
+    tool: checkov
+    command: checkov -d .
   severity_threshold: medium
 YAML
         export BRIK_CONFIG_FILE="$TEMP_CONFIG"
@@ -771,20 +829,92 @@ YAML
       Before 'setup_config'
       After 'cleanup_config'
 
-      It "exports BRIK_SECURITY_ENABLED as true"
-        export_and_check() {
-          config.export_security_vars
-          printf '%s' "$BRIK_SECURITY_ENABLED"
-        }
+      It "exports BRIK_SECURITY_SAST_TOOL"
+        export_and_check() { config.export_security_vars; printf '%s' "${BRIK_SECURITY_SAST_TOOL:-}"; }
         When call export_and_check
-        The output should equal "true"
+        The output should equal "semgrep"
+      End
+
+      It "exports BRIK_SECURITY_SAST_RULESET"
+        export_and_check() { config.export_security_vars; printf '%s' "${BRIK_SECURITY_SAST_RULESET:-}"; }
+        When call export_and_check
+        The output should equal "auto"
+      End
+
+      It "exports BRIK_SECURITY_SAST_COMMAND"
+        export_and_check() { config.export_security_vars; printf '%s' "${BRIK_SECURITY_SAST_COMMAND:-}"; }
+        When call export_and_check
+        The output should equal "semgrep scan"
+      End
+
+      It "exports BRIK_SECURITY_DEPS_TOOL"
+        export_and_check() { config.export_security_vars; printf '%s' "${BRIK_SECURITY_DEPS_TOOL:-}"; }
+        When call export_and_check
+        The output should equal "npm-audit"
+      End
+
+      It "exports BRIK_SECURITY_DEPS_SEVERITY"
+        export_and_check() { config.export_security_vars; printf '%s' "${BRIK_SECURITY_DEPS_SEVERITY:-}"; }
+        When call export_and_check
+        The output should equal "high"
+      End
+
+      It "exports BRIK_SECURITY_DEPS_COMMAND"
+        export_and_check() { config.export_security_vars; printf '%s' "${BRIK_SECURITY_DEPS_COMMAND:-}"; }
+        When call export_and_check
+        The output should equal "npm audit"
+      End
+
+      It "exports BRIK_SECURITY_SECRETS_TOOL"
+        export_and_check() { config.export_security_vars; printf '%s' "${BRIK_SECURITY_SECRETS_TOOL:-}"; }
+        When call export_and_check
+        The output should equal "gitleaks"
+      End
+
+      It "exports BRIK_SECURITY_SECRETS_COMMAND"
+        export_and_check() { config.export_security_vars; printf '%s' "${BRIK_SECURITY_SECRETS_COMMAND:-}"; }
+        When call export_and_check
+        The output should equal "gitleaks detect"
+      End
+
+      It "exports BRIK_SECURITY_LICENSE_ALLOWED"
+        export_and_check() { config.export_security_vars; printf '%s' "${BRIK_SECURITY_LICENSE_ALLOWED:-}"; }
+        When call export_and_check
+        The output should equal "MIT,Apache-2.0"
+      End
+
+      It "exports BRIK_SECURITY_LICENSE_DENIED"
+        export_and_check() { config.export_security_vars; printf '%s' "${BRIK_SECURITY_LICENSE_DENIED:-}"; }
+        When call export_and_check
+        The output should equal "GPL-3.0"
+      End
+
+      It "exports BRIK_SECURITY_CONTAINER_IMAGE"
+        export_and_check() { config.export_security_vars; printf '%s' "${BRIK_SECURITY_CONTAINER_IMAGE:-}"; }
+        When call export_and_check
+        The output should equal "myapp:latest"
+      End
+
+      It "exports BRIK_SECURITY_CONTAINER_SEVERITY"
+        export_and_check() { config.export_security_vars; printf '%s' "${BRIK_SECURITY_CONTAINER_SEVERITY:-}"; }
+        When call export_and_check
+        The output should equal "critical"
+      End
+
+      It "exports BRIK_SECURITY_IAC_TOOL"
+        export_and_check() { config.export_security_vars; printf '%s' "${BRIK_SECURITY_IAC_TOOL:-}"; }
+        When call export_and_check
+        The output should equal "checkov"
+      End
+
+      It "exports BRIK_SECURITY_IAC_COMMAND"
+        export_and_check() { config.export_security_vars; printf '%s' "${BRIK_SECURITY_IAC_COMMAND:-}"; }
+        When call export_and_check
+        The output should equal "checkov -d ."
       End
 
       It "exports BRIK_SECURITY_SEVERITY_THRESHOLD"
-        export_and_check() {
-          config.export_security_vars
-          printf '%s' "$BRIK_SECURITY_SEVERITY_THRESHOLD"
-        }
+        export_and_check() { config.export_security_vars; printf '%s' "${BRIK_SECURITY_SEVERITY_THRESHOLD:-}"; }
         When call export_and_check
         The output should equal "medium"
       End
@@ -799,15 +929,6 @@ YAML
       cleanup_config() { rm -f "$TEMP_CONFIG"; }
       Before 'setup_config'
       After 'cleanup_config'
-
-      It "defaults BRIK_SECURITY_ENABLED to false"
-        export_and_check() {
-          config.export_security_vars
-          printf '%s' "$BRIK_SECURITY_ENABLED"
-        }
-        When call export_and_check
-        The output should equal "false"
-      End
 
       It "defaults BRIK_SECURITY_SEVERITY_THRESHOLD to high"
         export_and_check() {
@@ -889,29 +1010,19 @@ project:
   name: test
   stack: node
 quality:
-  enabled: true
   lint:
+    enabled: true
     tool: eslint
     config: .eslintrc.json
     fix: "true"
-  sast:
-    tool: semgrep
-    ruleset: p/security-audit
-  deps:
-    tool: npm-audit
-    severity: high
-  coverage:
-    threshold: 85
-    report: lcov
-  license:
-    allowed: MIT,Apache-2.0
-    denied: GPL-3.0
+    command: npx eslint .
   format:
     tool: prettier
     check: true
-  container:
-    image: myapp:latest
-    severity: critical
+    command: npx prettier --check .
+  type_check:
+    tool: tsc
+    command: npx tsc --noEmit
 YAML
       export BRIK_CONFIG_FILE="$TEMP_CONFIG"
     }
@@ -937,80 +1048,47 @@ YAML
       The output should equal "true"
     End
 
-    It "exports BRIK_QUALITY_SAST_TOOL"
-      export_and_check() { config.export_quality_vars; printf '%s' "${BRIK_QUALITY_SAST_TOOL:-}"; }
+    It "exports BRIK_QUALITY_LINT_COMMAND"
+      export_and_check() { config.export_quality_vars; printf '%s' "${BRIK_QUALITY_LINT_COMMAND:-}"; }
       When call export_and_check
-      The output should equal "semgrep"
+      The output should equal "npx eslint ."
     End
 
-    It "exports BRIK_QUALITY_SAST_RULESET"
-      export_and_check() { config.export_quality_vars; printf '%s' "${BRIK_QUALITY_SAST_RULESET:-}"; }
+    It "exports BRIK_QUALITY_FORMAT_COMMAND"
+      export_and_check() { config.export_quality_vars; printf '%s' "${BRIK_QUALITY_FORMAT_COMMAND:-}"; }
       When call export_and_check
-      The output should equal "p/security-audit"
+      The output should equal "npx prettier --check ."
     End
 
-    It "exports BRIK_QUALITY_DEPS_TOOL"
-      export_and_check() { config.export_quality_vars; printf '%s' "${BRIK_QUALITY_DEPS_TOOL:-}"; }
+    It "exports BRIK_QUALITY_TYPE_CHECK_TOOL"
+      export_and_check() { config.export_quality_vars; printf '%s' "${BRIK_QUALITY_TYPE_CHECK_TOOL:-}"; }
       When call export_and_check
-      The output should equal "npm-audit"
+      The output should equal "tsc"
     End
 
-    It "exports BRIK_QUALITY_DEPS_SEVERITY"
-      export_and_check() { config.export_quality_vars; printf '%s' "${BRIK_QUALITY_DEPS_SEVERITY:-}"; }
+    It "exports BRIK_QUALITY_TYPE_CHECK_COMMAND"
+      export_and_check() { config.export_quality_vars; printf '%s' "${BRIK_QUALITY_TYPE_CHECK_COMMAND:-}"; }
       When call export_and_check
-      The output should equal "high"
-    End
-
-    It "exports BRIK_QUALITY_COVERAGE_THRESHOLD"
-      export_and_check() { config.export_quality_vars; printf '%s' "${BRIK_QUALITY_COVERAGE_THRESHOLD:-}"; }
-      When call export_and_check
-      The output should equal "85"
-    End
-
-    It "exports BRIK_QUALITY_COVERAGE_REPORT"
-      export_and_check() { config.export_quality_vars; printf '%s' "${BRIK_QUALITY_COVERAGE_REPORT:-}"; }
-      When call export_and_check
-      The output should equal "lcov"
-    End
-
-    It "exports BRIK_QUALITY_LICENSE_ALLOWED"
-      export_and_check() { config.export_quality_vars; printf '%s' "${BRIK_QUALITY_LICENSE_ALLOWED:-}"; }
-      When call export_and_check
-      The output should equal "MIT,Apache-2.0"
-    End
-
-    It "exports BRIK_QUALITY_LICENSE_DENIED"
-      export_and_check() { config.export_quality_vars; printf '%s' "${BRIK_QUALITY_LICENSE_DENIED:-}"; }
-      When call export_and_check
-      The output should equal "GPL-3.0"
-    End
-
-    It "exports BRIK_QUALITY_CONTAINER_IMAGE"
-      export_and_check() { config.export_quality_vars; printf '%s' "${BRIK_QUALITY_CONTAINER_IMAGE:-}"; }
-      When call export_and_check
-      The output should equal "myapp:latest"
-    End
-
-    It "exports BRIK_QUALITY_CONTAINER_SEVERITY"
-      export_and_check() { config.export_quality_vars; printf '%s' "${BRIK_QUALITY_CONTAINER_SEVERITY:-}"; }
-      When call export_and_check
-      The output should equal "critical"
+      The output should equal "npx tsc --noEmit"
     End
   End
 
   # =========================================================================
-  # config.export_security_vars - scan flags
+  # config.export_test_vars - coverage fields
   # =========================================================================
-  Describe "config.export_security_vars scan flags"
+  Describe "config.export_test_vars coverage fields"
     setup_config() {
       TEMP_CONFIG="$(mktemp)"
       cat > "$TEMP_CONFIG" <<'YAML'
 version: 1
-security:
-  enabled: true
-  dependency_scan: "true"
-  secret_scan: "true"
-  container_scan: "false"
+project:
+  name: test
+  stack: node
+test:
+  framework: jest
+  coverage:
+    threshold: 85
+    report: coverage/cobertura.xml
 YAML
       export BRIK_CONFIG_FILE="$TEMP_CONFIG"
     }
@@ -1018,22 +1096,16 @@ YAML
     Before 'setup_config'
     After 'cleanup_config'
 
-    It "exports BRIK_SECURITY_DEPENDENCY_SCAN"
-      export_and_check() { config.export_security_vars; printf '%s' "${BRIK_SECURITY_DEPENDENCY_SCAN:-}"; }
+    It "exports BRIK_TEST_COVERAGE_THRESHOLD"
+      export_and_check() { config.export_test_vars; printf '%s' "${BRIK_TEST_COVERAGE_THRESHOLD:-}"; }
       When call export_and_check
-      The output should equal "true"
+      The output should equal "85"
     End
 
-    It "exports BRIK_SECURITY_SECRET_SCAN"
-      export_and_check() { config.export_security_vars; printf '%s' "${BRIK_SECURITY_SECRET_SCAN:-}"; }
+    It "exports BRIK_TEST_COVERAGE_REPORT"
+      export_and_check() { config.export_test_vars; printf '%s' "${BRIK_TEST_COVERAGE_REPORT:-}"; }
       When call export_and_check
-      The output should equal "true"
-    End
-
-    It "exports BRIK_SECURITY_CONTAINER_SCAN"
-      export_and_check() { config.export_security_vars; printf '%s' "${BRIK_SECURITY_CONTAINER_SCAN:-}"; }
-      When call export_and_check
-      The output should equal "false"
+      The output should equal "coverage/cobertura.xml"
     End
   End
 
@@ -1340,9 +1412,10 @@ build:
 test:
   framework: jest
 quality:
-  enabled: true
+  lint:
+    enabled: true
 security:
-  enabled: false
+  severity_threshold: medium
 YAML
       export BRIK_CONFIG_FILE="$TEMP_CONFIG"
     }
@@ -1389,7 +1462,7 @@ YAML
     It "exports quality vars"
       export_and_check() {
         config.export_all "$TEMP_CONFIG"
-        printf '%s' "$BRIK_QUALITY_ENABLED"
+        printf '%s' "$BRIK_LINT_ENABLED"
       }
       When call export_and_check
       The output should equal "true"
@@ -1398,10 +1471,10 @@ YAML
     It "exports security vars"
       export_and_check() {
         config.export_all "$TEMP_CONFIG"
-        printf '%s' "$BRIK_SECURITY_ENABLED"
+        printf '%s' "$BRIK_SECURITY_SEVERITY_THRESHOLD"
       }
       When call export_and_check
-      The output should equal "false"
+      The output should equal "medium"
     End
 
     It "returns 7 when config file does not exist"

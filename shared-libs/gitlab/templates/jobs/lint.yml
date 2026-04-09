@@ -1,7 +1,8 @@
-# Brik Test Stage
-# Runs tests via brik-lib. Runs in parallel with lint/sast/scan in verify stage.
+# Brik Lint Stage
+# Code quality checks: lint, format, type_check.
+# Runs in the CI (stack) image alongside SAST, Scan, and Test (all in verify stage).
 
-brik-test:
+brik-lint:
   stage: verify
   needs:
     - job: brik-init
@@ -24,12 +25,8 @@ brik-test:
       - "${BRIK_BUILD_STACK}-default"
     policy: pull
   script:
-    - bash -c '. /tmp/brik-bootstrap.sh && brik.gitlab.run_stage test'
-  artifacts:
-    when: always
-    reports:
-      junit: reports/*.xml
-    paths:
-      - coverage/
-      - reports/
-    expire_in: 1 week
+    - bash -c '. /tmp/brik-bootstrap.sh && brik.gitlab.run_stage lint'
+  rules:
+    - if: '$BRIK_LINT_ENABLED == "false"'
+      when: never
+    - when: on_success

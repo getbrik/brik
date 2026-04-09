@@ -5,68 +5,49 @@ Describe "Integration: Quality and Security stages"
   Include "$BRIK_CORE_LIB/_loader.sh"
   Include "$BRIK_CORE_LIB/quality.sh"
   Include "$BRIK_CORE_LIB/quality/lint.sh"
-  Include "$BRIK_CORE_LIB/quality/sast.sh"
-  Include "$BRIK_CORE_LIB/quality/deps.sh"
-  Include "$BRIK_CORE_LIB/quality/container.sh"
+  Include "$BRIK_CORE_LIB/quality/format.sh"
   Include "$BRIK_CORE_LIB/security.sh"
 
   Describe "quality.run with multiple real sub-modules"
-    Describe "all checks pass"
+    Describe "lint and format pass"
       setup_pass() {
         TEST_WS="$(mktemp -d)"
         printf '{"name":"test"}\n' > "${TEST_WS}/package.json"
         printf 'export default [];\n' > "${TEST_WS}/eslint.config.js"
         MOCK_BIN="$(mktemp -d)"
         MOCK_NPX_LOG="${TEST_WS}/mock_npx.log"
-        MOCK_NPM_LOG="${TEST_WS}/mock_npm.log"
-        MOCK_SEMGREP_LOG="${TEST_WS}/mock_semgrep.log"
-        # Mock npx (eslint)
+        # Mock npx (eslint + prettier)
         cat > "${MOCK_BIN}/npx" << MOCKEOF
 #!/usr/bin/env bash
 printf 'npx %s\n' "\$*" >> "$MOCK_NPX_LOG"
 exit 0
 MOCKEOF
         chmod +x "${MOCK_BIN}/npx"
-        # Mock npm (audit)
-        cat > "${MOCK_BIN}/npm" << MOCKEOF
-#!/usr/bin/env bash
-printf 'npm %s\n' "\$*" >> "$MOCK_NPM_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/npm"
-        # Mock semgrep
-        cat > "${MOCK_BIN}/semgrep" << MOCKEOF
-#!/usr/bin/env bash
-printf 'semgrep %s\n' "\$*" >> "$MOCK_SEMGREP_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/semgrep"
         ORIG_PATH="$PATH"
         export PATH="${MOCK_BIN}:${PATH}"
         # Mark sub-modules as loaded
         eval "_BRIK_MODULE_QUALITY_LINT_LOADED=1"
-        eval "_BRIK_MODULE_QUALITY_SAST_LOADED=1"
-        eval "_BRIK_MODULE_QUALITY_DEPS_LOADED=1"
-        export _BRIK_MODULE_QUALITY_LINT_LOADED _BRIK_MODULE_QUALITY_SAST_LOADED _BRIK_MODULE_QUALITY_DEPS_LOADED
+        eval "_BRIK_MODULE_QUALITY_FORMAT_LOADED=1"
+        export _BRIK_MODULE_QUALITY_LINT_LOADED _BRIK_MODULE_QUALITY_FORMAT_LOADED
       }
       cleanup_pass() {
         export PATH="$ORIG_PATH"
-        unset _BRIK_MODULE_QUALITY_LINT_LOADED _BRIK_MODULE_QUALITY_SAST_LOADED _BRIK_MODULE_QUALITY_DEPS_LOADED
+        unset _BRIK_MODULE_QUALITY_LINT_LOADED _BRIK_MODULE_QUALITY_FORMAT_LOADED
         rm -rf "$TEST_WS" "$MOCK_BIN"
       }
       Before 'setup_pass'
       After 'cleanup_pass'
 
-      It "runs lint, sast, and deps checks successfully"
-        When call quality.run "$TEST_WS" --checks "lint,sast,deps"
+      It "runs lint and format checks successfully"
+        When call quality.run "$TEST_WS" --checks "lint,format"
         The status should be success
-        The stderr should include "3/3 passed"
+        The stderr should include "2/2 passed"
       End
 
       It "actually invokes the real sub-module functions"
         invoke_check_logs() {
-          quality.run "$TEST_WS" --checks "lint,sast,deps" 2>/dev/null || return 1
-          [[ -f "$MOCK_NPX_LOG" ]] && [[ -f "$MOCK_SEMGREP_LOG" ]] && [[ -f "$MOCK_NPM_LOG" ]]
+          quality.run "$TEST_WS" --checks "lint,format" 2>/dev/null || return 1
+          [[ -f "$MOCK_NPX_LOG" ]]
         }
         When call invoke_check_logs
         The status should be success
@@ -85,30 +66,24 @@ MOCKEOF
 exit 1
 EOF
         chmod +x "${MOCK_BIN}/npx"
-        # semgrep passes
-        cat > "${MOCK_BIN}/semgrep" << 'EOF'
-#!/usr/bin/env bash
-exit 0
-EOF
-        chmod +x "${MOCK_BIN}/semgrep"
         ORIG_PATH="$PATH"
         export PATH="${MOCK_BIN}:${PATH}"
         eval "_BRIK_MODULE_QUALITY_LINT_LOADED=1"
-        eval "_BRIK_MODULE_QUALITY_SAST_LOADED=1"
-        export _BRIK_MODULE_QUALITY_LINT_LOADED _BRIK_MODULE_QUALITY_SAST_LOADED
+        eval "_BRIK_MODULE_QUALITY_FORMAT_LOADED=1"
+        export _BRIK_MODULE_QUALITY_LINT_LOADED _BRIK_MODULE_QUALITY_FORMAT_LOADED
       }
       cleanup_mixed() {
         export PATH="$ORIG_PATH"
-        unset _BRIK_MODULE_QUALITY_LINT_LOADED _BRIK_MODULE_QUALITY_SAST_LOADED
+        unset _BRIK_MODULE_QUALITY_LINT_LOADED _BRIK_MODULE_QUALITY_FORMAT_LOADED
         rm -rf "$TEST_WS" "$MOCK_BIN"
       }
       Before 'setup_mixed'
       After 'cleanup_mixed'
 
       It "returns 10 when any check fails"
-        When call quality.run "$TEST_WS" --checks "lint,sast"
+        When call quality.run "$TEST_WS" --checks "lint,format"
         The status should equal 10
-        The stderr should include "1/2 passed"
+        The stderr should include "quality check failed"
       End
     End
   End
@@ -120,7 +95,7 @@ EOF
         MOCK_BIN="$(mktemp -d)"
         MOCK_NPM_LOG="${TEST_WS}/mock_npm.log"
         MOCK_GITLEAKS_LOG="${TEST_WS}/mock_gitleaks.log"
-        # Mock npm for deps scan (via security.deps -> quality.deps)
+        # Mock npm for deps scan
         cat > "${MOCK_BIN}/npm" << MOCKEOF
 #!/usr/bin/env bash
 printf 'npm %s\n' "\$*" >> "$MOCK_NPM_LOG"

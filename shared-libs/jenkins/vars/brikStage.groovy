@@ -8,7 +8,7 @@
  * to the portable stage logic via brik.jenkins.run_stage.
  */
 def call(String stageName, String brikHome) {
-    def validStages = ['init', 'release', 'build', 'quality', 'security', 'test', 'package', 'deploy', 'notify']
+    def validStages = ['init', 'release', 'build', 'lint', 'sast', 'scan', 'test', 'package', 'container-scan', 'deploy', 'notify']
     if (!validStages.contains(stageName)) {
         error("brikStage: unknown stage '${stageName}'. Valid: ${validStages.join(', ')}")
     }

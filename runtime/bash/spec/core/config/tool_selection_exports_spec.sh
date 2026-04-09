@@ -1,4 +1,4 @@
-## TDD RED: Tests for new config exports (test.command, quality.*.command, security.*_tool)
+## TDD RED: Tests for new config exports (test.command, quality.*.command, security.*.tool)
 
 Describe "Tool selection: config.export_test_vars exports BRIK_TEST_COMMAND"
   Include "$BRIK_RUNTIME_LIB/logging.sh"
@@ -86,22 +86,19 @@ quality:
   format:
     tool: biome
     command: npx biome format . --check
-  sast:
-    tool: semgrep
-    command: semgrep scan --config p/security-audit .
-  deps:
-    tool: npm-audit
-    command: npm audit --production
+  type_check:
+    tool: tsc
+    command: npx tsc --noEmit
 YAML
       export BRIK_CONFIG_FILE="$TEMP_CONFIG"
     }
     cleanup_config() {
       rm -f "$TEMP_CONFIG"
       unset BRIK_QUALITY_LINT_COMMAND BRIK_QUALITY_FORMAT_COMMAND \
-            BRIK_QUALITY_SAST_COMMAND BRIK_QUALITY_DEPS_COMMAND \
+            BRIK_QUALITY_TYPE_CHECK_COMMAND \
             BRIK_QUALITY_LINT_TOOL BRIK_QUALITY_FORMAT_TOOL \
-            BRIK_QUALITY_SAST_TOOL BRIK_QUALITY_DEPS_TOOL \
-            BRIK_QUALITY_ENABLED BRIK_CONFIG_FILE
+            BRIK_QUALITY_TYPE_CHECK_TOOL \
+            BRIK_LINT_ENABLED BRIK_CONFIG_FILE
     }
     Before 'setup_config'
     After 'cleanup_config'
@@ -124,22 +121,13 @@ YAML
       The output should equal "npx biome format . --check"
     End
 
-    It "exports BRIK_QUALITY_SAST_COMMAND"
+    It "exports BRIK_QUALITY_TYPE_CHECK_COMMAND"
       export_and_check() {
         config.export_quality_vars
-        printf '%s' "${BRIK_QUALITY_SAST_COMMAND:-UNSET}"
+        printf '%s' "${BRIK_QUALITY_TYPE_CHECK_COMMAND:-UNSET}"
       }
       When call export_and_check
-      The output should equal "semgrep scan --config p/security-audit ."
-    End
-
-    It "exports BRIK_QUALITY_DEPS_COMMAND"
-      export_and_check() {
-        config.export_quality_vars
-        printf '%s' "${BRIK_QUALITY_DEPS_COMMAND:-UNSET}"
-      }
-      When call export_and_check
-      The output should equal "npm audit --production"
+      The output should equal "npx tsc --noEmit"
     End
   End
 
@@ -160,8 +148,8 @@ YAML
     cleanup_config() {
       rm -f "$TEMP_CONFIG"
       unset BRIK_QUALITY_LINT_COMMAND BRIK_QUALITY_FORMAT_COMMAND \
-            BRIK_QUALITY_SAST_COMMAND BRIK_QUALITY_DEPS_COMMAND \
-            BRIK_QUALITY_LINT_TOOL BRIK_QUALITY_ENABLED BRIK_CONFIG_FILE
+            BRIK_QUALITY_TYPE_CHECK_COMMAND \
+            BRIK_QUALITY_LINT_TOOL BRIK_LINT_ENABLED BRIK_CONFIG_FILE
     }
     Before 'setup_config'
     After 'cleanup_config'
@@ -191,52 +179,65 @@ project:
   name: test
   stack: node
 security:
-  enabled: true
-  dependency_scan: true
-  dependency_scan_tool: npm-audit
-  secret_scan: true
-  secret_scan_tool: gitleaks
-  container_scan: true
-  container_scan_tool: grype
+  sast:
+    tool: semgrep
+    command: semgrep scan .
+  deps:
+    tool: npm-audit
+    severity: high
+  secrets:
+    tool: gitleaks
+  container:
+    image: myapp:latest
+    severity: critical
 YAML
       export BRIK_CONFIG_FILE="$TEMP_CONFIG"
     }
     cleanup_config() {
       rm -f "$TEMP_CONFIG"
-      unset BRIK_SECURITY_ENABLED BRIK_SECURITY_DEPENDENCY_SCAN \
-            BRIK_SECURITY_DEPENDENCY_SCAN_TOOL BRIK_SECURITY_SECRET_SCAN \
-            BRIK_SECURITY_SECRET_SCAN_TOOL BRIK_SECURITY_CONTAINER_SCAN \
-            BRIK_SECURITY_CONTAINER_SCAN_TOOL BRIK_SECURITY_SEVERITY_THRESHOLD \
+      unset BRIK_SECURITY_SAST_TOOL BRIK_SECURITY_SAST_COMMAND \
+            BRIK_SECURITY_DEPS_TOOL BRIK_SECURITY_DEPS_SEVERITY \
+            BRIK_SECURITY_SECRETS_TOOL BRIK_SECURITY_CONTAINER_IMAGE \
+            BRIK_SECURITY_CONTAINER_SEVERITY BRIK_SECURITY_SEVERITY_THRESHOLD \
             BRIK_CONFIG_FILE
     }
     Before 'setup_config'
     After 'cleanup_config'
 
-    It "exports BRIK_SECURITY_DEPENDENCY_SCAN_TOOL"
+    It "exports BRIK_SECURITY_SAST_TOOL"
       export_and_check() {
         config.export_security_vars
-        printf '%s' "${BRIK_SECURITY_DEPENDENCY_SCAN_TOOL:-UNSET}"
+        printf '%s' "${BRIK_SECURITY_SAST_TOOL:-UNSET}"
+      }
+      When call export_and_check
+      The output should equal "semgrep"
+    End
+
+    It "exports BRIK_SECURITY_DEPS_TOOL"
+      export_and_check() {
+        config.export_security_vars
+        printf '%s' "${BRIK_SECURITY_DEPS_TOOL:-UNSET}"
       }
       When call export_and_check
       The output should equal "npm-audit"
     End
 
-    It "exports BRIK_SECURITY_SECRET_SCAN_TOOL"
+    It "exports BRIK_SECURITY_SECRETS_TOOL"
       export_and_check() {
         config.export_security_vars
-        printf '%s' "${BRIK_SECURITY_SECRET_SCAN_TOOL:-UNSET}"
+        printf '%s' "${BRIK_SECURITY_SECRETS_TOOL:-UNSET}"
       }
       When call export_and_check
       The output should equal "gitleaks"
     End
 
-    It "exports BRIK_SECURITY_CONTAINER_SCAN_TOOL"
+    It "exports BRIK_SECURITY_CONTAINER_IMAGE"
       export_and_check() {
         config.export_security_vars
-        printf '%s' "${BRIK_SECURITY_CONTAINER_SCAN_TOOL:-UNSET}"
+        printf '%s' "${BRIK_SECURITY_CONTAINER_IMAGE:-UNSET}"
       }
       When call export_and_check
-      The output should equal "grype"
+      The output should equal "myapp:latest"
     End
   End
 
@@ -248,29 +249,29 @@ version: 1
 project:
   name: test
 security:
-  enabled: true
-  dependency_scan: true
+  deps:
+    severity: high
 YAML
       export BRIK_CONFIG_FILE="$TEMP_CONFIG"
     }
     cleanup_config() {
       rm -f "$TEMP_CONFIG"
-      unset BRIK_SECURITY_ENABLED BRIK_SECURITY_DEPENDENCY_SCAN \
-            BRIK_SECURITY_DEPENDENCY_SCAN_TOOL BRIK_SECURITY_SECRET_SCAN_TOOL \
-            BRIK_SECURITY_CONTAINER_SCAN_TOOL BRIK_CONFIG_FILE
+      unset BRIK_SECURITY_SAST_TOOL BRIK_SECURITY_DEPS_TOOL \
+            BRIK_SECURITY_SECRETS_TOOL BRIK_SECURITY_CONTAINER_IMAGE \
+            BRIK_SECURITY_SEVERITY_THRESHOLD BRIK_CONFIG_FILE
     }
     Before 'setup_config'
     After 'cleanup_config'
 
     It "does not export tool vars when not configured"
       export_and_check() {
-        unset BRIK_SECURITY_DEPENDENCY_SCAN_TOOL BRIK_SECURITY_SECRET_SCAN_TOOL \
-              BRIK_SECURITY_CONTAINER_SCAN_TOOL 2>/dev/null || true
+        unset BRIK_SECURITY_SAST_TOOL BRIK_SECURITY_SECRETS_TOOL \
+              BRIK_SECURITY_CONTAINER_IMAGE 2>/dev/null || true
         config.export_security_vars
         printf '%s|%s|%s' \
-          "${BRIK_SECURITY_DEPENDENCY_SCAN_TOOL:-UNSET}" \
-          "${BRIK_SECURITY_SECRET_SCAN_TOOL:-UNSET}" \
-          "${BRIK_SECURITY_CONTAINER_SCAN_TOOL:-UNSET}"
+          "${BRIK_SECURITY_SAST_TOOL:-UNSET}" \
+          "${BRIK_SECURITY_SECRETS_TOOL:-UNSET}" \
+          "${BRIK_SECURITY_CONTAINER_IMAGE:-UNSET}"
       }
       When call export_and_check
       The output should equal "UNSET|UNSET|UNSET"

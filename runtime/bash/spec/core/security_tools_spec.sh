@@ -1,10 +1,11 @@
-Describe "security.sh - tool selection via BRIK_SECURITY_*_TOOL"
+Describe "security modules - tool selection via BRIK_SECURITY_*_TOOL"
   Include "$BRIK_RUNTIME_LIB/logging.sh"
   Include "$BRIK_RUNTIME_LIB/tools.sh"
-  Include "$BRIK_CORE_LIB/_loader.sh"
-  Include "$BRIK_CORE_LIB/security.sh"
+  Include "$BRIK_CORE_LIB/quality/_tools.sh"
+  Include "$BRIK_CORE_LIB/security/secret_scan.sh"
+  Include "$BRIK_CORE_LIB/security/deps.sh"
 
-  Describe "BRIK_SECURITY_SECRET_SCAN_TOOL selection"
+  Describe "BRIK_SECURITY_SECRETS_TOOL selection"
     setup_secret_tool() {
       TEST_WS="$(mktemp -d)"
       MOCK_LOG="${TEST_WS}/mock.log"
@@ -17,19 +18,19 @@ MOCKEOF
       chmod +x "${MOCK_BIN}/gitleaks"
       ORIG_PATH="$PATH"
       export PATH="${MOCK_BIN}:${PATH}"
-      export BRIK_SECURITY_SECRET_SCAN_TOOL="gitleaks"
+      export BRIK_SECURITY_SECRETS_TOOL="gitleaks"
     }
     cleanup_secret_tool() {
       export PATH="$ORIG_PATH"
-      unset BRIK_SECURITY_SECRET_SCAN_TOOL
+      unset BRIK_SECURITY_SECRETS_TOOL
       rm -rf "$TEST_WS" "$MOCK_BIN"
     }
     Before 'setup_secret_tool'
     After 'cleanup_secret_tool'
 
-    It "uses gitleaks for secret scan when BRIK_SECURITY_SECRET_SCAN_TOOL=gitleaks"
+    It "uses gitleaks for secret scan when BRIK_SECURITY_SECRETS_TOOL=gitleaks"
       invoke_secret() {
-        security.run "$TEST_WS" --dependency-scan false --container-scan false 2>/dev/null || return 1
+        security.secret_scan.run "$TEST_WS" 2>/dev/null || return 1
         grep -q "gitleaks" "$MOCK_LOG"
       }
       When call invoke_secret
@@ -37,7 +38,7 @@ MOCKEOF
     End
   End
 
-  Describe "BRIK_SECURITY_DEPENDENCY_SCAN_TOOL selection"
+  Describe "BRIK_SECURITY_DEPS_TOOL selection"
     setup_dep_tool() {
       TEST_WS="$(mktemp -d)"
       MOCK_LOG="${TEST_WS}/mock.log"
@@ -51,19 +52,19 @@ MOCKEOF
       chmod +x "${MOCK_BIN}/grype"
       ORIG_PATH="$PATH"
       export PATH="${MOCK_BIN}:${PATH}"
-      export BRIK_SECURITY_DEPENDENCY_SCAN_TOOL="grype"
+      export BRIK_SECURITY_DEPS_TOOL="grype"
     }
     cleanup_dep_tool() {
       export PATH="$ORIG_PATH"
-      unset BRIK_SECURITY_DEPENDENCY_SCAN_TOOL
+      unset BRIK_SECURITY_DEPS_TOOL
       rm -rf "$TEST_WS" "$MOCK_BIN"
     }
     Before 'setup_dep_tool'
     After 'cleanup_dep_tool'
 
-    It "uses grype for dependency scan when BRIK_SECURITY_DEPENDENCY_SCAN_TOOL=grype"
+    It "uses grype for dependency scan when BRIK_SECURITY_DEPS_TOOL=grype"
       invoke_dep() {
-        security.run "$TEST_WS" --secret-scan false --container-scan false 2>/dev/null || return 1
+        security.deps.run "$TEST_WS" 2>/dev/null || return 1
         grep -q "grype" "$MOCK_LOG"
       }
       When call invoke_dep

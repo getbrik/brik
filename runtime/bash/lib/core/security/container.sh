@@ -31,19 +31,16 @@ security.container.run() {
         esac
     done
 
+    # Use config vars as fallback for image and severity
+    if [[ -z "$image" ]]; then
+        image="${BRIK_SECURITY_CONTAINER_IMAGE:-}"
+    fi
     if [[ -z "$image" ]]; then
         image="${BRIK_PROJECT_NAME:-project}:${BRIK_VERSION:-latest}"
     fi
 
-    # Tier 1: BRIK_SECURITY_CONTAINER_SCAN_COMMAND
-    if [[ -n "${BRIK_SECURITY_CONTAINER_SCAN_COMMAND:-}" ]]; then
-        log.info "security container scan (command override): $BRIK_SECURITY_CONTAINER_SCAN_COMMAND"
-        (cd "$workspace" && eval "$BRIK_SECURITY_CONTAINER_SCAN_COMMAND") || {
-            log.error "security container vulnerabilities found in: $image"
-            return 10
-        }
-        log.info "security container scan passed"
-        return 0
+    if [[ -n "${BRIK_SECURITY_CONTAINER_SEVERITY:-}" && "$severity" == "HIGH" ]]; then
+        severity="${BRIK_SECURITY_CONTAINER_SEVERITY^^}"
     fi
 
     local resolved

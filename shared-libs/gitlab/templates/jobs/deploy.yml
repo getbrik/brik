@@ -11,10 +11,16 @@ brik-deploy:
     - job: brik-package
       artifacts: false
       optional: true
-    - job: brik-quality
+    - job: brik-lint
       artifacts: false
       optional: true
-    - job: brik-security
+    - job: brik-sast
+      artifacts: false
+      optional: true
+    - job: brik-scan
+      artifacts: false
+      optional: true
+    - job: brik-container-scan
       artifacts: false
       optional: true
   script:

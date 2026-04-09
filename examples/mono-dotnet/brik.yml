@@ -16,7 +16,6 @@ test:
     integration: dotnet test --filter Category=Integration
 
 quality:
-  enabled: true
   lint:
     tool: dotnet-format
     config: .editorconfig

@@ -298,52 +298,79 @@ Describe "stage-wrapper.sh"
       The error should be present
     End
 
-    # --- Quality stage: verify side effects ---
+    # --- Lint stage: verify side effects ---
 
-    It "runs quality stage and writes BRIK_QUALITY_STATUS=skipped to context"
-      run_quality_check_context() {
+    It "runs lint stage and writes BRIK_LINT_STATUS=skipped to context"
+      run_lint_check_context() {
+        brik.gitlab.run_stage "lint" >/dev/null 2>&1
+        local context_file
+        context_file="$(ls "${BRIK_LOG_DIR}"/context-lint-* 2>/dev/null | head -1)"
+        if [[ -n "$context_file" ]]; then
+          grep "^BRIK_LINT_STATUS=" "$context_file" | cut -d= -f2
+        else
+          echo "no_context"
+        fi
+      }
+      When call run_lint_check_context
+      The output should equal "skipped"
+    End
+
+    It "runs lint stage and logs message"
+      When call brik.gitlab.run_stage "lint"
+      The status should be success
+      The output should include "lint"
+      The error should be present
+    End
+
+    # --- Scan stage: verify side effects ---
+
+    It "runs scan stage and writes BRIK_SCAN_STATUS to context"
+      run_scan_check_context() {
+        brik.gitlab.run_stage "scan" >/dev/null 2>&1
+        local context_file
+        context_file="$(ls "${BRIK_LOG_DIR}"/context-scan-* 2>/dev/null | head -1)"
+        if [[ -n "$context_file" ]]; then
+          grep "^BRIK_SCAN_STATUS=" "$context_file" | cut -d= -f2
+        else
+          echo "no_context"
+        fi
+      }
+      When call run_scan_check_context
+      The output should be present
+    End
+
+    # --- Backward compat: quality -> lint ---
+
+    It "dispatches quality to lint (backward compat)"
+      run_compat_quality() {
         brik.gitlab.run_stage "quality" >/dev/null 2>&1
         local context_file
         context_file="$(ls "${BRIK_LOG_DIR}"/context-quality-* 2>/dev/null | head -1)"
         if [[ -n "$context_file" ]]; then
-          grep "^BRIK_QUALITY_STATUS=" "$context_file" | cut -d= -f2
+          echo "has_context"
         else
           echo "no_context"
         fi
       }
-      When call run_quality_check_context
-      The output should equal "skipped"
+      When call run_compat_quality
+      The output should equal "has_context"
     End
 
-    It "runs quality stage and logs disabled message"
-      When call brik.gitlab.run_stage "quality"
-      The status should be success
-      The output should include "quality"
-      The error should be present
-    End
+    # --- Backward compat: security -> scan ---
 
-    # --- Security stage: verify side effects ---
-
-    It "runs security stage and writes BRIK_SECURITY_STATUS=skipped to context"
-      run_security_check_context() {
+    It "dispatches security to scan (backward compat)"
+      run_compat_security() {
         brik.gitlab.run_stage "security" >/dev/null 2>&1
         local context_file
         context_file="$(ls "${BRIK_LOG_DIR}"/context-security-* 2>/dev/null | head -1)"
         if [[ -n "$context_file" ]]; then
-          grep "^BRIK_SECURITY_STATUS=" "$context_file" | cut -d= -f2
+          echo "has_context"
         else
           echo "no_context"
         fi
       }
-      When call run_security_check_context
-      The output should equal "skipped"
-    End
-
-    It "runs security stage and logs disabled message"
-      When call brik.gitlab.run_stage "security"
-      The status should be success
-      The output should include "security"
-      The error should be present
+      When call run_compat_security
+      The output should equal "has_context"
     End
 
     # --- Package stub ---

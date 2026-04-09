@@ -154,18 +154,23 @@ brik.jenkins.run_stage() {
     local logic_function=""
 
     case "$stage_name" in
-        init)     logic_function="stages.init" ;;
-        release)  logic_function="stages.release" ;;
-        build)    logic_function="stages.build" ;;
-        quality)  logic_function="stages.quality" ;;
-        security) logic_function="stages.security" ;;
-        test)     logic_function="stages.test" ;;
-        package)  logic_function="stages.package" ;;
-        deploy)   logic_function="stages.deploy" ;;
-        notify)   logic_function="stages.notify" ;;
+        init)            logic_function="stages.init" ;;
+        release)         logic_function="stages.release" ;;
+        build)           logic_function="stages.build" ;;
+        lint)            logic_function="stages.lint" ;;
+        sast)            logic_function="stages.sast" ;;
+        scan)            logic_function="stages.scan" ;;
+        test)            logic_function="stages.test" ;;
+        package)         logic_function="stages.package" ;;
+        container-scan)  logic_function="stages.container_scan" ;;
+        deploy)          logic_function="stages.deploy" ;;
+        notify)          logic_function="stages.notify" ;;
+        # Backward-compat aliases (deprecated)
+        quality)         logic_function="stages.lint" ;;
+        security)        logic_function="stages.scan" ;;
         *)
             log.error "unknown stage: $stage_name"
-            log.error "valid stages: init, release, build, quality, security, test, package, deploy, notify"
+            log.error "valid stages: init, release, build, lint, sast, scan, test, package, container-scan, deploy, notify"
             return 2
             ;;
     esac

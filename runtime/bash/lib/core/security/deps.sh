@@ -31,10 +31,10 @@ security.deps.run() {
 
     runtime.require_dir "$workspace" || return 6
 
-    # Tier 1: BRIK_SECURITY_DEPENDENCY_SCAN_COMMAND
-    if [[ -n "${BRIK_SECURITY_DEPENDENCY_SCAN_COMMAND:-}" ]]; then
-        log.info "security dependency scan (command override): $BRIK_SECURITY_DEPENDENCY_SCAN_COMMAND"
-        (cd "$workspace" && eval "$BRIK_SECURITY_DEPENDENCY_SCAN_COMMAND") || {
+    # Tier 1: BRIK_SECURITY_DEPS_COMMAND
+    if [[ -n "${BRIK_SECURITY_DEPS_COMMAND:-}" ]]; then
+        log.info "security dependency scan (command override): $BRIK_SECURITY_DEPS_COMMAND"
+        (cd "$workspace" && eval "$BRIK_SECURITY_DEPS_COMMAND") || {
             log.error "security dependency vulnerabilities found"
             return 10
         }
@@ -42,8 +42,8 @@ security.deps.run() {
         return 0
     fi
 
-    # Tier 2: BRIK_SECURITY_DEPENDENCY_SCAN_TOOL
-    local dep_tool="${BRIK_SECURITY_DEPENDENCY_SCAN_TOOL:-}"
+    # Tier 2: BRIK_SECURITY_DEPS_TOOL
+    local dep_tool="${BRIK_SECURITY_DEPS_TOOL:-}"
     if [[ -n "$dep_tool" ]]; then
         if command -v "$dep_tool" >/dev/null 2>&1; then
             log.info "security dependency scan with tool: $dep_tool"

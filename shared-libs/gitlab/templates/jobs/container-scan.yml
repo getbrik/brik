@@ -1,0 +1,16 @@
+# Brik Container Scan Stage
+# Container image vulnerability scanning (grype/dockle).
+# Runs after package (needs the built Docker image).
+
+brik-container-scan:
+  stage: post-verify
+  image: "${BRIK_SCANNER_IMAGE}"
+  needs:
+    - job: brik-package
+      artifacts: true
+  script:
+    - bash -c '. /tmp/brik-bootstrap.sh && brik.gitlab.run_stage container-scan'
+  rules:
+    - if: '$BRIK_CONTAINER_SCAN_ENABLED == "true"'
+      when: on_success
+    - when: never

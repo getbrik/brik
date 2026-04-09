@@ -138,6 +138,9 @@ test:
     unit: mvn test
     integration: mvn verify -Pintegration
     e2e: mvn verify -Pe2e
+  coverage:
+    threshold: 80
+    report: target/site/cobertura/coverage.xml
 
 quality:
   enabled: true
@@ -148,27 +151,22 @@ quality:
   format:
     tool: google-java-format
     check: true
+
+security:
   sast:
     tool: semgrep
     ruleset: auto
   deps:
     tool: trivy
     severity: high
-  coverage:
-    threshold: 80
-    report: target/site/cobertura/coverage.xml
+  secrets:
+    tool: gitleaks
   license:
     allowed: MIT,Apache-2.0,BSD-3-Clause
     denied: GPL-3.0
   container:
     image: registry.example.com/my-app:latest
     severity: high
-
-security:
-  enabled: true
-  dependency_scan: true
-  secret_scan: true
-  container_scan: false
   severity_threshold: high
 
 package:
@@ -266,21 +264,29 @@ hooks:
 | `test.commands.integration` | string | no | -- | Command to run integration tests. |
 | `test.commands.e2e` | string | no | -- | Command to run end-to-end tests. |
 
----
-
-### `quality`
+#### `test.coverage`
 
 | Key | Type | Required | Default | Description |
 |-----|------|----------|---------|-------------|
-| `quality.enabled` | boolean | no | `true` | Set to `false` to skip the entire quality stage. |
+| `test.coverage.threshold` | integer | no | `80` | Minimum coverage percentage required (0-100). |
+| `test.coverage.report` | string | no | auto-detected | Path to Cobertura XML coverage report. |
+
+Report auto-detection paths: `coverage/cobertura-coverage.xml`, `coverage.xml`,
+`target/site/cobertura/coverage.xml`, `build/reports/cobertura/coverage.xml`.
+
+---
+
+### `quality`
 
 #### `quality.lint`
 
 | Key | Type | Required | Default | Description |
 |-----|------|----------|---------|-------------|
+| `quality.lint.enabled` | boolean | no | `true` | Set to `false` to skip lint checks entirely. |
 | `quality.lint.tool` | string | no | stack default | Lint tool (e.g. `eslint`, `checkstyle`, `ruff`, `clippy`). |
 | `quality.lint.config` | string | no | -- | Path to lint configuration file. |
 | `quality.lint.fix` | boolean | no | `false` | Run the linter in auto-fix mode. |
+| `quality.lint.command` | string | no | -- | Lint command override (Tier 1). |
 
 #### `quality.format`
 
@@ -288,64 +294,70 @@ hooks:
 |-----|------|----------|---------|-------------|
 | `quality.format.tool` | string | no | stack default | Formatter (e.g. `prettier`, `google-java-format`, `ruff format`, `rustfmt`). |
 | `quality.format.check` | boolean | no | `false` | Check mode only (fail if files would be reformatted). |
+| `quality.format.command` | string | no | -- | Format command override (Tier 1). |
 
-#### `quality.sast`
-
-| Key | Type | Required | Default | Description |
-|-----|------|----------|---------|-------------|
-| `quality.sast.tool` | string | no | auto-detected | SAST tool: `semgrep`, `sonarqube`, `codeql`. Auto-detects from available tools. |
-| `quality.sast.ruleset` | string | no | -- | Ruleset or profile (e.g. `auto`, `p/security-audit`). |
-
-SAST tool auto-detection order: semgrep, trivy, skip.
-
-#### `quality.deps`
+#### `quality.type_check`
 
 | Key | Type | Required | Default | Description |
 |-----|------|----------|---------|-------------|
-| `quality.deps.tool` | string | no | auto-detected | Dependency scanning tool (e.g. `npm-audit`, `pip-audit`, `trivy`). |
-| `quality.deps.severity` | string | no | `high` | Minimum severity that fails the scan: `critical`, `high`, `medium`, `low`. |
-
-Dependency tool auto-detection: npm audit (node), pip-audit/safety (python), trivy (fallback).
-
-#### `quality.coverage`
-
-| Key | Type | Required | Default | Description |
-|-----|------|----------|---------|-------------|
-| `quality.coverage.threshold` | integer | no | `80` | Minimum coverage percentage required (0-100). |
-| `quality.coverage.report` | string | no | auto-detected | Path to Cobertura XML coverage report. |
-
-Report auto-detection paths: `coverage/cobertura-coverage.xml`, `coverage.xml`,
-`target/site/cobertura/coverage.xml`, `build/reports/cobertura/coverage.xml`.
-
-#### `quality.license`
-
-| Key | Type | Required | Default | Description |
-|-----|------|----------|---------|-------------|
-| `quality.license.allowed` | string | no | -- | Comma-separated list of allowed licenses. |
-| `quality.license.denied` | string | no | -- | Comma-separated list of denied licenses. |
-
-License tool auto-detection: license_finder, trivy (fallback).
-
-#### `quality.container`
-
-| Key | Type | Required | Default | Description |
-|-----|------|----------|---------|-------------|
-| `quality.container.image` | string | no | `<project>:<version>` | Container image to scan. |
-| `quality.container.severity` | string | no | `HIGH` | Minimum severity: `critical`, `high`, `medium`, `low`. |
-
-Container scan tool detection: trivy, grype, skip.
+| `quality.type_check.tool` | string | no | auto-detected | Type checker (e.g. `tsc`, `mypy`, `pyright`). |
+| `quality.type_check.command` | string | no | -- | Type check command override (Tier 1). |
 
 ---
 
 ### `security`
 
+All security scans are configured as structured objects under `security:`.
+
+#### `security.sast`
+
 | Key | Type | Required | Default | Description |
 |-----|------|----------|---------|-------------|
-| `security.enabled` | boolean | no | `true` | Set to `false` to skip all security scans. |
-| `security.dependency_scan` | boolean | no | `true` | Scan dependencies for known vulnerabilities. |
-| `security.secret_scan` | boolean | no | `true` | Scan codebase for committed secrets/tokens. |
-| `security.container_scan` | boolean | no | `false` | Scan Docker image for vulnerabilities. |
-| `security.severity_threshold` | string | no | `high` | Minimum severity that fails the stage: `critical`, `high`, `medium`, `low`. |
+| `security.sast.tool` | string | no | auto-detected | SAST tool: `semgrep`, `sonarqube`, `codeql`. |
+| `security.sast.ruleset` | string | no | -- | Ruleset or profile (e.g. `auto`, `p/security-audit`). |
+| `security.sast.command` | string | no | -- | SAST command override (Tier 1). |
+
+#### `security.deps`
+
+| Key | Type | Required | Default | Description |
+|-----|------|----------|---------|-------------|
+| `security.deps.tool` | string | no | auto-detected | Dependency scanning tool (e.g. `npm-audit`, `pip-audit`, `trivy`). |
+| `security.deps.severity` | string | no | -- | Minimum severity that fails the scan: `critical`, `high`, `medium`, `low`. |
+| `security.deps.command` | string | no | -- | Dependency scan command override (Tier 1). |
+
+#### `security.secrets`
+
+| Key | Type | Required | Default | Description |
+|-----|------|----------|---------|-------------|
+| `security.secrets.tool` | string | no | auto-detected | Secret scanning tool (e.g. `gitleaks`, `trufflehog`). |
+| `security.secrets.command` | string | no | -- | Secret scan command override (Tier 1). |
+
+#### `security.license`
+
+| Key | Type | Required | Default | Description |
+|-----|------|----------|---------|-------------|
+| `security.license.allowed` | string | no | -- | Comma-separated list of allowed licenses. |
+| `security.license.denied` | string | no | -- | Comma-separated list of denied licenses. |
+
+#### `security.container`
+
+| Key | Type | Required | Default | Description |
+|-----|------|----------|---------|-------------|
+| `security.container.image` | string | no | -- | Container image to scan. |
+| `security.container.severity` | string | no | -- | Minimum severity: `critical`, `high`, `medium`, `low`. |
+
+#### `security.iac`
+
+| Key | Type | Required | Default | Description |
+|-----|------|----------|---------|-------------|
+| `security.iac.tool` | string | no | -- | IaC scanning tool (e.g. `checkov`, `tfsec`). |
+| `security.iac.command` | string | no | -- | IaC scan command override (Tier 1). |
+
+#### `security.severity_threshold`
+
+| Key | Type | Required | Default | Description |
+|-----|------|----------|---------|-------------|
+| `security.severity_threshold` | string | no | `high` | Global minimum severity that fails the stage: `critical`, `high`, `medium`, `low`. |
 
 ---
 
@@ -416,10 +428,12 @@ Inline shell commands executed before or after each stage. Available hooks:
 | `pre_init` / `post_init` | Before/after init stage |
 | `pre_release` / `post_release` | Before/after release stage |
 | `pre_build` / `post_build` | Before/after build stage |
-| `pre_quality` / `post_quality` | Before/after quality stage |
-| `pre_security` / `post_security` | Before/after security stage |
+| `pre_lint` / `post_lint` | Before/after lint stage |
+| `pre_sast` / `post_sast` | Before/after SAST scan |
+| `pre_scan` / `post_scan` | Before/after security scan stage |
 | `pre_test` / `post_test` | Before/after test stage |
 | `pre_package` / `post_package` | Before/after package stage |
+| `pre_container_scan` / `post_container_scan` | Before/after container scan |
 | `pre_deploy` / `post_deploy` | Before/after deploy stage |
 | `pre_notify` / `post_notify` | Before/after notify stage |
 

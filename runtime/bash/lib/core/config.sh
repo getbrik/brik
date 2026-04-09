@@ -108,20 +108,25 @@ config.stage_enabled() {
     local stage_name="$1"
 
     case "$stage_name" in
-        init|build|test|notify)
+        init|build|test|notify|verify)
             # These stages are always enabled
             return 0
             ;;
-        quality)
+        lint)
             local enabled
-            enabled="$(config.get '.quality.enabled')" || enabled="true"
+            enabled="$(config.get '.quality.lint.enabled')" || enabled="true"
             [[ "$enabled" == "true" ]]
             return $?
             ;;
-        security)
-            local enabled
-            enabled="$(config.get '.security.enabled')" || enabled="false"
-            [[ "$enabled" == "true" ]]
+        sast|scan)
+            # Always enabled when reached (non-negotiable scans)
+            return 0
+            ;;
+        container_scan)
+            # Enabled only if container image is configured
+            local container_image
+            container_image="$(config.get '.security.container.image' '')"
+            [[ -n "$container_image" ]]
             return $?
             ;;
         release)
@@ -249,15 +254,24 @@ config.export_test_vars() {
     test_cmd="$(config.get '.test.command' '')"
     [[ -n "$test_cmd" ]] && export BRIK_TEST_COMMAND="$test_cmd"
 
+    # Coverage threshold (moved from quality)
+    local coverage_threshold
+    coverage_threshold="$(config.get '.test.coverage.threshold' '')"
+    [[ -n "$coverage_threshold" ]] && export BRIK_TEST_COVERAGE_THRESHOLD="$coverage_threshold"
+
+    local coverage_report
+    coverage_report="$(config.get '.test.coverage.report' '')"
+    [[ -n "$coverage_report" ]] && export BRIK_TEST_COVERAGE_REPORT="$coverage_report"
+
     return 0
 }
 
 # Export quality-related variables from brik.yml.
-# Sets: BRIK_QUALITY_ENABLED, BRIK_QUALITY_LINT_TOOL, BRIK_QUALITY_FORMAT_TOOL
+# Sets: BRIK_LINT_ENABLED, BRIK_QUALITY_LINT_TOOL, BRIK_QUALITY_FORMAT_TOOL
 config.export_quality_vars() {
     local enabled
-    enabled="$(config.get '.quality.enabled' 'true')"
-    export BRIK_QUALITY_ENABLED="$enabled"
+    enabled="$(config.get '.quality.lint.enabled' 'true')"
+    export BRIK_LINT_ENABLED="$enabled"
 
     local stack
     stack="$(config.get '.project.stack' 'auto')"
@@ -289,46 +303,6 @@ config.export_quality_vars() {
     lint_fix="$(config.get '.quality.lint.fix' '')"
     [[ -n "$lint_fix" ]] && export BRIK_QUALITY_LINT_FIX="$lint_fix"
 
-    local sast_tool
-    sast_tool="$(config.get '.quality.sast.tool' '')"
-    [[ -n "$sast_tool" ]] && export BRIK_QUALITY_SAST_TOOL="$sast_tool"
-
-    local sast_ruleset
-    sast_ruleset="$(config.get '.quality.sast.ruleset' '')"
-    [[ -n "$sast_ruleset" ]] && export BRIK_QUALITY_SAST_RULESET="$sast_ruleset"
-
-    local deps_tool
-    deps_tool="$(config.get '.quality.deps.tool' '')"
-    [[ -n "$deps_tool" ]] && export BRIK_QUALITY_DEPS_TOOL="$deps_tool"
-
-    local deps_severity
-    deps_severity="$(config.get '.quality.deps.severity' '')"
-    [[ -n "$deps_severity" ]] && export BRIK_QUALITY_DEPS_SEVERITY="$deps_severity"
-
-    local coverage_threshold
-    coverage_threshold="$(config.get '.quality.coverage.threshold' '')"
-    [[ -n "$coverage_threshold" ]] && export BRIK_QUALITY_COVERAGE_THRESHOLD="$coverage_threshold"
-
-    local coverage_report
-    coverage_report="$(config.get '.quality.coverage.report' '')"
-    [[ -n "$coverage_report" ]] && export BRIK_QUALITY_COVERAGE_REPORT="$coverage_report"
-
-    local license_allowed
-    license_allowed="$(config.get '.quality.license.allowed' '')"
-    [[ -n "$license_allowed" ]] && export BRIK_QUALITY_LICENSE_ALLOWED="$license_allowed"
-
-    local license_denied
-    license_denied="$(config.get '.quality.license.denied' '')"
-    [[ -n "$license_denied" ]] && export BRIK_QUALITY_LICENSE_DENIED="$license_denied"
-
-    local container_image
-    container_image="$(config.get '.quality.container.image' '')"
-    [[ -n "$container_image" ]] && export BRIK_QUALITY_CONTAINER_IMAGE="$container_image"
-
-    local container_severity
-    container_severity="$(config.get '.quality.container.severity' '')"
-    [[ -n "$container_severity" ]] && export BRIK_QUALITY_CONTAINER_SEVERITY="$container_severity"
-
     # Quality command overrides (Tier 1 of 3-tier resolution)
     local lint_cmd
     lint_cmd="$(config.get '.quality.lint.command' '')"
@@ -337,14 +311,6 @@ config.export_quality_vars() {
     local format_cmd
     format_cmd="$(config.get '.quality.format.command' '')"
     [[ -n "$format_cmd" ]] && export BRIK_QUALITY_FORMAT_COMMAND="$format_cmd"
-
-    local sast_cmd
-    sast_cmd="$(config.get '.quality.sast.command' '')"
-    [[ -n "$sast_cmd" ]] && export BRIK_QUALITY_SAST_COMMAND="$sast_cmd"
-
-    local deps_cmd
-    deps_cmd="$(config.get '.quality.deps.command' '')"
-    [[ -n "$deps_cmd" ]] && export BRIK_QUALITY_DEPS_COMMAND="$deps_cmd"
 
     # Type check tool and command (Tier 2 / Tier 1)
     local type_check_tool
@@ -359,40 +325,53 @@ config.export_quality_vars() {
 }
 
 # Export security-related variables from brik.yml.
-# Sets: BRIK_SECURITY_ENABLED, BRIK_SECURITY_SEVERITY_THRESHOLD
+# Sets: BRIK_SECURITY_SAST_*, BRIK_SECURITY_DEPS_*, BRIK_SECURITY_SECRETS_*,
+#       BRIK_SECURITY_LICENSE_*, BRIK_SECURITY_CONTAINER_*, BRIK_SECURITY_IAC_*,
+#       BRIK_SECURITY_SEVERITY_THRESHOLD
 config.export_security_vars() {
-    local enabled
-    enabled="$(config.get '.security.enabled' 'false')"
-    export BRIK_SECURITY_ENABLED="$enabled"
+    # SAST
+    local sast_tool; sast_tool="$(config.get '.security.sast.tool' '')"
+    [[ -n "$sast_tool" ]] && export BRIK_SECURITY_SAST_TOOL="$sast_tool"
+    local sast_ruleset; sast_ruleset="$(config.get '.security.sast.ruleset' '')"
+    [[ -n "$sast_ruleset" ]] && export BRIK_SECURITY_SAST_RULESET="$sast_ruleset"
+    local sast_cmd; sast_cmd="$(config.get '.security.sast.command' '')"
+    [[ -n "$sast_cmd" ]] && export BRIK_SECURITY_SAST_COMMAND="$sast_cmd"
 
-    local threshold
-    threshold="$(config.get '.security.severity_threshold' 'high')"
+    # Deps
+    local deps_tool; deps_tool="$(config.get '.security.deps.tool' '')"
+    [[ -n "$deps_tool" ]] && export BRIK_SECURITY_DEPS_TOOL="$deps_tool"
+    local deps_severity; deps_severity="$(config.get '.security.deps.severity' '')"
+    [[ -n "$deps_severity" ]] && export BRIK_SECURITY_DEPS_SEVERITY="$deps_severity"
+    local deps_cmd; deps_cmd="$(config.get '.security.deps.command' '')"
+    [[ -n "$deps_cmd" ]] && export BRIK_SECURITY_DEPS_COMMAND="$deps_cmd"
+
+    # Secrets
+    local secrets_tool; secrets_tool="$(config.get '.security.secrets.tool' '')"
+    [[ -n "$secrets_tool" ]] && export BRIK_SECURITY_SECRETS_TOOL="$secrets_tool"
+    local secrets_cmd; secrets_cmd="$(config.get '.security.secrets.command' '')"
+    [[ -n "$secrets_cmd" ]] && export BRIK_SECURITY_SECRETS_COMMAND="$secrets_cmd"
+
+    # License
+    local license_allowed; license_allowed="$(config.get '.security.license.allowed' '')"
+    [[ -n "$license_allowed" ]] && export BRIK_SECURITY_LICENSE_ALLOWED="$license_allowed"
+    local license_denied; license_denied="$(config.get '.security.license.denied' '')"
+    [[ -n "$license_denied" ]] && export BRIK_SECURITY_LICENSE_DENIED="$license_denied"
+
+    # Container
+    local container_image; container_image="$(config.get '.security.container.image' '')"
+    [[ -n "$container_image" ]] && export BRIK_SECURITY_CONTAINER_IMAGE="$container_image"
+    local container_severity; container_severity="$(config.get '.security.container.severity' '')"
+    [[ -n "$container_severity" ]] && export BRIK_SECURITY_CONTAINER_SEVERITY="$container_severity"
+
+    # IaC
+    local iac_tool; iac_tool="$(config.get '.security.iac.tool' '')"
+    [[ -n "$iac_tool" ]] && export BRIK_SECURITY_IAC_TOOL="$iac_tool"
+    local iac_cmd; iac_cmd="$(config.get '.security.iac.command' '')"
+    [[ -n "$iac_cmd" ]] && export BRIK_SECURITY_IAC_COMMAND="$iac_cmd"
+
+    # Global threshold
+    local threshold; threshold="$(config.get '.security.severity_threshold' 'high')"
     export BRIK_SECURITY_SEVERITY_THRESHOLD="$threshold"
-
-    local dep_scan
-    dep_scan="$(config.get '.security.dependency_scan' '')"
-    [[ -n "$dep_scan" ]] && export BRIK_SECURITY_DEPENDENCY_SCAN="$dep_scan"
-
-    local secret_scan
-    secret_scan="$(config.get '.security.secret_scan' '')"
-    [[ -n "$secret_scan" ]] && export BRIK_SECURITY_SECRET_SCAN="$secret_scan"
-
-    local container_scan
-    container_scan="$(config.get '.security.container_scan' '')"
-    [[ -n "$container_scan" ]] && export BRIK_SECURITY_CONTAINER_SCAN="$container_scan"
-
-    # Security tool fields (Tier 2 of 3-tier resolution)
-    local dep_scan_tool
-    dep_scan_tool="$(config.get '.security.dependency_scan_tool' '')"
-    [[ -n "$dep_scan_tool" ]] && export BRIK_SECURITY_DEPENDENCY_SCAN_TOOL="$dep_scan_tool"
-
-    local secret_scan_tool
-    secret_scan_tool="$(config.get '.security.secret_scan_tool' '')"
-    [[ -n "$secret_scan_tool" ]] && export BRIK_SECURITY_SECRET_SCAN_TOOL="$secret_scan_tool"
-
-    local container_scan_tool
-    container_scan_tool="$(config.get '.security.container_scan_tool' '')"
-    [[ -n "$container_scan_tool" ]] && export BRIK_SECURITY_CONTAINER_SCAN_TOOL="$container_scan_tool"
 
     return 0
 }
@@ -499,7 +478,7 @@ config.export_notify_vars() {
 # Sets: BRIK_HOOK_PRE_<STAGE>, BRIK_HOOK_POST_<STAGE>
 config.export_hooks_vars() {
     local stage upper_stage val
-    for stage in init release build quality security test package deploy notify; do
+    for stage in init release build lint sast scan test package container_scan deploy notify; do
         upper_stage="$(printf '%s' "$stage" | tr '[:lower:]' '[:upper:]')"
 
         val="$(config.get ".hooks.pre_${stage}" '')"

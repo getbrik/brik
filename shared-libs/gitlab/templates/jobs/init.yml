@@ -31,12 +31,17 @@ brik-init:
         RUNNER_IMAGE="$(runner.resolve_image "$STACK" "$STACK_VERSION" 2>/dev/null)" || true
       fi
       [ -z "$RUNNER_IMAGE" ] && RUNNER_IMAGE="ghcr.io/getbrik/brik-runner-base:latest"
+      # Read lint-enable flag from brik.yml (quality.lint.enabled, default true)
+      LINT_ENABLED="true"
+      if command -v yq >/dev/null 2>&1 && [ -f brik.yml ]; then
+        LINT_ENABLED="$(yq '.quality.lint.enabled // true' brik.yml)"
+      fi
       echo "[brik:init] stack=${STACK} version=${STACK_VERSION:-<default>} -> image=${RUNNER_IMAGE}"
+      echo "[brik:init] lint_enabled=${LINT_ENABLED}"
       {
         echo "BRIK_BUILD_STACK=${STACK}"
         echo "BRIK_BUILD_STACK_VERSION=${STACK_VERSION}"
         echo "BRIK_CI_IMAGE=${RUNNER_IMAGE}"
         echo "BRIK_PROJECT_NAME=${PROJECT_NAME}"
-        echo "BRIK_QUALITY_ENABLED=${BRIK_QUALITY_ENABLED:-true}"
-        echo "BRIK_SECURITY_ENABLED=${BRIK_SECURITY_ENABLED:-false}"
+        echo "BRIK_LINT_ENABLED=${LINT_ENABLED}"
       } > brik-init.env

@@ -159,11 +159,11 @@ MOCKEOF
     End
   End
 
-  Describe "brik run stage quality"
+  Describe "brik run stage lint"
     setup() {
       WORKSPACE="$(mktemp -d)"
       CONFIG="$(mktemp)"
-      printf 'version: 1\nproject:\n  name: cli-test\n  stack: node\nquality:\n  enabled: "false"\n' > "$CONFIG"
+      printf 'version: 1\nproject:\n  name: cli-test\n  stack: node\nquality:\n  lint:\n    enabled: false\n' > "$CONFIG"
       export BRIK_LOG_DIR
       BRIK_LOG_DIR="$(mktemp -d)"
     }
@@ -171,11 +171,11 @@ MOCKEOF
     Before 'setup'
     After 'cleanup'
 
-    It "executes quality stage successfully"
-      When run script "$BRIK_BIN" run stage quality --workspace "$WORKSPACE" --config "$CONFIG"
+    It "executes lint stage successfully (disabled)"
+      When run script "$BRIK_BIN" run stage lint --workspace "$WORKSPACE" --config "$CONFIG"
       The status should be success
-      The stdout should include "quality"
-      The stderr should include "stage quality completed successfully"
+      The stdout should include "lint disabled"
+      The stderr should include "stage lint completed successfully"
     End
   End
 
@@ -203,7 +203,16 @@ MOCKEOF
       printf '{"name":"cli-test","version":"1.0.0","scripts":{"build":"echo ok","test":"echo ok"}}\n' > "${WORKSPACE}/package.json"
       mkdir -p "${WORKSPACE}/node_modules"
       CONFIG="$(mktemp)"
-      printf 'version: 1\nproject:\n  name: cli-test\n  stack: node\nquality:\n  enabled: "false"\ntest:\n  framework: npm\n' > "$CONFIG"
+      printf 'version: 1\nproject:\n  name: cli-test\n  stack: node\nquality:\n  lint:\n    enabled: false\ntest:\n  framework: npm\n' > "$CONFIG"
+      # Mock security tools (non-negotiable defaults: semgrep, osv-scanner, gitleaks)
+      for tool in semgrep osv-scanner gitleaks; do
+        cat > "${MOCK_BIN}/${tool}" << 'MOCKEOF'
+#!/usr/bin/env bash
+echo "mock ${0##*/}: $*"
+exit 0
+MOCKEOF
+        chmod +x "${MOCK_BIN}/${tool}"
+      done
       export PATH="${MOCK_BIN}:${PATH}"
       export BRIK_LOG_DIR
       BRIK_LOG_DIR="$(mktemp -d)"

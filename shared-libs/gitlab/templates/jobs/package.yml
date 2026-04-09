@@ -1,6 +1,6 @@
 # Brik Package Stage
 # Container build + publish (conditional - only if package section configured).
-# Needs brik-init for BRIK_CI_IMAGE (stack runner) so publish tools (npm, pip, mvn, dotnet) are available.
+# Waits for all verify jobs to complete.
 
 brik-package:
   stage: package
@@ -11,10 +11,13 @@ brik-package:
       artifacts: true
     - job: brik-test
       artifacts: true
-    - job: brik-quality
+    - job: brik-lint
       artifacts: false
       optional: true
-    - job: brik-security
+    - job: brik-sast
+      artifacts: false
+      optional: true
+    - job: brik-scan
       artifacts: false
       optional: true
   cache:

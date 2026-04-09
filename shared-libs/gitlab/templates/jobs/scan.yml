@@ -1,8 +1,10 @@
-# Brik Test Stage
-# Runs tests via brik-lib. Runs in parallel with lint/sast/scan in verify stage.
+# Brik Scan Stage
+# Security scanning: dependency vulnerabilities (osv-scanner/grype), secrets (gitleaks/trufflehog).
+# Runs in the scanner image (Go binaries).
 
-brik-test:
+brik-scan:
   stage: verify
+  image: "${BRIK_SCANNER_IMAGE}"
   needs:
     - job: brik-init
       artifacts: true
@@ -24,12 +26,4 @@ brik-test:
       - "${BRIK_BUILD_STACK}-default"
     policy: pull
   script:
-    - bash -c '. /tmp/brik-bootstrap.sh && brik.gitlab.run_stage test'
-  artifacts:
-    when: always
-    reports:
-      junit: reports/*.xml
-    paths:
-      - coverage/
-      - reports/
-    expire_in: 1 week
+    - bash -c '. /tmp/brik-bootstrap.sh && brik.gitlab.run_stage scan'

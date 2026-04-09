@@ -12,7 +12,6 @@ test:
   framework: pytest
 
 quality:
-  enabled: true
   lint:
     tool: ruff
     config: ruff.toml
@@ -20,10 +19,8 @@ quality:
   format:
     tool: ruff format
     check: true
-  deps:
-    severity: high
 
 security:
-  dependency_scan: true
-  secret_scan: true
-  container_scan: false
+  deps:
+    severity: high
+  secrets: {}

@@ -374,17 +374,31 @@ Describe "local-wrapper.sh"
       The error should be present
     End
 
-    It "runs quality stage successfully"
-      When call brik.local.run_stage "quality"
+    It "runs lint stage successfully"
+      When call brik.local.run_stage "lint"
       The status should be success
-      The output should include "quality"
+      The output should include "lint"
       The error should be present
     End
 
-    It "runs security stage successfully"
+    It "runs scan stage successfully"
+      When call brik.local.run_stage "scan"
+      The status should be success
+      The output should be present
+      The error should be present
+    End
+
+    It "dispatches quality to lint (backward compat)"
+      When call brik.local.run_stage "quality"
+      The status should be success
+      The output should include "lint"
+      The error should be present
+    End
+
+    It "dispatches security to scan (backward compat)"
       When call brik.local.run_stage "security"
       The status should be success
-      The output should include "security"
+      The output should be present
       The error should be present
     End
 
@@ -499,18 +513,33 @@ Describe "local-wrapper.sh"
       The status should equal 1
     End
 
-    It "never skips quality"
-      When call _brik_local_should_skip_stage "quality" "false" "false" "false"
+    It "never skips lint"
+      When call _brik_local_should_skip_stage "lint" "false" "false" "false"
       The status should equal 1
     End
 
-    It "never skips security"
-      When call _brik_local_should_skip_stage "security" "false" "false" "false"
+    It "never skips sast"
+      When call _brik_local_should_skip_stage "sast" "false" "false" "false"
+      The status should equal 1
+    End
+
+    It "never skips scan"
+      When call _brik_local_should_skip_stage "scan" "false" "false" "false"
       The status should equal 1
     End
 
     It "never skips test"
       When call _brik_local_should_skip_stage "test" "false" "false" "false"
+      The status should equal 1
+    End
+
+    It "skips container-scan when with_package is false"
+      When call _brik_local_should_skip_stage "container-scan" "false" "false" "false"
+      The status should be success
+    End
+
+    It "does not skip container-scan when with_package is true"
+      When call _brik_local_should_skip_stage "container-scan" "false" "true" "false"
       The status should equal 1
     End
   End
@@ -662,9 +691,9 @@ MOCKEOF
 
     It "prints pass/fail/skip counts"
       check_summary() {
-        local -a my_stages=(init build quality)
-        local -A my_status=([init]="PASS" [build]="PASS" [quality]="SKIP")
-        local -A my_duration=([init]="1" [build]="2" [quality]="0")
+        local -a my_stages=(init build lint)
+        local -A my_status=([init]="PASS" [build]="PASS" [lint]="SKIP")
+        local -A my_duration=([init]="1" [build]="2" [lint]="0")
         local output
         output="$(brik.local.print_summary my_stages my_status my_duration 3)"
         if echo "$output" | grep -qF "2/2 passed" && echo "$output" | grep -qF "1 skipped"; then
@@ -696,9 +725,9 @@ MOCKEOF
 
     It "shows correct counts with all 3 states"
       check_all_states() {
-        local -a my_stages=(init build quality security)
-        local -A my_status=([init]="PASS" [build]="FAIL" [quality]="PASS" [security]="SKIP")
-        local -A my_duration=([init]="1" [build]="2" [quality]="1" [security]="0")
+        local -a my_stages=(init build lint scan)
+        local -A my_status=([init]="PASS" [build]="FAIL" [lint]="PASS" [scan]="SKIP")
+        local -A my_duration=([init]="1" [build]="2" [lint]="1" [scan]="0")
         local output
         output="$(brik.local.print_summary my_stages my_status my_duration 4)"
         if echo "$output" | grep -qF "2/3 passed" && echo "$output" | grep -qF "1 skipped"; then

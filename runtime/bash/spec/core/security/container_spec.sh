@@ -5,34 +5,6 @@ Describe "security/container.sh"
   Include "$BRIK_CORE_LIB/security/container.sh"
 
   Describe "security.container.run"
-    Describe "Tier 1: command override"
-      setup_cmd() {
-        TEST_WS="$(mktemp -d)"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/my-scanner" << 'EOF'
-#!/usr/bin/env bash
-exit 0
-EOF
-        chmod +x "${MOCK_BIN}/my-scanner"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
-        export BRIK_SECURITY_CONTAINER_SCAN_COMMAND="my-scanner"
-      }
-      cleanup_cmd() {
-        export PATH="$ORIG_PATH"
-        unset BRIK_SECURITY_CONTAINER_SCAN_COMMAND
-        rm -rf "$TEST_WS" "$MOCK_BIN"
-      }
-      Before 'setup_cmd'
-      After 'cleanup_cmd'
-
-      It "runs command override"
-        When call security.container.run "$TEST_WS" --image "myapp:1.0"
-        The status should be success
-        The stderr should include "security container scan passed"
-      End
-    End
-
     Describe "Tier 3: auto-detect grype"
       setup_grype() {
         TEST_WS="$(mktemp -d)"

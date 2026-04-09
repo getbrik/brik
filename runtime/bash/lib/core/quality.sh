@@ -7,7 +7,7 @@
 _BRIK_CORE_QUALITY_LOADED=1
 
 # Run quality checks on a workspace.
-# Usage: quality.run <workspace> [--checks <lint,sast,deps,coverage,license,container>]
+# Usage: quality.run <workspace> [--checks <lint,format,type_check>]
 quality.run() {
     local workspace="$1"
     shift

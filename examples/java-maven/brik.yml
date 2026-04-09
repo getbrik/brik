@@ -13,7 +13,6 @@ test:
   framework: junit
 
 quality:
-  enabled: true
   lint:
     tool: checkstyle
     config: checkstyle.xml
@@ -21,10 +20,8 @@ quality:
   format:
     tool: google-java-format
     check: true
-  deps:
-    severity: high
 
 security:
-  dependency_scan: true
-  secret_scan: true
-  container_scan: false
+  deps:
+    severity: high
+  secrets: {}

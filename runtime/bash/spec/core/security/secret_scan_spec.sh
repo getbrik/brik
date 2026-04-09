@@ -22,11 +22,11 @@ EOF
         chmod +x "${MOCK_BIN}/my-scanner"
         ORIG_PATH="$PATH"
         export PATH="${MOCK_BIN}:${PATH}"
-        export BRIK_SECURITY_SECRET_SCAN_COMMAND="my-scanner"
+        export BRIK_SECURITY_SECRETS_COMMAND="my-scanner"
       }
       cleanup_cmd() {
         export PATH="$ORIG_PATH"
-        unset BRIK_SECURITY_SECRET_SCAN_COMMAND
+        unset BRIK_SECURITY_SECRETS_COMMAND
         rm -rf "$TEST_WS" "$MOCK_BIN"
       }
       Before 'setup_cmd'
@@ -50,11 +50,11 @@ EOF
         chmod +x "${MOCK_BIN}/fail-scanner"
         ORIG_PATH="$PATH"
         export PATH="${MOCK_BIN}:${PATH}"
-        export BRIK_SECURITY_SECRET_SCAN_COMMAND="fail-scanner"
+        export BRIK_SECURITY_SECRETS_COMMAND="fail-scanner"
       }
       cleanup_cmd_fail() {
         export PATH="$ORIG_PATH"
-        unset BRIK_SECURITY_SECRET_SCAN_COMMAND
+        unset BRIK_SECURITY_SECRETS_COMMAND
         rm -rf "$TEST_WS" "$MOCK_BIN"
       }
       Before 'setup_cmd_fail'
@@ -80,11 +80,11 @@ MOCKEOF
         chmod +x "${MOCK_BIN}/gitleaks"
         ORIG_PATH="$PATH"
         export PATH="${MOCK_BIN}:${PATH}"
-        export BRIK_SECURITY_SECRET_SCAN_TOOL="gitleaks"
+        export BRIK_SECURITY_SECRETS_TOOL="gitleaks"
       }
       cleanup_gitleaks() {
         export PATH="$ORIG_PATH"
-        unset BRIK_SECURITY_SECRET_SCAN_TOOL
+        unset BRIK_SECURITY_SECRETS_TOOL
         rm -rf "$TEST_WS" "$MOCK_BIN"
       }
       Before 'setup_gitleaks'
@@ -113,11 +113,11 @@ MOCKEOF
         chmod +x "${MOCK_BIN}/trufflehog"
         ORIG_PATH="$PATH"
         export PATH="${MOCK_BIN}:${PATH}"
-        export BRIK_SECURITY_SECRET_SCAN_TOOL="trufflehog"
+        export BRIK_SECURITY_SECRETS_TOOL="trufflehog"
       }
       cleanup_trufflehog() {
         export PATH="$ORIG_PATH"
-        unset BRIK_SECURITY_SECRET_SCAN_TOOL
+        unset BRIK_SECURITY_SECRETS_TOOL
         rm -rf "$TEST_WS" "$MOCK_BIN"
       }
       Before 'setup_trufflehog'
@@ -139,11 +139,11 @@ MOCKEOF
         MOCK_BIN="$(mktemp -d)"
         ORIG_PATH="$PATH"
         export PATH="${MOCK_BIN}"
-        export BRIK_SECURITY_SECRET_SCAN_TOOL="gitleaks"
+        export BRIK_SECURITY_SECRETS_TOOL="gitleaks"
       }
       cleanup_gitleaks_missing() {
         export PATH="$ORIG_PATH"
-        unset BRIK_SECURITY_SECRET_SCAN_TOOL
+        unset BRIK_SECURITY_SECRETS_TOOL
         rm -rf "$TEST_WS" "$MOCK_BIN"
       }
       Before 'setup_gitleaks_missing'
@@ -162,11 +162,11 @@ MOCKEOF
         MOCK_BIN="$(mktemp -d)"
         ORIG_PATH="$PATH"
         export PATH="${MOCK_BIN}"
-        export BRIK_SECURITY_SECRET_SCAN_TOOL="trufflehog"
+        export BRIK_SECURITY_SECRETS_TOOL="trufflehog"
       }
       cleanup_trufflehog_missing() {
         export PATH="$ORIG_PATH"
-        unset BRIK_SECURITY_SECRET_SCAN_TOOL
+        unset BRIK_SECURITY_SECRETS_TOOL
         rm -rf "$TEST_WS" "$MOCK_BIN"
       }
       Before 'setup_trufflehog_missing'
@@ -182,10 +182,10 @@ MOCKEOF
     Describe "Tier 2: unknown tool"
       setup_unknown() {
         TEST_WS="$(mktemp -d)"
-        export BRIK_SECURITY_SECRET_SCAN_TOOL="nosuch-tool"
+        export BRIK_SECURITY_SECRETS_TOOL="nosuch-tool"
       }
       cleanup_unknown() {
-        unset BRIK_SECURITY_SECRET_SCAN_TOOL
+        unset BRIK_SECURITY_SECRETS_TOOL
         rm -rf "$TEST_WS"
       }
       Before 'setup_unknown'

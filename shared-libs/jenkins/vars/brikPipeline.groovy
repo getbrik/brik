@@ -13,7 +13,7 @@
  *   dockerNetwork   - Docker network for runner containers (default: auto-detected from Jenkins container)
  *
  * The fixed flow:
- *   Init -> Release -> Build -> Quality || Security -> Test -> Package -> Deploy -> Notify
+ *   Init -> Release -> Build -> Lint||SAST||Scan||Test -> Package -> Container Scan -> Deploy -> Notify
  *
  * All business logic lives in portable Bash stages (runtime/bash/lib/stages/).
  * This Groovy file is a thin orchestrator only.
@@ -62,8 +62,10 @@ def call(Map params = [:]) {
                 returnStdout: true
             ).trim()
 
-            // Resolve runner image after init when Docker agent mode is enabled
+            // Resolve runner images after init
             def resolvedImage = ''
+            def analysisImage = 'ghcr.io/getbrik/brik-runner-analysis:latest'
+            def scannerImage = 'ghcr.io/getbrik/brik-runner-scanner:latest'
 
             try {
                 // Init stage always runs on the Jenkins agent (needs brik.yml)
@@ -108,17 +110,33 @@ def call(Map params = [:]) {
                         brikStage(name, brikHome)
                     }
                 }
+                def runInAnalysis = { name ->
+                    if (useDocker) {
+                        docker.image(analysisImage).inside(dockerArgs) { brikStage(name, brikHome) }
+                    } else {
+                        brikStage(name, brikHome)
+                    }
+                }
+                def runInScanner = { name ->
+                    if (useDocker) {
+                        docker.image(scannerImage).inside(dockerArgs) { brikStage(name, brikHome) }
+                    } else {
+                        brikStage(name, brikHome)
+                    }
+                }
 
                 stage('Release') { runStage('release') }
                 stage('Build')   { runStage('build') }
-                stage('Quality & Security') {
+                stage('Verify') {
                     parallel(
-                        'Quality': { runStage('quality') },
-                        'Security': { runStage('security') }
+                        'Lint': { runStage('lint') },
+                        'SAST': { runInAnalysis('sast') },
+                        'Scan': { runInScanner('scan') },
+                        'Test': { runStage('test') }
                     )
                 }
-                stage('Test')    { runStage('test') }
                 stage('Package') { runStage('package') }
+                stage('Container Scan') { runInScanner('container-scan') }
                 stage('Deploy')  { runStage('deploy') }
             } finally {
                 stage('Notify') { brikStage('notify', brikHome) }

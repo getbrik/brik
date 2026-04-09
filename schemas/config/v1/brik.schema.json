@@ -51,11 +51,11 @@
       "$ref": "#/$defs/test"
     },
     "quality": {
-      "description": "Quality stage configuration covering lint, formatting, and static analysis. Enabled by default.",
+      "description": "Quality stage configuration covering lint, formatting, and type checking. Enabled by default.",
       "$ref": "#/$defs/quality"
     },
     "security": {
-      "description": "Security stage configuration covering dependency scanning, secret scanning, and container scanning. Enabled by default.",
+      "description": "Security stage configuration covering SAST, dependency scanning, secret scanning, license compliance, container scanning, and IaC scanning.",
       "$ref": "#/$defs/security"
     },
     "package": {
@@ -196,6 +196,25 @@
               "minLength": 1
             }
           }
+        },
+        "coverage": {
+          "description": "Test coverage threshold enforcement.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "threshold": {
+              "description": "Minimum coverage percentage required. Default is 80.",
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100,
+              "default": 80
+            },
+            "report": {
+              "description": "Path to the coverage report file (Cobertura XML).",
+              "type": "string",
+              "minLength": 1
+            }
+          }
         }
       }
     },
@@ -203,16 +222,16 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "enabled": {
-          "description": "Whether the quality stage is active. Set to false to skip lint, format, and SAST checks entirely. Default is true.",
-          "type": "boolean",
-          "default": true
-        },
         "lint": {
           "description": "Linting configuration.",
           "type": "object",
           "additionalProperties": false,
           "properties": {
+            "enabled": {
+              "description": "Whether linting is active. Set to false to skip lint checks entirely. Default is true.",
+              "type": "boolean",
+              "default": true
+            },
             "command": {
               "description": "Lint command to execute. Overrides tool-based and stack-default lint commands (Tier 1).",
               "type": "string",
@@ -257,6 +276,29 @@
             }
           }
         },
+        "type_check": {
+          "description": "Type checking configuration.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "command": {
+              "description": "Type check command to execute. Overrides tool selection (Tier 1).",
+              "type": "string",
+              "minLength": 1
+            },
+            "tool": {
+              "description": "Type checker to use (e.g. tsc, mypy, pyright). Overrides auto-detection (Tier 2).",
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    "security": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
         "sast": {
           "description": "Static application security testing configuration.",
           "type": "object",
@@ -301,37 +343,18 @@
             }
           }
         },
-        "type_check": {
-          "description": "Type checking configuration.",
+        "secrets": {
+          "description": "Secret scanning configuration.",
           "type": "object",
           "additionalProperties": false,
           "properties": {
             "command": {
-              "description": "Type check command to execute. Overrides tool selection (Tier 1).",
+              "description": "Secret scan command to execute.",
               "type": "string",
               "minLength": 1
             },
             "tool": {
-              "description": "Type checker to use (e.g. tsc, mypy, pyright). Overrides auto-detection (Tier 2).",
-              "type": "string",
-              "minLength": 1
-            }
-          }
-        },
-        "coverage": {
-          "description": "Test coverage threshold enforcement.",
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "threshold": {
-              "description": "Minimum coverage percentage required. Default is 80.",
-              "type": "integer",
-              "minimum": 0,
-              "maximum": 100,
-              "default": 80
-            },
-            "report": {
-              "description": "Path to the coverage report file (Cobertura XML).",
+              "description": "Secret scanning tool to use (e.g. gitleaks, trufflehog).",
               "type": "string",
               "minLength": 1
             }
@@ -368,47 +391,26 @@
               "enum": ["critical", "high", "medium", "low"]
             }
           }
-        }
-      }
-    },
-    "security": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "enabled": {
-          "description": "Whether the security stage is active. Set to false to skip all security scans. Default is true.",
-          "type": "boolean",
-          "default": true
         },
-        "dependency_scan": {
-          "description": "Whether to scan project dependencies for known vulnerabilities.",
-          "type": "boolean"
-        },
-        "secret_scan": {
-          "description": "Whether to scan the codebase for accidentally committed secrets, tokens, or credentials.",
-          "type": "boolean"
-        },
-        "container_scan": {
-          "description": "Whether to scan the built Docker image for OS and application vulnerabilities. Typically meaningful only when package.docker is configured.",
-          "type": "boolean"
-        },
-        "dependency_scan_tool": {
-          "description": "Tool for dependency vulnerability scanning (e.g. npm-audit, pip-audit, safety, osv-scanner, grype, cargo-audit). Auto-detected from stack when omitted.",
-          "type": "string",
-          "minLength": 1
-        },
-        "secret_scan_tool": {
-          "description": "Tool for secret scanning (e.g. gitleaks, trufflehog). Defaults to gitleaks if available.",
-          "type": "string",
-          "minLength": 1
-        },
-        "container_scan_tool": {
-          "description": "Tool for container image scanning (e.g. grype, dockle). Auto-detected when omitted.",
-          "type": "string",
-          "minLength": 1
+        "iac": {
+          "description": "Infrastructure as Code scanning configuration.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "command": {
+              "description": "IaC scan command to execute.",
+              "type": "string",
+              "minLength": 1
+            },
+            "tool": {
+              "description": "IaC scanning tool to use (e.g. checkov, tfsec).",
+              "type": "string",
+              "minLength": 1
+            }
+          }
         },
         "severity_threshold": {
-          "description": "Minimum vulnerability severity that causes the security stage to fail. Vulnerabilities below this level are reported but do not block the pipeline.",
+          "description": "Global minimum vulnerability severity that causes the security stage to fail. Vulnerabilities below this level are reported but do not block the pipeline.",
           "type": "string",
           "enum": ["critical", "high", "medium", "low"]
         }
@@ -763,20 +765,36 @@
           "description": "Commands executed after the build stage completes successfully.",
           "$ref": "#/$defs/hookCommandList"
         },
-        "pre_quality": {
-          "description": "Commands executed before the quality stage.",
+        "pre_lint": {
+          "description": "Commands executed before the lint stage.",
           "$ref": "#/$defs/hookCommandList"
         },
-        "post_quality": {
-          "description": "Commands executed after the quality stage completes successfully.",
+        "post_lint": {
+          "description": "Commands executed after the lint stage completes successfully.",
           "$ref": "#/$defs/hookCommandList"
         },
-        "pre_security": {
-          "description": "Commands executed before the security stage.",
+        "pre_sast": {
+          "description": "Commands executed before the SAST scan.",
           "$ref": "#/$defs/hookCommandList"
         },
-        "post_security": {
-          "description": "Commands executed after the security stage completes successfully.",
+        "post_sast": {
+          "description": "Commands executed after the SAST scan completes successfully.",
+          "$ref": "#/$defs/hookCommandList"
+        },
+        "pre_scan": {
+          "description": "Commands executed before the security scan stage.",
+          "$ref": "#/$defs/hookCommandList"
+        },
+        "post_scan": {
+          "description": "Commands executed after the security scan stage completes successfully.",
+          "$ref": "#/$defs/hookCommandList"
+        },
+        "pre_container_scan": {
+          "description": "Commands executed before the container scan.",
+          "$ref": "#/$defs/hookCommandList"
+        },
+        "post_container_scan": {
+          "description": "Commands executed after the container scan completes successfully.",
           "$ref": "#/$defs/hookCommandList"
         },
         "pre_test": {

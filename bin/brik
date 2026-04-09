@@ -222,7 +222,7 @@ Options for version:
   --verbose               Show additional info (home, install method, commit)
 
 Stages:
-  init, release, build, quality, security, test, package, deploy, notify
+  init, release, build, lint, sast, scan, test, package, container-scan, deploy, notify
 
 Examples:
   brik validate
@@ -232,7 +232,7 @@ Examples:
   brik init
   brik init --stack node --platform gitlab
   brik run stage build
-  brik run stage quality --workspace ./my-project
+  brik run stage lint --workspace ./my-project
   brik run pipeline
   brik run pipeline --with-package --continue-on-error
   brik self-update

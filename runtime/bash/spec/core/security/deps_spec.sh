@@ -22,11 +22,11 @@ EOF
         chmod +x "${MOCK_BIN}/my-scanner"
         ORIG_PATH="$PATH"
         export PATH="${MOCK_BIN}:${PATH}"
-        export BRIK_SECURITY_DEPENDENCY_SCAN_COMMAND="my-scanner"
+        export BRIK_SECURITY_DEPS_COMMAND="my-scanner"
       }
       cleanup_cmd() {
         export PATH="$ORIG_PATH"
-        unset BRIK_SECURITY_DEPENDENCY_SCAN_COMMAND
+        unset BRIK_SECURITY_DEPS_COMMAND
         rm -rf "$TEST_WS" "$MOCK_BIN"
       }
       Before 'setup_cmd'
@@ -52,11 +52,11 @@ MOCKEOF
         chmod +x "${MOCK_BIN}/grype"
         ORIG_PATH="$PATH"
         export PATH="${MOCK_BIN}:${PATH}"
-        export BRIK_SECURITY_DEPENDENCY_SCAN_TOOL="grype"
+        export BRIK_SECURITY_DEPS_TOOL="grype"
       }
       cleanup_tool() {
         export PATH="$ORIG_PATH"
-        unset BRIK_SECURITY_DEPENDENCY_SCAN_TOOL
+        unset BRIK_SECURITY_DEPS_TOOL
         rm -rf "$TEST_WS" "$MOCK_BIN"
       }
       Before 'setup_tool'
@@ -78,11 +78,11 @@ MOCKEOF
         MOCK_BIN="$(mktemp -d)"
         ORIG_PATH="$PATH"
         export PATH="${MOCK_BIN}"
-        export BRIK_SECURITY_DEPENDENCY_SCAN_TOOL="grype"
+        export BRIK_SECURITY_DEPS_TOOL="grype"
       }
       cleanup_missing() {
         export PATH="$ORIG_PATH"
-        unset BRIK_SECURITY_DEPENDENCY_SCAN_TOOL
+        unset BRIK_SECURITY_DEPS_TOOL
         rm -rf "$TEST_WS" "$MOCK_BIN"
       }
       Before 'setup_missing'

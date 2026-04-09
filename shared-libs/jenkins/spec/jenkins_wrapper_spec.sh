@@ -330,38 +330,54 @@ Describe "jenkins-wrapper.sh"
       The error should be present
     End
 
-    # --- Quality stage ---
+    # --- Lint stage ---
 
-    It "runs quality stage and writes BRIK_QUALITY_STATUS=skipped to context"
-      run_quality_check_context() {
-        brik.jenkins.run_stage "quality" >/dev/null 2>&1
+    It "runs lint stage and writes BRIK_LINT_STATUS=skipped to context"
+      run_lint_check_context() {
+        brik.jenkins.run_stage "lint" >/dev/null 2>&1
         local context_file
-        context_file="$(ls "${BRIK_LOG_DIR}"/context-quality-* 2>/dev/null | head -1)"
+        context_file="$(ls "${BRIK_LOG_DIR}"/context-lint-* 2>/dev/null | head -1)"
         if [[ -n "$context_file" ]]; then
-          grep "^BRIK_QUALITY_STATUS=" "$context_file" | cut -d= -f2
+          grep "^BRIK_LINT_STATUS=" "$context_file" | cut -d= -f2
         else
           echo "no_context"
         fi
       }
-      When call run_quality_check_context
+      When call run_lint_check_context
       The output should equal "skipped"
     End
 
-    # --- Security stage ---
+    # --- Scan stage ---
 
-    It "runs security stage and writes BRIK_SECURITY_STATUS=skipped to context"
-      run_security_check_context() {
-        brik.jenkins.run_stage "security" >/dev/null 2>&1
+    It "runs scan stage and writes BRIK_SCAN_STATUS to context"
+      run_scan_check_context() {
+        brik.jenkins.run_stage "scan" >/dev/null 2>&1
         local context_file
-        context_file="$(ls "${BRIK_LOG_DIR}"/context-security-* 2>/dev/null | head -1)"
+        context_file="$(ls "${BRIK_LOG_DIR}"/context-scan-* 2>/dev/null | head -1)"
         if [[ -n "$context_file" ]]; then
-          grep "^BRIK_SECURITY_STATUS=" "$context_file" | cut -d= -f2
+          grep "^BRIK_SCAN_STATUS=" "$context_file" | cut -d= -f2
         else
           echo "no_context"
         fi
       }
-      When call run_security_check_context
-      The output should equal "skipped"
+      When call run_scan_check_context
+      The output should be present
+    End
+
+    # --- Backward compat ---
+
+    It "dispatches quality to lint (backward compat)"
+      When call brik.jenkins.run_stage "quality"
+      The status should be success
+      The output should include "lint"
+      The error should be present
+    End
+
+    It "dispatches security to scan (backward compat)"
+      When call brik.jenkins.run_stage "security"
+      The status should be success
+      The output should be present
+      The error should be present
     End
 
     # --- Notify stage ---

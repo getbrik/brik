@@ -6,7 +6,7 @@
 # 1. Sets up the local environment (BRIK_* from git)
 # 2. Sources the portable runtime, config, condition, and stage modules
 # 3. Dispatches stages to portable stages.* functions via stage.run
-# 4. Orchestrates the full pipeline with brik.local.run_pipeline
+# 4. Orchestrates the full pipeline: Init -> Release -> Build -> Lint||SAST||Scan||Test -> Package -> Container Scan -> Deploy -> Notify
 #
 # Usage from brik CLI:
 #   source "${BRIK_HOME}/shared-libs/local/scripts/local-wrapper.sh"
@@ -167,18 +167,23 @@ brik.local.run_stage() {
     local logic_function=""
 
     case "$stage_name" in
-        init)     logic_function="stages.init" ;;
-        release)  logic_function="stages.release" ;;
-        build)    logic_function="stages.build" ;;
-        quality)  logic_function="stages.quality" ;;
-        security) logic_function="stages.security" ;;
-        test)     logic_function="stages.test" ;;
-        package)  logic_function="stages.package" ;;
-        deploy)   logic_function="stages.deploy" ;;
-        notify)   logic_function="stages.notify" ;;
+        init)            logic_function="stages.init" ;;
+        release)         logic_function="stages.release" ;;
+        build)           logic_function="stages.build" ;;
+        lint)            logic_function="stages.lint" ;;
+        sast)            logic_function="stages.sast" ;;
+        scan)            logic_function="stages.scan" ;;
+        test)            logic_function="stages.test" ;;
+        package)         logic_function="stages.package" ;;
+        container-scan)  logic_function="stages.container_scan" ;;
+        deploy)          logic_function="stages.deploy" ;;
+        notify)          logic_function="stages.notify" ;;
+        # Backward-compat aliases (deprecated)
+        quality)         logic_function="stages.lint" ;;
+        security)        logic_function="stages.scan" ;;
         *)
             log.error "unknown stage: $stage_name"
-            log.error "valid stages: init, release, build, quality, security, test, package, deploy, notify"
+            log.error "valid stages: init, release, build, lint, sast, scan, test, package, container-scan, deploy, notify"
             return 2
             ;;
     esac
@@ -221,9 +226,9 @@ brik.local.run_pipeline() {
     fi
 
     # Fixed flow: stages to run and stages to skip
-    # Default: init, build, quality, security, test
-    # Opt-in: release, package, deploy, notify (notify auto-added with deploy)
-    local -a all_stages=(init release build quality security test package deploy notify)
+    # Default: init, build, lint, sast, scan, test
+    # Opt-in: release, package, container-scan, deploy, notify
+    local -a all_stages=(init release build lint sast scan test package container-scan deploy notify)
 
     # Track results: associative arrays for status and duration
     local -A stage_status=()
@@ -286,10 +291,11 @@ _brik_local_should_skip_stage() {
     local with_deploy="$4"
 
     case "$stage" in
-        release) [[ "$with_release" != "true" ]] && return 0 ;;
-        package) [[ "$with_package" != "true" ]] && return 0 ;;
-        deploy)  [[ "$with_deploy" != "true" ]] && return 0 ;;
-        notify)  [[ "$with_deploy" != "true" ]] && return 0 ;;
+        release)        [[ "$with_release" != "true" ]] && return 0 ;;
+        package)        [[ "$with_package" != "true" ]] && return 0 ;;
+        container-scan) [[ "$with_package" != "true" ]] && return 0 ;;
+        deploy)         [[ "$with_deploy" != "true" ]] && return 0 ;;
+        notify)         [[ "$with_deploy" != "true" ]] && return 0 ;;
     esac
     return 1
 }

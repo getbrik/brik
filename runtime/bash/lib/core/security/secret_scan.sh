@@ -23,10 +23,10 @@ security.secret_scan.run() {
 
     runtime.require_dir "$workspace" || return 6
 
-    # Tier 1: BRIK_SECURITY_SECRET_SCAN_COMMAND
-    if [[ -n "${BRIK_SECURITY_SECRET_SCAN_COMMAND:-}" ]]; then
-        log.info "security secret scan (command override): $BRIK_SECURITY_SECRET_SCAN_COMMAND"
-        (cd "$workspace" && eval "$BRIK_SECURITY_SECRET_SCAN_COMMAND") || {
+    # Tier 1: BRIK_SECURITY_SECRETS_COMMAND
+    if [[ -n "${BRIK_SECURITY_SECRETS_COMMAND:-}" ]]; then
+        log.info "security secret scan (command override): $BRIK_SECURITY_SECRETS_COMMAND"
+        (cd "$workspace" && eval "$BRIK_SECURITY_SECRETS_COMMAND") || {
             log.error "secrets detected"
             return 10
         }
@@ -35,7 +35,7 @@ security.secret_scan.run() {
     fi
 
     local scan_cmd=""
-    local tool="${BRIK_SECURITY_SECRET_SCAN_TOOL:-}"
+    local tool="${BRIK_SECURITY_SECRETS_TOOL:-}"
 
     # Tier 2: explicit tool selection
     if [[ -n "$tool" ]]; then
