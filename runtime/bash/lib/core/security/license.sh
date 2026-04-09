@@ -26,20 +26,28 @@ security.license.run() {
     local allowed="${BRIK_SECURITY_LICENSE_ALLOWED:-}"
     local denied="${BRIK_SECURITY_LICENSE_DENIED:-}"
 
-    # license_finder handled inline (conditional --permitted/--restricted flags)
+    # license_finder: add permitted/restricted licenses, then check action_items
     if command -v license_finder >/dev/null 2>&1; then
-        local scan_cmd="license_finder action_items"
-        if [[ -n "$allowed" ]]; then
-            # Convert comma-separated to space-separated for license_finder
-            local allowed_args="${allowed//,/ }"
-            scan_cmd="$scan_cmd --permitted-licenses $allowed_args"
-        fi
-        if [[ -n "$denied" ]]; then
-            local denied_args="${denied//,/ }"
-            scan_cmd="$scan_cmd --restricted-licenses $denied_args"
-        fi
-        log.info "checking licenses: $scan_cmd"
-        (cd "$workspace" && eval "$scan_cmd") || {
+        log.info "checking licenses with license_finder"
+        (
+            cd "$workspace"
+            # Add permitted licenses from config (comma-separated -> individual adds)
+            if [[ -n "$allowed" ]]; then
+                local IFS=','
+                for lic in $allowed; do
+                    license_finder permitted_licenses add "$lic" 2>/dev/null || true
+                done
+            fi
+            # Add restricted licenses from config
+            if [[ -n "$denied" ]]; then
+                local IFS=','
+                for lic in $denied; do
+                    license_finder restricted_licenses add "$lic" 2>/dev/null || true
+                done
+            fi
+            # Check for unapproved dependencies
+            license_finder action_items
+        ) || {
             log.error "license violations found"
             return 10
         }
