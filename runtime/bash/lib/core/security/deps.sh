@@ -53,7 +53,13 @@ security.deps.run() {
                 *)           dep_cmd="$dep_tool ." ;;
             esac
             log.info "security dependency scan with tool: $dep_tool"
-            (cd "$workspace" && eval "$dep_cmd") || {
+            local dep_output=""
+            dep_output="$(cd "$workspace" && eval "$dep_cmd" 2>&1)" || {
+                # osv-scanner returns non-zero when no package sources found
+                if echo "$dep_output" | grep -qi "no package sources found"; then
+                    log.warn "no package sources found for $dep_tool - skipping"
+                    return 0
+                fi
                 log.error "security dependency vulnerabilities found"
                 return 10
             }
@@ -72,8 +78,13 @@ security.deps.run() {
         return 0
     }
     log.info "security dependency scan with ${resolved}"
-    (cd "$workspace" && quality.tool.exec sec_deps "$resolved" \
-        workspace="$workspace" severity="${severity^^}") || {
+    local auto_output=""
+    auto_output="$(cd "$workspace" && quality.tool.exec sec_deps "$resolved" \
+        workspace="$workspace" severity="${severity^^}" 2>&1)" || {
+        if echo "$auto_output" | grep -qi "no package sources found"; then
+            log.warn "no package sources found for $resolved - skipping"
+            return 0
+        fi
         log.error "security dependency vulnerabilities found"
         return 10
     }
