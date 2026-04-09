@@ -46,8 +46,14 @@ security.deps.run() {
     local dep_tool="${BRIK_SECURITY_DEPS_TOOL:-}"
     if [[ -n "$dep_tool" ]]; then
         if command -v "$dep_tool" >/dev/null 2>&1; then
+            local dep_cmd=""
+            case "$dep_tool" in
+                osv-scanner) dep_cmd="osv-scanner scan --format table ." ;;
+                grype)       dep_cmd="grype dir:." ;;
+                *)           dep_cmd="$dep_tool ." ;;
+            esac
             log.info "security dependency scan with tool: $dep_tool"
-            (cd "$workspace" && "$dep_tool" .) || {
+            (cd "$workspace" && eval "$dep_cmd") || {
                 log.error "security dependency vulnerabilities found"
                 return 10
             }

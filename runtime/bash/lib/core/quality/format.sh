@@ -71,7 +71,7 @@ quality.format.run() {
                 return 3
             fi
             ;;
-        ruff-format|ruff)
+        ruff-format|ruff|"ruff format")
             if command -v ruff >/dev/null 2>&1; then
                 fmt_cmd="ruff format --check ."
             else

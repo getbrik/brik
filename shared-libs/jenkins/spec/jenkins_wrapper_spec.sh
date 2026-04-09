@@ -268,7 +268,7 @@ Describe "jenkins-wrapper.sh"
     setup_stage_env() {
       export BRIK_CONFIG_FILE
       BRIK_CONFIG_FILE="$(mktemp)"
-      printf "version: 1\nproject:\n  name: test-project\n  stack: node\nquality:\n  enabled: 'false'\n" > "$BRIK_CONFIG_FILE"
+      printf "version: 1\nproject:\n  name: test-project\n  stack: node\nquality:\n  lint:\n    enabled: false\n" > "$BRIK_CONFIG_FILE"
       export BRIK_LOG_DIR
       BRIK_LOG_DIR="$(mktemp -d)"
       export BRIK_WORKSPACE
@@ -281,11 +281,21 @@ Describe "jenkins-wrapper.sh"
       export GIT_BRANCH="origin/main"
       export GIT_COMMIT="abc123def456789012345678901234567890abcd"
 
+      # Mock non-negotiable security tools
+      MOCK_SEC_BIN="$(mktemp -d)"
+      for tool in semgrep osv-scanner gitleaks; do
+        printf '#!/usr/bin/env bash\nexit 0\n' > "${MOCK_SEC_BIN}/${tool}"
+        chmod +x "${MOCK_SEC_BIN}/${tool}"
+      done
+      ORIG_PATH_STAGE="$PATH"
+      export PATH="${MOCK_SEC_BIN}:${PATH}"
+
       brik.jenkins.setup "$BRIK_HOME" >/dev/null 2>&1 || true
     }
     cleanup_stage_env() {
+      export PATH="$ORIG_PATH_STAGE"
       rm -f "$BRIK_CONFIG_FILE"
-      rm -rf "$BRIK_LOG_DIR" "$BRIK_WORKSPACE"
+      rm -rf "$BRIK_LOG_DIR" "$BRIK_WORKSPACE" "$MOCK_SEC_BIN"
     }
     Before 'setup_stage_env'
     After 'cleanup_stage_env'

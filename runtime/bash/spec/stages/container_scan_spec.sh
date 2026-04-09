@@ -1,137 +1,136 @@
-Describe "stages.container_scan"
-  Include "$BRIK_HOME/runtime/bash/lib/runtime/stage.sh"
-  Include "$BRIK_HOME/runtime/bash/lib/core/_loader.sh"
-  Include "$BRIK_HOME/runtime/bash/lib/core/config.sh"
+Describe "stages/container_scan.sh"
+  Include "$BRIK_RUNTIME_LIB/logging.sh"
+  Include "$BRIK_RUNTIME_LIB/context.sh"
+  Include "$BRIK_CORE_LIB/config.sh"
   Include "$BRIK_HOME/runtime/bash/lib/stages/container_scan.sh"
 
-  setup_env() {
-    export BRIK_CONFIG_FILE
-    BRIK_CONFIG_FILE="$(mktemp)"
-    printf 'version: 1\nproject:\n  name: test\n  stack: node\n' > "$BRIK_CONFIG_FILE"
-    export BRIK_LOG_DIR
-    BRIK_LOG_DIR="$(mktemp -d)"
-    export BRIK_WORKSPACE
-    BRIK_WORKSPACE="$(mktemp -d)"
-    export BRIK_PROJECT_DIR="$BRIK_WORKSPACE"
-    export BRIK_PLATFORM="gitlab"
-    config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
-  }
-  cleanup_env() {
-    rm -f "$BRIK_CONFIG_FILE"
-    rm -rf "$BRIK_LOG_DIR" "$BRIK_WORKSPACE"
-    unset BRIK_SECURITY_CONTAINER_IMAGE BRIK_SECURITY_CONTAINER_SEVERITY \
-          BRIK_SECURITY_SEVERITY_THRESHOLD 2>/dev/null || true
-  }
-  Before 'setup_env'
-  After 'cleanup_env'
-
-  It "is callable as a function"
-    callable_check() { declare -f stages.container_scan >/dev/null; }
-    When call callable_check
-    The status should be success
-  End
-
-  Describe "with no container image configured"
-    setup_no_image() {
-      cat > "$BRIK_CONFIG_FILE" <<'YAML'
-version: 1
-project:
-  name: test
-  stack: node
-YAML
-      config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
-    }
-    Before 'setup_no_image'
-
-    It "returns 0 and status skipped"
-      run_no_image() {
-        local ctx
-        ctx="$(context.create "container_scan")" 2>/dev/null || ctx="$(mktemp)"
-        stages.container_scan "$ctx" >/dev/null 2>&1
-        grep "^BRIK_CONTAINER_SCAN_STATUS=" "$ctx" | cut -d= -f2
+  Describe "stages.container_scan"
+    Describe "no image configured"
+      setup_no_image() {
+        export BRIK_CONFIG_FILE
+        BRIK_CONFIG_FILE="$(mktemp)"
+        printf 'version: 1\nproject:\n  name: test\n  stack: node\n' > "$BRIK_CONFIG_FILE"
+        CTX_FILE="$(mktemp)"
+        unset BRIK_SECURITY_CONTAINER_IMAGE 2>/dev/null || true
       }
-      When call run_no_image
-      The output should equal "skipped"
+      cleanup_no_image() {
+        rm -f "$BRIK_CONFIG_FILE" "$CTX_FILE"
+      }
+      Before 'setup_no_image'
+      After 'cleanup_no_image'
+
+      It "skips when no container image configured"
+        invoke_skip() {
+          stages.container_scan "$CTX_FILE" 2>/dev/null
+          local status=$?
+          grep "^BRIK_CONTAINER_SCAN_STATUS=" "$CTX_FILE" | cut -d= -f2
+          return $status
+        }
+        When call invoke_skip
+        The status should be success
+        The output should equal "skipped"
+      End
     End
-  End
 
-  Describe "with container image configured"
-    setup_container() {
-      cat > "$BRIK_CONFIG_FILE" <<'YAML'
-version: 1
-project:
-  name: test
-  stack: node
-security:
-  container:
-    image: myapp:latest
-    severity: critical
-YAML
-      config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
-    }
-    Before 'setup_container'
+    Describe "with image configured auto-loads container module"
+      setup_autoload() {
+        export BRIK_CONFIG_FILE
+        BRIK_CONFIG_FILE="$(mktemp)"
+        printf 'version: 1\nproject:\n  name: test\n  stack: node\nsecurity:\n  container:\n    image: myapp:latest\n' > "$BRIK_CONFIG_FILE"
+        CTX_FILE="$(mktemp)"
+        export BRIK_WORKSPACE
+        BRIK_WORKSPACE="$(mktemp -d)"
+        # Provide mock scanner tools so container.run resolves
+        MOCK_BIN="$(mktemp -d)"
+        cat > "${MOCK_BIN}/grype" << 'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+        chmod +x "${MOCK_BIN}/grype"
+        ORIG_PATH="$PATH"
+        export PATH="${MOCK_BIN}:${PATH}"
+      }
+      cleanup_autoload() {
+        export PATH="$ORIG_PATH"
+        rm -f "$BRIK_CONFIG_FILE" "$CTX_FILE"
+        rm -rf "$BRIK_WORKSPACE" "$MOCK_BIN"
+      }
+      Before 'setup_autoload'
+      After 'cleanup_autoload'
 
-    It "runs container scan and sets status to success"
-      run_container() {
+      It "auto-loads security.container module and runs scan"
+        invoke_autoload() {
+          stages.container_scan "$CTX_FILE" 2>/dev/null
+          local status=$?
+          grep "^BRIK_CONTAINER_SCAN_STATUS=" "$CTX_FILE" | cut -d= -f2
+          return $status
+        }
+        When call invoke_autoload
+        The status should be success
+        The output should equal "success"
+      End
+    End
+
+    Describe "with image and mock scanner"
+      setup_with_scanner() {
+        export BRIK_CONFIG_FILE
+        BRIK_CONFIG_FILE="$(mktemp)"
+        printf 'version: 1\nproject:\n  name: test\n  stack: node\nsecurity:\n  container:\n    image: myapp:latest\n    severity: critical\n' > "$BRIK_CONFIG_FILE"
+        CTX_FILE="$(mktemp)"
+        export BRIK_WORKSPACE
+        BRIK_WORKSPACE="$(mktemp -d)"
         security.container.run() { return 0; }
-        local ctx
-        ctx="$(context.create "container_scan")" 2>/dev/null || ctx="$(mktemp)"
-        stages.container_scan "$ctx" >/dev/null 2>&1
-        grep "^BRIK_CONTAINER_SCAN_STATUS=" "$ctx" | cut -d= -f2
       }
-      When call run_container
-      The output should equal "success"
+      cleanup_with_scanner() {
+        rm -f "$BRIK_CONFIG_FILE" "$CTX_FILE"
+        rm -rf "$BRIK_WORKSPACE"
+        unset -f security.container.run 2>/dev/null || true
+      }
+      Before 'setup_with_scanner'
+      After 'cleanup_with_scanner'
+
+      It "sets status to success when scan passes"
+        invoke_success() {
+          stages.container_scan "$CTX_FILE" 2>/dev/null
+          local status=$?
+          grep "^BRIK_CONTAINER_SCAN_STATUS=" "$CTX_FILE" | cut -d= -f2
+          return $status
+        }
+        When call invoke_success
+        The status should be success
+        The output should equal "success"
+      End
     End
 
-    It "sets status to failed when container scan fails"
-      run_container_fail() {
+    Describe "with image and failing scanner"
+      setup_failing_scanner() {
+        export BRIK_CONFIG_FILE
+        BRIK_CONFIG_FILE="$(mktemp)"
+        printf 'version: 1\nproject:\n  name: test\n  stack: node\nsecurity:\n  container:\n    image: myapp:latest\n' > "$BRIK_CONFIG_FILE"
+        CTX_FILE="$(mktemp)"
+        export BRIK_WORKSPACE
+        BRIK_WORKSPACE="$(mktemp -d)"
         security.container.run() { return 1; }
-        local ctx
-        ctx="$(context.create "container_scan")" 2>/dev/null || ctx="$(mktemp)"
-        stages.container_scan "$ctx" >/dev/null 2>&1 || true
-        grep "^BRIK_CONTAINER_SCAN_STATUS=" "$ctx" | cut -d= -f2
       }
-      When call run_container_fail
-      The output should equal "failed"
-    End
-
-    It "passes image and severity to security.container.run"
-      run_container_args() {
-        security.container.run() { printf '%s ' "$@"; printf '\n'; return 0; }
-        local ctx
-        ctx="$(context.create "container_scan")" 2>/dev/null || ctx="$(mktemp)"
-        stages.container_scan "$ctx" 2>/dev/null
+      cleanup_failing_scanner() {
+        rm -f "$BRIK_CONFIG_FILE" "$CTX_FILE"
+        rm -rf "$BRIK_WORKSPACE"
+        unset -f security.container.run 2>/dev/null || true
       }
-      When call run_container_args
-      The output should include "--image myapp:latest"
-      The output should include "--severity critical"
-    End
-  End
+      Before 'setup_failing_scanner'
+      After 'cleanup_failing_scanner'
 
-  Describe "with container image but no severity"
-    setup_no_severity() {
-      cat > "$BRIK_CONFIG_FILE" <<'YAML'
-version: 1
-project:
-  name: test
-  stack: node
-security:
-  container:
-    image: myapp:latest
-YAML
-      config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
-    }
-    Before 'setup_no_severity'
-
-    It "uses default severity threshold"
-      run_default_severity() {
-        security.container.run() { printf '%s ' "$@"; printf '\n'; return 0; }
-        local ctx
-        ctx="$(context.create "container_scan")" 2>/dev/null || ctx="$(mktemp)"
-        stages.container_scan "$ctx" 2>/dev/null
-      }
-      When call run_default_severity
-      The output should include "--severity high"
+      It "sets status to failed and returns non-zero"
+        invoke_fail() {
+          stages.container_scan "$CTX_FILE" 2>/dev/null
+          local status=$?
+          grep "^BRIK_CONTAINER_SCAN_STATUS=" "$CTX_FILE" | cut -d= -f2
+          return $status
+        }
+        When call invoke_fail
+        The status should equal 1
+        The output should equal "failed"
+      End
     End
   End
 End

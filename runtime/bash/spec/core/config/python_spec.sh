@@ -20,9 +20,9 @@ Describe "config/python.sh"
       The output should equal "ruff"
     End
 
-    It "returns 'ruff format' for format_tool"
+    It "returns 'ruff-format' for format_tool"
       When call config.python.default "format_tool"
-      The output should equal "ruff format"
+      The output should equal "ruff-format"
     End
 
     It "returns 1 for unknown setting"

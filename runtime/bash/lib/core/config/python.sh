@@ -18,7 +18,7 @@ config.python.default() {
         build_tool)     printf 'auto' ;;
         test_framework) printf 'pytest' ;;
         lint_tool)      printf 'ruff' ;;
-        format_tool)    printf 'ruff format' ;;
+        format_tool)    printf 'ruff-format' ;;
         *) return 1 ;;
     esac
     return 0

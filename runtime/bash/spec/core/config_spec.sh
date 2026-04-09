@@ -471,7 +471,7 @@ YAML
 
     It "returns python format_tool"
       When call config.stack_default "python" "format_tool"
-      The output should equal "ruff format"
+      The output should equal "ruff-format"
     End
 
     It "returns dotnet build_command"

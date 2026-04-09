@@ -339,18 +339,29 @@ Describe "local-wrapper.sh"
     setup_stage_env() {
       export BRIK_CONFIG_FILE
       BRIK_CONFIG_FILE="$(mktemp)"
-      printf "version: 1\nproject:\n  name: test-project\n  stack: node\nquality:\n  enabled: 'false'\n" > "$BRIK_CONFIG_FILE"
+      printf "version: 1\nproject:\n  name: test-project\n  stack: node\nquality:\n  lint:\n    enabled: false\n" > "$BRIK_CONFIG_FILE"
       export BRIK_LOG_DIR
       BRIK_LOG_DIR="$(mktemp -d)"
       export BRIK_WORKSPACE
       BRIK_WORKSPACE="$(mktemp -d)"
       export BRIK_PROJECT_DIR="$BRIK_WORKSPACE"
       export BRIK_LOG_LEVEL="info"
+
+      # Mock non-negotiable security tools
+      MOCK_SEC_BIN="$(mktemp -d)"
+      for tool in semgrep osv-scanner gitleaks; do
+        printf '#!/usr/bin/env bash\nexit 0\n' > "${MOCK_SEC_BIN}/${tool}"
+        chmod +x "${MOCK_SEC_BIN}/${tool}"
+      done
+      ORIG_PATH_STAGE="$PATH"
+      export PATH="${MOCK_SEC_BIN}:${PATH}"
+
       brik.local.setup >/dev/null 2>&1 || true
     }
     cleanup_stage_env() {
+      export PATH="$ORIG_PATH_STAGE"
       rm -f "$BRIK_CONFIG_FILE"
-      rm -rf "$BRIK_LOG_DIR" "$BRIK_WORKSPACE"
+      rm -rf "$BRIK_LOG_DIR" "$BRIK_WORKSPACE" "$MOCK_SEC_BIN"
     }
     Before 'setup_stage_env'
     After 'cleanup_stage_env'
@@ -553,7 +564,7 @@ Describe "local-wrapper.sh"
     setup_pipeline_env() {
       export BRIK_CONFIG_FILE
       BRIK_CONFIG_FILE="$(mktemp)"
-      printf "version: 1\nproject:\n  name: pipeline-test\n  stack: node\nquality:\n  enabled: 'false'\ntest:\n  framework: npm\n" > "$BRIK_CONFIG_FILE"
+      printf "version: 1\nproject:\n  name: pipeline-test\n  stack: node\nquality:\n  lint:\n    enabled: false\ntest:\n  framework: npm\n" > "$BRIK_CONFIG_FILE"
       export BRIK_LOG_DIR
       BRIK_LOG_DIR="$(mktemp -d)"
       export BRIK_WORKSPACE
@@ -579,6 +590,11 @@ echo "mock npx: $*"
 exit 0
 MOCKEOF
       chmod +x "${MOCK_BIN}/npx"
+      # Mock non-negotiable security tools
+      for tool in semgrep osv-scanner gitleaks; do
+        printf '#!/usr/bin/env bash\nexit 0\n' > "${MOCK_BIN}/${tool}"
+        chmod +x "${MOCK_BIN}/${tool}"
+      done
       export PATH="${MOCK_BIN}:${PATH}"
       export BRIK_PROJECT_DIR="$BRIK_WORKSPACE"
       export BRIK_LOG_LEVEL="info"
@@ -772,7 +788,7 @@ MOCKEOF
     setup_pipeline_release() {
       export BRIK_CONFIG_FILE
       BRIK_CONFIG_FILE="$(mktemp)"
-      printf "version: 1\nproject:\n  name: pipeline-test\n  stack: node\nquality:\n  enabled: 'false'\ntest:\n  framework: npm\n" > "$BRIK_CONFIG_FILE"
+      printf "version: 1\nproject:\n  name: pipeline-test\n  stack: node\nquality:\n  lint:\n    enabled: false\ntest:\n  framework: npm\n" > "$BRIK_CONFIG_FILE"
       export BRIK_LOG_DIR
       BRIK_LOG_DIR="$(mktemp -d)"
       export BRIK_WORKSPACE
@@ -797,12 +813,18 @@ echo "mock npx: $*"
 exit 0
 MOCKEOF
       chmod +x "${MOCK_BIN}/npx"
+      for tool in semgrep osv-scanner gitleaks; do
+        printf '#!/usr/bin/env bash\nexit 0\n' > "${MOCK_BIN}/${tool}"
+        chmod +x "${MOCK_BIN}/${tool}"
+      done
+      ORIG_PATH_PIPELINE_RELEASE="$PATH"
       export PATH="${MOCK_BIN}:${PATH}"
       export BRIK_PROJECT_DIR="$BRIK_WORKSPACE"
       export BRIK_LOG_LEVEL="info"
       brik.local.setup >/dev/null 2>&1 || true
     }
     cleanup_pipeline_release() {
+      export PATH="$ORIG_PATH_PIPELINE_RELEASE"
       rm -f "$BRIK_CONFIG_FILE"
       rm -rf "$BRIK_LOG_DIR" "$BRIK_WORKSPACE" "$MOCK_BIN"
     }
