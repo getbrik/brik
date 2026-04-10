@@ -1,10 +1,10 @@
-Describe "stage-wrapper.sh"
+Describe "gitlab-wrapper.sh"
 
   # =========================================================================
   # brik.gitlab.setup
   # =========================================================================
   Describe "brik.gitlab.setup"
-    Include "$BRIK_HOME/shared-libs/gitlab/scripts/stage-wrapper.sh"
+    Include "$BRIK_HOME/shared-libs/gitlab/scripts/gitlab-wrapper.sh"
 
     It "returns 4 with BRIK_HOME message when given empty string"
       setup_empty() { local saved="$BRIK_HOME"; unset BRIK_HOME; }
@@ -205,7 +205,7 @@ Describe "stage-wrapper.sh"
   # brik.gitlab.run_stage
   # =========================================================================
   Describe "brik.gitlab.run_stage"
-    Include "$BRIK_HOME/shared-libs/gitlab/scripts/stage-wrapper.sh"
+    Include "$BRIK_HOME/shared-libs/gitlab/scripts/gitlab-wrapper.sh"
 
     setup_stage_env() {
       export BRIK_CONFIG_FILE

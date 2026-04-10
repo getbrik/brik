@@ -124,7 +124,7 @@ shared-libs/gitlab/
   scripts/
     config-reader.sh    -- Reads brik.yml via yq
     condition-eval.sh   -- Evaluates deploy conditions
-    stage-wrapper.sh    -- Bridges GitLab CI to stage.run
+    gitlab-wrapper.sh   -- Bridges GitLab CI to stage.run
   templates/
     pipeline.yml        -- Main entry point (stages, defaults, includes)
     jobs/

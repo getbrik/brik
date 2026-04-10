@@ -4,9 +4,8 @@
 #
 # This is a thin adapter that:
 # 1. Sets up the local environment (BRIK_* from git)
-# 2. Sources the portable runtime, config, condition, and stage modules
-# 3. Dispatches stages to portable stages.* functions via stage.run
-# 4. Orchestrates the full pipeline: Init -> Release -> Build -> Lint||SAST||Scan||Test -> Package -> Container Scan -> Deploy -> Notify
+# 2. Delegates common bootstrap and dispatch to base-wrapper.sh
+# 3. Orchestrates the full pipeline: Init -> Release -> Build -> Lint||SAST||Scan||Test -> Package -> Container Scan -> Deploy -> Notify
 #
 # Usage from brik CLI:
 #   source "${BRIK_HOME}/shared-libs/local/scripts/local-wrapper.sh"
@@ -18,6 +17,11 @@
 [[ -n "${_BRIK_LOCAL_WRAPPER_LOADED:-}" ]] && return 0
 _BRIK_LOCAL_WRAPPER_LOADED=1
 
+# Source shared wrapper logic
+_BRIK_WRAPPER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=/dev/null
+. "${_BRIK_WRAPPER_DIR}/../../common/scripts/base-wrapper.sh"
+
 # ---------------------------------------------------------------------------
 # Bootstrap: setup BRIK_HOME, source runtime, load stages
 # ---------------------------------------------------------------------------
@@ -25,80 +29,21 @@ _BRIK_LOCAL_WRAPPER_LOADED=1
 # Setup the Brik runtime environment for local execution.
 # Populates BRIK_* variables from the local Git repository.
 # Must be called once before any brik.local.run_stage calls.
-# Exit codes: 0=success, 4=environment error, 7=config error
+# Exit codes: 0=success, BRIK_EXIT_INVALID_ENV=environment error, BRIK_EXIT_CONFIG_ERROR=config error
 brik.local.setup() {
-    local brik_home="${BRIK_HOME:-}"
+    brik.wrapper.validate_home "${BRIK_HOME:-}" || return $?
 
-    if [[ -z "$brik_home" ]]; then
-        echo "error: BRIK_HOME is not set. Cannot find the Brik runtime." >&2
-        return 4
-    fi
-
-    if [[ ! -d "$brik_home" ]]; then
-        echo "error: BRIK_HOME directory does not exist: $brik_home" >&2
-        return 4
-    fi
-
-    # Verify runtime files exist
-    local runtime_dir="${BRIK_HOME}/runtime/bash/lib/runtime"
-    local core_dir="${BRIK_HOME}/runtime/bash/lib/core"
-
-    if [[ ! -f "${runtime_dir}/stage.sh" ]]; then
-        echo "error: stage.sh not found at ${runtime_dir}/stage.sh" >&2
-        return 4
-    fi
-
-    if [[ ! -f "${core_dir}/_loader.sh" ]]; then
-        echo "error: _loader.sh not found at ${core_dir}/_loader.sh" >&2
-        return 4
-    fi
-
-    # Set standard environment variables
     export BRIK_PROJECT_DIR="${BRIK_PROJECT_DIR:-$(pwd)}"
-    export BRIK_WORKSPACE="${BRIK_WORKSPACE:-${BRIK_PROJECT_DIR}}"
-    export BRIK_CONFIG_FILE="${BRIK_CONFIG_FILE:-${BRIK_PROJECT_DIR}/brik.yml}"
-    export BRIK_LOG_DIR="${BRIK_LOG_DIR:-/tmp/brik/logs}"
     export BRIK_PLATFORM="local"
-    export BRIK_LIB="${core_dir}"
 
-    # Source the runtime (before git context so log.warn is available)
-    # shellcheck source=/dev/null
-    . "${runtime_dir}/stage.sh"
-    # shellcheck source=/dev/null
-    . "${core_dir}/_loader.sh"
+    brik.wrapper.set_standard_env
+    # Source runtime before git context so log.warn is available
+    brik.wrapper.bootstrap || return $?
 
     # Platform variable normalization from local Git (after runtime for log.warn)
     _brik_local_setup_git_context
 
-    # Load portable config and condition modules
-    brik.use config
-    brik.use condition
-
-    # Source portable stage logic
-    local stages_dir="${BRIK_HOME}/runtime/bash/lib/stages"
-    local stage_file
-    for stage_file in "${stages_dir}"/*.sh; do
-        if [[ -f "$stage_file" ]]; then
-            # shellcheck source=/dev/null
-            . "$stage_file"
-        fi
-    done
-
-    # Read configuration
-    config.read "${BRIK_CONFIG_FILE}" || {
-        log.error "failed to read config: ${BRIK_CONFIG_FILE}"
-        return 7
-    }
-
-    # Export all config vars
-    config.export_all "${BRIK_CONFIG_FILE}" || {
-        log.warn "some config exports failed, continuing with defaults"
-    }
-
-    # Prepare runtime environment (install prerequisites + stack)
-    setup.prepare_env "${BRIK_BUILD_STACK:-}" || {
-        log.warn "runtime preparation failed, some stages may fail"
-    }
+    brik.wrapper.load_config || return $?
 
     log.info "brik local setup complete (BRIK_HOME=$BRIK_HOME)"
     return 0
@@ -142,53 +87,9 @@ _brik_local_setup_git_context() {
 
 # Run a stage by name. Dispatches to portable stages.* functions via stage.run.
 # Usage: brik.local.run_stage <stage_name>
-# Exit codes: 0=success, 2=invalid argument, 4=setup not called
+# Exit codes: 0=success, BRIK_EXIT_INVALID_INPUT=invalid argument, BRIK_EXIT_INVALID_ENV=setup not called
 brik.local.run_stage() {
-    local stage_name="$1"
-
-    if [[ -z "$stage_name" ]]; then
-        log.error "stage name is required"
-        return 2
-    fi
-
-    # Verify setup was called
-    if [[ -z "${BRIK_HOME:-}" ]]; then
-        echo "error: brik.local.setup must be called before brik.local.run_stage" >&2
-        return 4
-    fi
-
-    # Show the logo once, before the first stage
-    if [[ "$stage_name" == "init" ]]; then
-        local _brik_ver="${BRIK_VERSION:-}"
-        [[ -z "$_brik_ver" ]] && _brik_ver="$(sed -n 's/^readonly BRIK_VERSION="\(.*\)"/\1/p' "${BRIK_HOME}/bin/brik" 2>/dev/null || true)"
-        banner.brik "$_brik_ver"
-    fi
-
-    local logic_function=""
-
-    case "$stage_name" in
-        init)            logic_function="stages.init" ;;
-        release)         logic_function="stages.release" ;;
-        build)           logic_function="stages.build" ;;
-        lint)            logic_function="stages.lint" ;;
-        sast)            logic_function="stages.sast" ;;
-        scan)            logic_function="stages.scan" ;;
-        test)            logic_function="stages.test" ;;
-        package)         logic_function="stages.package" ;;
-        container-scan)  logic_function="stages.container_scan" ;;
-        deploy)          logic_function="stages.deploy" ;;
-        notify)          logic_function="stages.notify" ;;
-        # Backward-compat aliases (deprecated)
-        quality)         logic_function="stages.lint" ;;
-        security)        logic_function="stages.scan" ;;
-        *)
-            log.error "unknown stage: $stage_name"
-            log.error "valid stages: init, release, build, lint, sast, scan, test, package, container-scan, deploy, notify"
-            return 2
-            ;;
-    esac
-
-    stage.run "$stage_name" "$logic_function" "${BRIK_WORKSPACE}" "${BRIK_CONFIG_FILE}"
+    brik.wrapper.run_stage "$@"
 }
 
 # ---------------------------------------------------------------------------
@@ -198,7 +99,7 @@ brik.local.run_stage() {
 # Run the full fixed-flow pipeline locally.
 # Usage: brik.local.run_pipeline [--continue-on-error] [--with-release]
 #        [--with-package] [--with-deploy]
-# Exit codes: 0=all stages passed, 1=at least one stage failed, 2=invalid flag
+# Exit codes: 0=all stages passed, BRIK_EXIT_FAILURE=at least one stage failed, BRIK_EXIT_INVALID_INPUT=invalid flag
 # shellcheck disable=SC2034
 brik.local.run_pipeline() {
     local continue_on_error=false
@@ -216,7 +117,7 @@ brik.local.run_pipeline() {
             --with-deploy)       with_deploy=true; shift ;;
             *)
                 log.error "unknown pipeline flag: $1"
-                return 2
+                return "$BRIK_EXIT_INVALID_INPUT"
                 ;;
         esac
     done
@@ -277,7 +178,7 @@ brik.local.run_pipeline() {
     brik.local.print_summary all_stages stage_status stage_duration "$total_duration"
 
     if $had_failure; then
-        return 1
+        return "$BRIK_EXIT_FAILURE"
     fi
     return 0
 }
@@ -310,7 +211,7 @@ _brik_local_should_skip_stage() {
 brik.local.print_summary() {
     if [[ $# -lt 4 ]]; then
         echo "error: brik.local.print_summary requires 4 arguments" >&2
-        return 2
+        return "$BRIK_EXIT_INVALID_INPUT"
     fi
 
     local -n __brik_ps_stages="$1"

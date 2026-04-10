@@ -98,7 +98,7 @@ default:
     # called inside brik.gitlab.setup
     - |
       cat > /tmp/brik-bootstrap.sh << 'BRIK_EOF'
-      . "${BRIK_HOME}/shared-libs/gitlab/scripts/stage-wrapper.sh"
+      . "${BRIK_HOME}/shared-libs/gitlab/scripts/gitlab-wrapper.sh"
       brik.gitlab.setup "${BRIK_HOME}"
       BRIK_EOF
       chmod +x /tmp/brik-bootstrap.sh

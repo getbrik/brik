@@ -777,7 +777,7 @@ MOCKEOF
       It "returns 4 with setup error"
         When call brik.local.run_stage "init"
         The status should equal 4
-        The error should include "brik.local.setup must be called"
+        The error should include "setup must be called before run_stage"
       End
     End
   End
