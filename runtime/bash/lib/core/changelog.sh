@@ -40,11 +40,11 @@ changelog.generate() {
             --from) from_ref="$2"; shift 2 ;;
             --to) to_ref="$2"; shift 2 ;;
             --format) shift 2 ;; # accepted but only 'conventional' is supported
-            *) log.error "unknown option: $1"; return 2 ;;
+            *) log.error "unknown option: $1"; return "$BRIK_EXIT_INVALID_INPUT" ;;
         esac
     done
 
-    runtime.require_tool git || return 3
+    runtime.require_tool git || return "$BRIK_EXIT_MISSING_DEP"
 
     # Auto-detect from ref (latest tag)
     if [[ -z "$from_ref" ]]; then
@@ -52,7 +52,7 @@ changelog.generate() {
             # No tags, use initial commit
             from_ref="$(git rev-list --max-parents=0 HEAD 2>/dev/null)" || {
                 log.error "cannot determine changelog starting point"
-                return 5
+                return "$BRIK_EXIT_EXTERNAL_FAIL"
             }
         }
     fi
@@ -61,7 +61,7 @@ changelog.generate() {
     local log_output
     log_output="$(git log "${from_ref}..${to_ref}" --format='%H %s' 2>/dev/null)" || {
         log.error "failed to read git log from $from_ref to $to_ref"
-        return 5
+        return "$BRIK_EXIT_EXTERNAL_FAIL"
     }
 
     if [[ -z "$log_output" ]]; then
@@ -148,17 +148,17 @@ changelog.validate_commits() {
         case "$1" in
             --from) from_ref="$2"; shift 2 ;;
             --to) to_ref="$2"; shift 2 ;;
-            *) log.error "unknown option: $1"; return 2 ;;
+            *) log.error "unknown option: $1"; return "$BRIK_EXIT_INVALID_INPUT" ;;
         esac
     done
 
-    runtime.require_tool git || return 3
+    runtime.require_tool git || return "$BRIK_EXIT_MISSING_DEP"
 
     if [[ -z "$from_ref" ]]; then
         from_ref="$(git describe --tags --abbrev=0 2>/dev/null)" || {
             from_ref="$(git rev-list --max-parents=0 HEAD 2>/dev/null)" || {
                 log.error "cannot determine starting point"
-                return 5
+                return "$BRIK_EXIT_EXTERNAL_FAIL"
             }
         }
     fi
@@ -166,7 +166,7 @@ changelog.validate_commits() {
     local log_output
     log_output="$(git log "${from_ref}..${to_ref}" --format='%s' 2>/dev/null)" || {
         log.error "failed to read git log"
-        return 5
+        return "$BRIK_EXIT_EXTERNAL_FAIL"
     }
 
     if [[ -z "$log_output" ]]; then
@@ -184,7 +184,7 @@ changelog.validate_commits() {
 
     if [[ "$has_errors" == "true" ]]; then
         log.error "non-conforming commits found"
-        return 10
+        return "$BRIK_EXIT_CHECK_FAILED"
     fi
 
     return 0

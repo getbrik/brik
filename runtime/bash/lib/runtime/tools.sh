@@ -17,7 +17,7 @@ runtime.require_tool() {
     local tool="$1"
     if ! command -v "$tool" >/dev/null 2>&1; then
         log.error "required tool not found: $tool"
-        return 3
+        return "$BRIK_EXIT_MISSING_DEP"
     fi
     return 0
 }
@@ -28,7 +28,7 @@ runtime.require_file() {
     local path="$1"
     if [[ ! -f "$path" ]]; then
         log.error "required file not found: $path"
-        return 6
+        return "$BRIK_EXIT_IO_FAILURE"
     fi
     return 0
 }
@@ -39,7 +39,7 @@ runtime.require_dir() {
     local path="$1"
     if [[ ! -d "$path" ]]; then
         log.error "required directory not found: $path"
-        return 6
+        return "$BRIK_EXIT_IO_FAILURE"
     fi
     return 0
 }

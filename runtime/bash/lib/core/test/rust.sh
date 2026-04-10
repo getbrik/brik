@@ -20,7 +20,7 @@ test.rust.cmd() {
             ;;
         *)
             log.error "unsupported Rust test framework: $framework"
-            return 7
+            return "$BRIK_EXIT_CONFIG_ERROR"
             ;;
     esac
 

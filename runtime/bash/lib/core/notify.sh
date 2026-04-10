@@ -18,7 +18,7 @@ _notify._should_send() {
     [[ "$on_condition" == *"$pipeline_status"* ]] && return 0
     [[ "$on_condition" == *"failure"* && "$pipeline_status" == "failed" ]] && return 0
 
-    return 1
+    return "$BRIK_EXIT_FAILURE"
 }
 
 # Send a notification via the specified channel.
@@ -33,18 +33,18 @@ notify.send() {
             --message) message="$2"; shift 2 ;;
             --level) level="$2"; shift 2 ;;
             --dry-run) dry_run="true"; shift ;;
-            *) log.error "unknown option: $1"; return 2 ;;
+            *) log.error "unknown option: $1"; return "$BRIK_EXIT_INVALID_INPUT" ;;
         esac
     done
 
     if [[ -z "$channel" ]]; then
         log.error "notification channel is required (--channel)"
-        return 2
+        return "$BRIK_EXIT_INVALID_INPUT"
     fi
 
     if [[ -z "$message" ]]; then
         log.error "notification message is required (--message)"
-        return 2
+        return "$BRIK_EXIT_INVALID_INPUT"
     fi
 
     case "$channel" in
@@ -53,7 +53,7 @@ notify.send() {
         webhook) notify.webhook --message "$message" ${dry_run:+--dry-run} ;;
         *)
             log.error "unsupported notification channel: $channel"
-            return 7
+            return "$BRIK_EXIT_CONFIG_ERROR"
             ;;
     esac
     return $?
@@ -74,13 +74,13 @@ notify.slack() {
             --channel) channel="$2"; shift 2 ;;
             --level) level="$2"; shift 2 ;;
             --dry-run) dry_run="true"; shift ;;
-            *) log.error "unknown option: $1"; return 2 ;;
+            *) log.error "unknown option: $1"; return "$BRIK_EXIT_INVALID_INPUT" ;;
         esac
     done
 
     if [[ -z "$message" ]]; then
         log.error "message is required for Slack notification"
-        return 2
+        return "$BRIK_EXIT_INVALID_INPUT"
     fi
 
     # Resolve webhook URL from variable
@@ -112,14 +112,14 @@ notify.slack() {
         return 0
     fi
 
-    runtime.require_tool curl || return 3
+    runtime.require_tool curl || return "$BRIK_EXIT_MISSING_DEP"
 
     curl --silent --max-time 10 --connect-timeout 5 \
         -H "Content-Type: application/json" \
         -d "$payload" \
         "$webhook_url" >/dev/null || {
         log.error "slack notification failed"
-        return 5
+        return "$BRIK_EXIT_EXTERNAL_FAIL"
     }
 
     log.info "slack notification sent"
@@ -140,13 +140,13 @@ notify.email() {
             --subject) subject="$2"; shift 2 ;;
             --level) level="$2"; shift 2 ;;
             --dry-run) dry_run="true"; shift ;;
-            *) log.error "unknown option: $1"; return 2 ;;
+            *) log.error "unknown option: $1"; return "$BRIK_EXIT_INVALID_INPUT" ;;
         esac
     done
 
     if [[ -z "$body" ]]; then
         log.error "email body is required"
-        return 2
+        return "$BRIK_EXIT_INVALID_INPUT"
     fi
 
     if [[ -z "$to" ]]; then
@@ -163,12 +163,12 @@ notify.email() {
     if command -v sendmail >/dev/null 2>&1; then
         printf 'Subject: %s\nTo: %s\n\n%s\n' "$subject" "$to" "$body" | sendmail "$to" || {
             log.error "sendmail failed"
-            return 5
+            return "$BRIK_EXIT_EXTERNAL_FAIL"
         }
     elif command -v mail >/dev/null 2>&1; then
         printf '%s\n' "$body" | mail -s "$subject" "$to" || {
             log.error "mail command failed"
-            return 5
+            return "$BRIK_EXIT_EXTERNAL_FAIL"
         }
     else
         log.warn "no mail tool available (sendmail or mail), skipping email notification"
@@ -192,13 +192,13 @@ notify.webhook() {
             --url-var) url_var="$2"; shift 2 ;;
             --url) url="$2"; shift 2 ;;
             --dry-run) dry_run="true"; shift ;;
-            *) log.error "unknown option: $1"; return 2 ;;
+            *) log.error "unknown option: $1"; return "$BRIK_EXIT_INVALID_INPUT" ;;
         esac
     done
 
     if [[ -z "$message" ]]; then
         log.error "webhook message is required"
-        return 2
+        return "$BRIK_EXIT_INVALID_INPUT"
     fi
 
     # Resolve URL from variable if specified
@@ -221,14 +221,14 @@ notify.webhook() {
         return 0
     fi
 
-    runtime.require_tool curl || return 3
+    runtime.require_tool curl || return "$BRIK_EXIT_MISSING_DEP"
 
     curl --silent --max-time 10 --connect-timeout 5 \
         -H "Content-Type: application/json" \
         -d "$payload" \
         "$url" >/dev/null || {
         log.error "webhook notification failed"
-        return 5
+        return "$BRIK_EXIT_EXTERNAL_FAIL"
     }
 
     log.info "webhook notification sent"

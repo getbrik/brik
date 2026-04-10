@@ -52,7 +52,7 @@ security.container.run() {
     quality.tool.exec sec_container "$resolved" \
         image="$image" severity="${severity,,}" || {
         log.error "security container vulnerabilities found in: $image"
-        return 10
+        return "$BRIK_EXIT_CHECK_FAILED"
     }
 
     log.info "security container scan passed"

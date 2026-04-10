@@ -17,18 +17,18 @@ build.rust.run() {
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --profile) profile="$2"; shift 2 ;;
-            *) log.error "unknown option: $1"; return 2 ;;
+            *) log.error "unknown option: $1"; return "$BRIK_EXIT_INVALID_INPUT" ;;
         esac
     done
 
-    runtime.require_dir "$workspace" || return 6
+    runtime.require_dir "$workspace" || return "$BRIK_EXIT_IO_FAILURE"
 
     if [[ ! -f "${workspace}/Cargo.toml" ]]; then
         log.error "no Cargo.toml found in workspace: $workspace"
-        return 6
+        return "$BRIK_EXIT_IO_FAILURE"
     fi
 
-    runtime.require_tool cargo || return 3
+    runtime.require_tool cargo || return "$BRIK_EXIT_MISSING_DEP"
 
     log.info "building with cargo"
 
@@ -41,7 +41,7 @@ build.rust.run() {
     # shellcheck disable=SC2086
     (cd "$workspace" && cargo $cargo_args) || {
         log.error "build failed"
-        return 5
+        return "$BRIK_EXIT_EXTERNAL_FAIL"
     }
 
     log.info "build completed successfully"

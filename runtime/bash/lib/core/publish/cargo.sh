@@ -21,12 +21,12 @@ publish.cargo.run() {
             --registry) registry="$2"; shift 2 ;;
             --token-var) token_var="$2"; shift 2 ;;
             --dry-run) dry_run="true"; shift ;;
-            *) log.error "unknown option: $1"; return 2 ;;
+            *) log.error "unknown option: $1"; return "$BRIK_EXIT_INVALID_INPUT" ;;
         esac
     done
 
-    runtime.require_tool cargo || return 3
-    runtime.require_file "Cargo.toml" || return 6
+    runtime.require_tool cargo || return "$BRIK_EXIT_MISSING_DEP"
+    runtime.require_file "Cargo.toml" || return "$BRIK_EXIT_IO_FAILURE"
 
     # Set token via environment variable (never passed as CLI arg)
     if [[ -n "$token_var" ]]; then
@@ -52,7 +52,7 @@ publish.cargo.run() {
 
     if [[ $rc -ne 0 ]]; then
         log.error "cargo publish failed"
-        return 5
+        return "$BRIK_EXIT_EXTERNAL_FAIL"
     fi
 
     log.info "cargo publish completed successfully"

@@ -11,7 +11,7 @@ _BRIK_CORE_TEST_PYTHON_LOADED=1
 # Usage: test.python.cmd <framework> <workspace> <report_dir>
 # Frameworks: pytest, unittest, tox
 test.python.cmd() {
-    local framework="$1" workspace="$2" report_dir="$3"
+    local framework="$1" _workspace="$2" report_dir="$3"
     local cmd=""
 
     case "$framework" in
@@ -27,7 +27,7 @@ test.python.cmd() {
             ;;
         *)
             log.error "unsupported Python test framework: $framework"
-            return 7
+            return "$BRIK_EXIT_CONFIG_ERROR"
             ;;
     esac
 

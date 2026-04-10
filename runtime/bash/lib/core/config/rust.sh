@@ -19,7 +19,7 @@ config.rust.default() {
         test_framework) printf 'cargo test' ;;
         lint_tool)      printf 'clippy' ;;
         format_tool)    printf 'rustfmt' ;;
-        *) return 1 ;;
+        *) return "$BRIK_EXIT_FAILURE" ;;
     esac
     return 0
 }
@@ -42,7 +42,7 @@ config.rust.validate_coherence() {
     if [[ ! -f "${workspace}/Cargo.toml" ]]; then
         log.error "config mismatch: stack is 'rust' but Cargo.toml not found"
         log.error "fix: create a Cargo.toml, or change project.stack in brik.yml"
-        return 7
+        return "$BRIK_EXIT_CONFIG_ERROR"
     fi
 
     return 0

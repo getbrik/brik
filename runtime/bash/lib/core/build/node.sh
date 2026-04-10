@@ -32,14 +32,14 @@ build.node.install() {
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --package-manager|--tool) pm="$2"; shift 2 ;;
-            *) log.error "unknown option: $1"; return 2 ;;
+            *) log.error "unknown option: $1"; return "$BRIK_EXIT_INVALID_INPUT" ;;
         esac
     done
 
     [[ -z "$pm" ]] && pm="$(_build.node._detect_pm "$workspace")"
 
-    runtime.require_tool "$pm" || return 3
-    runtime.require_file "${workspace}/package.json" || return 6
+    runtime.require_tool "$pm" || return "$BRIK_EXIT_MISSING_DEP"
+    runtime.require_file "${workspace}/package.json" || return "$BRIK_EXIT_IO_FAILURE"
 
     log.info "installing dependencies with $pm"
 
@@ -63,7 +63,7 @@ build.node.install() {
     # shellcheck disable=SC2086
     (cd "$workspace" && $pm $install_cmd) || {
         log.error "dependency installation failed"
-        return 5
+        return "$BRIK_EXIT_EXTERNAL_FAIL"
     }
 
     return 0
@@ -79,15 +79,15 @@ build.node.run() {
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --package-manager|--tool) pm="$2"; shift 2 ;;
-            *) log.error "unknown option: $1"; return 2 ;;
+            *) log.error "unknown option: $1"; return "$BRIK_EXIT_INVALID_INPUT" ;;
         esac
     done
 
     [[ -z "$pm" ]] && pm="$(_build.node._detect_pm "$workspace")"
 
-    runtime.require_tool node || return 3
-    runtime.require_tool "$pm" || return 3
-    runtime.require_file "${workspace}/package.json" || return 6
+    runtime.require_tool node || return "$BRIK_EXIT_MISSING_DEP"
+    runtime.require_tool "$pm" || return "$BRIK_EXIT_MISSING_DEP"
+    runtime.require_file "${workspace}/package.json" || return "$BRIK_EXIT_IO_FAILURE"
 
     # Install if node_modules is missing
     if [[ ! -d "${workspace}/node_modules" ]]; then
@@ -97,7 +97,7 @@ build.node.run() {
     log.info "running build with $pm"
     (cd "$workspace" && $pm run build) || {
         log.error "build failed"
-        return 5
+        return "$BRIK_EXIT_EXTERNAL_FAIL"
     }
 
     log.info "build completed successfully"

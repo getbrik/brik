@@ -21,11 +21,11 @@ publish.nuget.run() {
             --source) source="$2"; shift 2 ;;
             --api-key-var) api_key_var="$2"; shift 2 ;;
             --dry-run) dry_run="true"; shift ;;
-            *) log.error "unknown option: $1"; return 2 ;;
+            *) log.error "unknown option: $1"; return "$BRIK_EXIT_INVALID_INPUT" ;;
         esac
     done
 
-    runtime.require_tool dotnet || return 3
+    runtime.require_tool dotnet || return "$BRIK_EXIT_MISSING_DEP"
 
     # Find .nupkg files (enable globstar for recursive search)
     local -a nupkgs
@@ -44,14 +44,14 @@ publish.nuget.run() {
         log.info "no .nupkg files found, running dotnet pack"
         dotnet pack --configuration Release --output ./nupkg 2>&1 || {
             log.error "dotnet pack failed"
-            return 6
+            return "$BRIK_EXIT_IO_FAILURE"
         }
         for f in ./nupkg/*.nupkg; do
             [[ -f "$f" ]] && nupkgs+=("$f")
         done
         if [[ ${#nupkgs[@]} -eq 0 ]]; then
             log.error "no .nupkg files found after dotnet pack"
-            return 6
+            return "$BRIK_EXIT_IO_FAILURE"
         fi
     fi
 
@@ -118,7 +118,7 @@ publish.nuget.run() {
                 # cleanup: always scrub credentials on error path
                 unset NUGET_API_KEY 2>/dev/null || true
                 rm -f "$tmp_nuget_config" 2>/dev/null || true
-                return 5
+                return "$BRIK_EXIT_EXTERNAL_FAIL"
             }
         fi
     done

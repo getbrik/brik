@@ -20,7 +20,7 @@ doc.generate() {
             --tool) tool="$2"; shift 2 ;;
             --output) output="$2"; shift 2 ;;
             --dry-run) dry_run="true"; shift ;;
-            *) log.error "unknown option: $1"; return 2 ;;
+            *) log.error "unknown option: $1"; return "$BRIK_EXIT_INVALID_INPUT" ;;
         esac
     done
 
@@ -29,7 +29,7 @@ doc.generate() {
         tool="$(_doc._detect_tool)"
         if [[ -z "$tool" ]]; then
             log.error "no documentation tool detected; use --tool to specify"
-            return 7
+            return "$BRIK_EXIT_CONFIG_ERROR"
         fi
         log.info "auto-detected documentation tool: $tool"
     fi
@@ -41,7 +41,7 @@ doc.generate() {
         rustdoc)  _doc._run_rustdoc "$output" "$dry_run" ;;
         *)
             log.error "unsupported documentation tool: $tool"
-            return 2
+            return "$BRIK_EXIT_INVALID_INPUT"
             ;;
     esac
 }
@@ -61,7 +61,7 @@ _doc._detect_tool() {
 
 _doc._run_mkdocs() {
     local output="$1" dry_run="$2"
-    runtime.require_tool mkdocs || return 3
+    runtime.require_tool mkdocs || return "$BRIK_EXIT_MISSING_DEP"
 
     local -a cmd=(mkdocs build)
     [[ -n "$output" ]] && cmd+=(--site-dir "$output")
@@ -74,7 +74,7 @@ _doc._run_mkdocs() {
     log.info "generating docs: ${cmd[*]}"
     "${cmd[@]}" || {
         log.error "mkdocs build failed"
-        return 5
+        return "$BRIK_EXIT_EXTERNAL_FAIL"
     }
 
     log.info "documentation generated successfully"
@@ -83,7 +83,7 @@ _doc._run_mkdocs() {
 
 _doc._run_sphinx() {
     local output="$1" dry_run="$2"
-    runtime.require_tool sphinx-build || return 3
+    runtime.require_tool sphinx-build || return "$BRIK_EXIT_MISSING_DEP"
 
     local source_dir="docs"
     [[ -f "conf.py" ]] && source_dir="."
@@ -99,7 +99,7 @@ _doc._run_sphinx() {
     log.info "generating docs: ${cmd[*]}"
     "${cmd[@]}" || {
         log.error "sphinx-build failed"
-        return 5
+        return "$BRIK_EXIT_EXTERNAL_FAIL"
     }
 
     log.info "documentation generated successfully"
@@ -111,15 +111,15 @@ _doc._run_javadoc() {
 
     local -a cmd
     if [[ -f "pom.xml" ]]; then
-        runtime.require_tool mvn || return 3
+        runtime.require_tool mvn || return "$BRIK_EXIT_MISSING_DEP"
         cmd=(mvn -B javadoc:javadoc)
         [[ -n "$output" ]] && cmd+=(-Dreportoutputdirectory="$output")
     elif [[ -f "build.gradle" || -f "build.gradle.kts" ]]; then
-        runtime.require_tool gradle || return 3
+        runtime.require_tool gradle || return "$BRIK_EXIT_MISSING_DEP"
         cmd=(gradle javadoc)
     else
         log.error "no pom.xml or build.gradle found for javadoc"
-        return 7
+        return "$BRIK_EXIT_CONFIG_ERROR"
     fi
 
     if [[ "$dry_run" == "true" ]]; then
@@ -130,7 +130,7 @@ _doc._run_javadoc() {
     log.info "generating docs: ${cmd[*]}"
     "${cmd[@]}" || {
         log.error "javadoc generation failed"
-        return 5
+        return "$BRIK_EXIT_EXTERNAL_FAIL"
     }
 
     log.info "documentation generated successfully"
@@ -139,7 +139,7 @@ _doc._run_javadoc() {
 
 _doc._run_rustdoc() {
     local output="$1" dry_run="$2"
-    runtime.require_tool cargo || return 3
+    runtime.require_tool cargo || return "$BRIK_EXIT_MISSING_DEP"
 
     local -a cmd=(cargo doc --no-deps)
     [[ -n "$output" ]] && cmd+=(--target-dir "$output")
@@ -152,7 +152,7 @@ _doc._run_rustdoc() {
     log.info "generating docs: ${cmd[*]}"
     "${cmd[@]}" || {
         log.error "cargo doc failed"
-        return 5
+        return "$BRIK_EXIT_EXTERNAL_FAIL"
     }
 
     log.info "documentation generated successfully"

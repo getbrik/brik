@@ -25,7 +25,7 @@ deploy.run() {
 
     if [[ -z "$target" ]]; then
         log.error "deploy target is required (--target)"
-        return 2
+        return "$BRIK_EXIT_INVALID_INPUT"
     fi
 
     # Load environment if specified
@@ -40,13 +40,13 @@ deploy.run() {
     # Load and delegate to target-specific module
     brik.use "deploy.${target}" || {
         log.error "unsupported deploy target: $target"
-        return 7
+        return "$BRIK_EXIT_CONFIG_ERROR"
     }
 
     local deploy_fn="deploy.${target}.run"
     if ! declare -f "$deploy_fn" >/dev/null 2>&1; then
         log.error "deploy function not found: $deploy_fn"
-        return 7
+        return "$BRIK_EXIT_CONFIG_ERROR"
     fi
 
     if [[ "$dry_run" == "true" ]]; then

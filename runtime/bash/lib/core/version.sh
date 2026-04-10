@@ -16,7 +16,7 @@ version.validate() {
         return 0
     fi
     log.error "invalid semver: $version"
-    return 2
+    return "$BRIK_EXIT_INVALID_INPUT"
 }
 
 # Bump a version component.
@@ -26,7 +26,7 @@ version.bump() {
     local current="$1"
     local bump_type="$2"
 
-    version.validate "$current" || return 2
+    version.validate "$current" || return "$BRIK_EXIT_INVALID_INPUT"
 
     # Strip prerelease and build metadata for splitting
     local base="${current%%[-+]*}"
@@ -58,7 +58,7 @@ version.bump() {
             ;;
         *)
             log.error "unknown bump type: $bump_type"
-            return 2
+            return "$BRIK_EXIT_INVALID_INPUT"
             ;;
     esac
 
@@ -72,8 +72,8 @@ version.compare() {
     local a="$1"
     local b="$2"
 
-    version.validate "$a" || return 2
-    version.validate "$b" || return 2
+    version.validate "$a" || return "$BRIK_EXIT_INVALID_INPUT"
+    version.validate "$b" || return "$BRIK_EXIT_INVALID_INPUT"
 
     local base_a="${a%%[-+]*}"
     local base_b="${b%%[-+]*}"
@@ -122,7 +122,7 @@ version.current() {
                 ;;
             *)
                 log.error "unknown option: $1"
-                return 2
+                return "$BRIK_EXIT_INVALID_INPUT"
                 ;;
         esac
     done
@@ -131,12 +131,12 @@ version.current() {
         file)
             if [[ ! -f "$file_path" ]]; then
                 log.error "file not found: $file_path"
-                return 6
+                return "$BRIK_EXIT_IO_FAILURE"
             fi
             # Try package.json
             if [[ "$file_path" == *package.json ]]; then
                 if command -v jq >/dev/null 2>&1; then
-                    jq -r '.version // empty' "$file_path" 2>/dev/null || return 2
+                    jq -r '.version // empty' "$file_path" 2>/dev/null || return "$BRIK_EXIT_INVALID_INPUT"
                 else
                     grep '"version"' "$file_path" | head -1 | sed 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/'
                 fi
@@ -147,11 +147,11 @@ version.current() {
             return 0
             ;;
         git)
-            runtime.require_tool git || return 3
+            runtime.require_tool git || return "$BRIK_EXIT_MISSING_DEP"
             local tag
             tag="$(git describe --tags --abbrev=0 2>/dev/null)" || {
                 log.error "no git tags found"
-                return 1
+                return "$BRIK_EXIT_FAILURE"
             }
             # Strip tag prefix (default: v)
             printf '%s' "${tag#"$prefix"}"
@@ -168,13 +168,13 @@ version.current() {
                 local tag
                 tag="$(git describe --tags --abbrev=0 2>/dev/null)" || {
                     log.error "cannot determine version"
-                    return 1
+                    return "$BRIK_EXIT_FAILURE"
                 }
                 printf '%s' "${tag#"$prefix"}"
                 return 0
             fi
             log.error "cannot determine version: no package.json or git tags"
-            return 1
+            return "$BRIK_EXIT_FAILURE"
             ;;
     esac
 }
@@ -189,31 +189,31 @@ version.write() {
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --file) file_path="$2"; shift 2 ;;
-            *) log.error "unknown option: $1"; return 2 ;;
+            *) log.error "unknown option: $1"; return "$BRIK_EXIT_INVALID_INPUT" ;;
         esac
     done
 
-    version.validate "$version" || return 2
+    version.validate "$version" || return "$BRIK_EXIT_INVALID_INPUT"
 
     if [[ -z "$file_path" ]]; then
         # Default to package.json if it exists
         if [[ -f "package.json" ]] && command -v jq >/dev/null 2>&1; then
             local tmp
-            tmp="$(mktemp)" || return 6
+            tmp="$(mktemp)" || return "$BRIK_EXIT_IO_FAILURE"
             jq --arg v "$version" '.version = $v' package.json > "$tmp" || {
                 rm -f "$tmp"
-                return 6
+                return "$BRIK_EXIT_IO_FAILURE"
             }
-            mv "$tmp" package.json || return 6
+            mv "$tmp" package.json || return "$BRIK_EXIT_IO_FAILURE"
             return 0
         fi
         log.error "no target file specified and no package.json found"
-        return 2
+        return "$BRIK_EXIT_INVALID_INPUT"
     fi
 
     printf '%s\n' "$version" > "$file_path" || {
         log.error "cannot write to: $file_path"
-        return 6
+        return "$BRIK_EXIT_IO_FAILURE"
     }
     return 0
 }

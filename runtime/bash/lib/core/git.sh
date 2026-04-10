@@ -16,11 +16,11 @@ git.configure() {
         case "$1" in
             --name) name="$2"; shift 2 ;;
             --email) email="$2"; shift 2 ;;
-            *) log.error "unknown option: $1"; return 2 ;;
+            *) log.error "unknown option: $1"; return "$BRIK_EXIT_INVALID_INPUT" ;;
         esac
     done
 
-    runtime.require_tool git || return 3
+    runtime.require_tool git || return "$BRIK_EXIT_MISSING_DEP"
 
     if [[ "${BRIK_DRY_RUN:-false}" == "true" ]]; then
         [[ -n "$name" ]] && log.info "[dry-run] git config user.name '$name'"
@@ -31,13 +31,13 @@ git.configure() {
     if [[ -n "$name" ]]; then
         git config user.name "$name" || {
             log.error "failed to set git user.name"
-            return 5
+            return "$BRIK_EXIT_EXTERNAL_FAIL"
         }
     fi
     if [[ -n "$email" ]]; then
         git config user.email "$email" || {
             log.error "failed to set git user.email"
-            return 5
+            return "$BRIK_EXIT_EXTERNAL_FAIL"
         }
     fi
     return 0
@@ -55,11 +55,11 @@ git.tag() {
             --message) message="$2"; shift 2 ;;
             --push) push=true; shift ;;
             --dry-run) dry_run=true; shift ;;
-            *) log.error "unknown option: $1"; return 2 ;;
+            *) log.error "unknown option: $1"; return "$BRIK_EXIT_INVALID_INPUT" ;;
         esac
     done
 
-    runtime.require_tool git || return 3
+    runtime.require_tool git || return "$BRIK_EXIT_MISSING_DEP"
 
     if [[ "$dry_run" == "true" ]]; then
         log.info "[dry-run] git tag ${message:+-m \"$message\"} \"$tag_name\""
@@ -70,19 +70,19 @@ git.tag() {
     if [[ -n "$message" ]]; then
         git tag -a "$tag_name" -m "$message" || {
             log.error "failed to create tag: $tag_name"
-            return 5
+            return "$BRIK_EXIT_EXTERNAL_FAIL"
         }
     else
         git tag "$tag_name" || {
             log.error "failed to create tag: $tag_name"
-            return 5
+            return "$BRIK_EXIT_EXTERNAL_FAIL"
         }
     fi
 
     if [[ "$push" == "true" ]]; then
         git push origin "$tag_name" || {
             log.error "failed to push tag: $tag_name"
-            return 5
+            return "$BRIK_EXIT_EXTERNAL_FAIL"
         }
     fi
 
@@ -93,10 +93,10 @@ git.tag() {
 # Output git repository information as JSON.
 # Usage: git.info
 git.info() {
-    runtime.require_tool git || return 3
+    runtime.require_tool git || return "$BRIK_EXIT_MISSING_DEP"
 
     local sha short_sha branch author message timestamp
-    sha="$(git rev-parse HEAD 2>/dev/null)" || { log.error "not a git repository"; return 5; }
+    sha="$(git rev-parse HEAD 2>/dev/null)" || { log.error "not a git repository"; return "$BRIK_EXIT_EXTERNAL_FAIL"; }
     short_sha="$(git rev-parse --short HEAD 2>/dev/null)" || short_sha=""
     branch="$(git rev-parse --abbrev-ref HEAD 2>/dev/null)" || branch=""
     author="$(git log -1 --format='%an' 2>/dev/null)" || author=""

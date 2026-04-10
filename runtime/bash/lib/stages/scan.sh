@@ -65,7 +65,7 @@ stages.scan() {
 
     if [[ "$failed" -gt 0 ]]; then
         context.set "$context_file" "BRIK_SCAN_STATUS" "failed"
-        return 10
+        return "$BRIK_EXIT_CHECK_FAILED"
     fi
 
     context.set "$context_file" "BRIK_SCAN_STATUS" "success"

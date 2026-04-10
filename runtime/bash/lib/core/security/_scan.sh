@@ -33,7 +33,7 @@ _security._run_scan() {
         log.info "$label (command override): $command_override"
         (cd "$workspace" && eval "$command_override") || {
             log.error "$label findings detected"
-            return 10
+            return "$BRIK_EXIT_CHECK_FAILED"
         }
         log.info "$label passed"
         return 0
@@ -49,10 +49,10 @@ _security._run_scan() {
         local rc=$?
         if [[ $rc -eq 3 ]]; then
             log.error "${tool} not found"
-            return 3
+            return "$BRIK_EXIT_MISSING_DEP"
         elif [[ $rc -eq 7 ]]; then
             log.error "unknown $label tool: ${tool}"
-            return 7
+            return "$BRIK_EXIT_CONFIG_ERROR"
         fi
         log.warn "no $label tool available - skipping"
         return 0
@@ -61,7 +61,7 @@ _security._run_scan() {
     log.info "$label with $resolved"
     (cd "$workspace" && quality.tool.exec "$category" "$resolved") || {
         log.error "$label findings detected"
-        return 10
+        return "$BRIK_EXIT_CHECK_FAILED"
     }
 
     log.info "$label passed"

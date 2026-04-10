@@ -62,7 +62,7 @@ runner.resolve_image() {
         version="${!default_var:-}"
     fi
 
-    [[ -z "$version" ]] && return 1
+    [[ -z "$version" ]] && return "$BRIK_EXIT_FAILURE"
 
     # Normalize version for variable name (dots -> underscores)
     local safe_version="${version//./_}"
@@ -70,5 +70,5 @@ runner.resolve_image() {
     local image="${!var_name:-}"
 
     [[ -n "$image" ]] && printf '%s' "$image" && return 0
-    return 1
+    return "$BRIK_EXIT_FAILURE"
 }

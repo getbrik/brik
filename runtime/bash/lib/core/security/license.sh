@@ -20,7 +20,7 @@ security.license.run() {
     local workspace="$1"
     shift
 
-    runtime.require_dir "$workspace" || return 6
+    runtime.require_dir "$workspace" || return "$BRIK_EXIT_IO_FAILURE"
 
     local allowed="${BRIK_SECURITY_LICENSE_ALLOWED:-}"
     local denied="${BRIK_SECURITY_LICENSE_DENIED:-}"
@@ -49,7 +49,7 @@ security.license.run() {
             license_finder action_items
         ) || {
             log.error "license violations found"
-            return 10
+            return "$BRIK_EXIT_CHECK_FAILED"
         }
         log.info "license check passed"
         return 0
@@ -64,7 +64,7 @@ security.license.run() {
     log.info "checking licenses with ${resolved}"
     (cd "$workspace" && quality.tool.exec sec_license "$resolved") || {
         log.error "license violations found"
-        return 10
+        return "$BRIK_EXIT_CHECK_FAILED"
     }
     log.info "license check passed"
     return 0

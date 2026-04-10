@@ -21,17 +21,17 @@ deploy.k8s.run() {
             --dry-run) dry_run="true"; shift ;;
             # Ignore deploy.run passthrough options
             --target|--env) shift 2 ;;
-            *) log.error "unknown option: $1"; return 2 ;;
+            *) log.error "unknown option: $1"; return "$BRIK_EXIT_INVALID_INPUT" ;;
         esac
     done
 
     if [[ -z "$manifest" ]]; then
         log.error "manifest path is required (--manifest)"
-        return 2
+        return "$BRIK_EXIT_INVALID_INPUT"
     fi
 
-    runtime.require_file "$manifest" || return 6
-    runtime.require_tool kubectl || return 3
+    runtime.require_file "$manifest" || return "$BRIK_EXIT_IO_FAILURE"
+    runtime.require_tool kubectl || return "$BRIK_EXIT_MISSING_DEP"
 
     # Build kubectl command
     local -a cmd=(kubectl apply -f "$manifest")
@@ -47,7 +47,7 @@ deploy.k8s.run() {
 
     "${cmd[@]}" || {
         log.error "kubectl apply failed"
-        return 5
+        return "$BRIK_EXIT_EXTERNAL_FAIL"
     }
 
     log.info "deployment completed successfully"

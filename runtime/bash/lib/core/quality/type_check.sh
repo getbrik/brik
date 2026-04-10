@@ -15,18 +15,18 @@ quality.type_check.run() {
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
-            *) log.error "unknown option: $1"; return 2 ;;
+            *) log.error "unknown option: $1"; return "$BRIK_EXIT_INVALID_INPUT" ;;
         esac
     done
 
-    runtime.require_dir "$workspace" || return 6
+    runtime.require_dir "$workspace" || return "$BRIK_EXIT_IO_FAILURE"
 
     # Tier 1: explicit command override
     if [[ -n "${BRIK_QUALITY_TYPE_CHECK_COMMAND:-}" ]]; then
         log.info "type checking (command override): $BRIK_QUALITY_TYPE_CHECK_COMMAND"
         (cd "$workspace" && eval "$BRIK_QUALITY_TYPE_CHECK_COMMAND") || {
             log.error "type check violations found"
-            return 10
+            return "$BRIK_EXIT_CHECK_FAILED"
         }
         log.info "type check passed"
         return 0
@@ -43,7 +43,7 @@ quality.type_check.run() {
                     check_cmd="npx tsc --noEmit"
                 else
                     log.error "npx not found for tsc"
-                    return 3
+                    return "$BRIK_EXIT_MISSING_DEP"
                 fi
                 ;;
             mypy)
@@ -51,7 +51,7 @@ quality.type_check.run() {
                     check_cmd="mypy ."
                 else
                     log.error "mypy not found"
-                    return 3
+                    return "$BRIK_EXIT_MISSING_DEP"
                 fi
                 ;;
             pyright)
@@ -59,7 +59,7 @@ quality.type_check.run() {
                     check_cmd="npx pyright"
                 else
                     log.error "npx not found for pyright"
-                    return 3
+                    return "$BRIK_EXIT_MISSING_DEP"
                 fi
                 ;;
             *)
@@ -67,7 +67,7 @@ quality.type_check.run() {
                     check_cmd="$tool"
                 else
                     log.error "unknown type check tool: $tool"
-                    return 7
+                    return "$BRIK_EXIT_CONFIG_ERROR"
                 fi
                 ;;
         esac
@@ -80,7 +80,7 @@ quality.type_check.run() {
                 check_cmd="npx tsc --noEmit"
             else
                 log.error "npx not found for TypeScript type checking"
-                return 3
+                return "$BRIK_EXIT_MISSING_DEP"
             fi
         elif [[ -f "${workspace}/mypy.ini" ]] \
             || { [[ -f "${workspace}/pyproject.toml" ]] && grep -q '\[tool\.mypy\]' "${workspace}/pyproject.toml" 2>/dev/null; }; then
@@ -88,7 +88,7 @@ quality.type_check.run() {
                 check_cmd="mypy ."
             else
                 log.error "mypy not found for Python type checking"
-                return 3
+                return "$BRIK_EXIT_MISSING_DEP"
             fi
         else
             log.info "no type checker detected - skipping"
@@ -99,7 +99,7 @@ quality.type_check.run() {
     log.info "type checking: $check_cmd"
     (cd "$workspace" && eval "$check_cmd") || {
         log.error "type check violations found"
-        return 10
+        return "$BRIK_EXIT_CHECK_FAILED"
     }
 
     log.info "type check passed"

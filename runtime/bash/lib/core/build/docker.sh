@@ -23,19 +23,19 @@ build.docker.run() {
             --context) context="$2"; shift 2 ;;
             --build-arg) build_args+=("--build-arg" "$2"); shift 2 ;;
             --dry-run) dry_run="true"; shift ;;
-            *) log.error "unknown option: $1"; return 2 ;;
+            *) log.error "unknown option: $1"; return "$BRIK_EXIT_INVALID_INPUT" ;;
         esac
     done
 
-    runtime.require_dir "$workspace" || return 6
+    runtime.require_dir "$workspace" || return "$BRIK_EXIT_IO_FAILURE"
 
     # Defaults
     [[ -z "$dockerfile" ]] && dockerfile="${workspace}/Dockerfile"
     [[ -z "$context" ]] && context="$workspace"
     [[ -z "$tag" ]] && tag="${BRIK_PROJECT_NAME:-project}:${BRIK_VERSION:-latest}"
 
-    runtime.require_file "$dockerfile" || return 6
-    runtime.require_tool docker || return 3
+    runtime.require_file "$dockerfile" || return "$BRIK_EXIT_IO_FAILURE"
+    runtime.require_tool docker || return "$BRIK_EXIT_MISSING_DEP"
 
     # Build the command
     local -a cmd=(docker build -f "$dockerfile" -t "$tag")
@@ -52,7 +52,7 @@ build.docker.run() {
     log.info "building Docker image: $tag"
     "${cmd[@]}" || {
         log.error "build failed"
-        return 5
+        return "$BRIK_EXIT_EXTERNAL_FAIL"
     }
 
     log.info "build completed successfully"

@@ -25,7 +25,7 @@ test.java.cmd() {
             ;;
         *)
             log.error "unsupported Java test framework: $framework"
-            return 7
+            return "$BRIK_EXIT_CONFIG_ERROR"
             ;;
     esac
 
@@ -45,6 +45,6 @@ test.java.run_cmd() {
         test.java.cmd "gradle" "$workspace" "$report_dir"
     else
         log.error "cannot detect Java test tool in workspace: $workspace"
-        return 7
+        return "$BRIK_EXIT_CONFIG_ERROR"
     fi
 }

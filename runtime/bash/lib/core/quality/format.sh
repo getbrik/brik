@@ -16,11 +16,11 @@ quality.format.run() {
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --check) shift ;;
-            *) log.error "unknown option: $1"; return 2 ;;
+            *) log.error "unknown option: $1"; return "$BRIK_EXIT_INVALID_INPUT" ;;
         esac
     done
 
-    runtime.require_dir "$workspace" || return 6
+    runtime.require_dir "$workspace" || return "$BRIK_EXIT_IO_FAILURE"
 
     local fmt_cmd=""
 
@@ -30,7 +30,7 @@ quality.format.run() {
         log.info "format (command override): $fmt_cmd"
         (cd "$workspace" && eval "$fmt_cmd") || {
             log.error "format violations found"
-            return 10
+            return "$BRIK_EXIT_CHECK_FAILED"
         }
         log.info "format check passed"
         return 0
@@ -60,7 +60,7 @@ quality.format.run() {
                 fmt_cmd="npx prettier --check ."
             else
                 log.error "npx not found for prettier"
-                return 3
+                return "$BRIK_EXIT_MISSING_DEP"
             fi
             ;;
         biome)
@@ -68,7 +68,7 @@ quality.format.run() {
                 fmt_cmd="npx biome format . --check"
             else
                 log.error "npx not found for biome"
-                return 3
+                return "$BRIK_EXIT_MISSING_DEP"
             fi
             ;;
         ruff-format|ruff|"ruff format")
@@ -76,7 +76,7 @@ quality.format.run() {
                 fmt_cmd="ruff format --check ."
             else
                 log.error "ruff not found for Python formatting"
-                return 3
+                return "$BRIK_EXIT_MISSING_DEP"
             fi
             ;;
         black)
@@ -84,7 +84,7 @@ quality.format.run() {
                 fmt_cmd="black --check ."
             else
                 log.error "black not found for Python formatting"
-                return 3
+                return "$BRIK_EXIT_MISSING_DEP"
             fi
             ;;
         rustfmt)
@@ -92,7 +92,7 @@ quality.format.run() {
                 fmt_cmd="cargo fmt -- --check"
             else
                 log.error "cargo not found for rustfmt"
-                return 3
+                return "$BRIK_EXIT_MISSING_DEP"
             fi
             ;;
         dotnet-format)
@@ -100,7 +100,7 @@ quality.format.run() {
                 fmt_cmd="dotnet format --verify-no-changes"
             else
                 log.error "dotnet not found for formatting"
-                return 3
+                return "$BRIK_EXIT_MISSING_DEP"
             fi
             ;;
         google-java-format)
@@ -116,7 +116,7 @@ quality.format.run() {
                 fmt_cmd="$tool"
             else
                 log.error "unknown format tool: $tool"
-                return 7
+                return "$BRIK_EXIT_CONFIG_ERROR"
             fi
             ;;
     esac
@@ -124,7 +124,7 @@ quality.format.run() {
     log.info "format check: $fmt_cmd"
     (cd "$workspace" && eval "$fmt_cmd") || {
         log.error "format violations found"
-        return 10
+        return "$BRIK_EXIT_CHECK_FAILED"
     }
 
     log.info "format check passed"

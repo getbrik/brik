@@ -75,7 +75,7 @@ brik.use() {
 
     if [[ -z "$resolved" ]]; then
         log.error "module not found: $module_name (searched: $relative_path)"
-        return 1
+        return "$BRIK_EXIT_FAILURE"
     fi
 
     log.debug "loading module: $module_name from $resolved"
@@ -83,7 +83,7 @@ brik.use() {
     # shellcheck source=/dev/null
     . "$resolved" || {
         log.error "failed to source module: $resolved"
-        return 1
+        return "$BRIK_EXIT_FAILURE"
     }
 
     # Set guard variable

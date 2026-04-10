@@ -19,7 +19,7 @@ config.python.default() {
         test_framework) printf 'pytest' ;;
         lint_tool)      printf 'ruff' ;;
         format_tool)    printf 'ruff-format' ;;
-        *) return 1 ;;
+        *) return "$BRIK_EXIT_FAILURE" ;;
     esac
     return 0
 }
@@ -48,21 +48,21 @@ config.python.validate_coherence() {
             if [[ ! -f "${workspace}/pyproject.toml" ]] && [[ ! -f "${workspace}/uv.lock" ]]; then
                 log.error "config mismatch: build.tool is 'uv' but neither pyproject.toml nor uv.lock found"
                 log.error "fix: create a pyproject.toml, or change build.tool in brik.yml"
-                return 7
+                return "$BRIK_EXIT_CONFIG_ERROR"
             fi
             ;;
         poetry)
             if [[ ! -f "${workspace}/pyproject.toml" ]] && [[ ! -f "${workspace}/poetry.lock" ]]; then
                 log.error "config mismatch: build.tool is 'poetry' but neither pyproject.toml nor poetry.lock found"
                 log.error "fix: create a pyproject.toml, or change build.tool in brik.yml"
-                return 7
+                return "$BRIK_EXIT_CONFIG_ERROR"
             fi
             ;;
         pipenv)
             if [[ ! -f "${workspace}/Pipfile" ]]; then
                 log.error "config mismatch: build.tool is 'pipenv' but Pipfile not found"
                 log.error "fix: create a Pipfile, or change build.tool in brik.yml"
-                return 7
+                return "$BRIK_EXIT_CONFIG_ERROR"
             fi
             ;;
         pip)
@@ -71,7 +71,7 @@ config.python.validate_coherence() {
                 && [[ ! -f "${workspace}/pyproject.toml" ]]; then
                 log.error "config mismatch: build.tool is 'pip' but no requirements.txt, setup.py, or pyproject.toml found"
                 log.error "fix: create a requirements.txt or setup.py, or change build.tool in brik.yml"
-                return 7
+                return "$BRIK_EXIT_CONFIG_ERROR"
             fi
             ;;
     esac

@@ -34,7 +34,7 @@ build.detect_stack() {
     fi
 
     log.error "cannot detect stack in workspace: $workspace"
-    return 1
+    return "$BRIK_EXIT_FAILURE"
 }
 
 # Run a build for the detected or specified stack.
@@ -48,15 +48,15 @@ build.run() {
         case "$1" in
             --stack) stack="$2"; shift 2 ;;
             --config) shift 2 ;;  # accepted but not yet used
-            *) log.error "unknown option: $1"; return 2 ;;
+            *) log.error "unknown option: $1"; return "$BRIK_EXIT_INVALID_INPUT" ;;
         esac
     done
 
-    runtime.require_dir "$workspace" || return 6
+    runtime.require_dir "$workspace" || return "$BRIK_EXIT_IO_FAILURE"
 
     # Auto-detect stack if not specified
     if [[ -z "$stack" ]]; then
-        stack="$(build.detect_stack "$workspace")" || return 7
+        stack="$(build.detect_stack "$workspace")" || return "$BRIK_EXIT_CONFIG_ERROR"
     fi
 
     log.info "building with stack: $stack"
@@ -71,13 +71,13 @@ build.run() {
     # Load and delegate to the stack-specific module
     brik.use "build.${stack}" || {
         log.error "unsupported build stack: $stack"
-        return 7
+        return "$BRIK_EXIT_CONFIG_ERROR"
     }
 
     local build_fn="build.${stack}.run"
     if ! declare -f "$build_fn" >/dev/null 2>&1; then
         log.error "build function not found: $build_fn"
-        return 7
+        return "$BRIK_EXIT_CONFIG_ERROR"
     fi
 
     # Pass BRIK_BUILD_TOOL to stack module if set and not 'auto'

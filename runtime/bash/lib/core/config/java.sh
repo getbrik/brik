@@ -19,7 +19,7 @@ config.java.default() {
         test_framework) printf 'junit' ;;
         lint_tool)      printf 'checkstyle' ;;
         format_tool)    printf 'google-java-format' ;;
-        *) return 1 ;;
+        *) return "$BRIK_EXIT_FAILURE" ;;
     esac
     return 0
 }
@@ -48,14 +48,14 @@ config.java.validate_coherence() {
             if [[ ! -f "${workspace}/pom.xml" ]]; then
                 log.error "config mismatch: build.tool is 'maven' but pom.xml not found"
                 log.error "fix: create a pom.xml, or change build.tool in brik.yml"
-                return 7
+                return "$BRIK_EXIT_CONFIG_ERROR"
             fi
             ;;
         gradle)
             if [[ ! -f "${workspace}/build.gradle" ]] && [[ ! -f "${workspace}/build.gradle.kts" ]]; then
                 log.error "config mismatch: build.tool is 'gradle' but neither build.gradle nor build.gradle.kts found"
                 log.error "fix: create a build.gradle, or change build.tool in brik.yml"
-                return 7
+                return "$BRIK_EXIT_CONFIG_ERROR"
             fi
             ;;
     esac

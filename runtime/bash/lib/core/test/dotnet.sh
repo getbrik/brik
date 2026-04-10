@@ -20,7 +20,7 @@ test.dotnet.cmd() {
             ;;
         *)
             log.error "unsupported .NET test framework: $framework"
-            return 7
+            return "$BRIK_EXIT_CONFIG_ERROR"
             ;;
     esac
 

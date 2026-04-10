@@ -26,7 +26,7 @@ _config._load_module() {
         # shellcheck source=/dev/null
         . "$module_path"
     else
-        return 1
+        return "$BRIK_EXIT_FAILURE"
     fi
 }
 
@@ -51,18 +51,18 @@ config.read() {
 
     if [[ ! -f "$config_path" ]]; then
         log.error "config file not found: $config_path"
-        return 7
+        return "$BRIK_EXIT_CONFIG_ERROR"
     fi
 
     if ! command -v yq >/dev/null 2>&1; then
         log.error "yq is required but not found on PATH"
-        return 3
+        return "$BRIK_EXIT_MISSING_DEP"
     fi
 
     # Validate YAML is parseable
     if ! yq '.' "$config_path" >/dev/null 2>&1; then
         log.error "failed to parse $config_path as YAML"
-        return 2
+        return "$BRIK_EXIT_INVALID_INPUT"
     fi
 
     export BRIK_CONFIG_FILE="$config_path"
@@ -82,7 +82,7 @@ config.get() {
             printf '%s' "$default_value"
             return 0
         fi
-        return 7
+        return "$BRIK_EXIT_CONFIG_ERROR"
     fi
 
     local value
@@ -94,7 +94,7 @@ config.get() {
             printf '%s' "$default_value"
             return 0
         fi
-        return 1
+        return "$BRIK_EXIT_FAILURE"
     fi
 
     printf '%s' "$value"
@@ -151,7 +151,7 @@ config.stage_enabled() {
             return $?
             ;;
         *)
-            return 1
+            return "$BRIK_EXIT_FAILURE"
             ;;
     esac
 }
@@ -168,14 +168,14 @@ config.stack_default() {
     local setting="$2"
 
     # Load stack config module if available
-    _config._load_module "$stack" || return 1
+    _config._load_module "$stack" || return "$BRIK_EXIT_FAILURE"
 
     local fn="config.${stack}.default"
     if declare -f "$fn" >/dev/null 2>&1; then
         "$fn" "$setting"
         return $?
     fi
-    return 1
+    return "$BRIK_EXIT_FAILURE"
 }
 
 # ---------------------------------------------------------------------------
@@ -647,7 +647,7 @@ config.validate_coherence() {
     if _config._load_module "$stack"; then
         local fn="config.${stack}.validate_coherence"
         if declare -f "$fn" >/dev/null 2>&1; then
-            "$fn" "$workspace" || return 7
+            "$fn" "$workspace" || return "$BRIK_EXIT_CONFIG_ERROR"
         fi
     fi
 

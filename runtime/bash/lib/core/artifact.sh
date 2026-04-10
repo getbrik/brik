@@ -23,15 +23,15 @@ artifact.archive() {
 
     if [[ ${#paths[@]} -eq 0 ]]; then
         log.error "no paths specified for archiving"
-        return 2
+        return "$BRIK_EXIT_INVALID_INPUT"
     fi
 
     if [[ -z "$output" ]]; then
         log.error "output path is required (--output)"
-        return 2
+        return "$BRIK_EXIT_INVALID_INPUT"
     fi
 
-    runtime.require_tool tar || return 3
+    runtime.require_tool tar || return "$BRIK_EXIT_MISSING_DEP"
 
     # Ensure parent directory exists
     local output_dir
@@ -39,7 +39,7 @@ artifact.archive() {
     if [[ ! -d "$output_dir" ]]; then
         mkdir -p "$output_dir" || {
             log.error "cannot create output directory: $output_dir"
-            return 6
+            return "$BRIK_EXIT_IO_FAILURE"
         }
     fi
 
@@ -48,7 +48,7 @@ artifact.archive() {
     for p in "${paths[@]}"; do
         if [[ ! -e "$p" ]]; then
             log.error "source path not found: $p"
-            return 6
+            return "$BRIK_EXIT_IO_FAILURE"
         fi
     done
 
@@ -56,7 +56,7 @@ artifact.archive() {
 
     tar -czf "$output" "${paths[@]}" 2>/dev/null || {
         log.error "tar archive failed"
-        return 5
+        return "$BRIK_EXIT_EXTERNAL_FAIL"
     }
 
     log.info "archive created: $output"
@@ -79,26 +79,26 @@ artifact.extract() {
 
     if [[ -z "$archive" ]]; then
         log.error "archive path is required"
-        return 2
+        return "$BRIK_EXIT_INVALID_INPUT"
     fi
 
     if [[ -z "$output" ]]; then
         log.error "output destination is required (--output)"
-        return 2
+        return "$BRIK_EXIT_INVALID_INPUT"
     fi
 
-    runtime.require_tool tar || return 3
+    runtime.require_tool tar || return "$BRIK_EXIT_MISSING_DEP"
 
     if [[ ! -f "$archive" ]]; then
         log.error "archive not found: $archive"
-        return 6
+        return "$BRIK_EXIT_IO_FAILURE"
     fi
 
     # Create destination if needed
     if [[ ! -d "$output" ]]; then
         mkdir -p "$output" || {
             log.error "cannot create destination directory: $output"
-            return 6
+            return "$BRIK_EXIT_IO_FAILURE"
         }
     fi
 
@@ -106,7 +106,7 @@ artifact.extract() {
 
     tar -xzf "$archive" -C "$output" 2>/dev/null || {
         log.error "tar extract failed"
-        return 5
+        return "$BRIK_EXIT_EXTERNAL_FAIL"
     }
 
     log.info "extraction complete"

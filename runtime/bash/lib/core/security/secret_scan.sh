@@ -19,7 +19,7 @@ quality.tool.register sec_secret trufflehog trufflehog "trufflehog filesystem ."
 # Usage: security.secret_scan.run <workspace>
 security.secret_scan.run() {
     local workspace="$1"
-    runtime.require_dir "$workspace" || return 6
+    runtime.require_dir "$workspace" || return "$BRIK_EXIT_IO_FAILURE"
     _security._run_scan sec_secret BRIK_SECURITY_SECRETS_COMMAND BRIK_SECURITY_SECRETS_TOOL \
         "$workspace" "security secret scan"
 }

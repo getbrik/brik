@@ -23,19 +23,19 @@ release.prepare() {
             --changelog) generate_changelog="true"; shift ;;
             --changelog-file) changelog_file="$2"; shift 2 ;;
             --dry-run) dry_run="true"; shift ;;
-            *) log.error "unknown option: $1"; return 2 ;;
+            *) log.error "unknown option: $1"; return "$BRIK_EXIT_INVALID_INPUT" ;;
         esac
     done
 
     if [[ -z "$version" ]]; then
         log.error "version is required"
-        return 2
+        return "$BRIK_EXIT_INVALID_INPUT"
     fi
 
     brik.use version
-    version.validate "$version" || return 2
+    version.validate "$version" || return "$BRIK_EXIT_INVALID_INPUT"
 
-    runtime.require_tool git || return 3
+    runtime.require_tool git || return "$BRIK_EXIT_MISSING_DEP"
 
     # Resolve changelog path relative to workspace
     if [[ "$changelog_file" != /* ]]; then
@@ -55,18 +55,18 @@ release.prepare() {
             # Prepend to existing changelog or create new
             if [[ -f "$changelog_file" ]]; then
                 local tmp
-                tmp="$(mktemp)" || return 6
+                tmp="$(mktemp)" || return "$BRIK_EXIT_IO_FAILURE"
                 {
                     printf '# %s\n\n' "$version"
                     printf '%s\n\n' "$changelog_content"
                     cat "$changelog_file"
                 } > "$tmp"
-                mv "$tmp" "$changelog_file" || return 6
+                mv "$tmp" "$changelog_file" || return "$BRIK_EXIT_IO_FAILURE"
             else
                 {
                     printf '# %s\n\n' "$version"
                     printf '%s\n' "$changelog_content"
-                } > "$changelog_file" || return 6
+                } > "$changelog_file" || return "$BRIK_EXIT_IO_FAILURE"
             fi
         fi
     fi
@@ -85,11 +85,11 @@ release.prepare() {
     else
         git add -A >/dev/null 2>&1 || {
             log.error "git add failed"
-            return 5
+            return "$BRIK_EXIT_EXTERNAL_FAIL"
         }
         git commit -q -m "release: $version" || {
             log.error "git commit failed"
-            return 5
+            return "$BRIK_EXIT_EXTERNAL_FAIL"
         }
     fi
 
@@ -112,13 +112,13 @@ release.finalize() {
             --tag-prefix) tag_prefix="$2"; shift 2 ;;
             --push) push=true; shift ;;
             --dry-run) dry_run="true"; shift ;;
-            *) log.error "unknown option: $1"; return 2 ;;
+            *) log.error "unknown option: $1"; return "$BRIK_EXIT_INVALID_INPUT" ;;
         esac
     done
 
     if [[ -z "$version" ]]; then
         log.error "version is required"
-        return 2
+        return "$BRIK_EXIT_INVALID_INPUT"
     fi
 
     brik.use git

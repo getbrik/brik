@@ -17,18 +17,18 @@ quality.lint.run() {
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --fix) fix="true"; shift ;;
-            *) log.error "unknown option: $1"; return 2 ;;
+            *) log.error "unknown option: $1"; return "$BRIK_EXIT_INVALID_INPUT" ;;
         esac
     done
 
-    runtime.require_dir "$workspace" || return 6
+    runtime.require_dir "$workspace" || return "$BRIK_EXIT_IO_FAILURE"
 
     # Tier 1: explicit command override
     if [[ -n "${BRIK_QUALITY_LINT_COMMAND:-}" ]]; then
         log.info "linting (command override): $BRIK_QUALITY_LINT_COMMAND"
         (cd "$workspace" && eval "$BRIK_QUALITY_LINT_COMMAND") || {
             log.error "lint violations found"
-            return 10
+            return "$BRIK_EXIT_CHECK_FAILED"
         }
         log.info "lint passed"
         return 0
@@ -51,7 +51,7 @@ quality.lint.run() {
                     [[ "$fix" == "true" ]] && lint_cmd="$lint_cmd --fix"
                 else
                     log.error "npx not found for eslint"
-                    return 3
+                    return "$BRIK_EXIT_MISSING_DEP"
                 fi
                 ;;
             biome)
@@ -60,7 +60,7 @@ quality.lint.run() {
                     [[ "$fix" == "true" ]] && lint_cmd="$lint_cmd --fix"
                 else
                     log.error "npx not found for biome"
-                    return 3
+                    return "$BRIK_EXIT_MISSING_DEP"
                 fi
                 ;;
             ruff)
@@ -69,7 +69,7 @@ quality.lint.run() {
                     [[ "$fix" == "true" ]] && lint_cmd="$lint_cmd --fix"
                 else
                     log.error "ruff not found for linting"
-                    return 3
+                    return "$BRIK_EXIT_MISSING_DEP"
                 fi
                 ;;
             clippy)
@@ -77,7 +77,7 @@ quality.lint.run() {
                     lint_cmd="cargo clippy"
                 else
                     log.error "cargo not found for clippy"
-                    return 3
+                    return "$BRIK_EXIT_MISSING_DEP"
                 fi
                 ;;
             checkstyle)
@@ -87,7 +87,7 @@ quality.lint.run() {
                     lint_cmd="gradle checkstyleMain"
                 else
                     log.error "mvn or gradle not found for checkstyle"
-                    return 3
+                    return "$BRIK_EXIT_MISSING_DEP"
                 fi
                 ;;
             dotnet-format)
@@ -95,7 +95,7 @@ quality.lint.run() {
                     lint_cmd="dotnet format --verify-no-changes"
                 else
                     log.error "dotnet not found for formatting"
-                    return 3
+                    return "$BRIK_EXIT_MISSING_DEP"
                 fi
                 ;;
             *)
@@ -103,7 +103,7 @@ quality.lint.run() {
                     lint_cmd="$tool"
                 else
                     log.error "unknown lint tool: $tool"
-                    return 7
+                    return "$BRIK_EXIT_CONFIG_ERROR"
                 fi
                 ;;
         esac
@@ -122,7 +122,7 @@ quality.lint.run() {
                 [[ "$fix" == "true" ]] && lint_cmd="$lint_cmd --fix"
             else
                 log.error "npx not found for JavaScript/TypeScript linting"
-                return 3
+                return "$BRIK_EXIT_MISSING_DEP"
             fi
         elif [[ -f "${workspace}/pyproject.toml" || -f "${workspace}/setup.py" ]]; then
             if command -v ruff >/dev/null 2>&1; then
@@ -130,14 +130,14 @@ quality.lint.run() {
                 [[ "$fix" == "true" ]] && lint_cmd="$lint_cmd --fix"
             else
                 log.error "ruff not found for Python linting"
-                return 3
+                return "$BRIK_EXIT_MISSING_DEP"
             fi
         elif [[ -f "${workspace}/Cargo.toml" ]]; then
             if command -v cargo >/dev/null 2>&1; then
                 lint_cmd="cargo clippy"
             else
                 log.error "cargo not found for Rust linting"
-                return 3
+                return "$BRIK_EXIT_MISSING_DEP"
             fi
         elif [[ -f "${workspace}/pom.xml" ]]; then
             if command -v mvn >/dev/null 2>&1; then
@@ -158,18 +158,18 @@ quality.lint.run() {
                 lint_cmd="dotnet format --verify-no-changes"
             else
                 log.error "dotnet not found for .NET linting"
-                return 3
+                return "$BRIK_EXIT_MISSING_DEP"
             fi
         else
             log.error "cannot detect stack for linting in workspace: $workspace"
-            return 3
+            return "$BRIK_EXIT_MISSING_DEP"
         fi
     fi
 
     log.info "linting: $lint_cmd"
     (cd "$workspace" && eval "$lint_cmd") || {
         log.error "lint violations found"
-        return 10
+        return "$BRIK_EXIT_CHECK_FAILED"
     }
 
     log.info "lint passed"

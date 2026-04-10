@@ -16,7 +16,7 @@ env.load() {
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --config-dir) config_dir="$2"; shift 2 ;;
-            *) log.error "unknown option: $1"; return 2 ;;
+            *) log.error "unknown option: $1"; return "$BRIK_EXIT_INVALID_INPUT" ;;
         esac
     done
 
@@ -33,7 +33,7 @@ env.load() {
     # shellcheck source=/dev/null
     . "$env_file" || {
         log.error "failed to source environment file: $env_file"
-        return 5
+        return "$BRIK_EXIT_EXTERNAL_FAIL"
     }
 
     return 0
@@ -46,7 +46,7 @@ env.require() {
     for var in "$@"; do
         if [[ -z "${!var:-}" ]]; then
             log.error "required environment variable not set: $var"
-            return 4
+            return "$BRIK_EXIT_INVALID_ENV"
         fi
     done
     return 0

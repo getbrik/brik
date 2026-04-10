@@ -15,17 +15,17 @@ _publish._require_secret_var() {
 
     if [[ -z "$var_name" ]]; then
         log.error "$label variable name is not configured"
-        return 7
+        return "$BRIK_EXIT_CONFIG_ERROR"
     fi
 
     if [[ ! "$var_name" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
         log.error "$label variable name '$var_name' is not a valid identifier"
-        return 7
+        return "$BRIK_EXIT_CONFIG_ERROR"
     fi
 
     if [[ -z "${!var_name:-}" ]]; then
         log.error "$label variable '$var_name' is not set or empty"
-        return 7
+        return "$BRIK_EXIT_CONFIG_ERROR"
     fi
 
     return 0
@@ -47,7 +47,7 @@ publish.run() {
 
     if [[ -z "$target" ]]; then
         log.error "publish target is required (--target)"
-        return 2
+        return "$BRIK_EXIT_INVALID_INPUT"
     fi
 
     log.info "publishing with target: $target"
@@ -55,13 +55,13 @@ publish.run() {
     # Load and delegate to target-specific module
     brik.use "publish.${target}" || {
         log.error "unsupported publish target: $target"
-        return 7
+        return "$BRIK_EXIT_CONFIG_ERROR"
     }
 
     local publish_fn="publish.${target}.run"
     if ! declare -f "$publish_fn" >/dev/null 2>&1; then
         log.error "publish function not found: $publish_fn"
-        return 7
+        return "$BRIK_EXIT_CONFIG_ERROR"
     fi
 
     if [[ "$dry_run" == "true" ]]; then

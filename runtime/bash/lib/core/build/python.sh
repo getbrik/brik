@@ -35,16 +35,16 @@ build.python.run() {
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --tool) pm="$2"; shift 2 ;;
-            *) log.error "unknown option: $1"; return 2 ;;
+            *) log.error "unknown option: $1"; return "$BRIK_EXIT_INVALID_INPUT" ;;
         esac
     done
 
-    runtime.require_dir "$workspace" || return 6
+    runtime.require_dir "$workspace" || return "$BRIK_EXIT_IO_FAILURE"
 
     # Need at least one Python project marker
     if [[ ! -f "${workspace}/pyproject.toml" && ! -f "${workspace}/setup.py" && ! -f "${workspace}/Pipfile" ]]; then
         log.error "no Python project file found in workspace: $workspace"
-        return 6
+        return "$BRIK_EXIT_IO_FAILURE"
     fi
 
     # Auto-detect package manager if not specified
@@ -52,15 +52,15 @@ build.python.run() {
 
     case "$pm" in
         uv)
-            runtime.require_tool uv || return 3
+            runtime.require_tool uv || return "$BRIK_EXIT_MISSING_DEP"
             log.info "building with uv"
             (cd "$workspace" && uv sync && uv build) || {
                 log.error "build failed"
-                return 5
+                return "$BRIK_EXIT_EXTERNAL_FAIL"
             }
             ;;
         pip)
-            runtime.require_tool pip || return 3
+            runtime.require_tool pip || return "$BRIK_EXIT_MISSING_DEP"
             log.info "building with pip"
             # Install project + deps so test/quality stages have them available
             local pip_install_flags="--quiet"
@@ -75,23 +75,23 @@ build.python.run() {
                 : # pip wheel fallback succeeded
             else
                 log.error "build failed"
-                return 5
+                return "$BRIK_EXIT_EXTERNAL_FAIL"
             fi
             ;;
         poetry)
-            runtime.require_tool poetry || return 3
+            runtime.require_tool poetry || return "$BRIK_EXIT_MISSING_DEP"
             log.info "building with poetry"
             (cd "$workspace" && poetry install && poetry build) || {
                 log.error "build failed"
-                return 5
+                return "$BRIK_EXIT_EXTERNAL_FAIL"
             }
             ;;
         pipenv)
-            runtime.require_tool pipenv || return 3
+            runtime.require_tool pipenv || return "$BRIK_EXIT_MISSING_DEP"
             log.info "building with pipenv"
             (cd "$workspace" && pipenv install) || {
                 log.error "dependency install failed"
-                return 5
+                return "$BRIK_EXIT_EXTERNAL_FAIL"
             }
             if (cd "$workspace" && pipenv run python -m build) 2>/dev/null; then
                 : # pipenv run python -m build succeeded
@@ -99,12 +99,12 @@ build.python.run() {
                 : # pipenv run pip wheel fallback succeeded
             else
                 log.error "build failed"
-                return 5
+                return "$BRIK_EXIT_EXTERNAL_FAIL"
             fi
             ;;
         *)
             log.error "unsupported Python package manager: $pm"
-            return 7
+            return "$BRIK_EXIT_CONFIG_ERROR"
             ;;
     esac
 

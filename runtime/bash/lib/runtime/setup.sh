@@ -45,7 +45,7 @@ _setup._is_brik_runner() {
 # Returns 0 (true) if virtualized, 1 (false) if local.
 _setup._is_virtualized() {
     case "${BRIK_PLATFORM:-local}" in
-        local) return 1 ;;
+        local) return "$BRIK_EXIT_FAILURE" ;;
         *)     return 0 ;;
     esac
 }
@@ -99,9 +99,9 @@ _setup._tool_command() {
 _setup._ensure_brik_bin() {
     local brik_bin="${BRIK_HOME:-}/bin"
     if [[ -z "${BRIK_HOME:-}" ]]; then
-        return 1
+        return "$BRIK_EXIT_FAILURE"
     fi
-    mkdir -p "$brik_bin" 2>/dev/null || return 1
+    mkdir -p "$brik_bin" 2>/dev/null || return "$BRIK_EXIT_FAILURE"
     case ":${PATH}:" in
         *":${brik_bin}:"*) ;;
         *) export PATH="${brik_bin}:${PATH}" ;;
@@ -118,7 +118,7 @@ _setup._self_host_binary() {
 
     _setup._ensure_brik_bin || {
         log.error "cannot create ${BRIK_HOME}/bin/ directory"
-        return 5
+        return "$BRIK_EXIT_EXTERNAL_FAIL"
     }
 
     log.info "downloading $name to ${target}"
@@ -128,12 +128,12 @@ _setup._self_host_binary() {
         curl -sSL -o "$target" "$url" && chmod +x "$target"
     else
         log.error "cannot download $name: neither wget nor curl available"
-        return 5
+        return "$BRIK_EXIT_EXTERNAL_FAIL"
     fi
 
     if ! command -v "$name" >/dev/null 2>&1; then
         log.error "$name download succeeded but binary not found on PATH"
-        return 5
+        return "$BRIK_EXIT_EXTERNAL_FAIL"
     fi
     return 0
 }
@@ -163,7 +163,7 @@ _setup._install_via_apk() {
     # shellcheck disable=SC2086
     if ! apk add --no-cache $packages 2>&1; then
         log.error "apk install failed for $packages"
-        return 5
+        return "$BRIK_EXIT_EXTERNAL_FAIL"
     fi
     return 0
 }
@@ -194,7 +194,7 @@ _setup._install_via_apt() {
     # shellcheck disable=SC2086
     if ! apt-get install -y -qq $packages 2>&1; then
         log.error "apt-get install failed for $packages"
-        return 5
+        return "$BRIK_EXIT_EXTERNAL_FAIL"
     fi
     return 0
 }
@@ -220,7 +220,7 @@ _setup._install_via_yum() {
     # shellcheck disable=SC2086
     if ! yum install -y $packages 2>&1; then
         log.error "yum install failed for $packages"
-        return 5
+        return "$BRIK_EXIT_EXTERNAL_FAIL"
     fi
     return 0
 }
@@ -246,7 +246,7 @@ _setup._install_via_dnf() {
     # shellcheck disable=SC2086
     if ! dnf install -y $packages 2>&1; then
         log.error "dnf install failed for $packages"
-        return 5
+        return "$BRIK_EXIT_EXTERNAL_FAIL"
     fi
     return 0
 }
@@ -275,7 +275,7 @@ _setup._install_via_mise() {
     log.info "installing $name via mise ($mise_name)"
     if ! mise install "$mise_name" 2>&1; then
         log.error "mise install failed for $mise_name"
-        return 5
+        return "$BRIK_EXIT_EXTERNAL_FAIL"
     fi
     # Activate for current shell session only (not --global)
     eval "$(mise env --shell bash "$mise_name" 2>/dev/null)" || {
@@ -310,7 +310,7 @@ _setup._sys_pkg_install() {
         dnf)     _setup._install_via_dnf "$name" "$version" ;;
         *)
             log.error "unsupported package manager: $mgr"
-            return 5
+            return "$BRIK_EXIT_EXTERNAL_FAIL"
             ;;
     esac
 }
@@ -377,7 +377,7 @@ setup.install_yq() {
             curl -sSL -o "$target" "$url" && chmod +x "$target"
         else
             log.error "cannot download yq: neither wget nor curl available"
-            return 5
+            return "$BRIK_EXIT_EXTERNAL_FAIL"
         fi
     else
         _setup._self_host_binary "yq" "$url"
@@ -385,7 +385,7 @@ setup.install_yq() {
 
     if ! command -v yq >/dev/null 2>&1; then
         log.error "yq installation failed"
-        return 5
+        return "$BRIK_EXIT_EXTERNAL_FAIL"
     fi
     return 0
 }
@@ -447,7 +447,7 @@ setup.install_prerequisites() {
             if ! command -v "$tool" >/dev/null 2>&1; then
                 log.error "$tool is required but not found on PATH"
                 log.error "hint: install $tool via your system package manager"
-                return 3
+                return "$BRIK_EXIT_MISSING_DEP"
             fi
         done
     fi
@@ -467,7 +467,7 @@ setup.install_stack() {
 
     if [[ -z "$stack" ]]; then
         log.error "stack name is required"
-        return 2
+        return "$BRIK_EXIT_INVALID_INPUT"
     fi
 
     if _setup._is_brik_runner; then
@@ -499,7 +499,7 @@ setup.install_stack() {
         fi
         _setup._sys_pkg_install "$mgr" "$stack" "$version" || {
             log.error "failed to install stack '$stack' via $mgr"
-            return 5
+            return "$BRIK_EXIT_EXTERNAL_FAIL"
         }
         # Post-install hooks (CI only - ephemeral environment)
         case "$stack" in
@@ -510,7 +510,7 @@ setup.install_stack() {
         if command -v mise >/dev/null 2>&1; then
             _setup._install_via_mise "$stack" "${version:-latest}" || {
                 log.error "failed to install stack '$stack' via mise"
-                return 5
+                return "$BRIK_EXIT_EXTERNAL_FAIL"
             }
         else
             setup.check_stack "$stack"
@@ -559,7 +559,7 @@ setup.check_stack() {
             ;;
     esac
 
-    return 3
+    return "$BRIK_EXIT_MISSING_DEP"
 }
 
 # ---------------------------------------------------------------------------

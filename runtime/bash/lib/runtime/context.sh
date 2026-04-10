@@ -24,12 +24,12 @@ context.create() {
 
     mkdir -p "$log_dir" || {
         log.error "cannot create log directory: $log_dir"
-        return 6
+        return "$BRIK_EXIT_IO_FAILURE"
     }
 
     context_file="$(mktemp "${log_dir}/context-${stage_name}-XXXXXX")" || {
         log.error "cannot create context file"
-        return 6
+        return "$BRIK_EXIT_IO_FAILURE"
     }
 
     local run_id
@@ -48,7 +48,7 @@ context.create() {
         printf 'BRIK_STARTED_AT=%s\n' "$(date +"%Y-%m-%dT%H:%M:%S%z")"
     } > "$context_file" || {
         log.error "cannot write to context file: $context_file"
-        return 6
+        return "$BRIK_EXIT_IO_FAILURE"
     }
 
     log.debug "context created: $context_file"
@@ -63,7 +63,7 @@ context.get() {
     local key="$2"
     local line
 
-    line="$(grep -m1 "^${key}=" "$context_file" 2>/dev/null)" || return 1
+    line="$(grep -m1 "^${key}=" "$context_file" 2>/dev/null)" || return "$BRIK_EXIT_FAILURE"
     printf '%s' "${line#*=}"
     return 0
 }
@@ -78,14 +78,14 @@ context.set() {
     if grep -q "^${key}=" "$context_file" 2>/dev/null; then
         # Replace existing key - use a temp file for safety
         local tmp
-        tmp="$(mktemp)" || return 6
+        tmp="$(mktemp)" || return "$BRIK_EXIT_IO_FAILURE"
         sed "s|^${key}=.*|${key}=${value}|" "$context_file" > "$tmp" || {
             rm -f "$tmp"
-            return 6
+            return "$BRIK_EXIT_IO_FAILURE"
         }
-        mv "$tmp" "$context_file" || return 6
+        mv "$tmp" "$context_file" || return "$BRIK_EXIT_IO_FAILURE"
     else
-        printf '%s=%s\n' "$key" "$value" >> "$context_file" || return 6
+        printf '%s=%s\n' "$key" "$value" >> "$context_file" || return "$BRIK_EXIT_IO_FAILURE"
     fi
     return 0
 }

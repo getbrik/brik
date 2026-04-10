@@ -35,13 +35,13 @@ condition.eval() {
 
     if [[ -z "$expression" ]]; then
         log.error "empty condition expression"
-        return 1
+        return "$BRIK_EXIT_FAILURE"
     fi
 
     # Special keyword: manual
     if [[ "$expression" == "manual" ]]; then
         # Manual stages are not auto-triggered
-        return 1
+        return "$BRIK_EXIT_FAILURE"
     fi
 
     # Parse the expression: <subject> <operator> <value>
@@ -58,7 +58,7 @@ condition.eval() {
     else
         log.error "invalid condition expression: $expression"
         log.warn "expected format: subject == 'value' or subject =~ 'pattern'"
-        return 1
+        return "$BRIK_EXIT_FAILURE"
     fi
 
     # Resolve the subject to an actual value
@@ -76,12 +76,12 @@ condition.eval() {
             # shellcheck disable=SC2254
             case "$actual_value" in
                 $value) return 0 ;;
-                *)      return 1 ;;
+                *)      return "$BRIK_EXIT_FAILURE" ;;
             esac
             ;;
         *)
             log.error "unsupported operator: $operator"
-            return 1
+            return "$BRIK_EXIT_FAILURE"
             ;;
     esac
 }
@@ -123,7 +123,7 @@ condition.eval_deploy_env() {
     if ! declare -f config.get >/dev/null 2>&1; then
         brik.use config || {
             log.error "config module is required for condition.eval_deploy_env"
-            return 1
+            return "$BRIK_EXIT_FAILURE"
         }
     fi
 
@@ -132,7 +132,7 @@ condition.eval_deploy_env() {
 
     if [[ -z "$when_expr" ]]; then
         log.warn "no condition defined for environment: $env_name"
-        return 1
+        return "$BRIK_EXIT_FAILURE"
     fi
 
     condition.eval "$when_expr"

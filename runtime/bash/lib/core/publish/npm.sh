@@ -25,12 +25,12 @@ publish.npm.run() {
             --access) access="$2"; shift 2 ;;
             --token-var) token_var="$2"; shift 2 ;;
             --dry-run) dry_run="true"; shift ;;
-            *) log.error "unknown option: $1"; return 2 ;;
+            *) log.error "unknown option: $1"; return "$BRIK_EXIT_INVALID_INPUT" ;;
         esac
     done
 
-    runtime.require_tool npm || return 3
-    runtime.require_file "package.json" || return 6
+    runtime.require_tool npm || return "$BRIK_EXIT_MISSING_DEP"
+    runtime.require_file "package.json" || return "$BRIK_EXIT_IO_FAILURE"
 
     # Build npm publish command
     local -a cmd=(npm publish)
@@ -73,7 +73,7 @@ ${registry_path}:always-auth=true"
 
     if [[ $rc -ne 0 ]]; then
         log.error "npm publish failed"
-        return 5
+        return "$BRIK_EXIT_EXTERNAL_FAIL"
     fi
 
     log.info "npm publish completed successfully"

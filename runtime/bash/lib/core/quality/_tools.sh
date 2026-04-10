@@ -39,7 +39,7 @@ _brik_tool_resolve_tier1() {
     if [[ -n "${!cmd_var:-}" ]]; then echo "__command__"; return 0; fi
     cmd_var="BRIK_SECURITY_${category_upper}_COMMAND"
     if [[ -n "${!cmd_var:-}" ]]; then echo "__command__"; return 0; fi
-    return 1
+    return "$BRIK_EXIT_FAILURE"
 }
 
 # Tier 2: resolve an explicitly requested tool name from registry.
@@ -55,11 +55,11 @@ _brik_tool_resolve_tier2() {
                 echo "$requested"
                 return 0
             else
-                return 3
+                return "$BRIK_EXIT_MISSING_DEP"
             fi
         fi
     done
-    return 7
+    return "$BRIK_EXIT_CONFIG_ERROR"
 }
 
 # Tier 3: auto-detect best available tool by priority.
@@ -82,7 +82,7 @@ _brik_tool_resolve_tier3() {
         echo "$best_tool"
         return 0
     fi
-    return 1
+    return "$BRIK_EXIT_FAILURE"
 }
 
 # Resolve which tool to use for a category (3-tier resolution).
@@ -142,7 +142,7 @@ quality.tool.exec() {
     done
 
     if [[ -z "$template" ]]; then
-        return 7
+        return "$BRIK_EXIT_CONFIG_ERROR"
     fi
 
     # Substitute {var} placeholders with key=value args
@@ -153,7 +153,7 @@ quality.tool.exec() {
         key="${1%%=*}" val="${1#*=}"
         if [[ "$val" =~ [^a-zA-Z0-9_./:@=-] ]]; then
             log.error "unsafe value for {$key}: $val"
-            return 2
+            return "$BRIK_EXIT_INVALID_INPUT"
         fi
         cmd="${cmd//\{$key\}/$val}"
         shift

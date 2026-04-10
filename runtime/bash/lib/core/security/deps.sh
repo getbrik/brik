@@ -29,14 +29,14 @@ security.deps.run() {
         esac
     done
 
-    runtime.require_dir "$workspace" || return 6
+    runtime.require_dir "$workspace" || return "$BRIK_EXIT_IO_FAILURE"
 
     # Tier 1: BRIK_SECURITY_DEPS_COMMAND
     if [[ -n "${BRIK_SECURITY_DEPS_COMMAND:-}" ]]; then
         log.info "security dependency scan (command override): $BRIK_SECURITY_DEPS_COMMAND"
         (cd "$workspace" && eval "$BRIK_SECURITY_DEPS_COMMAND") || {
             log.error "security dependency vulnerabilities found"
-            return 10
+            return "$BRIK_EXIT_CHECK_FAILED"
         }
         log.info "security dependency scan passed"
         return 0
@@ -52,10 +52,10 @@ security.deps.run() {
         local rc=$?
         if [[ $rc -eq 3 ]]; then
             log.error "security dependency scan tool not found: $tool"
-            return 3
+            return "$BRIK_EXIT_MISSING_DEP"
         elif [[ $rc -eq 7 ]]; then
             log.error "unknown security dependency scan tool: $tool"
-            return 7
+            return "$BRIK_EXIT_CONFIG_ERROR"
         fi
         log.warn "no security dependency scanner available - skipping"
         return 0
@@ -71,7 +71,7 @@ security.deps.run() {
             return 0
         fi
         log.error "security dependency vulnerabilities found"
-        return 10
+        return "$BRIK_EXIT_CHECK_FAILED"
     }
     log.info "security dependency scan passed"
     return 0

@@ -12,7 +12,7 @@ stages.init() {
     # Validate brik.yml exists
     if [[ ! -f "${BRIK_CONFIG_FILE}" ]]; then
         log.error "brik.yml not found at ${BRIK_CONFIG_FILE}"
-        return 7
+        return "$BRIK_EXIT_CONFIG_ERROR"
     fi
 
     # Detect or read stack
@@ -49,7 +49,7 @@ stages.init() {
     # Verify required tools
     if ! command -v yq >/dev/null 2>&1; then
         log.error "yq is required but not available"
-        return 3
+        return "$BRIK_EXIT_MISSING_DEP"
     fi
 
     log.info "init stage complete"

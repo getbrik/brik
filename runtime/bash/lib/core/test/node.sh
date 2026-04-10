@@ -23,7 +23,7 @@ test.node.cmd() {
             ;;
         *)
             log.error "unsupported Node.js test framework: $framework"
-            return 7
+            return "$BRIK_EXIT_CONFIG_ERROR"
             ;;
     esac
 

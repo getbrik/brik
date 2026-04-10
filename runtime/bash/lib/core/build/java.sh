@@ -32,31 +32,31 @@ build.java.run() {
         case "$1" in
             --tool) tool="$2"; shift 2 ;;
             --goals) goals="$2"; shift 2 ;;
-            *) log.error "unknown option: $1"; return 2 ;;
+            *) log.error "unknown option: $1"; return "$BRIK_EXIT_INVALID_INPUT" ;;
         esac
     done
 
-    runtime.require_dir "$workspace" || return 6
+    runtime.require_dir "$workspace" || return "$BRIK_EXIT_IO_FAILURE"
 
     # Auto-detect tool if not specified
     if [[ -z "$tool" ]]; then
         tool="$(_build.java._detect_tool "$workspace")"
         if [[ -z "$tool" ]]; then
             log.error "cannot detect Java build tool in workspace: $workspace"
-            return 7
+            return "$BRIK_EXIT_CONFIG_ERROR"
         fi
     fi
 
     case "$tool" in
         maven)
-            runtime.require_tool mvn || return 3
+            runtime.require_tool mvn || return "$BRIK_EXIT_MISSING_DEP"
             [[ -z "$goals" ]] && goals="package -DskipTests"
             log.info "building with Maven: mvn $goals"
             # $goals intentionally word-splits
             # shellcheck disable=SC2086
             (cd "$workspace" && mvn -B $goals) || {
                 log.error "build failed"
-                return 5
+                return "$BRIK_EXIT_EXTERNAL_FAIL"
             }
             ;;
         gradle)
@@ -64,7 +64,7 @@ build.java.run() {
             if [[ -x "${workspace}/gradlew" ]]; then
                 gradle_cmd="./gradlew"
             else
-                runtime.require_tool gradle || return 3
+                runtime.require_tool gradle || return "$BRIK_EXIT_MISSING_DEP"
             fi
             [[ -z "$goals" ]] && goals="build -x test"
             log.info "building with Gradle: $gradle_cmd $goals"
@@ -72,12 +72,12 @@ build.java.run() {
             # shellcheck disable=SC2086
             (cd "$workspace" && $gradle_cmd $goals) || {
                 log.error "build failed"
-                return 5
+                return "$BRIK_EXIT_EXTERNAL_FAIL"
             }
             ;;
         *)
             log.error "unsupported Java build tool: $tool"
-            return 7
+            return "$BRIK_EXIT_CONFIG_ERROR"
             ;;
     esac
 

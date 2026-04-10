@@ -19,7 +19,7 @@ config.dotnet.default() {
         test_framework) printf 'xunit' ;;
         lint_tool)      printf 'dotnet-format' ;;
         format_tool)    printf 'dotnet-format' ;;
-        *) return 1 ;;
+        *) return "$BRIK_EXIT_FAILURE" ;;
     esac
     return 0
 }
@@ -43,7 +43,7 @@ config.dotnet.validate_coherence() {
         && ! compgen -G "${workspace}/*.sln" >/dev/null 2>&1; then
         log.error "config mismatch: stack is 'dotnet' but no .csproj or .sln file found"
         log.error "fix: create a .csproj or .sln file, or change project.stack in brik.yml"
-        return 7
+        return "$BRIK_EXIT_CONFIG_ERROR"
     fi
 
     return 0

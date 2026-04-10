@@ -46,12 +46,12 @@ stage.create_log_file() {
     local log_dir="${BRIK_LOG_DIR:-${BRIK_DEFAULT_LOG_DIR:-/tmp/brik/logs}}"
     mkdir -p "$log_dir" || {
         log.error "cannot create log directory: $log_dir"
-        return 6
+        return "$BRIK_EXIT_IO_FAILURE"
     }
     local log_file
     log_file="$(mktemp "${log_dir}/${stage_name}-XXXXXX")" || {
         log.error "cannot create log file for stage: $stage_name"
-        return 6
+        return "$BRIK_EXIT_IO_FAILURE"
     }
     mv "$log_file" "${log_file}.log" && log_file="${log_file}.log"
     printf '%s' "$log_file"
@@ -80,7 +80,7 @@ stage.execute() {
     if ! declare -f "$logic_function" >/dev/null 2>&1; then
         log.error "logic function not defined: $logic_function"
         export BRIK_LOG_SCOPE="$previous_scope"
-        return 2
+        return "$BRIK_EXIT_INVALID_INPUT"
     fi
 
     "$logic_function" "$context_file" "$@"
@@ -116,9 +116,9 @@ stage.run() {
     log.info "starting stage: $stage_name"
 
     # Create execution context
-    context_file="$(context.create "$stage_name")" || return 4
-    log_file="$(stage.create_log_file "$stage_name")" || return 6
-    context.set "$context_file" "BRIK_LOG_FILE" "$log_file" || return 6
+    context_file="$(context.create "$stage_name")" || return "$BRIK_EXIT_INVALID_ENV"
+    log_file="$(stage.create_log_file "$stage_name")" || return "$BRIK_EXIT_IO_FAILURE"
+    context.set "$context_file" "BRIK_LOG_FILE" "$log_file" || return "$BRIK_EXIT_IO_FAILURE"
 
     # Pre-stage hook (can abort)
     hook.pre_stage "$stage_name" "$context_file" "$log_file" || {

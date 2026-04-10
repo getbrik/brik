@@ -104,7 +104,7 @@ summary.write_json() {
     local output_path="$2"
     printf '%s\n' "$data" > "$output_path" || {
         log.error "cannot write summary to: $output_path"
-        return 6
+        return "$BRIK_EXIT_IO_FAILURE"
     }
     return 0
 }

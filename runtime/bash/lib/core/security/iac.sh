@@ -21,14 +21,14 @@ security.iac.run() {
     local workspace="$1"
     shift
 
-    runtime.require_dir "$workspace" || return 6
+    runtime.require_dir "$workspace" || return "$BRIK_EXIT_IO_FAILURE"
 
     # Tier 1: BRIK_SECURITY_IAC_COMMAND
     if [[ -n "${BRIK_SECURITY_IAC_COMMAND:-}" ]]; then
         log.info "IaC scan (command override): $BRIK_SECURITY_IAC_COMMAND"
         (cd "$workspace" && eval "$BRIK_SECURITY_IAC_COMMAND") || {
             log.error "IaC security findings detected"
-            return 10
+            return "$BRIK_EXIT_CHECK_FAILED"
         }
         log.info "IaC scan passed"
         return 0
@@ -53,13 +53,13 @@ security.iac.run() {
             log.info "IaC scan with tool: $tool"
             (cd "$workspace" && eval "$iac_cmd") || {
                 log.error "IaC security findings detected"
-                return 10
+                return "$BRIK_EXIT_CHECK_FAILED"
             }
             log.info "IaC scan passed"
             return 0
         else
             log.error "IaC scan tool not found: $tool"
-            return 3
+            return "$BRIK_EXIT_MISSING_DEP"
         fi
     fi
 
@@ -72,7 +72,7 @@ security.iac.run() {
     log.info "IaC scan with ${resolved}"
     (cd "$workspace" && quality.tool.exec sec_iac "$resolved") || {
         log.error "IaC security findings detected"
-        return 10
+        return "$BRIK_EXIT_CHECK_FAILED"
     }
     log.info "IaC scan passed"
     return 0

@@ -37,28 +37,28 @@ cache.save() {
         case "$1" in
             --key) key="$2"; shift 2 ;;
             --paths) shift; while [[ $# -gt 0 && "$1" != --* ]]; do paths+=("$1"); shift; done ;;
-            *) log.error "unknown option: $1"; return 2 ;;
+            *) log.error "unknown option: $1"; return "$BRIK_EXIT_INVALID_INPUT" ;;
         esac
     done
 
     if [[ -z "$key" ]]; then
         log.error "cache key is required (--key)"
-        return 2
+        return "$BRIK_EXIT_INVALID_INPUT"
     fi
 
     if [[ ${#paths[@]} -eq 0 ]]; then
         log.error "no paths specified (--paths)"
-        return 2
+        return "$BRIK_EXIT_INVALID_INPUT"
     fi
 
-    runtime.require_tool tar || return 3
+    runtime.require_tool tar || return "$BRIK_EXIT_MISSING_DEP"
 
     # Verify all source paths exist
     local p
     for p in "${paths[@]}"; do
         if [[ ! -e "$p" ]]; then
             log.error "cache source path not found: $p"
-            return 6
+            return "$BRIK_EXIT_IO_FAILURE"
         fi
     done
 
@@ -67,7 +67,7 @@ cache.save() {
     local cache_dir="${_CACHE_BASE_DIR}"
     mkdir -p "$cache_dir" || {
         log.error "cannot create cache directory: $cache_dir"
-        return 6
+        return "$BRIK_EXIT_IO_FAILURE"
     }
 
     local archive="${cache_dir}/${hash}.tar.gz"
@@ -76,7 +76,7 @@ cache.save() {
 
     tar -czf "$archive" "${paths[@]}" 2>/dev/null || {
         log.error "cache save failed"
-        return 5
+        return "$BRIK_EXIT_EXTERNAL_FAIL"
     }
 
     log.info "cache saved: $archive"
@@ -94,16 +94,16 @@ cache.restore() {
         case "$1" in
             --key) key="$2"; shift 2 ;;
             --destination) destination="$2"; shift 2 ;;
-            *) log.error "unknown option: $1"; return 2 ;;
+            *) log.error "unknown option: $1"; return "$BRIK_EXIT_INVALID_INPUT" ;;
         esac
     done
 
     if [[ -z "$key" ]]; then
         log.error "cache key is required (--key)"
-        return 2
+        return "$BRIK_EXIT_INVALID_INPUT"
     fi
 
-    runtime.require_tool tar || return 3
+    runtime.require_tool tar || return "$BRIK_EXIT_MISSING_DEP"
 
     local hash
     hash="$(_cache._hash_key "$key")"
@@ -111,7 +111,7 @@ cache.restore() {
 
     if [[ ! -f "$archive" ]]; then
         log.info "cache miss: key=$key"
-        return 1
+        return "$BRIK_EXIT_FAILURE"
     fi
 
     log.info "restoring cache: key=$key"
@@ -121,7 +121,7 @@ cache.restore() {
 
     tar -xzf "$archive" -C "$destination" 2>/dev/null || {
         log.error "cache restore failed"
-        return 5
+        return "$BRIK_EXIT_EXTERNAL_FAIL"
     }
 
     log.info "cache restored from $archive"

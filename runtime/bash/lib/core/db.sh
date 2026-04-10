@@ -21,13 +21,13 @@ db.migrate() {
             --url) url="$2"; shift 2 ;;
             --command) command="$2"; shift 2 ;;
             --dry-run) dry_run="true"; shift ;;
-            *) log.error "unknown option: $1"; return 2 ;;
+            *) log.error "unknown option: $1"; return "$BRIK_EXIT_INVALID_INPUT" ;;
         esac
     done
 
     if [[ -z "$tool" ]]; then
         log.error "migration tool is required (--tool)"
-        return 2
+        return "$BRIK_EXIT_INVALID_INPUT"
     fi
 
     case "$tool" in
@@ -37,7 +37,7 @@ db.migrate() {
         custom)     _db._migrate_custom "$command" "$dry_run" ;;
         *)
             log.error "unsupported migration tool: $tool"
-            return 2
+            return "$BRIK_EXIT_INVALID_INPUT"
             ;;
     esac
 }
@@ -54,54 +54,54 @@ db.status() {
         case "$1" in
             --tool) tool="$2"; shift 2 ;;
             --url) url="$2"; shift 2 ;;
-            *) log.error "unknown option: $1"; return 2 ;;
+            *) log.error "unknown option: $1"; return "$BRIK_EXIT_INVALID_INPUT" ;;
         esac
     done
 
     if [[ -z "$tool" ]]; then
         log.error "migration tool is required (--tool)"
-        return 2
+        return "$BRIK_EXIT_INVALID_INPUT"
     fi
 
     case "$tool" in
         flyway)
-            runtime.require_tool flyway || return 3
+            runtime.require_tool flyway || return "$BRIK_EXIT_MISSING_DEP"
             local -a cmd=(flyway info)
             [[ -n "$url" ]] && cmd+=(-url="$url")
             log.info "checking migration status: ${cmd[*]}"
             "${cmd[@]}" || {
                 log.error "flyway info failed"
-                return 5
+                return "$BRIK_EXIT_EXTERNAL_FAIL"
             }
             ;;
         liquibase)
-            runtime.require_tool liquibase || return 3
+            runtime.require_tool liquibase || return "$BRIK_EXIT_MISSING_DEP"
             local -a cmd=(liquibase status)
             [[ -n "$url" ]] && cmd+=(--url="$url")
             log.info "checking migration status: ${cmd[*]}"
             "${cmd[@]}" || {
                 log.error "liquibase status failed"
-                return 5
+                return "$BRIK_EXIT_EXTERNAL_FAIL"
             }
             ;;
         alembic)
-            runtime.require_tool alembic || return 3
+            runtime.require_tool alembic || return "$BRIK_EXIT_MISSING_DEP"
             log.info "checking migration status: alembic current"
             alembic current || {
                 log.error "alembic current failed"
-                return 5
+                return "$BRIK_EXIT_EXTERNAL_FAIL"
             }
             ;;
         *)
             log.error "unsupported migration tool for status: $tool"
-            return 2
+            return "$BRIK_EXIT_INVALID_INPUT"
             ;;
     esac
 }
 
 _db._migrate_flyway() {
     local url="$1" dry_run="$2"
-    runtime.require_tool flyway || return 3
+    runtime.require_tool flyway || return "$BRIK_EXIT_MISSING_DEP"
 
     local -a cmd=(flyway migrate)
     [[ -n "$url" ]] && cmd+=(-url="$url")
@@ -114,7 +114,7 @@ _db._migrate_flyway() {
     log.info "running migrations: ${cmd[*]}"
     "${cmd[@]}" || {
         log.error "flyway migrate failed"
-        return 5
+        return "$BRIK_EXIT_EXTERNAL_FAIL"
     }
 
     log.info "flyway migrations completed successfully"
@@ -123,7 +123,7 @@ _db._migrate_flyway() {
 
 _db._migrate_liquibase() {
     local url="$1" dry_run="$2"
-    runtime.require_tool liquibase || return 3
+    runtime.require_tool liquibase || return "$BRIK_EXIT_MISSING_DEP"
 
     local -a cmd=(liquibase update)
     [[ -n "$url" ]] && cmd+=(--url="$url")
@@ -136,7 +136,7 @@ _db._migrate_liquibase() {
     log.info "running migrations: ${cmd[*]}"
     "${cmd[@]}" || {
         log.error "liquibase update failed"
-        return 5
+        return "$BRIK_EXIT_EXTERNAL_FAIL"
     }
 
     log.info "liquibase migrations completed successfully"
@@ -145,7 +145,7 @@ _db._migrate_liquibase() {
 
 _db._migrate_alembic() {
     local url="$1" dry_run="$2"
-    runtime.require_tool alembic || return 3
+    runtime.require_tool alembic || return "$BRIK_EXIT_MISSING_DEP"
 
     local -a cmd=(alembic upgrade head)
 
@@ -158,12 +158,12 @@ _db._migrate_alembic() {
     if [[ -n "$url" ]]; then
         SQLALCHEMY_DATABASE_URI="$url" "${cmd[@]}" || {
             log.error "alembic upgrade failed"
-            return 5
+            return "$BRIK_EXIT_EXTERNAL_FAIL"
         }
     else
         "${cmd[@]}" || {
             log.error "alembic upgrade failed"
-            return 5
+            return "$BRIK_EXIT_EXTERNAL_FAIL"
         }
     fi
 
@@ -176,7 +176,7 @@ _db._migrate_custom() {
 
     if [[ -z "$command" ]]; then
         log.error "custom migration command is required (--command)"
-        return 2
+        return "$BRIK_EXIT_INVALID_INPUT"
     fi
 
     if [[ "$dry_run" == "true" ]]; then
@@ -188,7 +188,7 @@ _db._migrate_custom() {
     # eval is required here: custom commands come from brik.yml (trusted project config)
     eval "$command" || {
         log.error "custom migration failed"
-        return 5
+        return "$BRIK_EXIT_EXTERNAL_FAIL"
     }
 
     log.info "custom migration completed successfully"

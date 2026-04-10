@@ -36,4 +36,7 @@ spec_helper_configure() {
   # Temporary log directory for tests - cleaned up by ShellSpec
   export BRIK_LOG_DIR
   BRIK_LOG_DIR="$(mktemp -d)"
+
+  # Exit code constants - required by all modules using BRIK_EXIT_* returns
+  . "${BRIK_RUNTIME_LIB}/error.sh"
 }

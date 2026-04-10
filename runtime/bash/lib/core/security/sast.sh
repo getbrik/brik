@@ -20,7 +20,7 @@ quality.tool.register sec_sast semgrep semgrep "semgrep scan --config auto ." 10
 # Usage: security.sast.run <workspace>
 security.sast.run() {
     local workspace="$1"
-    runtime.require_dir "$workspace" || return 6
+    runtime.require_dir "$workspace" || return "$BRIK_EXIT_IO_FAILURE"
 
     # If a custom ruleset is configured, re-register semgrep with it
     if [[ -n "${BRIK_SECURITY_SAST_RULESET:-}" ]]; then

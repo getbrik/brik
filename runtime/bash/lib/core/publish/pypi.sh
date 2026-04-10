@@ -22,7 +22,7 @@ publish.pypi.run() {
             --repository) repository="$2"; shift 2 ;;
             --token-var) token_var="$2"; shift 2 ;;
             --dry-run) dry_run="true"; shift ;;
-            *) log.error "unknown option: $1"; return 2 ;;
+            *) log.error "unknown option: $1"; return "$BRIK_EXIT_INVALID_INPUT" ;;
         esac
     done
 
@@ -40,13 +40,13 @@ publish.pypi.run() {
             log.info "installing twine and build tools"
             pip install --quiet twine build 2>/dev/null || {
                 log.error "failed to install twine"
-                return 3
+                return "$BRIK_EXIT_MISSING_DEP"
             }
             export PATH="${HOME}/.local/bin:${PATH}"
             tool="twine"
         else
             log.error "no publish tool found (poetry, uv, or twine)"
-            return 3
+            return "$BRIK_EXIT_MISSING_DEP"
         fi
     fi
 
@@ -75,12 +75,12 @@ publish.pypi.run() {
                 log.info "building distribution package"
                 python -m build --outdir dist/ . 2>&1 || {
                     log.error "failed to build distribution"
-                    return 5
+                    return "$BRIK_EXIT_EXTERNAL_FAIL"
                 }
                 dist_files=(dist/*)
                 if [[ ${#dist_files[@]} -eq 0 ]] || [[ "${dist_files[0]}" == "dist/*" ]]; then
                     log.error "no distribution files found in dist/ after build"
-                    return 5
+                    return "$BRIK_EXIT_EXTERNAL_FAIL"
                 fi
             fi
             cmd=(twine upload "${dist_files[@]}")
@@ -117,7 +117,7 @@ publish.pypi.run() {
 
     if [[ $rc -ne 0 ]]; then
         log.error "pypi publish failed"
-        return 5
+        return "$BRIK_EXIT_EXTERNAL_FAIL"
     fi
 
     log.info "pypi publish completed successfully"

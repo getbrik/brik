@@ -19,7 +19,7 @@ config.node.default() {
         test_framework) printf 'jest' ;;
         lint_tool)      printf 'eslint' ;;
         format_tool)    printf 'prettier' ;;
-        *) return 1 ;;
+        *) return "$BRIK_EXIT_FAILURE" ;;
     esac
     return 0
 }
@@ -71,7 +71,7 @@ config.node.validate_coherence() {
         log.error "config mismatch: test.framework resolves to 'jest' (${source}) but jest is not in package.json dependencies"
         log.error "package.json defines a custom test script: \"${test_script}\""
         log.error "fix: set 'test.framework: npm' in brik.yml, or add jest to devDependencies"
-        return 7
+        return "$BRIK_EXIT_CONFIG_ERROR"
     fi
 
     return 0

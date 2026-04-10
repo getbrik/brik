@@ -37,7 +37,7 @@ _hook._resolve() {
         printf '%s' "$default_hook"
         return 0
     fi
-    return 1
+    return "$BRIK_EXIT_FAILURE"
 }
 
 # Resolve a brik.yml inline hook for a stage.
@@ -53,7 +53,7 @@ _hook._resolve_config() {
         printf '%s' "${!var_name}"
         return 0
     fi
-    return 1
+    return "$BRIK_EXIT_FAILURE"
 }
 
 # Execute a hook by name. Sources the hook script and calls the function

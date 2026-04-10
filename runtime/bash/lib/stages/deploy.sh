@@ -54,7 +54,7 @@ stages.deploy() {
 
     if [[ $deploy_failed -gt 0 ]]; then
         context.set "$context_file" "BRIK_DEPLOY_STATUS" "failed"
-        return 1
+        return "$BRIK_EXIT_FAILURE"
     fi
 
     context.set "$context_file" "BRIK_DEPLOY_STATUS" "success"

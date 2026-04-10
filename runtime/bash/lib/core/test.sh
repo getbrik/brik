@@ -13,7 +13,7 @@ _test._load_stack() {
     local stack="$1"
     brik.use "test.${stack}" || {
         log.error "no test module: $stack"
-        return 7
+        return "$BRIK_EXIT_CONFIG_ERROR"
     }
 }
 
@@ -27,7 +27,7 @@ _test._stack_for_framework() {
         pytest|unittest|tox)        printf 'python' ;;
         cargo)                      printf 'rust' ;;
         dotnet|xunit|nunit)         printf 'dotnet' ;;
-        *)                          return 1 ;;
+        *)                          return "$BRIK_EXIT_FAILURE" ;;
     esac
 }
 
@@ -44,11 +44,11 @@ test.run() {
             --suite) suite="$2"; shift 2 ;;
             --report-dir) report_dir="$2"; shift 2 ;;
             --framework) framework="$2"; shift 2 ;;
-            *) log.error "unknown option: $1"; return 2 ;;
+            *) log.error "unknown option: $1"; return "$BRIK_EXIT_INVALID_INPUT" ;;
         esac
     done
 
-    runtime.require_dir "$workspace" || return 6
+    runtime.require_dir "$workspace" || return "$BRIK_EXIT_IO_FAILURE"
 
     # Tier 1: explicit command override
     if [[ -n "${BRIK_TEST_COMMAND:-}" ]]; then
@@ -56,7 +56,7 @@ test.run() {
         (cd "$workspace" && eval "$BRIK_TEST_COMMAND") || {
             local exit_code=$?
             log.error "tests failed with exit code $exit_code"
-            return 10
+            return "$BRIK_EXIT_CHECK_FAILED"
         }
         log.info "tests passed"
         return 0
@@ -67,14 +67,14 @@ test.run() {
         local stack
         stack="$(_test._stack_for_framework "$framework")" || {
             log.error "unsupported test framework: $framework"
-            return 7
+            return "$BRIK_EXIT_CONFIG_ERROR"
         }
         _test._load_stack "$stack"
         test_cmd="$(test."${stack}".cmd "$framework" "$workspace" "$report_dir")" || return $?
     else
         local stack
         brik.use build
-        stack="$(build.detect_stack "$workspace")" || return 3
+        stack="$(build.detect_stack "$workspace")" || return "$BRIK_EXIT_MISSING_DEP"
         _test._load_stack "$stack"
         test_cmd="$(test."${stack}".run_cmd "$workspace" "$report_dir")" || return $?
     fi
@@ -82,14 +82,14 @@ test.run() {
     log.info "running $suite tests: $test_cmd"
 
     if [[ -n "$report_dir" ]]; then
-        mkdir -p "$report_dir" || return 6
+        mkdir -p "$report_dir" || return "$BRIK_EXIT_IO_FAILURE"
         export JEST_JUNIT_OUTPUT_DIR="$report_dir"
     fi
 
     (cd "$workspace" && eval "$test_cmd") || {
         local exit_code=$?
         log.error "tests failed with exit code $exit_code"
-        return 10
+        return "$BRIK_EXIT_CHECK_FAILED"
     }
 
     log.info "tests passed"
@@ -106,23 +106,23 @@ test.publish_report() {
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --format) format="$2"; shift 2 ;;
-            *) log.error "unknown option: $1"; return 2 ;;
+            *) log.error "unknown option: $1"; return "$BRIK_EXIT_INVALID_INPUT" ;;
         esac
     done
 
     if [[ ! -f "$report_path" ]]; then
         log.error "report file not found: $report_path"
-        return 6
+        return "$BRIK_EXIT_IO_FAILURE"
     fi
 
     local reports_dir="${BRIK_LOG_DIR:-${BRIK_DEFAULT_LOG_DIR:-/tmp/brik/logs}}/reports"
-    mkdir -p "$reports_dir" || return 6
+    mkdir -p "$reports_dir" || return "$BRIK_EXIT_IO_FAILURE"
 
     local dest
     dest="${reports_dir}/$(basename "$report_path")"
     cp "$report_path" "$dest" || {
         log.error "cannot copy report to: $dest"
-        return 6
+        return "$BRIK_EXIT_IO_FAILURE"
     }
 
     log.info "test report published: $dest (format: $format)"

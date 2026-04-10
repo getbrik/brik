@@ -24,11 +24,11 @@ security.run() {
             --container-scan) container_scan="$2"; shift 2 ;;
             --severity) severity="$2"; shift 2 ;;
             --image) image="$2"; shift 2 ;;
-            *) log.error "unknown option: $1"; return 2 ;;
+            *) log.error "unknown option: $1"; return "$BRIK_EXIT_INVALID_INPUT" ;;
         esac
     done
 
-    runtime.require_dir "$workspace" || return 6
+    runtime.require_dir "$workspace" || return "$BRIK_EXIT_IO_FAILURE"
 
     log.info "running security scans (deps=$dep_scan, secrets=$secret_scan, container=$container_scan)"
 
@@ -80,7 +80,7 @@ security.run() {
     log.info "security summary: $passed/$total scans passed, $failed failed"
 
     if [[ "$failed" -gt 0 ]]; then
-        return 10
+        return "$BRIK_EXIT_CHECK_FAILED"
     fi
     return 0
 }

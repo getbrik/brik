@@ -28,16 +28,16 @@ publish.docker.run() {
             --username-var) username_var="$2"; shift 2 ;;
             --password-var) password_var="$2"; shift 2 ;;
             --dry-run) dry_run="true"; shift ;;
-            *) log.error "unknown option: $1"; return 2 ;;
+            *) log.error "unknown option: $1"; return "$BRIK_EXIT_INVALID_INPUT" ;;
         esac
     done
 
     if [[ -z "$image" ]]; then
         log.error "docker image name is required (--image or publish.docker.image in brik.yml)"
-        return 2
+        return "$BRIK_EXIT_INVALID_INPUT"
     fi
 
-    runtime.require_tool docker || return 3
+    runtime.require_tool docker || return "$BRIK_EXIT_MISSING_DEP"
 
     # Default tags to BRIK_VERSION if not specified
     if [[ -z "$tags" ]]; then
@@ -64,7 +64,7 @@ publish.docker.run() {
                 log.error "docker login failed"
                 rm -rf "$_docker_config_dir"
                 unset DOCKER_CONFIG
-                return 5
+                return "$BRIK_EXIT_EXTERNAL_FAIL"
             }
         fi
     fi
@@ -83,7 +83,7 @@ publish.docker.run() {
             log.info "pushing image: $full_image"
             docker push "$full_image" || {
                 log.error "docker push failed for $full_image"
-                return 5
+                return "$BRIK_EXIT_EXTERNAL_FAIL"
             }
         fi
     done

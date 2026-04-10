@@ -16,11 +16,11 @@ quality.run() {
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --checks) checks="$2"; shift 2 ;;
-            *) log.error "unknown option: $1"; return 2 ;;
+            *) log.error "unknown option: $1"; return "$BRIK_EXIT_INVALID_INPUT" ;;
         esac
     done
 
-    runtime.require_dir "$workspace" || return 6
+    runtime.require_dir "$workspace" || return "$BRIK_EXIT_IO_FAILURE"
 
     log.info "running quality checks: $checks"
 
@@ -56,7 +56,7 @@ quality.run() {
     log.info "quality summary: $passed/$total passed, $failed failed"
 
     if [[ "$failed" -gt 0 ]]; then
-        return 10
+        return "$BRIK_EXIT_CHECK_FAILED"
     fi
     return 0
 }

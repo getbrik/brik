@@ -24,7 +24,7 @@ publish.maven.run() {
             --username-var) username_var="$2"; shift 2 ;;
             --password-var) password_var="$2"; shift 2 ;;
             --dry-run) dry_run="true"; shift ;;
-            *) log.error "unknown option: $1"; return 2 ;;
+            *) log.error "unknown option: $1"; return "$BRIK_EXIT_INVALID_INPUT" ;;
         esac
     done
 
@@ -36,10 +36,10 @@ publish.maven.run() {
         tool="gradle"
     else
         log.error "no pom.xml or build.gradle found"
-        return 6
+        return "$BRIK_EXIT_IO_FAILURE"
     fi
 
-    runtime.require_tool "$tool" || return 3
+    runtime.require_tool "$tool" || return "$BRIK_EXIT_MISSING_DEP"
 
     # Validate credentials if provided
     if [[ -n "$username_var" ]]; then
@@ -94,7 +94,7 @@ SETTINGS_XML
 
     if [[ $rc -ne 0 ]]; then
         log.error "maven publish failed"
-        return 5
+        return "$BRIK_EXIT_EXTERNAL_FAIL"
     fi
 
     log.info "maven publish completed successfully"
