@@ -48,6 +48,7 @@ summary.build() {
     local errors_json="[]"
     if [[ -f "$log_file" ]] && command -v jq >/dev/null 2>&1; then
         local error_lines
+        # optional: grep returns 1 when no match
         error_lines="$(grep '\[ERROR\]' "$log_file" 2>/dev/null | sed 's/.*\[ERROR\] \[.*\] //' || true)"
         if [[ -n "$error_lines" ]]; then
             errors_json="$(printf '%s\n' "$error_lines" | jq -R -s 'split("\n") | map(select(length > 0))')"

@@ -1,6 +1,7 @@
 Describe "security/secret_scan.sh"
   Include "$BRIK_RUNTIME_LIB/logging.sh"
   Include "$BRIK_RUNTIME_LIB/tools.sh"
+  Include "$BRIK_CORE_LIB/_loader.sh"
   Include "$BRIK_CORE_LIB/quality/_tools.sh"
   Include "$BRIK_CORE_LIB/security/secret_scan.sh"
 
@@ -63,7 +64,7 @@ EOF
       It "returns 10 when command override finds secrets"
         When call security.secret_scan.run "$TEST_WS"
         The status should equal 10
-        The stderr should include "secrets detected"
+        The stderr should include "security secret scan findings detected"
       End
     End
 
@@ -194,7 +195,7 @@ MOCKEOF
       It "returns 7 for unknown tool name"
         When call security.secret_scan.run "$TEST_WS"
         The status should equal 7
-        The stderr should include "unknown secret scan tool"
+        The stderr should include "unknown security secret scan tool"
       End
     End
 
@@ -260,7 +261,7 @@ EOF
       It "returns 10 when scanner finds secrets"
         When call security.secret_scan.run "$TEST_WS"
         The status should equal 10
-        The stderr should include "secrets detected"
+        The stderr should include "security secret scan findings detected"
       End
     End
 
@@ -312,7 +313,7 @@ MOCKEOF
       It "skips when no tool available"
         When call security.secret_scan.run "$TEST_WS"
         The status should be success
-        The stderr should include "install gitleaks or trufflehog"
+        The stderr should include "no security secret scan tool available"
       End
     End
   End

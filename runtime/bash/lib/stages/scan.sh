@@ -3,36 +3,7 @@
 # @description Scan stage - dependency and secret scanning.
 # Runs in the scanner image (Go binaries like osv-scanner, grype, gitleaks).
 
-# Install project dependencies for dependency scanning tools.
-# Idempotent: skips if deps are already present.
-# Tools like npm audit and pip-audit need the dependency tree.
-_scan.install_deps() {
-    local workspace="$1"
-    local stack="${BRIK_BUILD_STACK:-}"
-
-    case "$stack" in
-        node)
-            if [[ ! -d "${workspace}/node_modules" ]]; then
-                log.info "installing node dependencies for security scanning"
-                (cd "$workspace" && npm ci --ignore-scripts 2>/dev/null) || true
-            fi
-            ;;
-        python)
-            export PATH="${HOME}/.local/bin:${PATH}"
-            local pip_flags="--quiet"
-            if pip install --help 2>&1 | grep -q -- '--break-system-packages'; then
-                pip_flags="$pip_flags --break-system-packages"
-            fi
-            if [[ -f "${workspace}/pyproject.toml" ]]; then
-                # shellcheck disable=SC2086
-                (cd "$workspace" && pip install . $pip_flags 2>/dev/null) || true
-            elif [[ -f "${workspace}/requirements.txt" ]]; then
-                # shellcheck disable=SC2086
-                (cd "$workspace" && pip install -r requirements.txt $pip_flags 2>/dev/null) || true
-            fi
-            ;;
-    esac
-}
+brik.use "_deps"
 
 # Scan stage: run dependency and secret scans via brik-lib.
 # Usage: stages.scan <context_file>
@@ -49,14 +20,10 @@ stages.scan() {
     export BRIK_SECURITY_DEPS_TOOL="${BRIK_SECURITY_DEPS_TOOL:-osv-scanner}"
     total=$((total + 1))
 
-    _scan.install_deps "${BRIK_WORKSPACE}"
+    _brik.install_deps "${BRIK_WORKSPACE}" scan
 
     if ! declare -f security.deps.run >/dev/null 2>&1; then
-        local sec_deps_path="${BASH_SOURCE[0]%/*}/../core/security/deps.sh"
-        if [[ -f "$sec_deps_path" ]]; then
-            # shellcheck source=../core/security/deps.sh
-            . "$sec_deps_path"
-        fi
+        brik.use "security.deps"
     fi
 
     if declare -f security.deps.run >/dev/null 2>&1; then
@@ -78,11 +45,7 @@ stages.scan() {
     total=$((total + 1))
 
     if ! declare -f security.secret_scan.run >/dev/null 2>&1; then
-        local sec_secret_path="${BASH_SOURCE[0]%/*}/../core/security/secret_scan.sh"
-        if [[ -f "$sec_secret_path" ]]; then
-            # shellcheck source=../core/security/secret_scan.sh
-            . "$sec_secret_path"
-        fi
+        brik.use "security.secret_scan"
     fi
 
     if declare -f security.secret_scan.run >/dev/null 2>&1; then

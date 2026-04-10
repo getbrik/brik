@@ -12,6 +12,7 @@ _BRIK_CORE_RELEASE_LOADED=1
 #        [--dry-run]
 release.prepare() {
     local version="$1"
+    # defensive: shift is safe even if no remaining args
     shift || true
     local generate_changelog="false"
     local changelog_file="${BRIK_RELEASE_CHANGELOG_FILE:-CHANGELOG.md}"
@@ -100,6 +101,7 @@ release.prepare() {
 # Usage: release.finalize <version> [--tag-prefix <prefix>] [--push] [--dry-run]
 release.finalize() {
     local version="$1"
+    # defensive: shift is safe even if no remaining args
     shift || true
     local tag_prefix="${BRIK_RELEASE_TAG_PREFIX:-v}"
     local push=false

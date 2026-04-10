@@ -44,7 +44,7 @@ test.node.run_cmd() {
         has_test_script="$(node -e "
             const p = require('${workspace}/package.json');
             if (p.scripts && p.scripts.test) console.log('yes');
-        " 2>/dev/null || true)"
+        " 2>/dev/null || true)"  # optional: node -e may fail if package.json invalid
     fi
 
     if [[ -n "$has_test_script" ]]; then

@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 # @module security.deps
-# @uses quality._tools
+# @uses quality._tools security._scan
 # @description Security-focused dependency vulnerability scanning.
 
 # Guard against double-sourcing
 [[ -n "${_BRIK_CORE_SECURITY_DEPS_LOADED:-}" ]] && return 0
 _BRIK_CORE_SECURITY_DEPS_LOADED=1
 
-# Source tool registry if not already loaded
-# shellcheck source=../quality/_tools.sh
-[[ -z "${_BRIK_CORE_QUALITY_TOOLS_LOADED:-}" ]] && . "${BASH_SOURCE[0]%/*}/../quality/_tools.sh"
+# Load tool registry and common scan helper
+brik.use "quality._tools"
+brik.use "security._scan"
 
 # Register security dependency scanners (sec_ prefix avoids collision with quality.deps)
 quality.tool.register sec_deps osv-scanner osv-scanner "osv-scanner scan --format table ." 10
@@ -42,46 +42,31 @@ security.deps.run() {
         return 0
     fi
 
-    # Tier 2: BRIK_SECURITY_DEPS_TOOL
-    local dep_tool="${BRIK_SECURITY_DEPS_TOOL:-}"
-    if [[ -n "$dep_tool" ]]; then
-        if command -v "$dep_tool" >/dev/null 2>&1; then
-            local dep_cmd=""
-            case "$dep_tool" in
-                osv-scanner) dep_cmd="osv-scanner scan --format table ." ;;
-                grype)       dep_cmd="grype dir:." ;;
-                *)           dep_cmd="$dep_tool ." ;;
-            esac
-            log.info "security dependency scan with tool: $dep_tool"
-            local dep_output=""
-            dep_output="$(cd "$workspace" && eval "$dep_cmd" 2>&1)" || {
-                # osv-scanner returns non-zero when no package sources found
-                if echo "$dep_output" | grep -qi "no package sources found"; then
-                    log.warn "no package sources found for $dep_tool - skipping"
-                    return 0
-                fi
-                log.error "security dependency vulnerabilities found"
-                return 10
-            }
-            log.info "security dependency scan passed"
-            return 0
-        else
-            log.error "security dependency scan tool not found: $dep_tool"
-            return 3
-        fi
-    fi
+    # Tier 2+3: resolve via tool registry
+    local tool="${BRIK_SECURITY_DEPS_TOOL:-}"
+    local resolve_args=(sec_deps)
+    [[ -n "$tool" ]] && resolve_args+=(--tool "$tool")
 
-    # Tier 3: auto-detect via registry
     local resolved
-    resolved="$(quality.tool.resolve sec_deps)" || {
+    resolved="$(quality.tool.resolve "${resolve_args[@]}")" || {
+        local rc=$?
+        if [[ $rc -eq 3 ]]; then
+            log.error "security dependency scan tool not found: $tool"
+            return 3
+        elif [[ $rc -eq 7 ]]; then
+            log.error "unknown security dependency scan tool: $tool"
+            return 7
+        fi
         log.warn "no security dependency scanner available - skipping"
         return 0
     }
-    log.info "security dependency scan with ${resolved}"
-    local auto_output=""
-    auto_output="$(cd "$workspace" && quality.tool.exec sec_deps "$resolved" \
+
+    log.info "security dependency scan with $resolved"
+    local scan_output=""
+    scan_output="$(cd "$workspace" && quality.tool.exec sec_deps "$resolved" \
         workspace="$workspace" severity="${severity^^}" 2>&1)" || {
-        if echo "$auto_output" | grep -qi "no package sources found"; then
+        # osv-scanner returns non-zero when no package sources found
+        if echo "$scan_output" | grep -qi "no package sources found"; then
             log.warn "no package sources found for $resolved - skipping"
             return 0
         fi

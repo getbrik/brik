@@ -31,7 +31,5 @@ test.rust.cmd() {
 # Auto-detect and return the test command for a Rust workspace.
 # Usage: test.rust.run_cmd <workspace> <report_dir>
 test.rust.run_cmd() {
-    local workspace="$1" report_dir="$2"
-
-    test.rust.cmd "cargo" "$workspace" "$report_dir"
+    printf '%s' "cargo test"
 }

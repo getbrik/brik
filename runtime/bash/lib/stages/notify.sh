@@ -27,6 +27,7 @@ stages.notify() {
     local pipeline_status="success"
     if [[ -n "$context_file" && -f "$context_file" ]]; then
         local ctx_val
+        # optional: key may not exist in context
         ctx_val="$(context.get "$context_file" "BRIK_PIPELINE_STATUS" 2>/dev/null)" || true
         [[ -n "$ctx_val" ]] && pipeline_status="$ctx_val"
     fi

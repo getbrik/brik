@@ -21,11 +21,7 @@ stages.container_scan() {
     log.info "container scan stage - scanning image: $image"
 
     if ! declare -f security.container.run >/dev/null 2>&1; then
-        local sec_container_path="${BASH_SOURCE[0]%/*}/../core/security/container.sh"
-        if [[ -f "$sec_container_path" ]]; then
-            # shellcheck source=../core/security/container.sh
-            . "$sec_container_path"
-        fi
+        brik.use "security.container"
     fi
 
     if ! declare -f security.container.run >/dev/null 2>&1; then
@@ -40,11 +36,7 @@ stages.container_scan() {
     security.container.run "${scan_args[@]}"
     local result=$?
 
-    if [[ $result -eq 0 ]]; then
-        context.set "$context_file" "BRIK_CONTAINER_SCAN_STATUS" "success"
-    else
-        context.set "$context_file" "BRIK_CONTAINER_SCAN_STATUS" "failed"
-    fi
+    context.set_result "$context_file" "BRIK_CONTAINER_SCAN_STATUS" "$result"
 
     return "$result"
 }

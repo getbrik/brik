@@ -8,9 +8,8 @@
 [[ -n "${_BRIK_CORE_SECURITY_IAC_LOADED:-}" ]] && return 0
 _BRIK_CORE_SECURITY_IAC_LOADED=1
 
-# Source tool registry if not already loaded
-# shellcheck source=../quality/_tools.sh
-[[ -z "${_BRIK_CORE_QUALITY_TOOLS_LOADED:-}" ]] && . "${BASH_SOURCE[0]%/*}/../quality/_tools.sh"
+# Load tool registry
+brik.use "quality._tools"
 
 # Register IaC scanners
 quality.tool.register sec_iac checkov checkov "checkov -d . --quiet --compact" 10

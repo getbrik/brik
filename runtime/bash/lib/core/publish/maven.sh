@@ -24,7 +24,6 @@ publish.maven.run() {
             --username-var) username_var="$2"; shift 2 ;;
             --password-var) password_var="$2"; shift 2 ;;
             --dry-run) dry_run="true"; shift ;;
-            --target) shift 2 ;;
             *) log.error "unknown option: $1"; return 2 ;;
         esac
     done
@@ -81,6 +80,7 @@ SETTINGS_XML
 
     if [[ "$dry_run" == "true" ]]; then
         log.info "[dry-run] ${cmd[*]}"
+        # cleanup: always remove temp credentials file
         rm -f "$tmp_settings" 2>/dev/null || true
         return 0
     fi
@@ -89,7 +89,7 @@ SETTINGS_XML
     "${cmd[@]}"
     local rc=$?
 
-    # Cleanup temporary settings file
+    # cleanup: always remove temp credentials file
     rm -f "$tmp_settings" 2>/dev/null || true
 
     if [[ $rc -ne 0 ]]; then

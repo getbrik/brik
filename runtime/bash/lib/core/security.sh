@@ -36,13 +36,9 @@ security.run() {
 
     if [[ "$dep_scan" == "true" ]]; then
         total=$((total + 1))
-        # Source security.deps module (skip if already defined, e.g. mocked)
+        # Load security.deps module (skip if already defined, e.g. mocked)
         if ! declare -f security.deps.run >/dev/null 2>&1; then
-            local sec_deps_path="${BASH_SOURCE[0]%/*}/security/deps.sh"
-            if [[ -f "$sec_deps_path" ]]; then
-                # shellcheck source=security/deps.sh
-                . "$sec_deps_path"
-            fi
+            brik.use "security.deps"
         fi
         if declare -f security.deps.run >/dev/null 2>&1; then
             security.deps.run "$workspace" --severity "$severity" || failed=$((failed + 1))
@@ -53,13 +49,9 @@ security.run() {
 
     if [[ "$secret_scan" == "true" ]]; then
         total=$((total + 1))
-        # Source security.secret_scan module (skip if already defined, e.g. mocked)
+        # Load security.secret_scan module (skip if already defined, e.g. mocked)
         if ! declare -f security.secret_scan.run >/dev/null 2>&1; then
-            local sec_secret_path="${BASH_SOURCE[0]%/*}/security/secret_scan.sh"
-            if [[ -f "$sec_secret_path" ]]; then
-                # shellcheck source=security/secret_scan.sh
-                . "$sec_secret_path"
-            fi
+            brik.use "security.secret_scan"
         fi
         if declare -f security.secret_scan.run >/dev/null 2>&1; then
             security.secret_scan.run "$workspace" || failed=$((failed + 1))
@@ -70,13 +62,9 @@ security.run() {
 
     if [[ "$container_scan" == "true" ]]; then
         total=$((total + 1))
-        # Source security.container module (skip if already defined, e.g. mocked)
+        # Load security.container module (skip if already defined, e.g. mocked)
         if ! declare -f security.container.run >/dev/null 2>&1; then
-            local sec_container_path="${BASH_SOURCE[0]%/*}/security/container.sh"
-            if [[ -f "$sec_container_path" ]]; then
-                # shellcheck source=security/container.sh
-                . "$sec_container_path"
-            fi
+            brik.use "security.container"
         fi
         if declare -f security.container.run >/dev/null 2>&1; then
             local container_args=("$workspace")

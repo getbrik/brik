@@ -1,6 +1,8 @@
 Describe "test.sh"
   Include "$BRIK_RUNTIME_LIB/logging.sh"
   Include "$BRIK_RUNTIME_LIB/tools.sh"
+  Include "$BRIK_CORE_LIB/_loader.sh"
+  Include "$BRIK_CORE_LIB/build.sh"
   Include "$BRIK_CORE_LIB/test.sh"
 
   Describe "test.run"
@@ -395,10 +397,10 @@ MOCKEOF
       Before 'setup_empty'
       After 'cleanup_empty'
 
-      It "returns 3 when no framework detected"
+      It "returns 3 when no stack detected"
         When call test.run "$TEST_WS"
         The status should equal 3
-        The stderr should include "cannot detect test framework"
+        The stderr should include "cannot detect stack"
       End
     End
 

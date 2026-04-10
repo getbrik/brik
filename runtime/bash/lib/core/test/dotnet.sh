@@ -31,7 +31,5 @@ test.dotnet.cmd() {
 # Auto-detect and return the test command for a .NET workspace.
 # Usage: test.dotnet.run_cmd <workspace> <report_dir>
 test.dotnet.run_cmd() {
-    local workspace="$1" report_dir="$2"
-
-    test.dotnet.cmd "dotnet" "$workspace" "$report_dir"
+    printf '%s' "dotnet test"
 }

@@ -28,7 +28,6 @@ publish.docker.run() {
             --username-var) username_var="$2"; shift 2 ;;
             --password-var) password_var="$2"; shift 2 ;;
             --dry-run) dry_run="true"; shift ;;
-            --target) shift 2 ;;
             *) log.error "unknown option: $1"; return 2 ;;
         esac
     done
@@ -90,7 +89,7 @@ publish.docker.run() {
     done
     IFS="${old_ifs}"
 
-    # Clean up credentials
+    # cleanup: always scrub credentials regardless of publish outcome
     if [[ -n "$_docker_config_dir" ]]; then
         docker logout ${registry:+"$registry"} >/dev/null 2>&1 || true
         rm -rf "$_docker_config_dir"

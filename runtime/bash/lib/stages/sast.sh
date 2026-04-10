@@ -18,8 +18,7 @@ stages.sast() {
     export BRIK_SECURITY_SAST_TOOL="${BRIK_SECURITY_SAST_TOOL:-semgrep}"
     total=$((total + 1))
     if ! declare -f security.sast.run >/dev/null 2>&1; then
-        local sec_sast_path="${BASH_SOURCE[0]%/*}/../core/security/sast.sh"
-        [[ -f "$sec_sast_path" ]] && . "$sec_sast_path"
+        brik.use "security.sast"
     fi
     if declare -f security.sast.run >/dev/null 2>&1; then
         log.info "running SAST scan (tool=${BRIK_SECURITY_SAST_TOOL})"
@@ -38,8 +37,7 @@ stages.sast() {
     if [[ -n "${BRIK_SECURITY_LICENSE_ALLOWED:-}" || -n "${BRIK_SECURITY_LICENSE_DENIED:-}" ]]; then
         total=$((total + 1))
         if ! declare -f security.license.run >/dev/null 2>&1; then
-            local sec_license_path="${BASH_SOURCE[0]%/*}/../core/security/license.sh"
-            [[ -f "$sec_license_path" ]] && . "$sec_license_path"
+            brik.use "security.license"
         fi
         if declare -f security.license.run >/dev/null 2>&1; then
             log.info "running license scan"
@@ -59,8 +57,7 @@ stages.sast() {
     if [[ -n "${BRIK_SECURITY_IAC_TOOL:-}" || -n "${BRIK_SECURITY_IAC_COMMAND:-}" ]]; then
         total=$((total + 1))
         if ! declare -f security.iac.run >/dev/null 2>&1; then
-            local sec_iac_path="${BASH_SOURCE[0]%/*}/../core/security/iac.sh"
-            [[ -f "$sec_iac_path" ]] && . "$sec_iac_path"
+            brik.use "security.iac"
         fi
         if declare -f security.iac.run >/dev/null 2>&1; then
             log.info "running IaC scan"

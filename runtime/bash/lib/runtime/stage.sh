@@ -94,6 +94,7 @@ stage.execute() {
 stage.cleanup() {
     local context_file="$1"
     local log_file="$2"
+    # best-effort: cleanup hook must not abort the stage
     hook.on_cleanup "${BRIK_LOG_SCOPE:-brik}" "$context_file" "$log_file" || true
     log.debug "stage cleanup complete"
     return 0
@@ -123,6 +124,7 @@ stage.run() {
     hook.pre_stage "$stage_name" "$context_file" "$log_file" || {
         exit_code=$?
         log.warn "pre-stage hook failed with code $exit_code, aborting stage"
+        # best-effort: finalization must not mask the pre-stage hook error
         summary.build "$stage_name" "$context_file" "$log_file" "$exit_code" || true
         stage.cleanup "$context_file" "$log_file" || true
         return "$exit_code"
@@ -133,10 +135,9 @@ stage.run() {
         stage.execute "$stage_name" "$logic_function" "$context_file" "${args[@]}"
     exit_code=$?
 
-    # Record finish time in context
+    # best-effort: finalization below must not override the stage exit code
     context.set "$context_file" "BRIK_FINISHED_AT" "$(date +"%Y-%m-%dT%H:%M:%S%z")" || true
 
-    # Success or failure hooks (best effort)
     if [[ $exit_code -eq 0 ]]; then
         log.info "stage $stage_name completed successfully"
         hook.on_success "$stage_name" "$context_file" "$log_file" || true
@@ -145,10 +146,8 @@ stage.run() {
         hook.on_failure "$stage_name" "$context_file" "$log_file" "$exit_code" || true
     fi
 
-    # Post-stage hook (best effort - does not override exit code)
     hook.post_stage "$stage_name" "$context_file" "$log_file" "$exit_code" || true
 
-    # Summary and cleanup
     summary.build "$stage_name" "$context_file" "$log_file" "$exit_code" || true
     stage.cleanup "$context_file" "$log_file" || true
 

@@ -195,6 +195,7 @@ config.export_build_vars() {
 
     local default_cmd=""
     if [[ "$stack" != "auto" ]]; then
+        # optional: stack may not define a default build command
         default_cmd="$(config.stack_default "$stack" "build_command" 2>/dev/null || true)"
     fi
 
@@ -206,6 +207,7 @@ config.export_build_vars() {
     local build_tool
     build_tool="$(config.get '.build.tool' '')"
     if [[ -z "$build_tool" && "$stack" != "auto" ]]; then
+        # optional: stack may not define a default build tool
         build_tool="$(config.stack_default "$stack" "build_tool" 2>/dev/null || true)"
     fi
     export BRIK_BUILD_TOOL="$build_tool"
@@ -229,6 +231,7 @@ config.export_test_vars() {
 
     local default_framework=""
     if [[ "$stack" != "auto" ]]; then
+        # optional: stack may not define a default test framework
         default_framework="$(config.stack_default "$stack" "test_framework" 2>/dev/null || true)"
     fi
 
@@ -279,6 +282,7 @@ config.export_quality_vars() {
     local default_lint=""
     local default_format=""
     if [[ "$stack" != "auto" ]]; then
+        # optional: stack may not define default quality tools
         default_lint="$(config.stack_default "$stack" "lint_tool" 2>/dev/null || true)"
         default_format="$(config.stack_default "$stack" "format_tool" 2>/dev/null || true)"
     fi
@@ -406,6 +410,7 @@ config.export_package_vars() {
 # Sets: BRIK_DEPLOY_ENVIRONMENTS, BRIK_DEPLOY_<ENV>_*
 config.export_deploy_vars() {
     local env_keys
+    # optional: deploy section may not exist in brik.yml
     env_keys="$(config.get '.deploy.environments | keys | .[]' '' 2>/dev/null)" || true
     if [[ -z "$env_keys" ]]; then
         export BRIK_DEPLOY_ENVIRONMENTS=""

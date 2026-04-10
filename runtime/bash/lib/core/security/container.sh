@@ -7,9 +7,8 @@
 [[ -n "${_BRIK_CORE_SECURITY_CONTAINER_LOADED:-}" ]] && return 0
 _BRIK_CORE_SECURITY_CONTAINER_LOADED=1
 
-# Source tool registry if not already loaded
-# shellcheck source=../quality/_tools.sh
-[[ -z "${_BRIK_CORE_QUALITY_TOOLS_LOADED:-}" ]] && . "${BASH_SOURCE[0]%/*}/../quality/_tools.sh"
+# Load tool registry
+brik.use "quality._tools"
 
 # Register security container scanners
 quality.tool.register sec_container grype  grype  "grype {image} --fail-on {severity}" 10

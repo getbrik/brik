@@ -1,6 +1,7 @@
 Describe "security/sast.sh"
   Include "$BRIK_RUNTIME_LIB/logging.sh"
   Include "$BRIK_RUNTIME_LIB/tools.sh"
+  Include "$BRIK_CORE_LIB/_loader.sh"
   Include "$BRIK_CORE_LIB/quality/_tools.sh"
   Include "$BRIK_CORE_LIB/security/sast.sh"
 
@@ -35,7 +36,7 @@ EOF
       It "runs command override"
         When call security.sast.run "$TEST_WS"
         The status should be success
-        The stderr should include "SAST scan passed"
+        The stderr should include "SAST passed"
       End
     End
 

@@ -1,6 +1,7 @@
 Describe "stages/container_scan.sh"
   Include "$BRIK_RUNTIME_LIB/logging.sh"
   Include "$BRIK_RUNTIME_LIB/context.sh"
+  Include "$BRIK_CORE_LIB/_loader.sh"
   Include "$BRIK_CORE_LIB/config.sh"
   Include "$BRIK_HOME/runtime/bash/lib/stages/container_scan.sh"
 

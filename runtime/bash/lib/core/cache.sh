@@ -116,6 +116,7 @@ cache.restore() {
 
     log.info "restoring cache: key=$key"
 
+    # idempotent: directory may already exist or be read-only
     mkdir -p "$destination" 2>/dev/null || true
 
     tar -xzf "$archive" -C "$destination" 2>/dev/null || {

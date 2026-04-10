@@ -25,7 +25,6 @@ publish.npm.run() {
             --access) access="$2"; shift 2 ;;
             --token-var) token_var="$2"; shift 2 ;;
             --dry-run) dry_run="true"; shift ;;
-            --target) shift 2 ;;
             *) log.error "unknown option: $1"; return 2 ;;
         esac
     done
@@ -69,7 +68,7 @@ ${registry_path}:always-auth=true"
     "${cmd[@]}"
     local rc=$?
 
-    # Cleanup token from environment
+    # cleanup: always scrub credentials from env
     unset NPM_TOKEN 2>/dev/null || true
 
     if [[ $rc -ne 0 ]]; then

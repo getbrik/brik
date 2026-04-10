@@ -22,7 +22,6 @@ publish.pypi.run() {
             --repository) repository="$2"; shift 2 ;;
             --token-var) token_var="$2"; shift 2 ;;
             --dry-run) dry_run="true"; shift ;;
-            --target) shift 2 ;;
             *) log.error "unknown option: $1"; return 2 ;;
         esac
     done
@@ -126,6 +125,7 @@ publish.pypi.run() {
 }
 
 # Cleanup PyPI-related credentials from the environment.
+# cleanup: always scrub credentials from env
 _publish._pypi_cleanup_env() {
     local tool="$1"
     case "$tool" in

@@ -7,9 +7,8 @@
 [[ -n "${_BRIK_CORE_SECURITY_LICENSE_LOADED:-}" ]] && return 0
 _BRIK_CORE_SECURITY_LICENSE_LOADED=1
 
-# Source tool registry if not already loaded
-# shellcheck source=../quality/_tools.sh
-[[ -z "${_BRIK_CORE_QUALITY_TOOLS_LOADED:-}" ]] && . "${BASH_SOURCE[0]%/*}/../quality/_tools.sh"
+# Load tool registry
+brik.use "quality._tools"
 
 # Register license scanners (license_finder handled inline for conditional flags)
 quality.tool.register sec_license syft     syft     "syft scan . -o spdx-json" 20
@@ -35,6 +34,7 @@ security.license.run() {
             if [[ -n "$allowed" ]]; then
                 local IFS=','
                 for lic in $allowed; do
+                    # best-effort: add is idempotent, may warn on duplicates
                     license_finder permitted_licenses add "$lic" 2>/dev/null || true
                 done
             fi
@@ -42,7 +42,7 @@ security.license.run() {
             if [[ -n "$denied" ]]; then
                 local IFS=','
                 for lic in $denied; do
-                    license_finder restricted_licenses add "$lic" 2>/dev/null || true
+                    license_finder restricted_licenses add "$lic" 2>/dev/null || true  # same as above
                 done
             fi
             # Check for unapproved dependencies

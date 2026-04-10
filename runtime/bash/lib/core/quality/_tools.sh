@@ -130,7 +130,7 @@ quality.tool.exec() {
         return
     fi
 
-    # Find template for resolved tool
+    # Find template for resolved tool (last match wins, supports re-registration)
     local template=""
     local var_name var_val _t_priority _t_tool _t_binary _t_template
     for var_name in $(compgen -v _BRIK_TOOL_"${category}"_ 2>/dev/null); do
@@ -138,7 +138,6 @@ quality.tool.exec() {
         _brik_tool_parse_entry "$var_val"
         if [[ "$_t_tool" == "$resolved" ]]; then
             template="$_t_template"
-            break
         fi
     done
 

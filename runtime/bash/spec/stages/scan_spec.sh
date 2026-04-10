@@ -188,8 +188,9 @@ YAML
   End
 End
 
-Describe "_scan.install_deps"
+Describe "_brik.install_deps (scan mode)"
   Include "$BRIK_HOME/runtime/bash/lib/runtime/stage.sh"
+  Include "$BRIK_HOME/runtime/bash/lib/core/_loader.sh"
   Include "$BRIK_HOME/runtime/bash/lib/stages/scan.sh"
 
   setup_deps_env() {
@@ -219,7 +220,7 @@ exit 0
 MOCKEOF
         chmod +x "${MOCK_BIN}/npm"
         export PATH="${MOCK_BIN}:${ORIG_PATH}"
-        _scan.install_deps "$DEPS_WS" 2>/dev/null
+        _brik.install_deps "$DEPS_WS" scan 2>/dev/null
         grep -q "npm ci" "$MOCK_LOG"
       }
       When call run_node_install
@@ -237,7 +238,7 @@ exit 1
 MOCKEOF
         chmod +x "${MOCK_BIN}/npm"
         export PATH="${MOCK_BIN}:${ORIG_PATH}"
-        _scan.install_deps "$DEPS_WS" 2>/dev/null
+        _brik.install_deps "$DEPS_WS" scan 2>/dev/null
       }
       When call run_node_skip
       The status should be success
@@ -256,7 +257,7 @@ exit 0
 MOCKEOF
         chmod +x "${MOCK_BIN}/pip"
         export PATH="${MOCK_BIN}:${ORIG_PATH}"
-        _scan.install_deps "$DEPS_WS" 2>/dev/null
+        _brik.install_deps "$DEPS_WS" scan 2>/dev/null
         grep -q 'pip install .' "$MOCK_LOG"
       }
       When call run_python_pyproject
@@ -275,7 +276,7 @@ exit 0
 MOCKEOF
         chmod +x "${MOCK_BIN}/pip"
         export PATH="${MOCK_BIN}:${ORIG_PATH}"
-        _scan.install_deps "$DEPS_WS" 2>/dev/null
+        _brik.install_deps "$DEPS_WS" scan 2>/dev/null
         grep -q 'pip install -r requirements.txt' "$MOCK_LOG"
       }
       When call run_python_req
@@ -287,7 +288,7 @@ MOCKEOF
         export BRIK_BUILD_STACK="python"
         rm -f "${DEPS_WS}/pyproject.toml" "${DEPS_WS}/requirements.txt"
         rm -f "$MOCK_LOG"
-        _scan.install_deps "$DEPS_WS" 2>/dev/null
+        _brik.install_deps "$DEPS_WS" scan 2>/dev/null
         [[ ! -f "$MOCK_LOG" ]]
       }
       When call run_python_noop
@@ -300,7 +301,7 @@ MOCKEOF
       run_unknown_stack() {
         export BRIK_BUILD_STACK="java"
         rm -f "$MOCK_LOG"
-        _scan.install_deps "$DEPS_WS" 2>/dev/null
+        _brik.install_deps "$DEPS_WS" scan 2>/dev/null
         [[ ! -f "$MOCK_LOG" ]]
       }
       When call run_unknown_stack
@@ -311,7 +312,7 @@ MOCKEOF
       run_empty_stack() {
         unset BRIK_BUILD_STACK
         rm -f "$MOCK_LOG"
-        _scan.install_deps "$DEPS_WS" 2>/dev/null
+        _brik.install_deps "$DEPS_WS" scan 2>/dev/null
         [[ ! -f "$MOCK_LOG" ]]
       }
       When call run_empty_stack

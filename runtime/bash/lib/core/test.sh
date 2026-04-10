@@ -7,46 +7,14 @@
 [[ -n "${_BRIK_CORE_TEST_LOADED:-}" ]] && return 0
 _BRIK_CORE_TEST_LOADED=1
 
-# Directory containing stack-specific test modules
-_BRIK_TEST_DIR="${BASH_SOURCE[0]%/*}/test"
-
-# Detect the stack from workspace marker files.
-# Prints the stack name on stdout.
-# Returns 1 if no stack detected.
-_test._detect_stack() {
-    local workspace="$1"
-
-    if [[ -f "${workspace}/package.json" ]]; then
-        printf 'node'
-    elif [[ -f "${workspace}/build.gradle" || -f "${workspace}/build.gradle.kts" ]]; then
-        printf 'java'
-    elif [[ -f "${workspace}/pom.xml" ]]; then
-        printf 'java'
-    elif [[ -f "${workspace}/pyproject.toml" || -f "${workspace}/setup.py" ]]; then
-        printf 'python'
-    elif [[ -f "${workspace}/Cargo.toml" ]]; then
-        printf 'rust'
-    elif ls "${workspace}"/*.csproj >/dev/null 2>&1 || ls "${workspace}"/*.sln >/dev/null 2>&1; then
-        printf 'dotnet'
-    else
-        return 1
-    fi
-    return 0
-}
-
-# Load a stack-specific test module.
+# Load a stack-specific test module via brik.use.
 # Returns 7 if module not found.
 _test._load_stack() {
     local stack="$1"
-    local module_path="${_BRIK_TEST_DIR}/${stack}.sh"
-
-    if [[ -f "$module_path" ]]; then
-        # shellcheck source=/dev/null
-        . "$module_path"
-    else
+    brik.use "test.${stack}" || {
         log.error "no test module: $stack"
         return 7
-    fi
+    }
 }
 
 # Map a framework name to its stack.
@@ -105,10 +73,8 @@ test.run() {
         test_cmd="$(test."${stack}".cmd "$framework" "$workspace" "$report_dir")" || return $?
     else
         local stack
-        stack="$(_test._detect_stack "$workspace")" || {
-            log.error "cannot detect test framework for workspace: $workspace"
-            return 3
-        }
+        brik.use build
+        stack="$(build.detect_stack "$workspace")" || return 3
         _test._load_stack "$stack"
         test_cmd="$(test."${stack}".run_cmd "$workspace" "$report_dir")" || return $?
     fi

@@ -4,6 +4,9 @@ Describe "security.sh"
   Include "$BRIK_CORE_LIB/quality/_tools.sh"
   Include "$BRIK_CORE_LIB/security.sh"
 
+  # brik.use is called lazily; sub-modules are mocked in test setup
+  brik.use() { :; }
+
   Describe "security.run"
     It "returns 6 for nonexistent workspace"
       When call security.run "/nonexistent/workspace"

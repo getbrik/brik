@@ -62,6 +62,7 @@ config.node.validate_coherence() {
     # Determine source of the framework value
     local source="stack default"
     local explicit_framework
+    # optional: .test.framework may not be set in brik.yml
     explicit_framework="$(config.get '.test.framework' '')" || true
     [[ -n "$explicit_framework" ]] && source="brik.yml"
 

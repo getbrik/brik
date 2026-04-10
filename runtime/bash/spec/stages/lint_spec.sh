@@ -262,8 +262,9 @@ YAML
   End
 End
 
-Describe "_lint.install_deps"
+Describe "_brik.install_deps (dev mode)"
   Include "$BRIK_HOME/runtime/bash/lib/runtime/stage.sh"
+  Include "$BRIK_HOME/runtime/bash/lib/core/_loader.sh"
   Include "$BRIK_HOME/runtime/bash/lib/stages/lint.sh"
 
   setup_deps_env() {
@@ -293,7 +294,7 @@ exit 0
 MOCKEOF
         chmod +x "${MOCK_BIN}/npm"
         export PATH="${MOCK_BIN}:${ORIG_PATH}"
-        _lint.install_deps "$DEPS_WS" 2>/dev/null
+        _brik.install_deps "$DEPS_WS" dev 2>/dev/null
         grep -q "npm ci" "$MOCK_LOG"
       }
       When call run_node_install
@@ -311,7 +312,7 @@ exit 1
 MOCKEOF
         chmod +x "${MOCK_BIN}/npm"
         export PATH="${MOCK_BIN}:${ORIG_PATH}"
-        _lint.install_deps "$DEPS_WS" 2>/dev/null
+        _brik.install_deps "$DEPS_WS" dev 2>/dev/null
       }
       When call run_node_skip
       The status should be success
@@ -330,7 +331,7 @@ exit 0
 MOCKEOF
         chmod +x "${MOCK_BIN}/pip"
         export PATH="${MOCK_BIN}:${ORIG_PATH}"
-        _lint.install_deps "$DEPS_WS" 2>/dev/null
+        _brik.install_deps "$DEPS_WS" dev 2>/dev/null
         grep -q 'pip install -e' "$MOCK_LOG"
       }
       When call run_python_pyproject
@@ -349,7 +350,7 @@ exit 0
 MOCKEOF
         chmod +x "${MOCK_BIN}/pip"
         export PATH="${MOCK_BIN}:${ORIG_PATH}"
-        _lint.install_deps "$DEPS_WS" 2>/dev/null
+        _brik.install_deps "$DEPS_WS" dev 2>/dev/null
         grep -q 'pip install -r requirements-dev.txt' "$MOCK_LOG"
       }
       When call run_python_reqdev
@@ -361,7 +362,7 @@ MOCKEOF
         export BRIK_BUILD_STACK="python"
         rm -f "${DEPS_WS}/pyproject.toml" "${DEPS_WS}/requirements-dev.txt"
         rm -f "$MOCK_LOG"
-        _lint.install_deps "$DEPS_WS" 2>/dev/null
+        _brik.install_deps "$DEPS_WS" dev 2>/dev/null
         [[ ! -f "$MOCK_LOG" ]]
       }
       When call run_python_noop
@@ -380,7 +381,7 @@ exit 0
 MOCKEOF
         chmod +x "${MOCK_BIN}/rustup"
         export PATH="${MOCK_BIN}:/usr/bin:/bin"
-        _lint.install_deps "$DEPS_WS" 2>/dev/null
+        _brik.install_deps "$DEPS_WS" dev 2>/dev/null
         grep -q "rustup component add clippy" "$MOCK_LOG"
       }
       When call run_rust_clippy
@@ -397,7 +398,7 @@ exit 0
 MOCKEOF
         chmod +x "${MOCK_BIN}/rustup"
         export PATH="${MOCK_BIN}:/usr/bin:/bin"
-        _lint.install_deps "$DEPS_WS" 2>/dev/null
+        _brik.install_deps "$DEPS_WS" dev 2>/dev/null
         grep -q "rustup component add rustfmt" "$MOCK_LOG"
       }
       When call run_rust_rustfmt
@@ -409,7 +410,7 @@ MOCKEOF
         export BRIK_BUILD_STACK="rust"
         rm -f "${MOCK_BIN}/rustup" "$MOCK_LOG"
         export PATH="${MOCK_BIN}:/usr/bin:/bin"
-        _lint.install_deps "$DEPS_WS" 2>/dev/null
+        _brik.install_deps "$DEPS_WS" dev 2>/dev/null
         [[ ! -f "$MOCK_LOG" ]]
       }
       When call run_rust_no_rustup
@@ -422,7 +423,7 @@ MOCKEOF
       run_unknown_stack() {
         export BRIK_BUILD_STACK="go"
         rm -f "$MOCK_LOG"
-        _lint.install_deps "$DEPS_WS" 2>/dev/null
+        _brik.install_deps "$DEPS_WS" dev 2>/dev/null
         [[ ! -f "$MOCK_LOG" ]]
       }
       When call run_unknown_stack
@@ -433,7 +434,7 @@ MOCKEOF
       run_empty_stack() {
         unset BRIK_BUILD_STACK
         rm -f "$MOCK_LOG"
-        _lint.install_deps "$DEPS_WS" 2>/dev/null
+        _brik.install_deps "$DEPS_WS" dev 2>/dev/null
         [[ ! -f "$MOCK_LOG" ]]
       }
       When call run_empty_stack

@@ -21,7 +21,6 @@ publish.nuget.run() {
             --source) source="$2"; shift 2 ;;
             --api-key-var) api_key_var="$2"; shift 2 ;;
             --dry-run) dry_run="true"; shift ;;
-            --target) shift 2 ;;
             *) log.error "unknown option: $1"; return 2 ;;
         esac
     done
@@ -31,13 +30,14 @@ publish.nuget.run() {
     # Find .nupkg files (enable globstar for recursive search)
     local -a nupkgs
     local prev_globstar
+    # defensive: globstar may not be available in all bash versions
     prev_globstar="$(shopt -p globstar 2>/dev/null)" || true
     shopt -s globstar 2>/dev/null || true
     local f
     for f in ./**/*.nupkg; do
         [[ -f "$f" ]] && nupkgs+=("$f")
     done
-    eval "$prev_globstar" 2>/dev/null || true
+    eval "$prev_globstar" 2>/dev/null || true  # restore previous globstar state
 
     if [[ ${#nupkgs[@]} -eq 0 ]]; then
         # Auto-pack if no .nupkg files found
@@ -115,6 +115,7 @@ publish.nuget.run() {
             log.info "publishing: dotnet nuget push $pkg${source:+ --source $source} --api-key ***"
             "${cmd[@]}" || {
                 log.error "nuget push failed for $pkg"
+                # cleanup: always scrub credentials on error path
                 unset NUGET_API_KEY 2>/dev/null || true
                 rm -f "$tmp_nuget_config" 2>/dev/null || true
                 return 5
@@ -122,7 +123,7 @@ publish.nuget.run() {
         fi
     done
 
-    # Cleanup credentials and temp files
+    # cleanup: always scrub credentials from env
     unset NUGET_API_KEY 2>/dev/null || true
     rm -f "$tmp_nuget_config" 2>/dev/null || true
 

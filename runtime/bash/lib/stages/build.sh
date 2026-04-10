@@ -27,11 +27,7 @@ stages.build() {
     build.run "${BRIK_WORKSPACE}" --stack "$stack" --config "${BRIK_CONFIG_FILE}"
     local result=$?
 
-    if [[ $result -eq 0 ]]; then
-        context.set "$context_file" "BRIK_BUILD_STATUS" "success"
-    else
-        context.set "$context_file" "BRIK_BUILD_STATUS" "failed"
-    fi
+    context.set_result "$context_file" "BRIK_BUILD_STATUS" "$result"
 
     return "$result"
 }

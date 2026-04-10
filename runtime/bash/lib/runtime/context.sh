@@ -90,6 +90,21 @@ context.set() {
     return 0
 }
 
+# Set a status key based on an exit code.
+# Maps 0 -> "success", non-zero -> "failed".
+# Usage: context.set_result <context_file> <key> <exit_code>
+context.set_result() {
+    local context_file="$1"
+    local key="$2"
+    local exit_code="$3"
+
+    if [[ "$exit_code" -eq 0 ]]; then
+        context.set "$context_file" "$key" "success"
+    else
+        context.set "$context_file" "$key" "failed"
+    fi
+}
+
 # Check whether a key exists in the context file.
 # Returns 0 if found, 1 otherwise.
 context.exists() {

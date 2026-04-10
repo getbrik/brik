@@ -123,8 +123,9 @@ YAML
   End
 End
 
-Describe "_test.install_deps"
+Describe "_brik.install_deps (test mode)"
   Include "$BRIK_HOME/runtime/bash/lib/runtime/stage.sh"
+  Include "$BRIK_HOME/runtime/bash/lib/core/_loader.sh"
   Include "$BRIK_HOME/runtime/bash/lib/stages/test.sh"
 
   setup_deps_env() {
@@ -154,7 +155,7 @@ exit 0
 MOCKEOF
         chmod +x "${MOCK_BIN}/npm"
         export PATH="${MOCK_BIN}:${ORIG_PATH}"
-        _test.install_deps "$DEPS_WS" 2>/dev/null
+        _brik.install_deps "$DEPS_WS" test 2>/dev/null
         grep -q "npm ci" "$MOCK_LOG"
       }
       When call run_node_install
@@ -172,7 +173,7 @@ exit 1
 MOCKEOF
         chmod +x "${MOCK_BIN}/npm"
         export PATH="${MOCK_BIN}:${ORIG_PATH}"
-        _test.install_deps "$DEPS_WS" 2>/dev/null
+        _brik.install_deps "$DEPS_WS" test 2>/dev/null
       }
       When call run_node_skip
       The status should be success
@@ -191,7 +192,7 @@ exit 0
 MOCKEOF
         chmod +x "${MOCK_BIN}/pip"
         export PATH="${MOCK_BIN}:${ORIG_PATH}"
-        _test.install_deps "$DEPS_WS" 2>/dev/null
+        _brik.install_deps "$DEPS_WS" test 2>/dev/null
         grep -q 'pip install -e' "$MOCK_LOG"
       }
       When call run_python_pyproject
@@ -210,7 +211,7 @@ exit 0
 MOCKEOF
         chmod +x "${MOCK_BIN}/pip"
         export PATH="${MOCK_BIN}:${ORIG_PATH}"
-        _test.install_deps "$DEPS_WS" 2>/dev/null
+        _brik.install_deps "$DEPS_WS" test 2>/dev/null
         grep -q 'pip install -r requirements.txt' "$MOCK_LOG"
       }
       When call run_python_req
@@ -222,7 +223,7 @@ MOCKEOF
         export BRIK_BUILD_STACK="python"
         rm -f "${DEPS_WS}/pyproject.toml" "${DEPS_WS}/requirements.txt"
         rm -f "$MOCK_LOG"
-        _test.install_deps "$DEPS_WS" 2>/dev/null
+        _brik.install_deps "$DEPS_WS" test 2>/dev/null
         [[ ! -f "$MOCK_LOG" ]]
       }
       When call run_python_noop
@@ -235,7 +236,7 @@ MOCKEOF
       run_java_noop() {
         export BRIK_BUILD_STACK="java"
         rm -f "$MOCK_LOG"
-        _test.install_deps "$DEPS_WS" 2>/dev/null
+        _brik.install_deps "$DEPS_WS" test 2>/dev/null
         [[ ! -f "$MOCK_LOG" ]]
       }
       When call run_java_noop
@@ -248,7 +249,7 @@ MOCKEOF
       run_rust_noop() {
         export BRIK_BUILD_STACK="rust"
         rm -f "$MOCK_LOG"
-        _test.install_deps "$DEPS_WS" 2>/dev/null
+        _brik.install_deps "$DEPS_WS" test 2>/dev/null
         [[ ! -f "$MOCK_LOG" ]]
       }
       When call run_rust_noop
@@ -267,7 +268,7 @@ exit 0
 MOCKEOF
         chmod +x "${MOCK_BIN}/dotnet"
         export PATH="${MOCK_BIN}:${ORIG_PATH}"
-        _test.install_deps "$DEPS_WS" 2>/dev/null
+        _brik.install_deps "$DEPS_WS" test 2>/dev/null
         grep -q "dotnet restore" "$MOCK_LOG"
       }
       When call run_dotnet_restore
@@ -280,7 +281,7 @@ MOCKEOF
       run_unknown_stack() {
         export BRIK_BUILD_STACK="go"
         rm -f "$MOCK_LOG"
-        _test.install_deps "$DEPS_WS" 2>/dev/null
+        _brik.install_deps "$DEPS_WS" test 2>/dev/null
         [[ ! -f "$MOCK_LOG" ]]
       }
       When call run_unknown_stack
@@ -291,7 +292,7 @@ MOCKEOF
       run_empty_stack() {
         unset BRIK_BUILD_STACK
         rm -f "$MOCK_LOG"
-        _test.install_deps "$DEPS_WS" 2>/dev/null
+        _brik.install_deps "$DEPS_WS" test 2>/dev/null
         [[ ! -f "$MOCK_LOG" ]]
       }
       When call run_empty_stack

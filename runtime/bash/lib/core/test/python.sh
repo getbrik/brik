@@ -38,7 +38,8 @@ test.python.cmd() {
 # Auto-detect and return the test command for a Python workspace.
 # Usage: test.python.run_cmd <workspace> <report_dir>
 test.python.run_cmd() {
-    local workspace="$1" report_dir="$2"
-
-    test.python.cmd "pytest" "$workspace" "$report_dir"
+    local report_dir="${2:-}"
+    local cmd="python -m pytest"
+    [[ -n "$report_dir" ]] && cmd="$cmd --junitxml=${report_dir}/report.xml"
+    printf '%s' "$cmd"
 }
