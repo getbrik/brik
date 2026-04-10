@@ -47,59 +47,55 @@ stages.scan() {
 
     # Dependency scan (non-negotiable: defaults to osv-scanner if not configured)
     export BRIK_SECURITY_DEPS_TOOL="${BRIK_SECURITY_DEPS_TOOL:-osv-scanner}"
-    if true; then
-        total=$((total + 1))
+    total=$((total + 1))
 
-        _scan.install_deps "${BRIK_WORKSPACE}"
+    _scan.install_deps "${BRIK_WORKSPACE}"
 
-        if ! declare -f security.deps.run >/dev/null 2>&1; then
-            local sec_deps_path="${BASH_SOURCE[0]%/*}/../core/security/deps.sh"
-            if [[ -f "$sec_deps_path" ]]; then
-                # shellcheck source=../core/security/deps.sh
-                . "$sec_deps_path"
-            fi
+    if ! declare -f security.deps.run >/dev/null 2>&1; then
+        local sec_deps_path="${BASH_SOURCE[0]%/*}/../core/security/deps.sh"
+        if [[ -f "$sec_deps_path" ]]; then
+            # shellcheck source=../core/security/deps.sh
+            . "$sec_deps_path"
         fi
+    fi
 
-        if declare -f security.deps.run >/dev/null 2>&1; then
-            local severity="${BRIK_SECURITY_DEPS_SEVERITY:-${BRIK_SECURITY_SEVERITY_THRESHOLD:-high}}"
-            log.info "running dependency scan (tool=${BRIK_SECURITY_DEPS_TOOL}, severity=$severity)"
-            if security.deps.run "${BRIK_WORKSPACE}" --severity "$severity"; then
-                passed=$((passed + 1))
-                log.info "dependency scan passed"
-            else
-                failed=$((failed + 1))
-                log.warn "dependency scan failed"
-            fi
+    if declare -f security.deps.run >/dev/null 2>&1; then
+        local severity="${BRIK_SECURITY_DEPS_SEVERITY:-${BRIK_SECURITY_SEVERITY_THRESHOLD:-high}}"
+        log.info "running dependency scan (tool=${BRIK_SECURITY_DEPS_TOOL}, severity=$severity)"
+        if security.deps.run "${BRIK_WORKSPACE}" --severity "$severity"; then
+            passed=$((passed + 1))
+            log.info "dependency scan passed"
         else
-            log.warn "security.deps module not available - skipping dependency scan"
+            failed=$((failed + 1))
+            log.warn "dependency scan failed"
         fi
+    else
+        log.warn "security.deps module not available - skipping dependency scan"
     fi
 
     # Secret scan (non-negotiable: defaults to gitleaks if not configured)
     export BRIK_SECURITY_SECRETS_TOOL="${BRIK_SECURITY_SECRETS_TOOL:-gitleaks}"
-    if true; then
-        total=$((total + 1))
+    total=$((total + 1))
 
-        if ! declare -f security.secret_scan.run >/dev/null 2>&1; then
-            local sec_secret_path="${BASH_SOURCE[0]%/*}/../core/security/secret_scan.sh"
-            if [[ -f "$sec_secret_path" ]]; then
-                # shellcheck source=../core/security/secret_scan.sh
-                . "$sec_secret_path"
-            fi
+    if ! declare -f security.secret_scan.run >/dev/null 2>&1; then
+        local sec_secret_path="${BASH_SOURCE[0]%/*}/../core/security/secret_scan.sh"
+        if [[ -f "$sec_secret_path" ]]; then
+            # shellcheck source=../core/security/secret_scan.sh
+            . "$sec_secret_path"
         fi
+    fi
 
-        if declare -f security.secret_scan.run >/dev/null 2>&1; then
-            log.info "running secret scan (tool=${BRIK_SECURITY_SECRETS_TOOL})"
-            if security.secret_scan.run "${BRIK_WORKSPACE}"; then
-                passed=$((passed + 1))
-                log.info "secret scan passed"
-            else
-                failed=$((failed + 1))
-                log.warn "secret scan failed"
-            fi
+    if declare -f security.secret_scan.run >/dev/null 2>&1; then
+        log.info "running secret scan (tool=${BRIK_SECURITY_SECRETS_TOOL})"
+        if security.secret_scan.run "${BRIK_WORKSPACE}"; then
+            passed=$((passed + 1))
+            log.info "secret scan passed"
         else
-            log.warn "security.secret_scan module not available - skipping secret scan"
+            failed=$((failed + 1))
+            log.warn "secret scan failed"
         fi
+    else
+        log.warn "security.secret_scan module not available - skipping secret scan"
     fi
 
     log.info "scan summary: $passed/$total passed, $failed failed"

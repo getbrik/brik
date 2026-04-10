@@ -23,6 +23,10 @@ _BRIK_SETUP_LOADED=1
 # shellcheck source=logging.sh
 [[ -z "${_BRIK_LOGGING_LOADED:-}" ]] && . "${BASH_SOURCE[0]%/*}/logging.sh"
 
+# Default stack versions - single source of truth for all package managers
+readonly _SETUP_DEFAULT_JAVA_VERSION=21
+readonly _SETUP_DEFAULT_DOTNET_VERSION=8
+
 # ---------------------------------------------------------------------------
 # brik-runner image detection
 # ---------------------------------------------------------------------------
@@ -146,9 +150,9 @@ _setup._install_via_apk() {
     case "$name" in
         node)   packages="nodejs npm" ;;
         python) packages="python3 py3-pip py3-setuptools" ;;
-        java)   packages="${version:+openjdk${version}-jdk}"; packages="${packages:-openjdk21-jdk}"; packages="$packages maven" ;;
+        java)   packages="${version:+openjdk${version}-jdk}"; packages="${packages:-openjdk${_SETUP_DEFAULT_JAVA_VERSION}-jdk}"; packages="$packages maven" ;;
         rust)   packages="rust cargo" ;;
-        dotnet) packages="${version:+dotnet${version%%.*}-sdk}"; packages="${packages:-dotnet8-sdk}" ;;
+        dotnet) packages="${version:+dotnet${version%%.*}-sdk}"; packages="${packages:-dotnet${_SETUP_DEFAULT_DOTNET_VERSION}-sdk}" ;;
         jq)     packages="jq" ;;
         git)    packages="git" ;;
         bash)   packages="bash" ;;
@@ -172,9 +176,9 @@ _setup._install_via_apt() {
     case "$name" in
         node)   packages="nodejs npm" ;;
         python) packages="python3 python3-pip python3-setuptools" ;;
-        java)   packages="${version:+openjdk-${version}-jdk}"; packages="${packages:-openjdk-21-jdk}" ;;
+        java)   packages="${version:+openjdk-${version}-jdk}"; packages="${packages:-openjdk-${_SETUP_DEFAULT_JAVA_VERSION}-jdk}" ;;
         rust)   packages="rustc cargo" ;;
-        dotnet) packages="${version:+dotnet-sdk-${version}.0}"; packages="${packages:-dotnet-sdk-8.0}" ;;
+        dotnet) packages="${version:+dotnet-sdk-${version}.0}"; packages="${packages:-dotnet-sdk-${_SETUP_DEFAULT_DOTNET_VERSION}.0}" ;;
         jq)     packages="jq" ;;
         git)    packages="git" ;;
         bash)   packages="bash" ;;
@@ -202,9 +206,9 @@ _setup._install_via_yum() {
     case "$name" in
         node)   packages="nodejs npm" ;;
         python) packages="python3 python3-pip" ;;
-        java)   packages="${version:+java-${version}-openjdk-devel}"; packages="${packages:-java-21-openjdk-devel}" ;;
+        java)   packages="${version:+java-${version}-openjdk-devel}"; packages="${packages:-java-${_SETUP_DEFAULT_JAVA_VERSION}-openjdk-devel}" ;;
         rust)   packages="rust cargo" ;;
-        dotnet) packages="${version:+dotnet-sdk-${version}.0}"; packages="${packages:-dotnet-sdk-8.0}" ;;
+        dotnet) packages="${version:+dotnet-sdk-${version}.0}"; packages="${packages:-dotnet-sdk-${_SETUP_DEFAULT_DOTNET_VERSION}.0}" ;;
         jq)     packages="jq" ;;
         git)    packages="git" ;;
         bash)   packages="bash" ;;
@@ -228,9 +232,9 @@ _setup._install_via_dnf() {
     case "$name" in
         node)   packages="nodejs npm" ;;
         python) packages="python3 python3-pip" ;;
-        java)   packages="${version:+java-${version}-openjdk-devel}"; packages="${packages:-java-21-openjdk-devel}" ;;
+        java)   packages="${version:+java-${version}-openjdk-devel}"; packages="${packages:-java-${_SETUP_DEFAULT_JAVA_VERSION}-openjdk-devel}" ;;
         rust)   packages="rust cargo" ;;
-        dotnet) packages="${version:+dotnet-sdk-${version}.0}"; packages="${packages:-dotnet-sdk-8.0}" ;;
+        dotnet) packages="${version:+dotnet-sdk-${version}.0}"; packages="${packages:-dotnet-sdk-${_SETUP_DEFAULT_DOTNET_VERSION}.0}" ;;
         jq)     packages="jq" ;;
         git)    packages="git" ;;
         bash)   packages="bash" ;;

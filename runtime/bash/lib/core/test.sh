@@ -149,7 +149,7 @@ test.publish_report() {
         return 6
     fi
 
-    local reports_dir="${BRIK_LOG_DIR:-/tmp/brik/logs}/reports"
+    local reports_dir="${BRIK_LOG_DIR:-${BRIK_DEFAULT_LOG_DIR:-/tmp/brik/logs}}/reports"
     mkdir -p "$reports_dir" || return 6
 
     local dest

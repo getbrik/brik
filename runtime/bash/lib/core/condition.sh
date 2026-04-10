@@ -34,7 +34,7 @@ condition.eval() {
     expression="$(echo "$expression" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
 
     if [[ -z "$expression" ]]; then
-        echo "error: empty condition expression" >&2
+        log.error "empty condition expression"
         return 1
     fi
 
@@ -56,8 +56,8 @@ condition.eval() {
         operator="${BASH_REMATCH[2]}"
         value="${BASH_REMATCH[3]}"
     else
-        echo "error: invalid condition expression: $expression" >&2
-        echo "hint: expected format: subject == 'value' or subject =~ 'pattern'" >&2
+        log.error "invalid condition expression: $expression"
+        log.warn "expected format: subject == 'value' or subject =~ 'pattern'"
         return 1
     fi
 
@@ -80,7 +80,7 @@ condition.eval() {
             esac
             ;;
         *)
-            echo "error: unsupported operator: $operator" >&2
+            log.error "unsupported operator: $operator"
             return 1
             ;;
     esac
@@ -122,7 +122,7 @@ condition.eval_deploy_env() {
     # Lazy-load config module if not yet loaded
     if ! declare -f config.get >/dev/null 2>&1; then
         brik.use config || {
-            echo "error: config module is required for condition.eval_deploy_env" >&2
+            log.error "config module is required for condition.eval_deploy_env"
             return 1
         }
     fi
@@ -131,7 +131,7 @@ condition.eval_deploy_env() {
     when_expr="$(config.get ".deploy.environments.${env_name}.when" '')"
 
     if [[ -z "$when_expr" ]]; then
-        echo "warning: no condition defined for environment: $env_name" >&2
+        log.warn "no condition defined for environment: $env_name"
         return 1
     fi
 

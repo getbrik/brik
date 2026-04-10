@@ -16,24 +16,22 @@ stages.sast() {
 
     # SAST scan (non-negotiable: defaults to semgrep if not configured)
     export BRIK_SECURITY_SAST_TOOL="${BRIK_SECURITY_SAST_TOOL:-semgrep}"
-    if true; then
-        total=$((total + 1))
-        if ! declare -f security.sast.run >/dev/null 2>&1; then
-            local sec_sast_path="${BASH_SOURCE[0]%/*}/../core/security/sast.sh"
-            [[ -f "$sec_sast_path" ]] && . "$sec_sast_path"
-        fi
-        if declare -f security.sast.run >/dev/null 2>&1; then
-            log.info "running SAST scan (tool=${BRIK_SECURITY_SAST_TOOL})"
-            if security.sast.run "${BRIK_WORKSPACE}"; then
-                passed=$((passed + 1))
-                log.info "SAST scan passed"
-            else
-                failed=$((failed + 1))
-                log.warn "SAST scan failed"
-            fi
+    total=$((total + 1))
+    if ! declare -f security.sast.run >/dev/null 2>&1; then
+        local sec_sast_path="${BASH_SOURCE[0]%/*}/../core/security/sast.sh"
+        [[ -f "$sec_sast_path" ]] && . "$sec_sast_path"
+    fi
+    if declare -f security.sast.run >/dev/null 2>&1; then
+        log.info "running SAST scan (tool=${BRIK_SECURITY_SAST_TOOL})"
+        if security.sast.run "${BRIK_WORKSPACE}"; then
+            passed=$((passed + 1))
+            log.info "SAST scan passed"
         else
-            log.warn "SAST module not available - skipping"
+            failed=$((failed + 1))
+            log.warn "SAST scan failed"
         fi
+    else
+        log.warn "SAST module not available - skipping"
     fi
 
     # License scan

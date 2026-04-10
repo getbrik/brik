@@ -54,7 +54,7 @@ summary.build() {
         fi
     fi
 
-    local log_dir="${BRIK_LOG_DIR:-/tmp/brik/logs}"
+    local log_dir="${BRIK_LOG_DIR:-${BRIK_DEFAULT_LOG_DIR:-/tmp/brik/logs}}"
     local summary_path="${log_dir}/${stage_name}-summary.json"
 
     if command -v jq >/dev/null 2>&1; then

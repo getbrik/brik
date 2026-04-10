@@ -18,6 +18,8 @@ _BRIK_STAGE_LOADED=1
 # Source all runtime modules
 _stage._load_runtime() {
     local runtime_dir="${BASH_SOURCE[0]%/*}"
+    # shellcheck source=version-info.sh
+    [[ -z "${_BRIK_VERSION_INFO_LOADED:-}" ]] && . "${runtime_dir}/version-info.sh"
     # shellcheck source=logging.sh
     [[ -z "${_BRIK_LOGGING_LOADED:-}" ]] && . "${runtime_dir}/logging.sh"
     # shellcheck source=error.sh
@@ -41,7 +43,7 @@ _stage._load_runtime
 # Create a log file for a stage. Prints the path on stdout.
 stage.create_log_file() {
     local stage_name="$1"
-    local log_dir="${BRIK_LOG_DIR:-/tmp/brik/logs}"
+    local log_dir="${BRIK_LOG_DIR:-${BRIK_DEFAULT_LOG_DIR:-/tmp/brik/logs}}"
     mkdir -p "$log_dir" || {
         log.error "cannot create log directory: $log_dir"
         return 6
