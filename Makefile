@@ -1,4 +1,4 @@
-.PHONY: help lint test test-quick coverage validate check clean install uninstall
+.PHONY: help lint test test-quick coverage validate check clean install uninstall metrics
 
 help: ## Show available targets
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F ':.*## ' '{printf "  %-14s %s\n", $$1, $$2}'
@@ -37,6 +37,10 @@ install: ## Install brik symlink into /usr/local/bin (dev mode)
 uninstall: ## Remove brik symlink from /usr/local/bin
 	rm -f /usr/local/bin/brik
 	@echo "removed: /usr/local/bin/brik"
+
+metrics: ## Run shellmetrics on production scripts
+	@find runtime/bash/lib shared-libs -name '*.sh' -not -path '*/spec/*' | \
+		xargs shellmetrics
 
 clean: ## Remove generated files
 	rm -rf coverage/

@@ -61,3 +61,71 @@ jobs:
         uses: codecov/codecov-action@v6
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
+
+  metrics:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install shellmetrics
+        run: |
+          git clone --depth 1 https://github.com/shellspec/shellmetrics.git /tmp/shellmetrics
+          sudo cp /tmp/shellmetrics/shellmetrics /usr/local/bin/shellmetrics
+          sudo chmod +x /usr/local/bin/shellmetrics
+
+      - name: Generate metrics badges
+        run: |
+          # Run shellmetrics and extract the summary totals line
+          # Format: NLOC_total NLOC_avg LLOC_total LLOC_avg CCN_avg Func_cnt File_cnt ...
+          summary=$(find runtime/bash/lib shared-libs -name '*.sh' -not -path '*/spec/*' | \
+            xargs shellmetrics --no-color 2>/dev/null | tail -2 | head -1)
+
+          # Parse whitespace-separated fields (locale may use comma as decimal separator)
+          lloc=$(echo "$summary" | awk '{print $3}')
+          ccn_avg=$(echo "$summary" | awk '{print $5}' | tr ',' '.')
+          func_cnt=$(echo "$summary" | awk '{print $6}')
+
+          echo "LLOC=$lloc CCN_avg=$ccn_avg Functions=$func_cnt"
+
+          # Determine CCN color
+          ccn_int=${ccn_avg%%.*}
+          if [ "$ccn_int" -lt 5 ]; then
+            ccn_color="brightgreen"
+          elif [ "$ccn_int" -lt 10 ]; then
+            ccn_color="yellow"
+          else
+            ccn_color="red"
+          fi
+
+          # Write badge JSON files
+          mkdir -p docs/badges
+          jq -n --arg msg "$ccn_avg" --arg color "$ccn_color" \
+            '{schemaVersion:1, label:"avg CCN", message:$msg, color:$color}' \
+            > docs/badges/ccn.json
+          jq -n --arg msg "$func_cnt" \
+            '{schemaVersion:1, label:"functions", message:$msg, color:"informational"}' \
+            > docs/badges/functions.json
+          jq -n --arg msg "$lloc" \
+            '{schemaVersion:1, label:"LLOC", message:$msg, color:"informational"}' \
+            > docs/badges/lloc.json
+
+          # Validate JSON
+          for f in docs/badges/*.json; do
+            jq empty "$f"
+            echo "  $f: $(cat "$f")"
+          done
+
+      - name: Commit badge updates
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/badges/*.json
+          if git diff --cached --quiet; then
+            echo "No badge changes to commit"
+          else
+            git commit -m "ci: update shellmetrics badges [skip ci]"
+            git push
+          fi

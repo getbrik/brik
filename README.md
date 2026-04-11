@@ -10,6 +10,9 @@
 <p align="center">
   <a href="https://github.com/getbrik/brik/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/getbrik/brik/ci.yml?label=CI" alt="CI"></a>
   <a href="https://codecov.io/gh/getbrik/brik"><img src="https://codecov.io/gh/getbrik/brik/graph/badge.svg?token=QMN3W4XI8Y" alt="codecov"></a>
+  <a href="#code-metrics"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/getbrik/brik/main/docs/badges/ccn.json" alt="CCN"></a>
+  <a href="#code-metrics"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/getbrik/brik/main/docs/badges/functions.json" alt="Functions"></a>
+  <a href="#code-metrics"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/getbrik/brik/main/docs/badges/lloc.json" alt="LLOC"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MPL--2.0-blue" alt="License"></a>
 </p>
 
@@ -285,6 +288,16 @@ for f in examples/*/brik.yml; do bin/brik validate --config "$f"; done
 ```bash
 shellcheck bin/brik
 ```
+
+## Code Metrics
+
+Tracked automatically via [shellmetrics](https://github.com/shellspec/shellmetrics) on every push to `main`:
+
+| Metric | Description |
+|--------|-------------|
+| **avg CCN** | Average cyclomatic complexity per function (< 5 = green) |
+| **Functions** | Total function count across production scripts |
+| **LLOC** | Logical lines of code (excludes blanks and comments) |
 
 ## Status
 
