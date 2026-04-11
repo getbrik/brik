@@ -26,8 +26,8 @@ stages.scan() {
         brik.use "security"
     fi
 
-    security.run "${BRIK_WORKSPACE}" --scans "deps,secret" --severity "$severity"
-    local result=$?
+    local result=0
+    security.run "${BRIK_WORKSPACE}" --scans "deps,secret" --severity "$severity" || result=$?
 
     if [[ "$result" -eq 0 ]]; then
         context.set "$context_file" "BRIK_SCAN_STATUS" "success"

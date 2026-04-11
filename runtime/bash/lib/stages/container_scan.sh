@@ -26,8 +26,8 @@ stages.container_scan() {
         brik.use "security"
     fi
 
-    security.run "${BRIK_WORKSPACE}" --scans "container" --image "$image" --severity "$severity"
-    local result=$?
+    local result=0
+    security.run "${BRIK_WORKSPACE}" --scans "container" --image "$image" --severity "$severity" || result=$?
 
     context.set_result "$context_file" "BRIK_CONTAINER_SCAN_STATUS" "$result"
 

@@ -65,8 +65,8 @@ ${registry_path}:always-auth=true"
         log.info "publishing npm package: ${cmd[*]}"
     fi
 
-    "${cmd[@]}"
-    local rc=$?
+    local rc=0
+    "${cmd[@]}" || rc=$?
 
     # cleanup: always scrub credentials from env
     unset NPM_TOKEN 2>/dev/null || true

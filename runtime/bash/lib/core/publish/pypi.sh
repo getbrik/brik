@@ -109,8 +109,8 @@ publish.pypi.run() {
     fi
 
     log.info "publishing to pypi via $tool (credentials via environment)"
-    "${cmd[@]}"
-    local rc=$?
+    local rc=0
+    "${cmd[@]}" || rc=$?
 
     # Cleanup credentials from environment
     _publish._pypi_cleanup_env "$tool"

@@ -53,11 +53,12 @@ test.run() {
     # Tier 1: explicit command override
     if [[ -n "${BRIK_TEST_COMMAND:-}" ]]; then
         log.info "running $suite tests (command override): $BRIK_TEST_COMMAND"
-        (cd "$workspace" && eval "$BRIK_TEST_COMMAND") || {
-            local exit_code=$?
+        local exit_code=0
+        (cd "$workspace" && eval "$BRIK_TEST_COMMAND") || exit_code=$?
+        if [[ "$exit_code" -ne 0 ]]; then
             log.error "tests failed with exit code $exit_code"
             return "$BRIK_EXIT_CHECK_FAILED"
-        }
+        fi
         log.info "tests passed"
         return 0
     fi
@@ -86,11 +87,12 @@ test.run() {
         export JEST_JUNIT_OUTPUT_DIR="$report_dir"
     fi
 
-    (cd "$workspace" && eval "$test_cmd") || {
-        local exit_code=$?
-        log.error "tests failed with exit code $exit_code"
+    local exit_code2=0
+    (cd "$workspace" && eval "$test_cmd") || exit_code2=$?
+    if [[ "$exit_code2" -ne 0 ]]; then
+        log.error "tests failed with exit code $exit_code2"
         return "$BRIK_EXIT_CHECK_FAILED"
-    }
+    fi
 
     log.info "tests passed"
     return 0

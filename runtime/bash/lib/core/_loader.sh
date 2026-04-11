@@ -86,8 +86,8 @@ brik.use() {
         return "$BRIK_EXIT_FAILURE"
     }
 
-    # Set guard variable
-    eval "$guard_name=1"
+    # Set guard variable (printf -v is safe -- no eval injection risk)
+    printf -v "$guard_name" '%s' '1'
     export "${guard_name?}"
 
     return 0

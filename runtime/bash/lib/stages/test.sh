@@ -33,8 +33,8 @@ stages.test() {
         log.info "e2e test command: $BRIK_TEST_COMMAND_E2E"
     fi
 
-    test.run "${test_args[@]}"
-    local result=$?
+    local result=0
+    test.run "${test_args[@]}" || result=$?
 
     context.set_result "$context_file" "BRIK_TEST_STATUS" "$result"
 

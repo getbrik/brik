@@ -83,8 +83,8 @@ stage.execute() {
         return "$BRIK_EXIT_INVALID_INPUT"
     fi
 
-    "$logic_function" "$context_file" "$@"
-    local result=$?
+    local result=0
+    "$logic_function" "$context_file" "$@" || result=$?
 
     export BRIK_LOG_SCOPE="$previous_scope"
     return "$result"

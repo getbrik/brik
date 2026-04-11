@@ -32,8 +32,8 @@ stages.sast() {
         brik.use "security"
     fi
 
-    security.run "${BRIK_WORKSPACE}" --scans "$scans"
-    local result=$?
+    local result=0
+    security.run "${BRIK_WORKSPACE}" --scans "$scans" || result=$?
 
     if [[ "$result" -eq 0 ]]; then
         context.set "$context_file" "BRIK_SAST_STATUS" "success"

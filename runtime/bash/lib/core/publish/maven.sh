@@ -86,8 +86,8 @@ SETTINGS_XML
     fi
 
     log.info "publishing to maven: ${cmd[*]}"
-    "${cmd[@]}"
-    local rc=$?
+    local rc=0
+    "${cmd[@]}" || rc=$?
 
     # cleanup: always remove temp credentials file
     rm -f "$tmp_settings" 2>/dev/null || true

@@ -44,8 +44,8 @@ publish.cargo.run() {
         log.info "publishing to crates.io: ${cmd[*]}"
     fi
 
-    "${cmd[@]}"
-    local rc=$?
+    local rc=0
+    "${cmd[@]}" || rc=$?
 
     # cleanup: always scrub credentials from env
     unset CARGO_REGISTRY_TOKEN 2>/dev/null || true

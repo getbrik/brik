@@ -98,9 +98,9 @@ brik.wrapper.set_standard_env() {
 # Precondition: BRIK_HOME set and validated via validate_home().
 brik.wrapper.bootstrap() {
     # shellcheck source=/dev/null
-    . "${_BRIK_RUNTIME_DIR}/stage.sh"
+    . "${_BRIK_RUNTIME_DIR}/stage.sh" || return "$BRIK_EXIT_IO_FAILURE"
     # shellcheck source=/dev/null
-    . "${_BRIK_CORE_DIR}/_loader.sh"
+    . "${_BRIK_CORE_DIR}/_loader.sh" || return "$BRIK_EXIT_IO_FAILURE"
 
     # Load portable config and condition modules
     brik.use config
@@ -163,9 +163,7 @@ brik.wrapper.run_stage() {
 
     # Show the logo once, before the first stage
     if [[ "$stage_name" == "init" ]]; then
-        local _brik_ver="${BRIK_VERSION:-}"
-        [[ -z "$_brik_ver" ]] && _brik_ver="$(sed -n 's/^readonly BRIK_VERSION="\(.*\)"/\1/p' "${BRIK_HOME}/bin/brik" 2>/dev/null || true)"
-        banner.brik "$_brik_ver"
+        banner.brik "${BRIK_VERSION:-}"
     fi
 
     local logic_function=""

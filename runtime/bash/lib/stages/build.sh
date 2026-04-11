@@ -24,8 +24,8 @@ stages.build() {
 
     log.info "running build (stack=$stack)"
 
-    build.run "${BRIK_WORKSPACE}" --stack "$stack" --config "${BRIK_CONFIG_FILE}"
-    local result=$?
+    local result=0
+    build.run "${BRIK_WORKSPACE}" --stack "$stack" --config "${BRIK_CONFIG_FILE}" || result=$?
 
     context.set_result "$context_file" "BRIK_BUILD_STATUS" "$result"
 

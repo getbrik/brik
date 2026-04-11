@@ -71,7 +71,10 @@ _hook._run() {
 
     log.debug "loading hook: $hook_path"
     # shellcheck source=/dev/null
-    . "$hook_path"
+    . "$hook_path" || {
+        log.error "failed to source hook: $hook_path"
+        return "$BRIK_EXIT_IO_FAILURE"
+    }
 
     if declare -f "$hook_name" >/dev/null 2>&1; then
         "$hook_name" "$@"
@@ -90,11 +93,12 @@ hook.pre_stage() {
     local log_file="$3"
 
     # Check brik.yml inline hook
+    # SECURITY: eval is intentional -- brik.yml is trusted project config
+    # (same trust level as the project's own code).
     local inline_cmd
     if inline_cmd="$(_hook._resolve_config "PRE" "$stage_name")"; then
         log.debug "running brik.yml pre_${stage_name} hook: $inline_cmd"
         eval "$inline_cmd"
-        return $?
     fi
 
     _hook._run "pre_stage" "$stage_name" "$context_file" "$log_file"
@@ -109,11 +113,12 @@ hook.post_stage() {
     local exit_code="$4"
 
     # Check brik.yml inline hook
+    # SECURITY: eval is intentional -- brik.yml is trusted project config
+    # (same trust level as the project's own code).
     local inline_cmd
     if inline_cmd="$(_hook._resolve_config "POST" "$stage_name")"; then
         log.debug "running brik.yml post_${stage_name} hook: $inline_cmd"
         eval "$inline_cmd"
-        return $?
     fi
 
     _hook._run "post_stage" "$stage_name" "$context_file" "$log_file" "$exit_code"

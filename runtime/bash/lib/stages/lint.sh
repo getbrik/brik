@@ -40,8 +40,8 @@ stages.lint() {
     local checks_csv
     checks_csv="$(IFS=','; printf '%s' "${checks[*]}")"
 
-    quality.run "${BRIK_WORKSPACE}" --checks "$checks_csv"
-    local result=$?
+    local result=0
+    quality.run "${BRIK_WORKSPACE}" --checks "$checks_csv" || result=$?
 
     context.set_result "$context_file" "BRIK_LINT_STATUS" "$result"
 

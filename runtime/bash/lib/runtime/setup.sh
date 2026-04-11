@@ -188,7 +188,7 @@ _setup._install_via_apt() {
     log.info "installing $name via apt-get ($packages)"
     if [[ -z "${_BRIK_APT_UPDATED:-}" ]]; then
         # best-effort: apt-get update may fail on non-Debian or network issues
-        apt-get update -qq 2>&1 || true
+        apt-get update -qq 2>&1 || log.warn "apt-get update failed (non-fatal)"
         _BRIK_APT_UPDATED=1
     fi
     # shellcheck disable=SC2086

@@ -47,9 +47,9 @@ security.deps.run() {
     local resolve_args=(sec_deps)
     [[ -n "$tool" ]] && resolve_args+=(--tool "$tool")
 
-    local resolved
-    resolved="$(quality.tool.resolve "${resolve_args[@]}")" || {
-        local rc=$?
+    local resolved rc=0
+    resolved="$(quality.tool.resolve "${resolve_args[@]}")" || rc=$?
+    if [[ "$rc" -ne 0 ]]; then
         if [[ $rc -eq 3 ]]; then
             log.error "security dependency scan tool not found: $tool"
             return "$BRIK_EXIT_MISSING_DEP"
@@ -59,7 +59,7 @@ security.deps.run() {
         fi
         log.warn "no security dependency scanner available - skipping"
         return 0
-    }
+    fi
 
     log.info "security dependency scan with $resolved"
     local scan_output=""

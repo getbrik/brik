@@ -44,9 +44,9 @@ _security._run_scan() {
     local resolve_args=("$category")
     [[ -n "$tool" ]] && resolve_args+=(--tool "$tool")
 
-    local resolved
-    resolved="$(quality.tool.resolve "${resolve_args[@]}")" || {
-        local rc=$?
+    local resolved rc=0
+    resolved="$(quality.tool.resolve "${resolve_args[@]}")" || rc=$?
+    if [[ "$rc" -ne 0 ]]; then
         if [[ $rc -eq 3 ]]; then
             log.error "${tool} not found"
             return "$BRIK_EXIT_MISSING_DEP"
@@ -56,7 +56,7 @@ _security._run_scan() {
         fi
         log.warn "no $label tool available - skipping"
         return 0
-    }
+    fi
 
     log.info "$label with $resolved"
     (cd "$workspace" && quality.tool.exec "$category" "$resolved") || {
