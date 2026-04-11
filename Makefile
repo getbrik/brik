@@ -14,8 +14,10 @@ test: ## Run all ShellSpec tests (parallel)
 test-quick: ## Run tests, stop on first failure
 	shellspec --jobs $(SHELLSPEC_JOBS) --fail-fast
 
+BASH_PATH ?= $(shell command -v bash)
+
 coverage: ## Run tests with kcov coverage report (--jobs ignored: kcov disables parallelism)
-	ulimit -n 1024 && shellspec --kcov
+	ulimit -n 1024 && shellspec --kcov --shell "$(BASH_PATH)"
 
 validate: ## Validate example brik.yml files
 	bin/brik validate --config examples/minimal-node/brik.yml

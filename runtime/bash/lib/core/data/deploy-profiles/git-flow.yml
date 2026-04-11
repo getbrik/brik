@@ -1,0 +1,17 @@
+# Default deploy profile for git-flow workflow.
+# Override target, namespace, or any field in your brik.yml deploy.environments section.
+# All environments default to target: k8s -- override with gitops, helm, compose, or ssh.
+deploy:
+  environments:
+    dev:
+      when: "branch == 'develop'"
+      target: k8s
+      namespace: dev
+    staging:
+      when: "branch =~ 'release/*'"
+      target: k8s
+      namespace: staging
+    production:
+      when: "tag =~ 'v*'"
+      target: k8s
+      namespace: production

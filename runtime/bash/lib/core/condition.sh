@@ -18,15 +18,26 @@
 
 # Guard against double-sourcing (compatible with brik.use)
 [[ -n "${_BRIK_MODULE_CONDITION_LOADED:-}" ]] && return 0
+_BRIK_MODULE_CONDITION_LOADED=1
 
 # Evaluate a condition expression.
 # Usage: condition.eval <expression>
 # Returns 0 (true) or 1 (false).
 #
+# Supports compound expressions with AND/OR operators:
+#   Compound expressions: AND has higher precedence than OR.
+#   OR is split first (lowest precedence), then each part checks for AND.
+#   Evaluation is right-recursive: "A OR B OR C" -> A || (B || C)
+#   "A AND B OR C" -> (A && B) || C
+#   No parentheses support.
+#
 # Examples:
 #   condition.eval "branch == 'main'"
 #   condition.eval "tag =~ 'v*'"
 #   condition.eval "manual"
+#   condition.eval "branch == 'main' AND tag =~ 'v*'"
+#   condition.eval "branch == 'main' OR branch == 'develop'"
+#   condition.eval "branch == 'main' AND tag =~ 'v*' OR branch == 'develop'"
 condition.eval() {
     local expression="$1"
 
@@ -38,13 +49,38 @@ condition.eval() {
         return "$BRIK_EXIT_FAILURE"
     fi
 
+    # Handle OR at top level (lowest precedence)
+    # Split on first " OR " and evaluate left || right recursively
+    if [[ "$expression" == *" OR "* ]]; then
+        local or_left or_right
+        or_left="${expression%% OR *}"
+        or_right="${expression#* OR }"
+        # Evaluate left part (which may contain AND)
+        condition.eval "$or_left" && return 0
+        # Evaluate right part (which may contain AND or OR)
+        condition.eval "$or_right"
+        return $?
+    fi
+
+    # Handle AND (higher precedence than OR)
+    # Split on first " AND " and evaluate left && right recursively
+    if [[ "$expression" == *" AND "* ]]; then
+        local and_left and_right
+        and_left="${expression%% AND *}"
+        and_right="${expression#* AND }"
+        # Both sides must be true
+        condition.eval "$and_left" || return "$BRIK_EXIT_FAILURE"
+        condition.eval "$and_right"
+        return $?
+    fi
+
     # Special keyword: manual
     if [[ "$expression" == "manual" ]]; then
         # Manual stages are not auto-triggered
         return "$BRIK_EXIT_FAILURE"
     fi
 
-    # Parse the expression: <subject> <operator> <value>
+    # Parse the simple expression: <subject> <operator> <value>
     local subject operator value
 
     if [[ "$expression" =~ ^([a-zA-Z_]+)[[:space:]]+(==|=~)[[:space:]]+\'([^\']*)\' ]]; then
@@ -105,9 +141,13 @@ _condition.resolve_subject() {
             printf '%s' "${BRIK_MERGE_REQUEST_ID:-}"
             ;;
         *)
-            # Try as a raw environment variable name
-            local var_value="${!subject:-}"
-            printf '%s' "$var_value"
+            if [[ "$subject" == BRIK_* ]]; then
+                local var_value="${!subject:-}"
+                printf '%s' "$var_value"
+            else
+                log.warn "unsupported condition subject: $subject"
+                printf ''
+            fi
             ;;
     esac
 }

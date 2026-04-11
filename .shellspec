@@ -4,6 +4,7 @@
 --require spec_helper
 --default-path "**/spec"
 --env LC_NUMERIC=C
+--jobs 16
 
 ## Default kcov (coverage) options
 --kcov-options "--include-path=./bin,./runtime/bash/lib,./shared-libs/gitlab/scripts,./shared-libs/jenkins/scripts,./shared-libs/local/scripts --path-strip-level=1"

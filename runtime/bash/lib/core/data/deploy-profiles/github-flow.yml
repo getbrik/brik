@@ -1,0 +1,13 @@
+# Default deploy profile for github-flow workflow.
+# Override target, namespace, or any field in your brik.yml deploy.environments section.
+# All environments default to target: k8s -- override with gitops, helm, compose, or ssh.
+deploy:
+  environments:
+    preview:
+      when: "branch =~ 'feature/*'"
+      target: k8s
+      namespace: preview
+    production:
+      when: "branch == 'main'"
+      target: k8s
+      namespace: production

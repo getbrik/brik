@@ -607,6 +607,11 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "workflow": {
+          "description": "Git workflow convention for automatic environment mapping. When set, Brik loads a built-in profile that pre-configures environments based on branch/tag patterns. User-defined environments override profile defaults.",
+          "type": "string",
+          "enum": ["trunk-based", "git-flow", "github-flow"]
+        },
         "environments": {
           "description": "Named deployment environments. Each key is an environment name (e.g. staging, production). Each value defines the deployment condition and target.",
           "type": "object",
@@ -660,6 +665,46 @@
           "description": "Application name as known to the GitOps controller.",
           "type": "string",
           "minLength": 1
+        },
+        "chart": {
+          "description": "Helm chart path or repository reference for the helm target (e.g. ./charts/myapp or oci://registry/chart).",
+          "type": "string",
+          "minLength": 1
+        },
+        "release_name": {
+          "description": "Helm release name for the helm target. Defaults to the environment name if omitted.",
+          "type": "string",
+          "minLength": 1
+        },
+        "values": {
+          "description": "Path to a Helm values file for the helm target (e.g. charts/values-staging.yaml).",
+          "type": "string",
+          "minLength": 1
+        },
+        "host": {
+          "description": "Remote host address for the ssh target (hostname or IP).",
+          "type": "string",
+          "minLength": 1
+        },
+        "compose_file": {
+          "description": "Path to the Docker Compose file for the compose target. Default is docker-compose.yml.",
+          "type": "string",
+          "minLength": 1
+        },
+        "remote_path": {
+          "description": "Absolute path on the remote host where the application is deployed (ssh target).",
+          "type": "string",
+          "minLength": 1
+        },
+        "restart_cmd": {
+          "description": "Command to restart the application on the remote host after deployment (ssh target).",
+          "type": "string",
+          "minLength": 1
+        },
+        "strategy": {
+          "description": "Deployment strategy for targets that support it.",
+          "type": "string",
+          "enum": ["rolling", "blue-green", "canary"]
         }
       }
     },

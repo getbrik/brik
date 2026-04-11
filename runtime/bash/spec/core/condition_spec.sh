@@ -120,16 +120,16 @@ Describe "condition.sh (portable condition evaluator)"
     End
 
     Describe "custom environment variable through full eval"
-      setup_custom() { export MY_DEPLOY_TARGET="production"; }
+      setup_custom() { export BRIK_DEPLOY_TARGET="production"; }
       Before 'setup_custom'
 
-      It "matches custom var condition"
-        When call condition.eval "MY_DEPLOY_TARGET == 'production'"
+      It "matches custom BRIK_ var condition"
+        When call condition.eval "BRIK_DEPLOY_TARGET == 'production'"
         The status should be success
       End
 
       It "does not match different value"
-        When call condition.eval "MY_DEPLOY_TARGET == 'staging'"
+        When call condition.eval "BRIK_DEPLOY_TARGET == 'staging'"
         The status should equal 1
       End
     End
@@ -164,6 +164,137 @@ Describe "condition.sh (portable condition evaluator)"
       It "trims both leading and trailing whitespace"
         When call condition.eval "  branch == 'main'  "
         The status should be success
+      End
+    End
+
+    # =========================================================================
+    # condition.eval - AND/OR compound expressions
+    # =========================================================================
+    Describe "AND operator"
+      setup_main_with_tag() {
+        export BRIK_BRANCH="main"
+        export BRIK_TAG="v1.0.0"
+      }
+      setup_develop_no_tag() {
+        export BRIK_BRANCH="develop"
+        unset BRIK_TAG 2>/dev/null || true
+      }
+      setup_main_no_tag() {
+        export BRIK_BRANCH="main"
+        unset BRIK_TAG 2>/dev/null || true
+      }
+
+      Describe "when both sides are true"
+        Before 'setup_main_with_tag'
+
+        It "returns 0 when branch == 'main' AND tag == 'v1.0.0'"
+          When call condition.eval "branch == 'main' AND tag == 'v1.0.0'"
+          The status should be success
+        End
+      End
+
+      Describe "when left side is false"
+        Before 'setup_develop_no_tag'
+
+        It "returns 1 when left condition is false"
+          When call condition.eval "branch == 'main' AND tag == 'v1.0.0'"
+          The status should equal 1
+        End
+      End
+
+      Describe "when right side is false"
+        Before 'setup_main_no_tag'
+
+        It "returns 1 when right condition is false"
+          When call condition.eval "branch == 'main' AND tag =~ 'v*'"
+          The status should equal 1
+        End
+      End
+    End
+
+    Describe "OR operator"
+      setup_main_branch() {
+        export BRIK_BRANCH="main"
+        unset BRIK_TAG 2>/dev/null || true
+      }
+      setup_develop_branch() {
+        export BRIK_BRANCH="develop"
+        unset BRIK_TAG 2>/dev/null || true
+      }
+      setup_feature_branch() {
+        export BRIK_BRANCH="feature/xyz"
+        unset BRIK_TAG 2>/dev/null || true
+      }
+
+      Describe "when left side is true"
+        Before 'setup_main_branch'
+
+        It "returns 0 when branch == 'main' OR branch == 'develop'"
+          When call condition.eval "branch == 'main' OR branch == 'develop'"
+          The status should be success
+        End
+      End
+
+      Describe "when right side is true"
+        Before 'setup_develop_branch'
+
+        It "returns 0 when second branch matches in OR"
+          When call condition.eval "branch == 'main' OR branch == 'develop'"
+          The status should be success
+        End
+      End
+
+      Describe "when both sides are false"
+        Before 'setup_feature_branch'
+
+        It "returns 1 when neither condition matches"
+          When call condition.eval "branch == 'main' OR branch == 'develop'"
+          The status should equal 1
+        End
+      End
+    End
+
+    Describe "AND takes precedence over OR"
+      setup_main_with_tag() {
+        export BRIK_BRANCH="main"
+        export BRIK_TAG="v1.0.0"
+      }
+      setup_develop_no_tag() {
+        export BRIK_BRANCH="develop"
+        unset BRIK_TAG 2>/dev/null || true
+      }
+
+      Describe "when AND part matches (main with tag)"
+        Before 'setup_main_with_tag'
+
+        It "returns 0: (branch == 'main' AND tag =~ 'v*') OR branch == 'develop'"
+          When call condition.eval "branch == 'main' AND tag =~ 'v*' OR branch == 'develop'"
+          The status should be success
+        End
+      End
+
+      Describe "when OR fallback matches (develop)"
+        Before 'setup_develop_no_tag'
+
+        It "returns 0: OR branch == 'develop' part matches"
+          When call condition.eval "branch == 'main' AND tag =~ 'v*' OR branch == 'develop'"
+          The status should be success
+        End
+      End
+    End
+
+    Describe "regression: simple expressions still work after AND/OR support"
+      setup_branch_main() { export BRIK_BRANCH="main"; }
+      Before 'setup_branch_main'
+
+      It "simple branch == 'main' still returns success"
+        When call condition.eval "branch == 'main'"
+        The status should be success
+      End
+
+      It "simple branch == 'other' still returns 1"
+        When call condition.eval "branch == 'other'"
+        The status should equal 1
       End
     End
 
@@ -262,12 +393,23 @@ Describe "condition.sh (portable condition evaluator)"
     End
 
     Describe "arbitrary env var"
+      setup_custom() { export BRIK_CUSTOM_VAR="hello"; }
+      Before 'setup_custom'
+
+      It "resolves BRIK_ prefixed var via indirect expansion"
+        When call _condition.resolve_subject "BRIK_CUSTOM_VAR"
+        The output should equal "hello"
+      End
+    End
+
+    Describe "non-BRIK_ env var is rejected"
       setup_custom() { export MY_CUSTOM_VAR="hello"; }
       Before 'setup_custom'
 
-      It "resolves via indirect expansion"
+      It "returns empty string for non-BRIK_ variable"
         When call _condition.resolve_subject "MY_CUSTOM_VAR"
-        The output should equal "hello"
+        The output should equal ""
+        The stderr should include "unsupported condition subject"
       End
     End
 
@@ -278,6 +420,7 @@ Describe "condition.sh (portable condition evaluator)"
       It "returns empty string"
         When call _condition.resolve_subject "NONEXISTENT_VAR"
         The output should equal ""
+        The stderr should include "unsupported condition subject"
       End
     End
   End
