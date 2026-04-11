@@ -108,7 +108,7 @@ with observability.
 
 **Layer 1 -- brik-lib** (`runtime/bash/lib/core/`).
 Reusable CI/CD business functions organized by domain: `build.node`, `build.java`,
-`test.run`, `quality.lint`, `quality.coverage`, `security.dependency_scan`, etc.
+`test.run`, `quality.lint.run`, `quality.format.run`, `security.run`, etc.
 Each function knows how to perform one CI/CD action for one stack or tool. Layer 1
 depends on Layer 0 for logging and context but has no knowledge of any CI platform.
 
@@ -127,15 +127,18 @@ overrides. Only `version` and `project.name` are required.
 
 ## Stage Flow
 
-The pipeline executes 9 stages in a fixed order:
+The pipeline executes 11 stages in a fixed order. Lint, SAST, Scan, and Test run
+in parallel after Build. Package waits for Test to pass and for Lint/SAST/Scan to
+succeed (quality gate). Container Scan runs after Package.
 
 ```
-                                     ┌───────────┐
-                                     │  Quality  │
-Init ─> Release ─> Build ─> ─────────┤           ├────────> Test ─> Package ─> Deploy ─> Notify
-                                     │ Security  │
-                                     └───────────┘
-                                      (parallel)
+init ─> release
+         └─> build ─┬─> lint ──────────┐
+                     ├─> sast ──────────┤ quality gate
+                     ├─> scan ──────────┤
+                     └─> test ──────────┼─> package ─> container_scan
+                                        │
+                                        └─> deploy ─> notify
 ```
 
 | Stage | File | What happens |
@@ -143,15 +146,17 @@ Init ─> Release ─> Build ─> ─────────┤           ├�
 | Init | `stages/init.sh` | Validate config, detect stack, export variables, check prerequisites |
 | Release | `stages/release.sh` | Determine version (semver from tags/commits), set release variables |
 | Build | `stages/build.sh` | Compile/build per stack (npm, mvn, pip, dotnet, cargo) |
-| Quality | `stages/quality.sh` | Lint, format check, dependency audit, coverage thresholds |
-| Security | `stages/security.sh` | Dependency scan, secret scan, container scan (SAST) |
+| Lint | `stages/lint.sh` | Lint, format check, type checking |
+| SAST | `stages/sast.sh` | Static application security testing, license and IaC scans |
+| Scan | `stages/scan.sh` | Dependency audit and secret scan |
 | Test | `stages/test.sh` | Run test suite per stack (jest, junit, pytest, xunit, cargo test) |
-| Package | `stages/package.sh` | Build Docker image, create archives, prepare artifacts |
+| Package | `stages/package.sh` | Build Docker image, create archives, publish artifacts |
+| Container Scan | `stages/container_scan.sh` | Scan built container images for vulnerabilities |
 | Deploy | `stages/deploy.sh` | Deploy to target environment (k8s, cloud, custom) |
 | Notify | `stages/notify.sh` | Send pipeline results (Slack, email, webhooks) |
 
-Quality and Security run in parallel on GitLab CI (same stage). On other platforms
-that support parallelism, the same pattern applies.
+Lint, SAST, Scan, and Test run in parallel on GitLab CI (same `verify` stage).
+On other platforms that support parallelism, the same pattern applies.
 
 ---
 
@@ -208,12 +213,13 @@ brik/
 │  │  ├─ core/                   # Layer 1 -- brik-lib business functions
 │  │  │  ├─ build.sh + build/    #   Dispatchers + stack-specific (node, java, python, docker)
 │  │  │  ├─ test.sh  + test/     #   Test runners per stack (node, java, python, rust, dotnet)
-│  │  │  ├─ quality.sh + quality/#   Lint, coverage, sast, deps, license, container
+│  │  │  ├─ quality.sh + quality/#   Lint, format, type_check
+│  │  │  ├─ security.sh + security/#  SAST, deps, secrets, license, IaC, container
 │  │  │  ├─ config.sh + config/  #   Config reader + stack defaults
 │  │  │  ├─ deploy.sh + deploy/  #   Deploy strategies (k8s)
-│  │  │  ├─ security.sh          #   Dependency scan, secret scan
+│  │  │  ├─ publish.sh + publish/#   Registry publishing (npm, pypi, maven, cargo, nuget, docker)
 │  │  │  └─ env.sh  git.sh  version.sh  condition.sh
-│  │  └─ stages/                 # 9 entry points (init, release, build, quality, ...)
+│  │  └─ stages/                 # 11 entry points (init, release, build, lint, sast, scan, ...)
 │  └─ spec/                      # ShellSpec tests (mirrors lib/ structure)
 ├─ shared-libs/                  # Layer 2 -- platform adapters
 │  ├─ gitlab/                    #   GitLab CI pipeline template
@@ -241,8 +247,8 @@ To add support for a new stack (e.g., `go`):
 4. **Config module** -- create `runtime/bash/lib/core/config/go.sh` implementing
    `config.go.defaults()` with sensible defaults for the stack.
 
-5. **Dispatchers** -- add the `go)` case to the dispatchers in `stages/build.sh`,
-   `stages/test.sh`, and any other stage that routes by stack.
+5. **Dispatchers** -- add the `go)` case to the dispatchers in `core/build.sh`,
+   `core/test.sh`, and any other module that routes by stack.
 
 6. **CLI doctor** -- add Go-specific prerequisite checks to `bin/brik` (doctor command).
 
@@ -306,9 +312,10 @@ production-like environment for validation.
 
 ### CI
 
-GitHub Actions runs two jobs on every push and pull request:
+GitHub Actions runs three jobs on every push and pull request:
 - **lint** -- ShellCheck on all Bash source files
 - **test** -- ShellSpec full suite + kcov coverage uploaded to Codecov
+- **metrics** -- shellmetrics badge generation (push to main only)
 
 ---
 

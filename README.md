@@ -47,7 +47,7 @@ flowchart LR
     JK["Jenkinsfile"]
     LO["brik run"]
     C["<b>3. Shared library</b><br/>Bash runtime<br/>(Git repo)"]
-    D["<b>4. CI/CD pipeline</b><br/>Build, test, lint,<br/>scan, deploy"]
+    D["<b>4. CI/CD pipeline</b><br/>Build, lint, SAST,<br/>scan, test, deploy"]
 
     A --> B
     B --> GL
@@ -62,7 +62,7 @@ flowchart LR
 ```
 
 1. **`brik.yml`** -- describe your project: stack, tools, thresholds. One file, platform-agnostic.
-2. **`brik init`** -- generates the bootstrap file for your CI platform: `.gitlab-ci.yml`, GitHub workflow, or `Jenkinsfile`. You can also run locally with `brik run` (requires Docker).
+2. **`brik init`** -- generates the bootstrap file for your CI platform: `.gitlab-ci.yml`, GitHub workflow, or `Jenkinsfile`. You can also run locally with `brik run`.
 3. **Shared library** -- portable Bash scripts hosted in a Git repository. Each bootstrap file references it. The library reads `brik.yml` and executes each stage.
 4. **Pipeline runs** -- build, test, lint, security scan, deploy -- with sensible defaults. Same result whether on CI or locally.
 
@@ -100,45 +100,55 @@ Every Brik pipeline follows a fixed stage sequence:
 ```mermaid
 flowchart LR
     init["Init"]
-    release["Release<br/><i>tag only</i>"]
+    release["Release"]
     build["Build"]
-    quality["Quality"]
-    security["Security"]
+    lint["Lint"]
+    sast["SAST"]
+    scan["Dep Scan"]
     test["Test"]
-    package["Package<br/><i>tag only</i>"]
+    package["Package"]
+    cscan["Container<br/>Scan"]
     deploy["Deploy"]
     notify["Notify"]
 
     init --> release
     init --> build
-    build --> quality
-    build --> security
-    quality -.->|quality gate| test
-    security -.->|quality gate| test
-    init --> test
+    build --> lint
+    build --> sast
+    build --> scan
     build --> test
+    lint -.->|quality gate| package
+    sast -.->|quality gate| package
+    scan -.->|quality gate| package
     test --> package
+    package --> cscan
     test --> deploy
-    package -.-> deploy
+    cscan -.-> deploy
     deploy --> notify
 ```
+
+Lint, SAST, Scan, and Test all run **in parallel** after Build (GitLab `verify` stage).
+The quality gate effect applies at **Package**: it waits for Test to pass and for
+Lint/SAST/Scan to succeed (or be skipped).
 
 | Stage | Purpose | Default behavior |
 |-------|---------|------------------|
 | Init | Setup | Validate config, detect stack, export variables |
-| Release | Versioning | Semantic version from git tags (tag push only) |
+| Release | Versioning | Compute semantic version from git tags; finalize on tag push only |
 | Build | Compile | Stack-specific build (npm, mvn, pip, dotnet, cargo) |
-| Quality | Code quality | Lint, format check, dependency audit, coverage |
-| Security | Security scans | Dependency scan, secret scan, container scan |
-| Test | Test suite | Runs after quality/security gates pass |
-| Package | Artifacts | Docker image build (tag push only) |
+| Lint | Code quality | Lint, format check, type checking |
+| SAST | Static analysis | SAST scan, plus license and IaC scans when configured |
+| Scan | Dependency scan | Dependency audit and secret scan |
+| Test | Test suite | Runs in parallel with Lint/SAST/Scan |
+| Package | Artifacts | Docker image build + artifact publishing (npm, maven, pypi, cargo, nuget) |
+| Container Scan | Image security | Scan built container images for vulnerabilities |
 | Deploy | Deployment | Multi-environment, condition-based (branch/tag) |
-| Notify | Notifications | Pipeline summary (always runs) |
+| Notify | Notifications | Pipeline summary (always runs on CI; opt-in locally via `--with-deploy`) |
 
-The pipeline is fully deterministic -- no manual triggers. Quality and Security act
-as **quality gates**: Test only starts when they pass (or are disabled). Release and
-Package run automatically on tag pushes and are skipped on branches. Deploy always
-runs but the runtime evaluates per-environment conditions from `brik.yml`.
+The pipeline is fully deterministic -- no manual triggers. Release runs unconditionally
+(computes version), but only finalizes on tag pushes. Package runs on tag pushes
+(GitLab) or opt-in locally (`--with-package`). Deploy evaluates per-environment
+conditions from `brik.yml`.
 
 Users do not define pipeline structure. They configure behavior within each stage
 via `brik.yml`.
@@ -147,11 +157,11 @@ via `brik.yml`.
 
 | Stack | Detection | Build | Test | Lint |
 |-------|-----------|-------|------|------|
-| **node** | `package.json` | npm/yarn/pnpm | jest/mocha/vitest | eslint |
-| **java** | `pom.xml` / `build.gradle` | mvn/gradle | junit | checkstyle |
-| **python** | `pyproject.toml` / `setup.py` | pip/poetry/uv/pipenv | pytest | ruff/flake8 |
-| **dotnet** | `*.csproj` / `*.sln` | dotnet build | xunit/nunit | dotnet format |
-| **rust** | `Cargo.toml` | cargo build | cargo test | clippy |
+| **node** | `package.json` | npm/yarn/pnpm | jest/npm | eslint/biome |
+| **java** | `pom.xml` / `build.gradle(.kts)` | mvn/gradle | junit/gradle | checkstyle |
+| **python** | `pyproject.toml` / `setup.py` / `Pipfile` | pip/poetry/uv/pipenv | pytest/unittest/tox | ruff |
+| **dotnet** | `*.csproj` / `*.sln` | dotnet build | dotnet test | dotnet-format |
+| **rust** | `Cargo.toml` | cargo build | cargo | clippy |
 
 Stack is auto-detected from project files when not specified in `brik.yml`.
 
@@ -168,6 +178,7 @@ version: 1
 project:
   name: my-java-app
   stack: java
+  stack_version: "21"
 
 build:
   java_version: "21"
@@ -177,7 +188,6 @@ test:
   framework: junit
 
 quality:
-  enabled: true
   lint:
     tool: checkstyle
     config: checkstyle.xml
@@ -185,13 +195,11 @@ quality:
   format:
     tool: google-java-format
     check: true
-  deps:
-    severity: high
 
 security:
-  dependency_scan: true
-  secret_scan: true
-  container_scan: false
+  deps:
+    severity: high
+  secrets: {}
 ```
 
 - JSON Schema: [`schemas/config/v1/brik.schema.json`](schemas/config/v1/brik.schema.json)
@@ -212,15 +220,18 @@ security:
 | `brik version` | Print version, schema, and runtime info |
 | `brik help` | Print usage information |
 
+Valid stages for `brik run stage`: `init`, `release`, `build`, `lint`, `sast`, `scan`, `test`, `package`, `container-scan`, `deploy`, `notify`.
+
 Key options:
 
 ```bash
-brik validate --config path/to/brik.yml
+brik validate --config path/to/brik.yml --schema path/to/schema.json
 brik doctor --workspace ./my-project
-brik init --stack node --platform gitlab
+brik init --stack node --platform gitlab --dir ./my-project --non-interactive
 brik run stage build --config brik.yml --workspace .
-brik run pipeline --with-package --continue-on-error
-brik self-update --channel edge
+brik run pipeline --continue-on-error --with-release --with-package --with-deploy
+brik self-update --channel edge --version v0.2.0
+brik self-uninstall --force
 brik version --verbose
 ```
 
@@ -252,10 +263,30 @@ and how to extend Brik, see [docs/architecture.md](docs/architecture.md).
 brew install bash yq jq check-jsonschema shellspec shellcheck kcov
 ```
 
+### Makefile
+
+The project includes a `Makefile` with common development targets:
+
+```bash
+make test          # Run all ShellSpec tests (parallel)
+make test-quick    # Run tests, stop on first failure
+make lint          # Run shellcheck on all production scripts
+make coverage      # Run tests with kcov coverage report
+make validate      # Validate all example brik.yml files
+make check         # Full pre-commit gate: lint + coverage + validate
+make metrics       # Run shellmetrics on production scripts
+make install       # Symlink bin/brik into /usr/local/bin (dev mode)
+make uninstall     # Remove symlink
+make clean         # Remove generated coverage/ directory
+```
+
 ### Run tests
 
 ```bash
-# All tests
+# All tests (via Makefile, parallel)
+make test
+
+# Or directly with ShellSpec
 shellspec
 
 # A specific spec file
@@ -265,27 +296,31 @@ shellspec runtime/bash/spec/cli/validate_spec.sh
 shellspec --format documentation
 
 # With coverage (requires kcov)
-ulimit -n 1024 && shellspec --kcov
+make coverage
 # Report in coverage/index.html
 ```
 
-Tests are in `runtime/bash/spec/` using [ShellSpec](https://shellspec.info). The `.shellspec` config at the project root sets the shell, spec path, and helper.
+Tests are in `runtime/bash/spec/` and `shared-libs/*/spec/` using [ShellSpec](https://shellspec.info). The `.shellspec` config at the project root sets the shell, spec path (`--default-path "**/spec"`), and helper.
 
-> **Note:** `ulimit -n 1024` is required on macOS where the default file descriptor limit is too high for kcov's `dup2()` call. See [kcov#293](https://github.com/SimonKagstrom/kcov/issues/293).
+> **Note:** `ulimit -n 1024` is required on macOS when running kcov directly. The Makefile handles this automatically. See [kcov#293](https://github.com/SimonKagstrom/kcov/issues/293).
 
 ### Validate examples
 
 ```bash
+# All examples (via Makefile)
+make validate
+
 # Single file
 bin/brik validate --config examples/minimal-node/brik.yml
-
-# All examples
-for f in examples/*/brik.yml; do bin/brik validate --config "$f"; done
 ```
 
 ### Lint
 
 ```bash
+# All production scripts (via Makefile)
+make lint
+
+# Single file
 shellcheck bin/brik
 ```
 
@@ -304,22 +339,22 @@ Tracked automatically via [shellmetrics](https://github.com/shellspec/shellmetri
 **Done:**
 - [x] `brik.yml` JSON Schema v1
 - [x] Bash Runtime (`stage.run` lifecycle)
-- [x] 9 pipeline stages (init, release, build, quality, security, test, package, deploy, notify)
+- [x] 11 pipeline stages (init, release, build, lint, sast, scan, test, package, container-scan, deploy, notify)
 - [x] 5 stacks (node, java, python, dotnet, rust)
 - [x] GitLab CI shared library (enterprise-grade DAG with quality gates)
-- [x] CLI (validate, doctor, init, run, self-update, self-uninstall, version)
-- [x] 1006 tests (ShellSpec + ShellCheck + kcov) + 13 E2E scenarios
+- [x] Jenkins shared library (fixed flow, CasC, E2E tested)
+- [x] CLI (validate, doctor, init, run stage, run pipeline, self-update, self-uninstall, version)
+- [x] Local pipeline execution (`brik run pipeline`)
+- [x] Official Docker images (`ghcr.io/getbrik/brik-runner-*`)
+- [x] 1600 tests (ShellSpec + ShellCheck + kcov) + 13 E2E scenarios
 
 **Next:**
-- [ ] Type checking, coherence validators, security scanning execution
-- [ ] Local pipeline execution (`brik run pipeline`)
-- [x] Jenkins shared library (fixed flow, CasC, E2E tested)
 - [ ] GitHub Actions reusable workflows
 - [ ] Multi-environment deploy (Git Flow, trunk-based, GitHub Flow profiles)
-- [ ] Official Docker images (`ghcr.io/getbrik/brik-runner-*`)
 
 ## Related
 
+- [brik-images](https://github.com/getbrik/brik-images) - official Docker images for Brik CI/CD runners
 - [briklab](https://github.com/getbrik/briklab) - local Docker infrastructure for testing Brik pipelines
 
 ## License

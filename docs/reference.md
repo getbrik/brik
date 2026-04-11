@@ -12,7 +12,7 @@ For a quick overview, see the [README](../README.md).
 | Platform | Status | Integration mechanism | Bootstrap file |
 |----------|--------|-----------------------|----------------|
 | **GitLab CI** | Functional | Shared library (pipeline template) | `.gitlab-ci.yml` |
-| **Jenkins** | PoC | Jenkins Shared Library | `Jenkinsfile` |
+| **Jenkins** | Functional | Jenkins Shared Library (CasC + Gitea) | `Jenkinsfile` |
 | **GitHub Actions** | Planned | Reusable workflows | `.github/workflows/*.yml` |
 
 ### GitLab CI
@@ -33,7 +33,7 @@ include:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `BRIK_VERSION` | `v0.1.0` | Brik version |
+| `BRIK_VERSION` | `0.2.0` | Brik version |
 | `BRIK_HOME` | `/opt/brik` | Installation directory on runners |
 | `BRIK_LOG_DIR` | `/tmp/brik/logs` | Log output directory |
 | `BRIK_LOG_LEVEL` | `info` | Log verbosity (debug, info, warn, error) |
@@ -68,7 +68,7 @@ These apply when the corresponding `brik.yml` key is omitted.
 | **Build** | `npm run build` | `mvn package -DskipTests` | `pip install .` | `cargo build` | `dotnet build` |
 | **Test framework** | jest | junit | pytest | cargo test | xunit |
 | **Lint tool** | eslint | checkstyle | ruff | clippy | dotnet-format |
-| **Format tool** | prettier | google-java-format | ruff format | rustfmt | dotnet-format |
+| **Format tool** | prettier | google-java-format | ruff-format | rustfmt | dotnet-format |
 
 ### Package manager detection
 
@@ -269,10 +269,7 @@ hooks:
 | Key | Type | Required | Default | Description |
 |-----|------|----------|---------|-------------|
 | `test.coverage.threshold` | integer | no | `80` | Minimum coverage percentage required (0-100). |
-| `test.coverage.report` | string | no | auto-detected | Path to Cobertura XML coverage report. |
-
-Report auto-detection paths: `coverage/cobertura-coverage.xml`, `coverage.xml`,
-`target/site/cobertura/coverage.xml`, `build/reports/cobertura/coverage.xml`.
+| `test.coverage.report` | string | no | -- | Path to Cobertura XML coverage report. |
 
 ---
 
@@ -458,12 +455,11 @@ Bash Runtime (Layer 0) independently of the `hooks` section in `brik.yml`.
 
 ## Configuration Resolution
 
-When a value is not set in `brik.yml`, Brik resolves it through a three-level hierarchy:
+When a value is not set in `brik.yml`, Brik resolves it through a two-level hierarchy:
 
 ```
 1. Explicit configuration (brik.yml)        -- highest priority
 2. Stack defaults (config/<stack>.sh)        -- applied when key is omitted
-3. Global defaults (hardcoded in modules)    -- lowest priority
 ```
 
 Example for a Node.js project with no `build` section:
@@ -471,4 +467,13 @@ Example for a Node.js project with no `build` section:
 ```
 brik.yml: build.command not set
   --> config.node defaults: "npm run build"
+```
+
+Separately, **module loading** uses a three-level resolution for `.sh` files
+(not configuration values):
+
+```
+1. Project extensions: ${BRIK_PROJECT_DIR}/.brik/lib/core/
+2. Organization extensions: BRIK_LIB_EXTENSIONS (colon-separated paths)
+3. Standard library: ${BRIK_HOME}/runtime/bash/lib/core/
 ```
