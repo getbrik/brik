@@ -46,9 +46,10 @@ Describe "brik self-uninstall"
       chmod +x "${SCRIPT_HOME}/bin/brik"
       cp -R "${BRIK_HOME}/runtime" "${SCRIPT_HOME}/runtime" 2>/dev/null || true
       cp -R "${BRIK_HOME}/schemas" "${SCRIPT_HOME}/schemas" 2>/dev/null || true
-      # Point BRIK_HOME to a dir without bin/brik
+      # Point BRIK_HOME to a dir without bin/brik but with runtime libs
       TARGET_HOME="$(mktemp -d)"
       TARGET_HOME="$(cd -P "${TARGET_HOME}" && pwd)"
+      cp -R "${BRIK_HOME}/runtime" "${TARGET_HOME}/runtime" 2>/dev/null || true
       export BRIK_HOME="${TARGET_HOME}"
     }
     cleanup_no_bin() { rm -rf "${SCRIPT_HOME}" "${TARGET_HOME}"; }

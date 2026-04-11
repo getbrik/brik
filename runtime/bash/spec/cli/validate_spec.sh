@@ -75,9 +75,9 @@ Describe "brik validate"
   End
 
   Describe "missing config file"
-    It "exits with code 7 and prints a 'not found' error to stderr"
+    It "exits with code 6 and prints a 'not found' error to stderr"
       When run script "${BRIK_BIN}" validate --config "/nonexistent/path/brik.yml"
-      The status should eq 7
+      The status should eq 6
       The error should include "not found"
       The output should be blank
     End
@@ -96,9 +96,9 @@ Describe "brik validate"
       The output should include "valid"
     End
 
-    It "exits with code 7 when no brik.yml exists in current directory"
+    It "exits with code 6 when no brik.yml exists in current directory"
       When call run_validate_in_dir "/tmp" validate
-      The status should eq 7
+      The status should eq 6
       The stderr should include "not found"
     End
   End
@@ -113,11 +113,11 @@ Describe "brik validate"
       The stderr should be blank
     End
 
-    It "exits with code 7 when the schema file does not exist"
+    It "exits with code 6 when the schema file does not exist"
       When run script "${BRIK_BIN}" validate \
         --config "${EXAMPLES}/minimal-node/brik.yml" \
         --schema "/nonexistent/schema.json"
-      The status should eq 7
+      The status should eq 6
       The stderr should include "not found"
       The output should be blank
     End

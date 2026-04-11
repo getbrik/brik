@@ -19,7 +19,7 @@ build.detect_stack() {
         printf 'java'
         return 0
     fi
-    if [[ -f "${workspace}/setup.py" || -f "${workspace}/pyproject.toml" ]]; then
+    if [[ -f "${workspace}/requirements.txt" || -f "${workspace}/setup.py" || -f "${workspace}/pyproject.toml" ]]; then
         printf 'python'
         return 0
     fi
