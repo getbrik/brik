@@ -229,6 +229,7 @@ Describe "base-wrapper.sh"
       It "succeeds with valid config"
         When call brik.wrapper.load_config
         The status should be success
+        The error should be present
       End
 
       It "exports BRIK_PROJECT_NAME from config"
@@ -322,18 +323,21 @@ Describe "base-wrapper.sh"
       When call brik.wrapper.run_stage "init"
       The status should be success
       The output should include "project: test-project"
+      The error should be present
     End
 
     It "dispatches quality to lint (backward compat)"
       When call brik.wrapper.run_stage "quality"
       The status should be success
       The output should include "lint"
+      The error should be present
     End
 
     It "dispatches security to scan (backward compat)"
       When call brik.wrapper.run_stage "security"
       The status should be success
       The output should be present
+      The error should be present
     End
 
     It "runs lint stage and writes context"
