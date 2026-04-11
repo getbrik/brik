@@ -2,6 +2,7 @@ Describe "db.sh"
   Include "$BRIK_RUNTIME_LIB/logging.sh"
   Include "$BRIK_RUNTIME_LIB/tools.sh"
   Include "$BRIK_CORE_LIB/db.sh"
+  Include "$BRIK_HOME/runtime/bash/spec/support/mock_helper.sh"
 
   Describe "db.migrate"
     It "returns 2 when no tool specified"
@@ -24,25 +25,19 @@ Describe "db.sh"
 
     Describe "with mock flyway"
       setup_flyway() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock_flyway.log"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/flyway" << MOCKEOF
-#!/usr/bin/env bash
-printf 'flyway %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/flyway"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_logging "flyway" "$MOCK_LOG"
+        mock.activate
         ORIG_DIR="$(pwd)"
         cd "$TEST_WS" || return 1
       }
       cleanup_flyway() {
         cd "$ORIG_DIR" || true
-        export PATH="$ORIG_PATH"
+        mock.cleanup
         unset BRIK_DRY_RUN 2>/dev/null
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        rm -rf "$TEST_WS"
       }
       Before 'setup_flyway'
       After 'cleanup_flyway'
@@ -74,24 +69,18 @@ MOCKEOF
 
     Describe "with mock liquibase"
       setup_liquibase() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock_liquibase.log"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/liquibase" << MOCKEOF
-#!/usr/bin/env bash
-printf 'liquibase %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/liquibase"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_logging "liquibase" "$MOCK_LOG"
+        mock.activate
         ORIG_DIR="$(pwd)"
         cd "$TEST_WS" || return 1
       }
       cleanup_liquibase() {
         cd "$ORIG_DIR" || true
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_liquibase'
       After 'cleanup_liquibase'
@@ -114,24 +103,18 @@ MOCKEOF
 
     Describe "with mock alembic"
       setup_alembic() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock_alembic.log"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/alembic" << MOCKEOF
-#!/usr/bin/env bash
-printf 'alembic %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/alembic"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_logging "alembic" "$MOCK_LOG"
+        mock.activate
         ORIG_DIR="$(pwd)"
         cd "$TEST_WS" || return 1
       }
       cleanup_alembic() {
         cd "$ORIG_DIR" || true
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_alembic'
       After 'cleanup_alembic'
@@ -182,24 +165,18 @@ MOCKEOF
 
     Describe "with mock alembic + url"
       setup_alembic_url() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock_alembic.log"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/alembic" << MOCKEOF
-#!/usr/bin/env bash
-printf 'alembic %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/alembic"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_logging "alembic" "$MOCK_LOG"
+        mock.activate
         ORIG_DIR="$(pwd)"
         cd "$TEST_WS" || return 1
       }
       cleanup_alembic_url() {
         cd "$ORIG_DIR" || true
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_alembic_url'
       After 'cleanup_alembic_url'
@@ -216,24 +193,18 @@ MOCKEOF
 
     Describe "flyway without url"
       setup_flyway_nourl() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock_flyway.log"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/flyway" << MOCKEOF
-#!/usr/bin/env bash
-printf 'flyway %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/flyway"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_logging "flyway" "$MOCK_LOG"
+        mock.activate
         ORIG_DIR="$(pwd)"
         cd "$TEST_WS" || return 1
       }
       cleanup_flyway_nourl() {
         cd "$ORIG_DIR" || true
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_flyway_nourl'
       After 'cleanup_flyway_nourl'
@@ -256,24 +227,18 @@ MOCKEOF
 
     Describe "liquibase without url"
       setup_liquibase_nourl() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock_liquibase.log"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/liquibase" << MOCKEOF
-#!/usr/bin/env bash
-printf 'liquibase %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/liquibase"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_logging "liquibase" "$MOCK_LOG"
+        mock.activate
         ORIG_DIR="$(pwd)"
         cd "$TEST_WS" || return 1
       }
       cleanup_liquibase_nourl() {
         cd "$ORIG_DIR" || true
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_liquibase_nourl'
       After 'cleanup_liquibase_nourl'
@@ -287,18 +252,12 @@ MOCKEOF
 
     Describe "alembic without url"
       setup_alembic_nourl() {
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/alembic" << 'EOF'
-#!/usr/bin/env bash
-exit 0
-EOF
-        chmod +x "${MOCK_BIN}/alembic"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.setup
+        mock.create_exit "alembic" 0
+        mock.activate
       }
       cleanup_alembic_nourl() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$MOCK_BIN"
+        mock.cleanup
       }
       Before 'setup_alembic_nourl'
       After 'cleanup_alembic_nourl'
@@ -340,18 +299,12 @@ EOF
 
     Describe "with mock flyway"
       setup_flyway_status() {
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/flyway" << 'EOF'
-#!/usr/bin/env bash
-exit 0
-EOF
-        chmod +x "${MOCK_BIN}/flyway"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.setup
+        mock.create_exit "flyway" 0
+        mock.activate
       }
       cleanup_flyway_status() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$MOCK_BIN"
+        mock.cleanup
       }
       Before 'setup_flyway_status'
       After 'cleanup_flyway_status'
@@ -371,18 +324,12 @@ EOF
 
     Describe "with mock liquibase"
       setup_liquibase_status() {
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/liquibase" << 'EOF'
-#!/usr/bin/env bash
-exit 0
-EOF
-        chmod +x "${MOCK_BIN}/liquibase"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.setup
+        mock.create_exit "liquibase" 0
+        mock.activate
       }
       cleanup_liquibase_status() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$MOCK_BIN"
+        mock.cleanup
       }
       Before 'setup_liquibase_status'
       After 'cleanup_liquibase_status'
@@ -396,18 +343,12 @@ EOF
 
     Describe "with mock alembic"
       setup_alembic_status() {
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/alembic" << 'EOF'
-#!/usr/bin/env bash
-exit 0
-EOF
-        chmod +x "${MOCK_BIN}/alembic"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.setup
+        mock.create_exit "alembic" 0
+        mock.activate
       }
       cleanup_alembic_status() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$MOCK_BIN"
+        mock.cleanup
       }
       Before 'setup_alembic_status'
       After 'cleanup_alembic_status'

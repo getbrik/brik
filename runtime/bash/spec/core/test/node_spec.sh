@@ -2,6 +2,7 @@ Describe "test/node.sh"
   Include "$BRIK_RUNTIME_LIB/logging.sh"
   Include "$BRIK_RUNTIME_LIB/tools.sh"
   Include "$BRIK_CORE_LIB/test/node.sh"
+  Include "$BRIK_HOME/runtime/bash/spec/support/mock_helper.sh"
 
   Describe "test.node.cmd"
     It "returns npx jest for jest framework"
@@ -44,20 +45,15 @@ Describe "test/node.sh"
 
     Describe "without scripts.test and with npx"
       setup_no_test_script() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         printf '{"name":"test"}\n' > "${TEST_WS}/package.json"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/npx" << 'EOF'
-#!/usr/bin/env bash
-exit 0
-EOF
-        chmod +x "${MOCK_BIN}/npx"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_exit "npx" 0
+        mock.activate
       }
       cleanup_no_test_script() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_no_test_script'
       After 'cleanup_no_test_script'
@@ -75,16 +71,15 @@ EOF
 
     Describe "without scripts.test and without npx"
       setup_no_npx() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         printf '{"name":"test"}\n' > "${TEST_WS}/package.json"
-        MOCK_BIN="$(mktemp -d)"
         ln -sf "$(command -v bash)" "${MOCK_BIN}/bash"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}"
+        mock.isolate
       }
       cleanup_no_npx() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_no_npx'
       After 'cleanup_no_npx'

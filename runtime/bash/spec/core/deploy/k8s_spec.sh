@@ -2,6 +2,7 @@ Describe "deploy/k8s.sh"
   Include "$BRIK_RUNTIME_LIB/logging.sh"
   Include "$BRIK_RUNTIME_LIB/tools.sh"
   Include "$BRIK_CORE_LIB/deploy/k8s.sh"
+  Include "$BRIK_HOME/runtime/bash/spec/support/mock_helper.sh"
 
   Describe "deploy.k8s.run"
     It "returns 2 for unknown option"
@@ -24,15 +25,14 @@ Describe "deploy/k8s.sh"
 
     Describe "require_tool kubectl failure"
       setup_no_kubectl() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         printf 'apiVersion: v1\nkind: Pod\n' > "${TEST_WS}/manifest.yaml"
-        MOCK_BIN="$(mktemp -d)"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}"
+        mock.isolate
       }
       cleanup_no_kubectl() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_no_kubectl'
       After 'cleanup_no_kubectl'
@@ -46,23 +46,17 @@ Describe "deploy/k8s.sh"
 
     Describe "with mock kubectl"
       setup_kubectl() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock_kubectl.log"
         printf 'apiVersion: v1\nkind: Pod\n' > "${TEST_WS}/manifest.yaml"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/kubectl" << MOCKEOF
-#!/usr/bin/env bash
-printf 'kubectl %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/kubectl"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_logging "kubectl" "$MOCK_LOG"
+        mock.activate
       }
       cleanup_kubectl() {
-        export PATH="$ORIG_PATH"
+        mock.cleanup
         unset BRIK_DRY_RUN 2>/dev/null
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        rm -rf "$TEST_WS"
       }
       Before 'setup_kubectl'
       After 'cleanup_kubectl'
@@ -130,24 +124,18 @@ MOCKEOF
 
     Describe "BRIK_DRY_RUN env var"
       setup_env_dryrun() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock_kubectl.log"
         printf 'apiVersion: v1\n' > "${TEST_WS}/manifest.yaml"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/kubectl" << MOCKEOF
-#!/usr/bin/env bash
-printf 'kubectl %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/kubectl"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_logging "kubectl" "$MOCK_LOG"
+        mock.activate
         export BRIK_DRY_RUN="true"
       }
       cleanup_env_dryrun() {
-        export PATH="$ORIG_PATH"
+        mock.cleanup
         unset BRIK_DRY_RUN
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        rm -rf "$TEST_WS"
       }
       Before 'setup_env_dryrun'
       After 'cleanup_env_dryrun'
@@ -164,20 +152,15 @@ MOCKEOF
 
     Describe "with failing kubectl"
       setup_fail() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         printf 'apiVersion: v1\n' > "${TEST_WS}/manifest.yaml"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/kubectl" << 'EOF'
-#!/usr/bin/env bash
-exit 1
-EOF
-        chmod +x "${MOCK_BIN}/kubectl"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_exit "kubectl" 1
+        mock.activate
       }
       cleanup_fail() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_fail'
       After 'cleanup_fail'

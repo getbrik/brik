@@ -1,15 +1,14 @@
 Describe "summary.sh"
   Include "$BRIK_RUNTIME_LIB/summary.sh"
+  Include "$BRIK_HOME/runtime/bash/spec/support/mock_helper.sh"
 
   Describe "summary.build"
     setup() {
-      export BRIK_LOG_DIR
-      BRIK_LOG_DIR="$(mktemp -d)"
       CTX_FILE="$(mktemp)"
       printf 'BRIK_STAGE_NAME=build\nBRIK_STARTED_AT=%s\n' "$(date +"%Y-%m-%dT%H:%M:%S%z")" > "$CTX_FILE"
       LOG_FILE="$(mktemp "${BRIK_LOG_DIR}/build-XXXXXX.log")"
     }
-    cleanup() { rm -rf "$BRIK_LOG_DIR" "$CTX_FILE"; }
+    cleanup() { rm -rf "$CTX_FILE"; }
     Before 'setup'
     After 'cleanup'
 
@@ -108,31 +107,16 @@ Describe "summary.sh"
 
     It "writes text fallback when jq is hidden via PATH"
       verify_text_fallback() {
-        # Create a minimal PATH that excludes jq but has essentials
-        local MOCK_BIN
-        MOCK_BIN="$(mktemp -d)"
-        local ORIG_PATH="$PATH"
+        mock.setup
+        mock.preserve_cmds
+        ln -sf "$(command -v bash)" "${MOCK_BIN}/bash"
+        mock.isolate
 
-        # Symlink all required tools except jq
-        for tool in date grep sed printf mkdir cat bash; do
-          local tool_path
-          tool_path="$(command -v "$tool" 2>/dev/null)" || true
-          if [[ -n "$tool_path" && -f "$tool_path" ]]; then
-            ln -sf "$tool_path" "${MOCK_BIN}/${tool}"
-          fi
-        done
-
-        export PATH="${MOCK_BIN}"
         summary.build "nojq" "$CTX_FILE" "$LOG_FILE" 0 2>/dev/null
-        export PATH="$ORIG_PATH"
+        mock.cleanup
 
         local summary_path="${BRIK_LOG_DIR}/nojq-summary.json"
-        local result=1
-        if [[ -f "$summary_path" ]] && grep -q 'stage_name=nojq' "$summary_path"; then
-          result=0
-        fi
-        rm -rf "$MOCK_BIN"
-        return $result
+        [[ -f "$summary_path" ]] && grep -q 'stage_name=nojq' "$summary_path"
       }
       When call verify_text_fallback
       The status should be success
@@ -197,23 +181,14 @@ Describe "summary.sh"
 
     It "uses cat fallback when jq is hidden via PATH"
       verify_cat_fallback() {
-        local MOCK_BIN
-        MOCK_BIN="$(mktemp -d)"
-        local ORIG_PATH="$PATH"
+        mock.setup
+        mock.preserve_cmds
+        ln -sf "$(command -v bash)" "${MOCK_BIN}/bash"
+        mock.isolate
 
-        for tool in cat printf bash; do
-          local tool_path
-          tool_path="$(command -v "$tool" 2>/dev/null)" || true
-          if [[ -n "$tool_path" && -f "$tool_path" ]]; then
-            ln -sf "$tool_path" "${MOCK_BIN}/${tool}"
-          fi
-        done
-
-        export PATH="${MOCK_BIN}"
         summary.print_human "${SUMMARY_DIR}/summary.json" 2>/dev/null
         local result=$?
-        export PATH="$ORIG_PATH"
-        rm -rf "$MOCK_BIN"
+        mock.cleanup
         return $result
       }
       When call verify_cat_fallback

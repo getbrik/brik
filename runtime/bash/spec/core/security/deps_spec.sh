@@ -4,6 +4,7 @@ Describe "security/deps.sh"
   Include "$BRIK_CORE_LIB/_loader.sh"
   Include "$BRIK_CORE_LIB/quality/_tools.sh"
   Include "$BRIK_CORE_LIB/security/deps.sh"
+  Include "$BRIK_HOME/runtime/bash/spec/support/mock_helper.sh"
 
   Describe "security.deps.run"
     It "returns 6 for nonexistent workspace"
@@ -14,21 +15,16 @@ Describe "security/deps.sh"
 
     Describe "Tier 1: command override"
       setup_cmd() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/my-scanner" << 'EOF'
-#!/usr/bin/env bash
-exit 0
-EOF
-        chmod +x "${MOCK_BIN}/my-scanner"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_exit "my-scanner" 0
+        mock.activate
         export BRIK_SECURITY_DEPS_COMMAND="my-scanner"
       }
       cleanup_cmd() {
-        export PATH="$ORIG_PATH"
         unset BRIK_SECURITY_DEPS_COMMAND
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_cmd'
       After 'cleanup_cmd'
@@ -42,23 +38,17 @@ EOF
 
     Describe "Tier 2: explicit tool"
       setup_tool() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock.log"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/grype" << MOCKEOF
-#!/usr/bin/env bash
-printf 'grype %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/grype"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_logging "grype" "$MOCK_LOG"
+        mock.activate
         export BRIK_SECURITY_DEPS_TOOL="grype"
       }
       cleanup_tool() {
-        export PATH="$ORIG_PATH"
         unset BRIK_SECURITY_DEPS_TOOL
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_tool'
       After 'cleanup_tool'
@@ -75,22 +65,17 @@ MOCKEOF
 
     Describe "Tier 2: osv-scanner no package sources"
       setup_no_sources() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/osv-scanner" << 'MOCKEOF'
-#!/usr/bin/env bash
-echo "No package sources found, --help for usage information."
-exit 128
-MOCKEOF
-        chmod +x "${MOCK_BIN}/osv-scanner"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_script "osv-scanner" 'echo "No package sources found, --help for usage information."
+exit 128'
+        mock.activate
         export BRIK_SECURITY_DEPS_TOOL="osv-scanner"
       }
       cleanup_no_sources() {
-        export PATH="$ORIG_PATH"
         unset BRIK_SECURITY_DEPS_TOOL
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_no_sources'
       After 'cleanup_no_sources'
@@ -104,22 +89,17 @@ MOCKEOF
 
     Describe "Tier 2: tool finds vulnerabilities"
       setup_vuln() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/osv-scanner" << 'MOCKEOF'
-#!/usr/bin/env bash
-echo "Found 3 vulnerabilities"
-exit 1
-MOCKEOF
-        chmod +x "${MOCK_BIN}/osv-scanner"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_script "osv-scanner" 'echo "Found 3 vulnerabilities"
+exit 1'
+        mock.activate
         export BRIK_SECURITY_DEPS_TOOL="osv-scanner"
       }
       cleanup_vuln() {
-        export PATH="$ORIG_PATH"
         unset BRIK_SECURITY_DEPS_TOOL
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_vuln'
       After 'cleanup_vuln'
@@ -133,16 +113,15 @@ MOCKEOF
 
     Describe "Tier 2: tool not found"
       setup_missing() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
-        MOCK_BIN="$(mktemp -d)"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}"
+        mock.isolate
         export BRIK_SECURITY_DEPS_TOOL="grype"
       }
       cleanup_missing() {
-        export PATH="$ORIG_PATH"
         unset BRIK_SECURITY_DEPS_TOOL
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_missing'
       After 'cleanup_missing'
@@ -156,23 +135,17 @@ MOCKEOF
 
     Describe "Tier 3: auto-detect osv-scanner"
       setup_auto() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock.log"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/osv-scanner" << MOCKEOF
-#!/usr/bin/env bash
-printf 'osv-scanner %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/osv-scanner"
+        mock.create_logging "osv-scanner" "$MOCK_LOG"
         ln -sf "$(command -v bash)" "${MOCK_BIN}/bash"
         ln -sf "$(command -v grep)" "${MOCK_BIN}/grep"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}"
+        mock.isolate
       }
       cleanup_auto() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_auto'
       After 'cleanup_auto'
@@ -189,14 +162,13 @@ MOCKEOF
 
     Describe "no tool available"
       setup_none() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
-        MOCK_BIN="$(mktemp -d)"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}"
+        mock.isolate
       }
       cleanup_none() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_none'
       After 'cleanup_none'

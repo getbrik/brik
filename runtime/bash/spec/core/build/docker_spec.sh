@@ -2,6 +2,7 @@ Describe "build/docker.sh"
   Include "$BRIK_RUNTIME_LIB/logging.sh"
   Include "$BRIK_RUNTIME_LIB/tools.sh"
   Include "$BRIK_CORE_LIB/build/docker.sh"
+  Include "$BRIK_HOME/runtime/bash/spec/support/mock_helper.sh"
 
   Describe "build.docker.run"
     It "returns 6 for nonexistent workspace"
@@ -24,15 +25,14 @@ Describe "build/docker.sh"
 
     Describe "require_tool docker failure"
       setup_no_docker() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         printf 'FROM alpine:3.19\n' > "${TEST_WS}/Dockerfile"
-        MOCK_BIN="$(mktemp -d)"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}"
+        mock.isolate
       }
       cleanup_no_docker() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_no_docker'
       After 'cleanup_no_docker'
@@ -46,23 +46,17 @@ Describe "build/docker.sh"
 
     Describe "with mock docker"
       setup_docker() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock_docker.log"
         printf 'FROM alpine:3.19\nCMD ["echo","hello"]\n' > "${TEST_WS}/Dockerfile"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/docker" << MOCKEOF
-#!/usr/bin/env bash
-printf 'docker %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/docker"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_logging "docker" "$MOCK_LOG"
+        mock.activate
       }
       cleanup_docker() {
-        export PATH="$ORIG_PATH"
+        mock.cleanup
         unset BRIK_PROJECT_NAME BRIK_VERSION 2>/dev/null
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        rm -rf "$TEST_WS"
       }
       Before 'setup_docker'
       After 'cleanup_docker'
@@ -145,21 +139,16 @@ MOCKEOF
 
     Describe "dry-run mode"
       setup_dryrun() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         printf 'FROM alpine:3.19\n' > "${TEST_WS}/Dockerfile"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/docker" << 'EOF'
-#!/usr/bin/env bash
-printf 'SHOULD NOT RUN\n'
-exit 1
-EOF
-        chmod +x "${MOCK_BIN}/docker"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_script "docker" 'printf "SHOULD NOT RUN\n"
+exit 1'
+        mock.activate
       }
       cleanup_dryrun() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_dryrun'
       After 'cleanup_dryrun'
@@ -174,23 +163,18 @@ EOF
 
     Describe "BRIK_DRY_RUN env var"
       setup_env_dryrun() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         printf 'FROM alpine:3.19\n' > "${TEST_WS}/Dockerfile"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/docker" << 'EOF'
-#!/usr/bin/env bash
-printf 'SHOULD NOT RUN\n'
-exit 1
-EOF
-        chmod +x "${MOCK_BIN}/docker"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_script "docker" 'printf "SHOULD NOT RUN\n"
+exit 1'
+        mock.activate
         export BRIK_DRY_RUN="true"
       }
       cleanup_env_dryrun() {
-        export PATH="$ORIG_PATH"
+        mock.cleanup
         unset BRIK_DRY_RUN
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        rm -rf "$TEST_WS"
       }
       Before 'setup_env_dryrun'
       After 'cleanup_env_dryrun'
@@ -205,20 +189,15 @@ EOF
 
     Describe "with failing docker"
       setup_fail() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         printf 'FROM alpine:3.19\n' > "${TEST_WS}/Dockerfile"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/docker" << 'EOF'
-#!/usr/bin/env bash
-exit 1
-EOF
-        chmod +x "${MOCK_BIN}/docker"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_exit "docker" 1
+        mock.activate
       }
       cleanup_fail() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_fail'
       After 'cleanup_fail'

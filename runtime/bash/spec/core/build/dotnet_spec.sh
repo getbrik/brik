@@ -2,6 +2,7 @@ Describe "build/dotnet.sh"
   Include "$BRIK_RUNTIME_LIB/logging.sh"
   Include "$BRIK_RUNTIME_LIB/tools.sh"
   Include "$BRIK_CORE_LIB/build/dotnet.sh"
+  Include "$BRIK_HOME/runtime/bash/spec/support/mock_helper.sh"
 
   Describe "build.dotnet.run"
     It "returns 6 for nonexistent workspace"
@@ -24,22 +25,16 @@ Describe "build/dotnet.sh"
 
     Describe "with mock dotnet"
       setup_dotnet() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock_dotnet.log"
         printf '<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net8.0</TargetFramework></PropertyGroup></Project>\n' > "${TEST_WS}/Test.csproj"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/dotnet" << MOCKEOF
-#!/usr/bin/env bash
-printf 'dotnet %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/dotnet"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_logging "dotnet" "$MOCK_LOG"
+        mock.activate
       }
       cleanup_dotnet() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_dotnet'
       After 'cleanup_dotnet'
@@ -62,22 +57,16 @@ MOCKEOF
 
     Describe "with --configuration Release"
       setup_dotnet_release() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock_dotnet.log"
         printf '<Project Sdk="Microsoft.NET.Sdk"></Project>\n' > "${TEST_WS}/Test.csproj"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/dotnet" << MOCKEOF
-#!/usr/bin/env bash
-printf 'dotnet %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/dotnet"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_logging "dotnet" "$MOCK_LOG"
+        mock.activate
       }
       cleanup_dotnet_release() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_dotnet_release'
       After 'cleanup_dotnet_release'
@@ -94,22 +83,16 @@ MOCKEOF
 
     Describe "with .sln file"
       setup_dotnet_sln() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock_dotnet.log"
         printf 'Microsoft Visual Studio Solution File\n' > "${TEST_WS}/App.sln"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/dotnet" << MOCKEOF
-#!/usr/bin/env bash
-printf 'dotnet %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/dotnet"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_logging "dotnet" "$MOCK_LOG"
+        mock.activate
       }
       cleanup_dotnet_sln() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_dotnet_sln'
       After 'cleanup_dotnet_sln'
@@ -123,20 +106,15 @@ MOCKEOF
 
     Describe "with failing dotnet"
       setup_dotnet_fail() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         printf '<Project Sdk="Microsoft.NET.Sdk"></Project>\n' > "${TEST_WS}/Test.csproj"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/dotnet" << 'EOF'
-#!/usr/bin/env bash
-exit 1
-EOF
-        chmod +x "${MOCK_BIN}/dotnet"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_exit "dotnet" 1
+        mock.activate
       }
       cleanup_dotnet_fail() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_dotnet_fail'
       After 'cleanup_dotnet_fail'
@@ -150,15 +128,14 @@ EOF
 
     Describe "require_tool dotnet failure"
       setup_no_dotnet() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         printf '<Project Sdk="Microsoft.NET.Sdk"></Project>\n' > "${TEST_WS}/Test.csproj"
-        MOCK_BIN="$(mktemp -d)"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}"
+        mock.isolate
       }
       cleanup_no_dotnet() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_no_dotnet'
       After 'cleanup_no_dotnet'

@@ -2,31 +2,22 @@ Describe "build/node.sh - --tool alias for --package-manager"
   Include "$BRIK_RUNTIME_LIB/logging.sh"
   Include "$BRIK_RUNTIME_LIB/tools.sh"
   Include "$BRIK_CORE_LIB/build/node.sh"
+  Include "$BRIK_HOME/runtime/bash/spec/support/mock_helper.sh"
 
   Describe "build.node.run with --tool"
     setup_tool_alias() {
+      mock.setup
       TEST_WS="$(mktemp -d)"
       MOCK_LOG="${TEST_WS}/mock_yarn.log"
       printf '{"name":"test","version":"1.0.0","scripts":{"build":"echo ok"}}\n' > "${TEST_WS}/package.json"
       mkdir -p "${TEST_WS}/node_modules"
-      MOCK_BIN="$(mktemp -d)"
-      cat > "${MOCK_BIN}/yarn" << MOCKEOF
-#!/usr/bin/env bash
-printf 'yarn %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-      chmod +x "${MOCK_BIN}/yarn"
-      cat > "${MOCK_BIN}/node" << 'EOF'
-#!/usr/bin/env bash
-exit 0
-EOF
-      chmod +x "${MOCK_BIN}/node"
-      ORIG_PATH="$PATH"
-      export PATH="${MOCK_BIN}:${PATH}"
+      mock.create_logging "yarn" "$MOCK_LOG"
+      mock.create_exit "node" 0
+      mock.activate
     }
     cleanup_tool_alias() {
-      export PATH="$ORIG_PATH"
-      rm -rf "$TEST_WS" "$MOCK_BIN"
+      mock.cleanup
+      rm -rf "$TEST_WS"
     }
     Before 'setup_tool_alias'
     After 'cleanup_tool_alias'
@@ -43,22 +34,16 @@ EOF
 
   Describe "build.node.install with --tool"
     setup_install_tool() {
+      mock.setup
       TEST_WS="$(mktemp -d)"
       MOCK_LOG="${TEST_WS}/mock_pnpm.log"
       printf '{"name":"test","version":"1.0.0"}\n' > "${TEST_WS}/package.json"
-      MOCK_BIN="$(mktemp -d)"
-      cat > "${MOCK_BIN}/pnpm" << MOCKEOF
-#!/usr/bin/env bash
-printf 'pnpm %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-      chmod +x "${MOCK_BIN}/pnpm"
-      ORIG_PATH="$PATH"
-      export PATH="${MOCK_BIN}:${PATH}"
+      mock.create_logging "pnpm" "$MOCK_LOG"
+      mock.activate
     }
     cleanup_install_tool() {
-      export PATH="$ORIG_PATH"
-      rm -rf "$TEST_WS" "$MOCK_BIN"
+      mock.cleanup
+      rm -rf "$TEST_WS"
     }
     Before 'setup_install_tool'
     After 'cleanup_install_tool'

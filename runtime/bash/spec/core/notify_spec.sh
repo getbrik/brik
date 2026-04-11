@@ -2,6 +2,7 @@ Describe "notify.sh"
   Include "$BRIK_RUNTIME_LIB/logging.sh"
   Include "$BRIK_RUNTIME_LIB/tools.sh"
   Include "$BRIK_CORE_LIB/notify.sh"
+  Include "$BRIK_HOME/runtime/bash/spec/support/mock_helper.sh"
 
   Describe "notify.send"
     It "returns 2 when no channel specified"
@@ -61,23 +62,17 @@ Describe "notify.sh"
 
     Describe "with mock curl"
       setup_curl() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock_curl.log"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/curl" << MOCKEOF
-#!/usr/bin/env bash
-printf 'curl %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/curl"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_logging "curl" "$MOCK_LOG"
+        mock.activate
         export SLACK_WEBHOOK_URL="https://hooks.slack.com/test"
       }
       cleanup_curl() {
-        export PATH="$ORIG_PATH"
+        mock.cleanup
         unset SLACK_WEBHOOK_URL
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        rm -rf "$TEST_WS"
       }
       Before 'setup_curl'
       After 'cleanup_curl'
@@ -119,20 +114,14 @@ MOCKEOF
 
     Describe "with failing curl"
       setup_fail() {
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/curl" << 'EOF'
-#!/usr/bin/env bash
-exit 1
-EOF
-        chmod +x "${MOCK_BIN}/curl"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.setup
+        mock.create_exit "curl" 1
+        mock.activate
         export SLACK_WEBHOOK_URL="https://hooks.slack.com/test"
       }
       cleanup_fail() {
-        export PATH="$ORIG_PATH"
+        mock.cleanup
         unset SLACK_WEBHOOK_URL
-        rm -rf "$MOCK_BIN"
       }
       Before 'setup_fail'
       After 'cleanup_fail'
@@ -168,22 +157,16 @@ EOF
 
     Describe "with mock sendmail"
       setup_sendmail() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock_sendmail.log"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/sendmail" << MOCKEOF
-#!/usr/bin/env bash
-cat > "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/sendmail"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_script "sendmail" "cat > \"$MOCK_LOG\""
+        mock.activate
       }
       cleanup_sendmail() {
-        export PATH="$ORIG_PATH"
+        mock.cleanup
         unset BRIK_NOTIFY_EMAIL_TO
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        rm -rf "$TEST_WS"
       }
       Before 'setup_sendmail'
       After 'cleanup_sendmail'
@@ -241,23 +224,17 @@ MOCKEOF
 
     Describe "with mock curl"
       setup_curl() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock_curl.log"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/curl" << MOCKEOF
-#!/usr/bin/env bash
-printf 'curl %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/curl"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_logging "curl" "$MOCK_LOG"
+        mock.activate
         export BRIK_NOTIFY_WEBHOOK_URL="https://hooks.example.com/notify"
       }
       cleanup_curl() {
-        export PATH="$ORIG_PATH"
+        mock.cleanup
         unset BRIK_NOTIFY_WEBHOOK_URL
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        rm -rf "$TEST_WS"
       }
       Before 'setup_curl'
       After 'cleanup_curl'
@@ -286,23 +263,17 @@ MOCKEOF
   Describe "notify.slack color mapping"
     Describe "with mock curl"
       setup_color() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock_curl.log"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/curl" << MOCKEOF
-#!/usr/bin/env bash
-printf 'curl %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/curl"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_logging "curl" "$MOCK_LOG"
+        mock.activate
         export SLACK_WEBHOOK_URL="https://hooks.slack.com/test"
       }
       cleanup_color() {
-        export PATH="$ORIG_PATH"
+        mock.cleanup
         unset SLACK_WEBHOOK_URL
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        rm -rf "$TEST_WS"
       }
       Before 'setup_color'
       After 'cleanup_color'
@@ -339,24 +310,17 @@ MOCKEOF
   Describe "notify.email with mail fallback"
     Describe "with mock mail"
       setup_mail() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock_mail.log"
-        MOCK_BIN="$(mktemp -d)"
-        # No sendmail, only mail
-        cat > "${MOCK_BIN}/mail" << MOCKEOF
-#!/usr/bin/env bash
-printf 'mail %s\n' "\$*" >> "$MOCK_LOG"
-cat >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/mail"
-        ORIG_PATH="$PATH"
-        # Exclude sendmail from PATH
+        mock.create_script "mail" "printf 'mail %s\n' \"\$*\" >> \"$MOCK_LOG\"
+cat >> \"$MOCK_LOG\""
+        # Hybrid isolation: exclude sendmail from PATH
         export PATH="${MOCK_BIN}:/usr/bin:/bin"
       }
       cleanup_mail() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_mail'
       After 'cleanup_mail'
@@ -384,22 +348,16 @@ MOCKEOF
   Describe "notify.webhook with --url option"
     Describe "with mock curl"
       setup_url() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock_curl.log"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/curl" << MOCKEOF
-#!/usr/bin/env bash
-printf 'curl %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/curl"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_logging "curl" "$MOCK_LOG"
+        mock.activate
       }
       cleanup_url() {
-        export PATH="$ORIG_PATH"
+        mock.cleanup
         unset BRIK_NOTIFY_WEBHOOK_URL
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        rm -rf "$TEST_WS"
       }
       Before 'setup_url'
       After 'cleanup_url'
@@ -425,20 +383,14 @@ MOCKEOF
 
     Describe "with failing curl"
       setup_fail_webhook() {
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/curl" << 'EOF'
-#!/usr/bin/env bash
-exit 1
-EOF
-        chmod +x "${MOCK_BIN}/curl"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.setup
+        mock.create_exit "curl" 1
+        mock.activate
         export BRIK_NOTIFY_WEBHOOK_URL="https://hooks.example.com/notify"
       }
       cleanup_fail_webhook() {
-        export PATH="$ORIG_PATH"
+        mock.cleanup
         unset BRIK_NOTIFY_WEBHOOK_URL
-        rm -rf "$MOCK_BIN"
       }
       Before 'setup_fail_webhook'
       After 'cleanup_fail_webhook'

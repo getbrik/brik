@@ -2,6 +2,7 @@ Describe "build/java.sh"
   Include "$BRIK_RUNTIME_LIB/logging.sh"
   Include "$BRIK_RUNTIME_LIB/tools.sh"
   Include "$BRIK_CORE_LIB/build/java.sh"
+  Include "$BRIK_HOME/runtime/bash/spec/support/mock_helper.sh"
 
   Describe "_build.java._detect_tool"
     It "detects maven from pom.xml"
@@ -62,15 +63,14 @@ Describe "build/java.sh"
 
     Describe "require_tool mvn failure"
       setup_no_mvn() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         printf '<project/>\n' > "${TEST_WS}/pom.xml"
-        MOCK_BIN="$(mktemp -d)"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}"
+        mock.isolate
       }
       cleanup_no_mvn() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_no_mvn'
       After 'cleanup_no_mvn'
@@ -84,15 +84,14 @@ Describe "build/java.sh"
 
     Describe "require_tool gradle failure"
       setup_no_gradle() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         printf 'plugins { id "java" }\n' > "${TEST_WS}/build.gradle"
-        MOCK_BIN="$(mktemp -d)"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}"
+        mock.isolate
       }
       cleanup_no_gradle() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_no_gradle'
       After 'cleanup_no_gradle'
@@ -106,22 +105,16 @@ Describe "build/java.sh"
 
     Describe "with mock mvn"
       setup_mvn() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock_mvn.log"
         printf '<project><modelVersion>4.0.0</modelVersion></project>\n' > "${TEST_WS}/pom.xml"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/mvn" << MOCKEOF
-#!/usr/bin/env bash
-printf 'mvn %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/mvn"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_logging "mvn" "$MOCK_LOG"
+        mock.activate
       }
       cleanup_mvn() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_mvn'
       After 'cleanup_mvn'
@@ -153,23 +146,17 @@ MOCKEOF
 
     Describe "explicit --tool maven override on gradle workspace"
       setup_override() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock_mvn.log"
         printf 'plugins { id "java" }\n' > "${TEST_WS}/build.gradle"
         printf '<project/>\n' > "${TEST_WS}/pom.xml"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/mvn" << MOCKEOF
-#!/usr/bin/env bash
-printf 'mvn %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/mvn"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_logging "mvn" "$MOCK_LOG"
+        mock.activate
       }
       cleanup_override() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_override'
       After 'cleanup_override'
@@ -186,22 +173,16 @@ MOCKEOF
 
     Describe "with mock gradle"
       setup_gradle() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock_gradle.log"
         printf 'plugins { id "java" }\n' > "${TEST_WS}/build.gradle"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/gradle" << MOCKEOF
-#!/usr/bin/env bash
-printf 'gradle %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/gradle"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_logging "gradle" "$MOCK_LOG"
+        mock.activate
       }
       cleanup_gradle() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_gradle'
       After 'cleanup_gradle'
@@ -233,6 +214,7 @@ MOCKEOF
 
     Describe "with gradlew wrapper"
       setup_gradlew() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock_gradlew.log"
         printf 'plugins { id "java" }\n' > "${TEST_WS}/build.gradle"
@@ -242,15 +224,13 @@ printf 'gradlew %s\n' "\$*" >> "$MOCK_LOG"
 exit 0
 MOCKEOF
         chmod +x "${TEST_WS}/gradlew"
-        ORIG_PATH="$PATH"
-        MOCK_BIN="$(mktemp -d)"
         ln -sf "$(command -v bash)" "${MOCK_BIN}/bash"
         ln -sf "$(command -v grep)" "${MOCK_BIN}/grep"
-        export PATH="${MOCK_BIN}"
+        mock.isolate
       }
       cleanup_gradlew() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_gradlew'
       After 'cleanup_gradlew'
@@ -273,20 +253,15 @@ MOCKEOF
 
     Describe "with failing mvn"
       setup_fail() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         printf '<project/>\n' > "${TEST_WS}/pom.xml"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/mvn" << 'EOF'
-#!/usr/bin/env bash
-exit 1
-EOF
-        chmod +x "${MOCK_BIN}/mvn"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_exit "mvn" 1
+        mock.activate
       }
       cleanup_fail() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_fail'
       After 'cleanup_fail'

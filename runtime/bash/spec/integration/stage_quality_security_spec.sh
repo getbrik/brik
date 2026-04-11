@@ -7,33 +7,26 @@ Describe "Integration: Quality and Security stages"
   Include "$BRIK_CORE_LIB/quality/lint.sh"
   Include "$BRIK_CORE_LIB/quality/format.sh"
   Include "$BRIK_CORE_LIB/security.sh"
+  Include "$BRIK_HOME/runtime/bash/spec/support/mock_helper.sh"
 
   Describe "quality.run with multiple real sub-modules"
     Describe "lint and format pass"
       setup_pass() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
+        MOCK_NPX_LOG="${TEST_WS}/mock_npx.log"
         printf '{"name":"test"}\n' > "${TEST_WS}/package.json"
         printf 'export default [];\n' > "${TEST_WS}/eslint.config.js"
-        MOCK_BIN="$(mktemp -d)"
-        MOCK_NPX_LOG="${TEST_WS}/mock_npx.log"
-        # Mock npx (eslint + prettier)
-        cat > "${MOCK_BIN}/npx" << MOCKEOF
-#!/usr/bin/env bash
-printf 'npx %s\n' "\$*" >> "$MOCK_NPX_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/npx"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
-        # Mark sub-modules as loaded
+        mock.create_logging "npx" "$MOCK_NPX_LOG"
+        mock.activate
         eval "_BRIK_MODULE_QUALITY_LINT_LOADED=1"
         eval "_BRIK_MODULE_QUALITY_FORMAT_LOADED=1"
         export _BRIK_MODULE_QUALITY_LINT_LOADED _BRIK_MODULE_QUALITY_FORMAT_LOADED
       }
       cleanup_pass() {
-        export PATH="$ORIG_PATH"
+        mock.cleanup
         unset _BRIK_MODULE_QUALITY_LINT_LOADED _BRIK_MODULE_QUALITY_FORMAT_LOADED
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        rm -rf "$TEST_WS"
       }
       Before 'setup_pass'
       After 'cleanup_pass'
@@ -56,26 +49,20 @@ MOCKEOF
 
     Describe "mixed pass/fail"
       setup_mixed() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         printf '{"name":"test"}\n' > "${TEST_WS}/package.json"
         printf 'export default [];\n' > "${TEST_WS}/eslint.config.js"
-        MOCK_BIN="$(mktemp -d)"
-        # npx (eslint) fails
-        cat > "${MOCK_BIN}/npx" << 'EOF'
-#!/usr/bin/env bash
-exit 1
-EOF
-        chmod +x "${MOCK_BIN}/npx"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_exit "npx" 1
+        mock.activate
         eval "_BRIK_MODULE_QUALITY_LINT_LOADED=1"
         eval "_BRIK_MODULE_QUALITY_FORMAT_LOADED=1"
         export _BRIK_MODULE_QUALITY_LINT_LOADED _BRIK_MODULE_QUALITY_FORMAT_LOADED
       }
       cleanup_mixed() {
-        export PATH="$ORIG_PATH"
+        mock.cleanup
         unset _BRIK_MODULE_QUALITY_LINT_LOADED _BRIK_MODULE_QUALITY_FORMAT_LOADED
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        rm -rf "$TEST_WS"
       }
       Before 'setup_mixed'
       After 'cleanup_mixed'
@@ -91,31 +78,18 @@ EOF
   Describe "security.run composing security sub-modules"
     Describe "with mocked tools"
       setup_security() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
-        MOCK_BIN="$(mktemp -d)"
         MOCK_NPM_LOG="${TEST_WS}/mock_npm.log"
         MOCK_GITLEAKS_LOG="${TEST_WS}/mock_gitleaks.log"
-        # Mock npm for deps scan
-        cat > "${MOCK_BIN}/npm" << MOCKEOF
-#!/usr/bin/env bash
-printf 'npm %s\n' "\$*" >> "$MOCK_NPM_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/npm"
+        mock.create_logging "npm" "$MOCK_NPM_LOG"
         printf '{"name":"test"}\n' > "${TEST_WS}/package.json"
-        # Mock gitleaks for secret scan
-        cat > "${MOCK_BIN}/gitleaks" << MOCKEOF
-#!/usr/bin/env bash
-printf 'gitleaks %s\n' "\$*" >> "$MOCK_GITLEAKS_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/gitleaks"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_logging "gitleaks" "$MOCK_GITLEAKS_LOG"
+        mock.activate
       }
       cleanup_security() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_security'
       After 'cleanup_security'
@@ -138,33 +112,17 @@ MOCKEOF
 
     Describe "with container scan enabled"
       setup_container() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
-        MOCK_BIN="$(mktemp -d)"
         printf '{"name":"test"}\n' > "${TEST_WS}/package.json"
-        # Mock npm for deps scan
-        cat > "${MOCK_BIN}/npm" << 'EOF'
-#!/usr/bin/env bash
-exit 0
-EOF
-        chmod +x "${MOCK_BIN}/npm"
-        # Mock gitleaks for secret scan
-        cat > "${MOCK_BIN}/gitleaks" << 'EOF'
-#!/usr/bin/env bash
-exit 0
-EOF
-        chmod +x "${MOCK_BIN}/gitleaks"
-        # Mock grype for container scan
-        cat > "${MOCK_BIN}/grype" << 'EOF'
-#!/usr/bin/env bash
-exit 0
-EOF
-        chmod +x "${MOCK_BIN}/grype"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_exit "npm" 0
+        mock.create_exit "gitleaks" 0
+        mock.create_exit "grype" 0
+        mock.activate
       }
       cleanup_container() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_container'
       After 'cleanup_container'

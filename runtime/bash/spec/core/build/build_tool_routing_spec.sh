@@ -3,6 +3,7 @@ Describe "build.sh - BRIK_BUILD_TOOL routing"
   Include "$BRIK_RUNTIME_LIB/tools.sh"
   Include "$BRIK_CORE_LIB/_loader.sh"
   Include "$BRIK_CORE_LIB/build.sh"
+  Include "$BRIK_HOME/runtime/bash/spec/support/mock_helper.sh"
 
   Describe "build.run passes BRIK_BUILD_TOOL to stack module"
     Describe "with node stack and --tool from BRIK_BUILD_TOOL"
@@ -11,27 +12,16 @@ Describe "build.sh - BRIK_BUILD_TOOL routing"
         MOCK_LOG="${TEST_WS}/mock_tool.log"
         printf '{"name":"test","version":"1.0.0","scripts":{"build":"echo ok"}}\n' > "${TEST_WS}/package.json"
         mkdir -p "${TEST_WS}/node_modules"
-        MOCK_BIN="$(mktemp -d)"
-        # Mock yarn to capture calls
-        cat > "${MOCK_BIN}/yarn" << MOCKEOF
-#!/usr/bin/env bash
-printf 'yarn %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/yarn"
-        cat > "${MOCK_BIN}/node" << 'EOF'
-#!/usr/bin/env bash
-exit 0
-EOF
-        chmod +x "${MOCK_BIN}/node"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.setup
+        mock.create_logging "yarn" "$MOCK_LOG"
+        mock.create_exit "node" 0
+        mock.activate
         export BRIK_BUILD_TOOL="yarn"
       }
       cleanup_node_tool() {
-        export PATH="$ORIG_PATH"
         unset BRIK_BUILD_TOOL
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_node_tool'
       After 'cleanup_node_tool'
@@ -51,21 +41,15 @@ EOF
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock_uv.log"
         printf '[project]\nname = "test"\n' > "${TEST_WS}/pyproject.toml"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/uv" << MOCKEOF
-#!/usr/bin/env bash
-printf 'uv %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/uv"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.setup
+        mock.create_logging "uv" "$MOCK_LOG"
+        mock.activate
         export BRIK_BUILD_TOOL="uv"
       }
       cleanup_python_tool() {
-        export PATH="$ORIG_PATH"
         unset BRIK_BUILD_TOOL
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_python_tool'
       After 'cleanup_python_tool'
@@ -86,26 +70,17 @@ MOCKEOF
       TEST_WS="$(mktemp -d)"
       printf '{"name":"test","version":"1.0.0"}\n' > "${TEST_WS}/package.json"
       mkdir -p "${TEST_WS}/node_modules"
-      MOCK_BIN="$(mktemp -d)"
-      cat > "${MOCK_BIN}/node" << 'EOF'
-#!/usr/bin/env bash
-exit 0
-EOF
-      chmod +x "${MOCK_BIN}/node"
-      cat > "${MOCK_BIN}/npm" << 'EOF'
-#!/usr/bin/env bash
-exit 0
-EOF
-      chmod +x "${MOCK_BIN}/npm"
-      ORIG_PATH="$PATH"
-      export PATH="${MOCK_BIN}:${PATH}"
+      mock.setup
+      mock.create_exit "node" 0
+      mock.create_exit "npm" 0
+      mock.activate
       export BRIK_BUILD_COMMAND="echo custom-build"
       export BRIK_BUILD_TOOL="yarn"
     }
     cleanup_cmd_priority() {
-      export PATH="$ORIG_PATH"
       unset BRIK_BUILD_COMMAND BRIK_BUILD_TOOL
-      rm -rf "$TEST_WS" "$MOCK_BIN"
+      mock.cleanup
+      rm -rf "$TEST_WS"
     }
     Before 'setup_cmd_priority'
     After 'cleanup_cmd_priority'
@@ -123,26 +98,17 @@ EOF
       TEST_WS="$(mktemp -d)"
       printf '{"name":"test","version":"1.0.0","scripts":{"build":"echo ok"}}\n' > "${TEST_WS}/package.json"
       mkdir -p "${TEST_WS}/node_modules"
-      MOCK_BIN="$(mktemp -d)"
-      cat > "${MOCK_BIN}/npm" << 'EOF'
-#!/usr/bin/env bash
-printf "mock-npm %s\n" "$*"
-exit 0
-EOF
-      chmod +x "${MOCK_BIN}/npm"
-      cat > "${MOCK_BIN}/node" << 'EOF'
-#!/usr/bin/env bash
-exit 0
-EOF
-      chmod +x "${MOCK_BIN}/node"
-      ORIG_PATH="$PATH"
-      export PATH="${MOCK_BIN}:${PATH}"
+      mock.setup
+      mock.create_script "npm" 'printf "mock-npm %s\n" "$*"
+exit 0'
+      mock.create_exit "node" 0
+      mock.activate
       export BRIK_BUILD_TOOL="auto"
     }
     cleanup_auto_tool() {
-      export PATH="$ORIG_PATH"
       unset BRIK_BUILD_TOOL
-      rm -rf "$TEST_WS" "$MOCK_BIN"
+      mock.cleanup
+      rm -rf "$TEST_WS"
     }
     Before 'setup_auto_tool'
     After 'cleanup_auto_tool'

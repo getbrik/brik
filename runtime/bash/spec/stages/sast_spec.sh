@@ -9,8 +9,6 @@ Describe "stages.sast"
     export BRIK_CONFIG_FILE
     BRIK_CONFIG_FILE="$(mktemp)"
     printf 'version: 1\nproject:\n  name: test\n  stack: node\n' > "$BRIK_CONFIG_FILE"
-    export BRIK_LOG_DIR
-    BRIK_LOG_DIR="$(mktemp -d)"
     export BRIK_WORKSPACE
     BRIK_WORKSPACE="$(mktemp -d)"
     export BRIK_PROJECT_DIR="$BRIK_WORKSPACE"
@@ -19,7 +17,7 @@ Describe "stages.sast"
   }
   cleanup_env() {
     rm -f "$BRIK_CONFIG_FILE"
-    rm -rf "$BRIK_LOG_DIR" "$BRIK_WORKSPACE"
+    rm -rf "$BRIK_WORKSPACE"
     unset BRIK_SECURITY_SAST_TOOL BRIK_SECURITY_SAST_COMMAND \
           BRIK_SECURITY_SAST_RULESET BRIK_SECURITY_LICENSE_ALLOWED \
           BRIK_SECURITY_LICENSE_DENIED BRIK_SECURITY_IAC_TOOL \

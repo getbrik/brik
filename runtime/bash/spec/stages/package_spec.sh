@@ -8,8 +8,6 @@ Describe "stages.package"
     export BRIK_CONFIG_FILE
     BRIK_CONFIG_FILE="$(mktemp)"
     printf 'version: 1\nproject:\n  name: test\n  stack: node\n' > "$BRIK_CONFIG_FILE"
-    export BRIK_LOG_DIR
-    BRIK_LOG_DIR="$(mktemp -d)"
     export BRIK_WORKSPACE
     BRIK_WORKSPACE="$(mktemp -d)"
     export BRIK_PROJECT_DIR="$BRIK_WORKSPACE"
@@ -19,7 +17,7 @@ Describe "stages.package"
   }
   cleanup_env() {
     rm -f "$BRIK_CONFIG_FILE"
-    rm -rf "$BRIK_LOG_DIR" "$BRIK_WORKSPACE"
+    rm -rf "$BRIK_WORKSPACE"
     unset BRIK_PACKAGE_DOCKER_IMAGE BRIK_VERSION 2>/dev/null || true
   }
   Before 'setup_env'

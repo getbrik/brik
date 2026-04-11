@@ -2,13 +2,9 @@ Describe "stage.sh"
   Include "$BRIK_RUNTIME_LIB/stage.sh"
 
   setup() {
-    export BRIK_LOG_DIR
-    BRIK_LOG_DIR="$(mktemp -d)"
     export BRIK_PROJECT_DIR="/nonexistent"
   }
-  cleanup() { rm -rf "$BRIK_LOG_DIR"; }
   Before 'setup'
-  After 'cleanup'
 
   Describe "stage.run"
     Describe "successful execution"
@@ -96,8 +92,6 @@ Describe "stage.sh"
     Describe "pre-stage hook failure"
       Describe "with failing pre_stage hook"
         setup_failing_hook() {
-          export BRIK_LOG_DIR
-          BRIK_LOG_DIR="$(mktemp -d)"
           HOOK_DIR="$(mktemp -d)"
           mkdir -p "${HOOK_DIR}/.brik/hooks"
           cat > "${HOOK_DIR}/.brik/hooks/pre_stage.sh" << 'HOOKEOF'
@@ -105,7 +99,7 @@ pre_stage() { return 7; }
 HOOKEOF
           export BRIK_PROJECT_DIR="$HOOK_DIR"
         }
-        cleanup_failing_hook() { rm -rf "$BRIK_LOG_DIR" "$HOOK_DIR"; }
+        cleanup_failing_hook() { rm -rf "$HOOK_DIR"; }
         Before 'setup_failing_hook'
         After 'cleanup_failing_hook'
 

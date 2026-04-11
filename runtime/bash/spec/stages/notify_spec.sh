@@ -9,8 +9,6 @@ Describe "stages.notify"
     export BRIK_CONFIG_FILE
     BRIK_CONFIG_FILE="$(mktemp)"
     printf 'version: 1\nproject:\n  name: test-project\n  stack: node\n' > "$BRIK_CONFIG_FILE"
-    export BRIK_LOG_DIR
-    BRIK_LOG_DIR="$(mktemp -d)"
     export BRIK_WORKSPACE
     BRIK_WORKSPACE="$(mktemp -d)"
     export BRIK_PROJECT_DIR="$BRIK_WORKSPACE"
@@ -21,7 +19,7 @@ Describe "stages.notify"
   }
   cleanup_env() {
     rm -f "$BRIK_CONFIG_FILE"
-    rm -rf "$BRIK_LOG_DIR" "$BRIK_WORKSPACE"
+    rm -rf "$BRIK_WORKSPACE"
     unset BRIK_NOTIFY_SLACK_CHANNEL BRIK_NOTIFY_EMAIL_TO BRIK_NOTIFY_WEBHOOK_URL 2>/dev/null || true
   }
   Before 'setup_env'

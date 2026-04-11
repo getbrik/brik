@@ -9,8 +9,6 @@ Describe "stages.lint"
     export BRIK_CONFIG_FILE
     BRIK_CONFIG_FILE="$(mktemp)"
     printf 'version: 1\nproject:\n  name: test\n  stack: node\n' > "$BRIK_CONFIG_FILE"
-    export BRIK_LOG_DIR
-    BRIK_LOG_DIR="$(mktemp -d)"
     export BRIK_WORKSPACE
     BRIK_WORKSPACE="$(mktemp -d)"
     export BRIK_PROJECT_DIR="$BRIK_WORKSPACE"
@@ -19,7 +17,7 @@ Describe "stages.lint"
   }
   cleanup_env() {
     rm -f "$BRIK_CONFIG_FILE"
-    rm -rf "$BRIK_LOG_DIR" "$BRIK_WORKSPACE"
+    rm -rf "$BRIK_WORKSPACE"
     unset BRIK_QUALITY_LINT_TOOL BRIK_QUALITY_FORMAT_TOOL \
           BRIK_QUALITY_TYPE_CHECK_TOOL BRIK_QUALITY_LINT_COMMAND \
           BRIK_QUALITY_FORMAT_COMMAND BRIK_QUALITY_TYPE_CHECK_COMMAND \
@@ -266,18 +264,16 @@ Describe "_brik.install_deps (dev mode)"
   Include "$BRIK_HOME/runtime/bash/lib/runtime/stage.sh"
   Include "$BRIK_HOME/runtime/bash/lib/core/_loader.sh"
   Include "$BRIK_HOME/runtime/bash/lib/stages/lint.sh"
+  Include "$BRIK_HOME/runtime/bash/spec/support/mock_helper.sh"
 
   setup_deps_env() {
-    export BRIK_LOG_DIR
-    BRIK_LOG_DIR="$(mktemp -d)"
+    mock.setup
     DEPS_WS="$(mktemp -d)"
-    MOCK_BIN="$(mktemp -d)"
     MOCK_LOG="${DEPS_WS}/mock.log"
-    ORIG_PATH="$PATH"
   }
   cleanup_deps_env() {
-    export PATH="$ORIG_PATH"
-    rm -rf "$BRIK_LOG_DIR" "$DEPS_WS" "$MOCK_BIN"
+    mock.cleanup
+    rm -rf "$DEPS_WS"
     unset BRIK_BUILD_STACK
   }
   Before 'setup_deps_env'
@@ -287,13 +283,8 @@ Describe "_brik.install_deps (dev mode)"
     It "runs npm ci when node_modules is missing"
       run_node_install() {
         export BRIK_BUILD_STACK="node"
-        cat > "${MOCK_BIN}/npm" << MOCKEOF
-#!/usr/bin/env bash
-printf 'npm %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/npm"
-        export PATH="${MOCK_BIN}:${ORIG_PATH}"
+        mock.create_logging "npm" "$MOCK_LOG"
+        mock.activate
         _brik.install_deps "$DEPS_WS" dev 2>/dev/null
         grep -q "npm ci" "$MOCK_LOG"
       }
@@ -305,13 +296,8 @@ MOCKEOF
       run_node_skip() {
         export BRIK_BUILD_STACK="node"
         mkdir -p "${DEPS_WS}/node_modules"
-        cat > "${MOCK_BIN}/npm" << 'MOCKEOF'
-#!/usr/bin/env bash
-echo "npm should not be called" >&2
-exit 1
-MOCKEOF
-        chmod +x "${MOCK_BIN}/npm"
-        export PATH="${MOCK_BIN}:${ORIG_PATH}"
+        mock.create_exit "npm" 1
+        mock.activate
         _brik.install_deps "$DEPS_WS" dev 2>/dev/null
       }
       When call run_node_skip
@@ -324,13 +310,8 @@ MOCKEOF
       run_python_pyproject() {
         export BRIK_BUILD_STACK="python"
         printf '[project]\nname = "test"\n' > "${DEPS_WS}/pyproject.toml"
-        cat > "${MOCK_BIN}/pip" << MOCKEOF
-#!/usr/bin/env bash
-printf 'pip %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/pip"
-        export PATH="${MOCK_BIN}:${ORIG_PATH}"
+        mock.create_logging "pip" "$MOCK_LOG"
+        mock.activate
         _brik.install_deps "$DEPS_WS" dev 2>/dev/null
         grep -q 'pip install -e' "$MOCK_LOG"
       }
@@ -343,13 +324,8 @@ MOCKEOF
         export BRIK_BUILD_STACK="python"
         rm -f "${DEPS_WS}/pyproject.toml"
         printf 'pytest\n' > "${DEPS_WS}/requirements-dev.txt"
-        cat > "${MOCK_BIN}/pip" << MOCKEOF
-#!/usr/bin/env bash
-printf 'pip %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/pip"
-        export PATH="${MOCK_BIN}:${ORIG_PATH}"
+        mock.create_logging "pip" "$MOCK_LOG"
+        mock.activate
         _brik.install_deps "$DEPS_WS" dev 2>/dev/null
         grep -q 'pip install -r requirements-dev.txt' "$MOCK_LOG"
       }
@@ -374,12 +350,7 @@ MOCKEOF
     It "installs clippy when missing"
       run_rust_clippy() {
         export BRIK_BUILD_STACK="rust"
-        cat > "${MOCK_BIN}/rustup" << MOCKEOF
-#!/usr/bin/env bash
-printf 'rustup %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/rustup"
+        mock.create_logging "rustup" "$MOCK_LOG"
         export PATH="${MOCK_BIN}:/usr/bin:/bin"
         _brik.install_deps "$DEPS_WS" dev 2>/dev/null
         grep -q "rustup component add clippy" "$MOCK_LOG"
@@ -391,12 +362,7 @@ MOCKEOF
     It "installs rustfmt when missing"
       run_rust_rustfmt() {
         export BRIK_BUILD_STACK="rust"
-        cat > "${MOCK_BIN}/rustup" << MOCKEOF
-#!/usr/bin/env bash
-printf 'rustup %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/rustup"
+        mock.create_logging "rustup" "$MOCK_LOG"
         export PATH="${MOCK_BIN}:/usr/bin:/bin"
         _brik.install_deps "$DEPS_WS" dev 2>/dev/null
         grep -q "rustup component add rustfmt" "$MOCK_LOG"
@@ -408,7 +374,7 @@ MOCKEOF
     It "skips when rustup is not available"
       run_rust_no_rustup() {
         export BRIK_BUILD_STACK="rust"
-        rm -f "${MOCK_BIN}/rustup" "$MOCK_LOG"
+        rm -f "$MOCK_LOG"
         export PATH="${MOCK_BIN}:/usr/bin:/bin"
         _brik.install_deps "$DEPS_WS" dev 2>/dev/null
         [[ ! -f "$MOCK_LOG" ]]

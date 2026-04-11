@@ -1,40 +1,29 @@
 Describe "Integration: stage.run with build"
   Include "$BRIK_RUNTIME_LIB/stage.sh"
   Include "$BRIK_CORE_LIB/_loader.sh"
+  Include "$BRIK_HOME/runtime/bash/spec/support/mock_helper.sh"
 
-  setup() {
-    export BRIK_LOG_DIR
-    BRIK_LOG_DIR="$(mktemp -d)"
-    export BRIK_PROJECT_DIR="/nonexistent"
-
-    # Create a mock npm in PATH
-    MOCK_BIN="$(mktemp -d)"
-    cat > "${MOCK_BIN}/npm" << 'MOCKEOF'
-#!/usr/bin/env bash
-case "$1" in
+  Describe "stage.run build with node workspace"
+    setup() {
+      export BRIK_PROJECT_DIR="/nonexistent"
+      mock.setup
+      mock.create_script "npm" 'case "$1" in
   run) echo "mock npm build ok"; exit 0 ;;
   ci|install) echo "mock npm install ok"; exit 0 ;;
   *) echo "mock npm: $*"; exit 0 ;;
-esac
-MOCKEOF
-    chmod +x "${MOCK_BIN}/npm"
-    export PATH="${MOCK_BIN}:${PATH}"
+esac'
+      mock.activate
+      WORKSPACE="$(mktemp -d)"
+      printf '{"name":"integration-test","version":"1.0.0","scripts":{"build":"echo built"}}\n' > "${WORKSPACE}/package.json"
+      mkdir -p "${WORKSPACE}/node_modules"
+    }
+    cleanup() {
+      mock.cleanup
+      rm -rf "$WORKSPACE"
+    }
+    Before 'setup'
+    After 'cleanup'
 
-    # Create a temp workspace with package.json
-    WORKSPACE="$(mktemp -d)"
-    printf '{"name":"integration-test","version":"1.0.0","scripts":{"build":"echo built"}}\n' > "${WORKSPACE}/package.json"
-    mkdir -p "${WORKSPACE}/node_modules"
-  }
-
-  cleanup() {
-    rm -rf "$BRIK_LOG_DIR" "$MOCK_BIN" "$WORKSPACE"
-  }
-
-  Before 'setup'
-  After 'cleanup'
-
-  Describe "stage.run build with node workspace"
-    # Load modules
     brik.use build
     brik.use build.node
 
@@ -75,22 +64,19 @@ MOCKEOF
 
   Describe "stage.run build with failing npm"
     setup_fail() {
-      export BRIK_LOG_DIR
-      BRIK_LOG_DIR="$(mktemp -d)"
       export BRIK_PROJECT_DIR="/nonexistent"
-      MOCK_BIN="$(mktemp -d)"
-      cat > "${MOCK_BIN}/npm" << 'MOCKEOF'
-#!/usr/bin/env bash
-echo "ERROR: build failed" >&2
-exit 1
-MOCKEOF
-      chmod +x "${MOCK_BIN}/npm"
-      export PATH="${MOCK_BIN}:${PATH}"
+      mock.setup
+      mock.create_script "npm" 'echo "ERROR: build failed" >&2
+exit 1'
+      mock.activate
       WORKSPACE="$(mktemp -d)"
       printf '{"name":"fail-test","version":"1.0.0","scripts":{"build":"exit 1"}}\n' > "${WORKSPACE}/package.json"
       mkdir -p "${WORKSPACE}/node_modules"
     }
-    cleanup_fail() { rm -rf "$BRIK_LOG_DIR" "$MOCK_BIN" "$WORKSPACE"; }
+    cleanup_fail() {
+      mock.cleanup
+      rm -rf "$WORKSPACE"
+    }
     Before 'setup_fail'
     After 'cleanup_fail'
 

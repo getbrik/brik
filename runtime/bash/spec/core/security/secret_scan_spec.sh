@@ -4,6 +4,7 @@ Describe "security/secret_scan.sh"
   Include "$BRIK_CORE_LIB/_loader.sh"
   Include "$BRIK_CORE_LIB/quality/_tools.sh"
   Include "$BRIK_CORE_LIB/security/secret_scan.sh"
+  Include "$BRIK_HOME/runtime/bash/spec/support/mock_helper.sh"
 
   Describe "security.secret_scan.run"
     It "returns 6 for nonexistent workspace"
@@ -14,21 +15,16 @@ Describe "security/secret_scan.sh"
 
     Describe "Tier 1: command override"
       setup_cmd() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/my-scanner" << 'EOF'
-#!/usr/bin/env bash
-exit 0
-EOF
-        chmod +x "${MOCK_BIN}/my-scanner"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_exit "my-scanner" 0
+        mock.activate
         export BRIK_SECURITY_SECRETS_COMMAND="my-scanner"
       }
       cleanup_cmd() {
-        export PATH="$ORIG_PATH"
         unset BRIK_SECURITY_SECRETS_COMMAND
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_cmd'
       After 'cleanup_cmd'
@@ -42,21 +38,16 @@ EOF
 
     Describe "Tier 1: command override fails"
       setup_cmd_fail() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/fail-scanner" << 'EOF'
-#!/usr/bin/env bash
-exit 1
-EOF
-        chmod +x "${MOCK_BIN}/fail-scanner"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_exit "fail-scanner" 1
+        mock.activate
         export BRIK_SECURITY_SECRETS_COMMAND="fail-scanner"
       }
       cleanup_cmd_fail() {
-        export PATH="$ORIG_PATH"
         unset BRIK_SECURITY_SECRETS_COMMAND
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_cmd_fail'
       After 'cleanup_cmd_fail'
@@ -70,23 +61,17 @@ EOF
 
     Describe "Tier 2: gitleaks"
       setup_gitleaks() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock.log"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/gitleaks" << MOCKEOF
-#!/usr/bin/env bash
-printf 'gitleaks %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/gitleaks"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_logging "gitleaks" "$MOCK_LOG"
+        mock.activate
         export BRIK_SECURITY_SECRETS_TOOL="gitleaks"
       }
       cleanup_gitleaks() {
-        export PATH="$ORIG_PATH"
         unset BRIK_SECURITY_SECRETS_TOOL
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_gitleaks'
       After 'cleanup_gitleaks'
@@ -103,23 +88,17 @@ MOCKEOF
 
     Describe "Tier 2: trufflehog"
       setup_trufflehog() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock.log"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/trufflehog" << MOCKEOF
-#!/usr/bin/env bash
-printf 'trufflehog %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/trufflehog"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_logging "trufflehog" "$MOCK_LOG"
+        mock.activate
         export BRIK_SECURITY_SECRETS_TOOL="trufflehog"
       }
       cleanup_trufflehog() {
-        export PATH="$ORIG_PATH"
         unset BRIK_SECURITY_SECRETS_TOOL
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_trufflehog'
       After 'cleanup_trufflehog'
@@ -136,16 +115,15 @@ MOCKEOF
 
     Describe "Tier 2: gitleaks not found"
       setup_gitleaks_missing() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
-        MOCK_BIN="$(mktemp -d)"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}"
+        mock.isolate
         export BRIK_SECURITY_SECRETS_TOOL="gitleaks"
       }
       cleanup_gitleaks_missing() {
-        export PATH="$ORIG_PATH"
         unset BRIK_SECURITY_SECRETS_TOOL
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_gitleaks_missing'
       After 'cleanup_gitleaks_missing'
@@ -159,16 +137,15 @@ MOCKEOF
 
     Describe "Tier 2: trufflehog not found"
       setup_trufflehog_missing() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
-        MOCK_BIN="$(mktemp -d)"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}"
+        mock.isolate
         export BRIK_SECURITY_SECRETS_TOOL="trufflehog"
       }
       cleanup_trufflehog_missing() {
-        export PATH="$ORIG_PATH"
         unset BRIK_SECURITY_SECRETS_TOOL
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_trufflehog_missing'
       After 'cleanup_trufflehog_missing'
@@ -201,30 +178,22 @@ MOCKEOF
 
     Describe "Tier 3: auto-detect trufflehog fallback"
       setup_trufflehog_auto() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock.log"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/trufflehog" << MOCKEOF
-#!/usr/bin/env bash
-printf 'trufflehog %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/trufflehog"
+        mock.create_logging "trufflehog" "$MOCK_LOG"
         # Build a PATH that has trufflehog but NOT gitleaks
-        # Keep /usr/bin etc. for system utilities (printf, cd, eval)
-        ORIG_PATH="$PATH"
-        # Remove any directory that contains a real gitleaks, then prepend mock
         local cleaned_path=""
         local IFS=':'
-        for dir in $PATH; do
+        for dir in $_MOCK_ORIG_PATH; do
           [[ -x "${dir}/gitleaks" ]] && continue
           cleaned_path="${cleaned_path:+${cleaned_path}:}${dir}"
         done
         export PATH="${MOCK_BIN}:${cleaned_path}"
       }
       cleanup_trufflehog_auto() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_trufflehog_auto'
       After 'cleanup_trufflehog_auto'
@@ -241,19 +210,14 @@ MOCKEOF
 
     Describe "scan detects secrets"
       setup_fail_scan() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/gitleaks" << 'EOF'
-#!/usr/bin/env bash
-exit 1
-EOF
-        chmod +x "${MOCK_BIN}/gitleaks"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_exit "gitleaks" 1
+        mock.activate
       }
       cleanup_fail_scan() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_fail_scan'
       After 'cleanup_fail_scan'
@@ -267,21 +231,15 @@ EOF
 
     Describe "Tier 3: auto-detect"
       setup_auto() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock.log"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/gitleaks" << MOCKEOF
-#!/usr/bin/env bash
-printf 'gitleaks %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/gitleaks"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_logging "gitleaks" "$MOCK_LOG"
+        mock.activate
       }
       cleanup_auto() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_auto'
       After 'cleanup_auto'
@@ -298,14 +256,13 @@ MOCKEOF
 
     Describe "no tool available"
       setup_none() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
-        MOCK_BIN="$(mktemp -d)"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}"
+        mock.isolate
       }
       cleanup_none() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_none'
       After 'cleanup_none'

@@ -2,6 +2,7 @@ Describe "build/python.sh - uv support"
   Include "$BRIK_RUNTIME_LIB/logging.sh"
   Include "$BRIK_RUNTIME_LIB/tools.sh"
   Include "$BRIK_CORE_LIB/build/python.sh"
+  Include "$BRIK_HOME/runtime/bash/spec/support/mock_helper.sh"
 
   Describe "_build.python._detect_pm"
     Describe "detects uv from uv.lock"
@@ -40,23 +41,17 @@ Describe "build/python.sh - uv support"
 
   Describe "build.python.run with mock uv"
     setup_uv_build() {
+      mock.setup
       TEST_WS="$(mktemp -d)"
       MOCK_LOG="${TEST_WS}/mock_uv.log"
       printf '[project]\nname = "test"\n' > "${TEST_WS}/pyproject.toml"
       touch "${TEST_WS}/uv.lock"
-      MOCK_BIN="$(mktemp -d)"
-      cat > "${MOCK_BIN}/uv" << MOCKEOF
-#!/usr/bin/env bash
-printf 'uv %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-      chmod +x "${MOCK_BIN}/uv"
-      ORIG_PATH="$PATH"
-      export PATH="${MOCK_BIN}:${PATH}"
+      mock.create_logging "uv" "$MOCK_LOG"
+      mock.activate
     }
     cleanup_uv_build() {
-      export PATH="$ORIG_PATH"
-      rm -rf "$TEST_WS" "$MOCK_BIN"
+      mock.cleanup
+      rm -rf "$TEST_WS"
     }
     Before 'setup_uv_build'
     After 'cleanup_uv_build'
@@ -79,23 +74,16 @@ MOCKEOF
 
   Describe "build.python.run with --tool uv override"
     setup_uv_override() {
+      mock.setup
       TEST_WS="$(mktemp -d)"
       MOCK_LOG="${TEST_WS}/mock_uv.log"
       printf '[project]\nname = "test"\n' > "${TEST_WS}/pyproject.toml"
-      # No uv.lock -- but --tool uv forces uv
-      MOCK_BIN="$(mktemp -d)"
-      cat > "${MOCK_BIN}/uv" << MOCKEOF
-#!/usr/bin/env bash
-printf 'uv %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-      chmod +x "${MOCK_BIN}/uv"
-      ORIG_PATH="$PATH"
-      export PATH="${MOCK_BIN}:${PATH}"
+      mock.create_logging "uv" "$MOCK_LOG"
+      mock.activate
     }
     cleanup_uv_override() {
-      export PATH="$ORIG_PATH"
-      rm -rf "$TEST_WS" "$MOCK_BIN"
+      mock.cleanup
+      rm -rf "$TEST_WS"
     }
     Before 'setup_uv_override'
     After 'cleanup_uv_override'
@@ -112,21 +100,16 @@ MOCKEOF
 
   Describe "build.python.run with failing uv"
     setup_uv_fail() {
+      mock.setup
       TEST_WS="$(mktemp -d)"
       printf '[project]\nname = "test"\n' > "${TEST_WS}/pyproject.toml"
       touch "${TEST_WS}/uv.lock"
-      MOCK_BIN="$(mktemp -d)"
-      cat > "${MOCK_BIN}/uv" << 'EOF'
-#!/usr/bin/env bash
-exit 1
-EOF
-      chmod +x "${MOCK_BIN}/uv"
-      ORIG_PATH="$PATH"
-      export PATH="${MOCK_BIN}:${PATH}"
+      mock.create_exit "uv" 1
+      mock.activate
     }
     cleanup_uv_fail() {
-      export PATH="$ORIG_PATH"
-      rm -rf "$TEST_WS" "$MOCK_BIN"
+      mock.cleanup
+      rm -rf "$TEST_WS"
     }
     Before 'setup_uv_fail'
     After 'cleanup_uv_fail'

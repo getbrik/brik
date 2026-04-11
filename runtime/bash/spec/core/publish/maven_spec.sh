@@ -3,6 +3,7 @@ Describe "publish/maven.sh"
   Include "$BRIK_RUNTIME_LIB/tools.sh"
   Include "$BRIK_CORE_LIB/publish.sh"
   Include "$BRIK_CORE_LIB/publish/maven.sh"
+  Include "$BRIK_HOME/runtime/bash/spec/support/mock_helper.sh"
 
   Describe "publish.maven.run"
     It "returns 2 for unknown option"
@@ -33,26 +34,20 @@ Describe "publish/maven.sh"
 
     Describe "with mock mvn"
       setup_mvn() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock_mvn.log"
         printf '<project/>\n' > "${TEST_WS}/pom.xml"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/mvn" << MOCKEOF
-#!/usr/bin/env bash
-printf 'mvn %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/mvn"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_logging "mvn" "$MOCK_LOG"
+        mock.activate
         ORIG_DIR="$(pwd)"
         cd "$TEST_WS" || return 1
       }
       cleanup_mvn() {
         cd "$ORIG_DIR" || true
-        export PATH="$ORIG_PATH"
+        mock.cleanup
         unset BRIK_DRY_RUN BRIK_PUBLISH_MAVEN_REPOSITORY 2>/dev/null
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        rm -rf "$TEST_WS"
       }
       Before 'setup_mvn'
       After 'cleanup_mvn'
@@ -132,23 +127,18 @@ MOCKEOF
 
     Describe "with failing mvn"
       setup_fail_mvn() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         printf '<project/>\n' > "${TEST_WS}/pom.xml"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/mvn" << 'MOCKEOF'
-#!/usr/bin/env bash
-exit 1
-MOCKEOF
-        chmod +x "${MOCK_BIN}/mvn"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_exit "mvn" 1
+        mock.activate
         ORIG_DIR="$(pwd)"
         cd "$TEST_WS" || return 1
       }
       cleanup_fail_mvn() {
         cd "$ORIG_DIR" || true
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_fail_mvn'
       After 'cleanup_fail_mvn'
@@ -162,25 +152,19 @@ MOCKEOF
 
     Describe "with gradle project"
       setup_gradle() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock_gradle.log"
         printf 'apply plugin: java\n' > "${TEST_WS}/build.gradle"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/gradle" << MOCKEOF
-#!/usr/bin/env bash
-printf 'gradle %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/gradle"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_logging "gradle" "$MOCK_LOG"
+        mock.activate
         ORIG_DIR="$(pwd)"
         cd "$TEST_WS" || return 1
       }
       cleanup_gradle() {
         cd "$ORIG_DIR" || true
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_gradle'
       After 'cleanup_gradle'

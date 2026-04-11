@@ -5,26 +5,21 @@ Describe "security modules - tool selection via BRIK_SECURITY_*_TOOL"
   Include "$BRIK_CORE_LIB/quality/_tools.sh"
   Include "$BRIK_CORE_LIB/security/secret_scan.sh"
   Include "$BRIK_CORE_LIB/security/deps.sh"
+  Include "$BRIK_HOME/runtime/bash/spec/support/mock_helper.sh"
 
   Describe "BRIK_SECURITY_SECRETS_TOOL selection"
     setup_secret_tool() {
+      mock.setup
       TEST_WS="$(mktemp -d)"
       MOCK_LOG="${TEST_WS}/mock.log"
-      MOCK_BIN="$(mktemp -d)"
-      cat > "${MOCK_BIN}/gitleaks" << MOCKEOF
-#!/usr/bin/env bash
-printf 'gitleaks %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-      chmod +x "${MOCK_BIN}/gitleaks"
-      ORIG_PATH="$PATH"
-      export PATH="${MOCK_BIN}:${PATH}"
+      mock.create_logging "gitleaks" "$MOCK_LOG"
+      mock.activate
       export BRIK_SECURITY_SECRETS_TOOL="gitleaks"
     }
     cleanup_secret_tool() {
-      export PATH="$ORIG_PATH"
+      mock.cleanup
       unset BRIK_SECURITY_SECRETS_TOOL
-      rm -rf "$TEST_WS" "$MOCK_BIN"
+      rm -rf "$TEST_WS"
     }
     Before 'setup_secret_tool'
     After 'cleanup_secret_tool'
@@ -41,24 +36,18 @@ MOCKEOF
 
   Describe "BRIK_SECURITY_DEPS_TOOL selection"
     setup_dep_tool() {
+      mock.setup
       TEST_WS="$(mktemp -d)"
       MOCK_LOG="${TEST_WS}/mock.log"
       printf '{"name":"test"}\n' > "${TEST_WS}/package.json"
-      MOCK_BIN="$(mktemp -d)"
-      cat > "${MOCK_BIN}/grype" << MOCKEOF
-#!/usr/bin/env bash
-printf 'grype %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-      chmod +x "${MOCK_BIN}/grype"
-      ORIG_PATH="$PATH"
-      export PATH="${MOCK_BIN}:${PATH}"
+      mock.create_logging "grype" "$MOCK_LOG"
+      mock.activate
       export BRIK_SECURITY_DEPS_TOOL="grype"
     }
     cleanup_dep_tool() {
-      export PATH="$ORIG_PATH"
+      mock.cleanup
       unset BRIK_SECURITY_DEPS_TOOL
-      rm -rf "$TEST_WS" "$MOCK_BIN"
+      rm -rf "$TEST_WS"
     }
     Before 'setup_dep_tool'
     After 'cleanup_dep_tool'

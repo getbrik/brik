@@ -2,6 +2,7 @@ Describe "doc.sh"
   Include "$BRIK_RUNTIME_LIB/logging.sh"
   Include "$BRIK_RUNTIME_LIB/tools.sh"
   Include "$BRIK_CORE_LIB/doc.sh"
+  Include "$BRIK_HOME/runtime/bash/spec/support/mock_helper.sh"
 
   Describe "doc.generate"
     It "returns 2 for unknown option"
@@ -133,25 +134,20 @@ Describe "doc.sh"
 
     Describe "dry-run with mock tools"
       setup_dryrun() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
-        MOCK_BIN="$(mktemp -d)"
         for tool in mkdocs sphinx-build mvn gradle cargo; do
-          cat > "${MOCK_BIN}/${tool}" << 'EOF'
-#!/usr/bin/env bash
-exit 0
-EOF
-          chmod +x "${MOCK_BIN}/${tool}"
+          mock.create_exit "$tool" 0
         done
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.activate
         ORIG_DIR="$(pwd)"
         cd "$TEST_WS" || return 1
       }
       cleanup_dryrun() {
         cd "$ORIG_DIR" || true
-        export PATH="$ORIG_PATH"
+        mock.cleanup
         unset BRIK_DOC_TOOL BRIK_DOC_OUTPUT BRIK_DRY_RUN 2>/dev/null
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        rm -rf "$TEST_WS"
       }
       Before 'setup_dryrun'
       After 'cleanup_dryrun'
@@ -241,26 +237,20 @@ EOF
 
     Describe "actual execution with mock tools"
       setup_exec() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock.log"
-        MOCK_BIN="$(mktemp -d)"
         for tool in mkdocs sphinx-build mvn gradle cargo; do
-          cat > "${MOCK_BIN}/${tool}" << MOCKEOF
-#!/usr/bin/env bash
-printf '%s %s\n' "$tool" "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-          chmod +x "${MOCK_BIN}/${tool}"
+          mock.create_logging "$tool" "$MOCK_LOG"
         done
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.activate
         ORIG_DIR="$(pwd)"
         cd "$TEST_WS" || return 1
       }
       cleanup_exec() {
         cd "$ORIG_DIR" || true
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_exec'
       After 'cleanup_exec'

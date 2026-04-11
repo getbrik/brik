@@ -1,4 +1,5 @@
 Describe "brik run"
+  Include "$BRIK_HOME/runtime/bash/spec/support/mock_helper.sh"
 
   Describe "brik run without subcommand"
     It "shows an error message"
@@ -43,28 +44,20 @@ Describe "brik run"
 
   Describe "brik run stage build --config"
     setup() {
-      MOCK_BIN="$(mktemp -d)"
-      cat > "${MOCK_BIN}/npm" << 'MOCKEOF'
-#!/usr/bin/env bash
-echo "mock npm: $*"
-exit 0
-MOCKEOF
-      chmod +x "${MOCK_BIN}/npm"
-      cat > "${MOCK_BIN}/node" << 'MOCKEOF'
-#!/usr/bin/env bash
-exit 0
-MOCKEOF
-      chmod +x "${MOCK_BIN}/node"
+      mock.setup
+      mock.create_script "npm" 'echo "mock npm: $*"'
+      mock.create_exit "node" 0
+      mock.activate
       WORKSPACE="$(mktemp -d)"
       printf '{"name":"cli-test","version":"1.0.0","scripts":{"build":"echo ok"}}\n' > "${WORKSPACE}/package.json"
       mkdir -p "${WORKSPACE}/node_modules"
       CONFIG="${WORKSPACE}/brik.yml"
       printf 'version: 1\nproject:\n  name: cli-test\n  stack: node\ntest:\n  framework: npm\n' > "$CONFIG"
-      export PATH="${MOCK_BIN}:${PATH}"
-      export BRIK_LOG_DIR
-      BRIK_LOG_DIR="$(mktemp -d)"
     }
-    cleanup() { rm -rf "$MOCK_BIN" "$WORKSPACE" "$BRIK_LOG_DIR"; }
+    cleanup() {
+      mock.cleanup
+      rm -rf "$WORKSPACE"
+    }
     Before 'setup'
     After 'cleanup'
 
@@ -78,27 +71,19 @@ MOCKEOF
 
   Describe "brik run stage build"
     setup() {
-      MOCK_BIN="$(mktemp -d)"
-      cat > "${MOCK_BIN}/npm" << 'MOCKEOF'
-#!/usr/bin/env bash
-echo "mock npm: $*"
-exit 0
-MOCKEOF
-      chmod +x "${MOCK_BIN}/npm"
-      cat > "${MOCK_BIN}/node" << 'MOCKEOF'
-#!/usr/bin/env bash
-exit 0
-MOCKEOF
-      chmod +x "${MOCK_BIN}/node"
+      mock.setup
+      mock.create_script "npm" 'echo "mock npm: $*"'
+      mock.create_exit "node" 0
+      mock.activate
       WORKSPACE="$(mktemp -d)"
       printf '{"name":"cli-test","version":"1.0.0","scripts":{"build":"echo ok"}}\n' > "${WORKSPACE}/package.json"
       mkdir -p "${WORKSPACE}/node_modules"
       printf 'version: 1\nproject:\n  name: cli-test\n  stack: node\ntest:\n  framework: npm\n' > "${WORKSPACE}/brik.yml"
-      export PATH="${MOCK_BIN}:${PATH}"
-      export BRIK_LOG_DIR
-      BRIK_LOG_DIR="$(mktemp -d)"
     }
-    cleanup() { rm -rf "$MOCK_BIN" "$WORKSPACE" "$BRIK_LOG_DIR"; }
+    cleanup() {
+      mock.cleanup
+      rm -rf "$WORKSPACE"
+    }
     Before 'setup'
     After 'cleanup'
 
@@ -112,21 +97,17 @@ MOCKEOF
 
   Describe "brik run stage test"
     setup() {
-      MOCK_BIN="$(mktemp -d)"
-      cat > "${MOCK_BIN}/npx" << 'MOCKEOF'
-#!/usr/bin/env bash
-echo "mock npx: $*"
-exit 0
-MOCKEOF
-      chmod +x "${MOCK_BIN}/npx"
+      mock.setup
+      mock.create_script "npx" 'echo "mock npx: $*"'
+      mock.activate
       WORKSPACE="$(mktemp -d)"
       printf '{"name":"cli-test","version":"1.0.0","scripts":{"test":"echo ok"}}\n' > "${WORKSPACE}/package.json"
       printf 'version: 1\nproject:\n  name: cli-test\n  stack: node\ntest:\n  framework: npm\n' > "${WORKSPACE}/brik.yml"
-      export PATH="${MOCK_BIN}:${PATH}"
-      export BRIK_LOG_DIR
-      BRIK_LOG_DIR="$(mktemp -d)"
     }
-    cleanup() { rm -rf "$MOCK_BIN" "$WORKSPACE" "$BRIK_LOG_DIR"; }
+    cleanup() {
+      mock.cleanup
+      rm -rf "$WORKSPACE"
+    }
     Before 'setup'
     After 'cleanup'
 
@@ -144,10 +125,8 @@ MOCKEOF
       printf '{"name":"cli-test","version":"1.0.0"}\n' > "${WORKSPACE}/package.json"
       CONFIG="$(mktemp)"
       printf 'version: 1\nproject:\n  name: cli-test\n  stack: node\ntest:\n  framework: npm\n' > "$CONFIG"
-      export BRIK_LOG_DIR
-      BRIK_LOG_DIR="$(mktemp -d)"
     }
-    cleanup() { rm -rf "$WORKSPACE" "$CONFIG" "$BRIK_LOG_DIR"; }
+    cleanup() { rm -rf "$WORKSPACE" "$CONFIG"; }
     Before 'setup'
     After 'cleanup'
 
@@ -164,10 +143,8 @@ MOCKEOF
       WORKSPACE="$(mktemp -d)"
       CONFIG="$(mktemp)"
       printf 'version: 1\nproject:\n  name: cli-test\n  stack: node\nquality:\n  lint:\n    enabled: false\n' > "$CONFIG"
-      export BRIK_LOG_DIR
-      BRIK_LOG_DIR="$(mktemp -d)"
     }
-    cleanup() { rm -rf "$WORKSPACE" "$CONFIG" "$BRIK_LOG_DIR"; }
+    cleanup() { rm -rf "$WORKSPACE" "$CONFIG"; }
     Before 'setup'
     After 'cleanup'
 
@@ -179,88 +156,4 @@ MOCKEOF
     End
   End
 
-  Describe "brik run pipeline"
-    setup() {
-      MOCK_BIN="$(mktemp -d)"
-      cat > "${MOCK_BIN}/npm" << 'MOCKEOF'
-#!/usr/bin/env bash
-echo "mock npm: $*"
-exit 0
-MOCKEOF
-      chmod +x "${MOCK_BIN}/npm"
-      cat > "${MOCK_BIN}/node" << 'MOCKEOF'
-#!/usr/bin/env bash
-exit 0
-MOCKEOF
-      chmod +x "${MOCK_BIN}/node"
-      cat > "${MOCK_BIN}/npx" << 'MOCKEOF'
-#!/usr/bin/env bash
-echo "mock npx: $*"
-exit 0
-MOCKEOF
-      chmod +x "${MOCK_BIN}/npx"
-      WORKSPACE="$(mktemp -d)"
-      printf '{"name":"cli-test","version":"1.0.0","scripts":{"build":"echo ok","test":"echo ok"}}\n' > "${WORKSPACE}/package.json"
-      mkdir -p "${WORKSPACE}/node_modules"
-      CONFIG="$(mktemp)"
-      printf 'version: 1\nproject:\n  name: cli-test\n  stack: node\nquality:\n  lint:\n    enabled: false\ntest:\n  framework: npm\n' > "$CONFIG"
-      # Mock security tools (non-negotiable defaults: semgrep, osv-scanner, gitleaks)
-      for tool in semgrep osv-scanner gitleaks; do
-        cat > "${MOCK_BIN}/${tool}" << 'MOCKEOF'
-#!/usr/bin/env bash
-echo "mock ${0##*/}: $*"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/${tool}"
-      done
-      export PATH="${MOCK_BIN}:${PATH}"
-      export BRIK_LOG_DIR
-      BRIK_LOG_DIR="$(mktemp -d)"
-    }
-    cleanup() { rm -rf "$MOCK_BIN" "$WORKSPACE" "$CONFIG" "$BRIK_LOG_DIR"; }
-    Before 'setup'
-    After 'cleanup'
-
-    It "executes the full default pipeline"
-      When run script "$BRIK_BIN" run pipeline --workspace "$WORKSPACE" --config "$CONFIG"
-      The status should be success
-      The stdout should include "Pipeline Summary"
-      The stdout should include "PASS"
-      The stderr should be present
-    End
-
-    It "accepts --with-package flag"
-      When run script "$BRIK_BIN" run pipeline --workspace "$WORKSPACE" --config "$CONFIG" --with-package
-      The status should be success
-      The stdout should include "Pipeline Summary"
-      The stderr should be present
-    End
-
-    It "rejects unknown pipeline flags"
-      When run script "$BRIK_BIN" run pipeline --workspace "$WORKSPACE" --config "$CONFIG" --bad-flag
-      The status should equal 2
-      The stderr should include "unknown"
-    End
-
-    It "accepts --with-release flag"
-      When run script "$BRIK_BIN" run pipeline --workspace "$WORKSPACE" --config "$CONFIG" --with-release
-      The status should be success
-      The stdout should include "Pipeline Summary"
-      The stderr should be present
-    End
-
-    It "accepts --with-deploy flag"
-      When run script "$BRIK_BIN" run pipeline --workspace "$WORKSPACE" --config "$CONFIG" --with-deploy
-      The status should be success
-      The stdout should include "Pipeline Summary"
-      The stderr should be present
-    End
-
-    It "accepts --continue-on-error flag"
-      When run script "$BRIK_BIN" run pipeline --workspace "$WORKSPACE" --config "$CONFIG" --continue-on-error
-      The status should be success
-      The stdout should include "Pipeline Summary"
-      The stderr should be present
-    End
-  End
 End

@@ -2,6 +2,7 @@ Describe "quality/type_check.sh"
   Include "$BRIK_RUNTIME_LIB/logging.sh"
   Include "$BRIK_RUNTIME_LIB/tools.sh"
   Include "$BRIK_CORE_LIB/quality/type_check.sh"
+  Include "$BRIK_HOME/runtime/bash/spec/support/mock_helper.sh"
 
   Describe "quality.type_check.run"
     It "returns 6 for nonexistent workspace"
@@ -25,21 +26,16 @@ Describe "quality/type_check.sh"
 
     Describe "Tier 1: command override success"
       setup_cmd() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/my-checker" << 'EOF'
-#!/usr/bin/env bash
-exit 0
-EOF
-        chmod +x "${MOCK_BIN}/my-checker"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_exit "my-checker" 0
+        mock.activate
         export BRIK_QUALITY_TYPE_CHECK_COMMAND="my-checker"
       }
       cleanup_cmd() {
-        export PATH="$ORIG_PATH"
         unset BRIK_QUALITY_TYPE_CHECK_COMMAND
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_cmd'
       After 'cleanup_cmd'
@@ -53,21 +49,16 @@ EOF
 
     Describe "Tier 1: command override failure"
       setup_cmd_fail() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/failing-checker" << 'EOF'
-#!/usr/bin/env bash
-exit 1
-EOF
-        chmod +x "${MOCK_BIN}/failing-checker"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_exit "failing-checker" 1
+        mock.activate
         export BRIK_QUALITY_TYPE_CHECK_COMMAND="failing-checker"
       }
       cleanup_cmd_fail() {
-        export PATH="$ORIG_PATH"
         unset BRIK_QUALITY_TYPE_CHECK_COMMAND
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_cmd_fail'
       After 'cleanup_cmd_fail'
@@ -81,23 +72,17 @@ EOF
 
     Describe "Tier 2: tsc with npx"
       setup_tsc() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock.log"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/npx" << MOCKEOF
-#!/usr/bin/env bash
-printf 'npx %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/npx"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_logging "npx" "$MOCK_LOG"
+        mock.activate
         export BRIK_QUALITY_TYPE_CHECK_TOOL="tsc"
       }
       cleanup_tsc() {
-        export PATH="$ORIG_PATH"
         unset BRIK_QUALITY_TYPE_CHECK_TOOL
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_tsc'
       After 'cleanup_tsc'
@@ -114,16 +99,15 @@ MOCKEOF
 
     Describe "Tier 2: tsc without npx"
       setup_tsc_no_npx() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
-        MOCK_BIN="$(mktemp -d)"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}"
+        mock.isolate
         export BRIK_QUALITY_TYPE_CHECK_TOOL="tsc"
       }
       cleanup_tsc_no_npx() {
-        export PATH="$ORIG_PATH"
         unset BRIK_QUALITY_TYPE_CHECK_TOOL
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_tsc_no_npx'
       After 'cleanup_tsc_no_npx'
@@ -137,23 +121,17 @@ MOCKEOF
 
     Describe "Tier 2: mypy present"
       setup_mypy() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock.log"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/mypy" << MOCKEOF
-#!/usr/bin/env bash
-printf 'mypy %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/mypy"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_logging "mypy" "$MOCK_LOG"
+        mock.activate
         export BRIK_QUALITY_TYPE_CHECK_TOOL="mypy"
       }
       cleanup_mypy() {
-        export PATH="$ORIG_PATH"
         unset BRIK_QUALITY_TYPE_CHECK_TOOL
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_mypy'
       After 'cleanup_mypy'
@@ -170,16 +148,15 @@ MOCKEOF
 
     Describe "Tier 2: mypy missing"
       setup_no_mypy() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
-        MOCK_BIN="$(mktemp -d)"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}"
+        mock.isolate
         export BRIK_QUALITY_TYPE_CHECK_TOOL="mypy"
       }
       cleanup_no_mypy() {
-        export PATH="$ORIG_PATH"
         unset BRIK_QUALITY_TYPE_CHECK_TOOL
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_no_mypy'
       After 'cleanup_no_mypy'
@@ -193,16 +170,15 @@ MOCKEOF
 
     Describe "Tier 2: pyright without npx"
       setup_pyright_no_npx() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
-        MOCK_BIN="$(mktemp -d)"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}"
+        mock.isolate
         export BRIK_QUALITY_TYPE_CHECK_TOOL="pyright"
       }
       cleanup_pyright_no_npx() {
-        export PATH="$ORIG_PATH"
         unset BRIK_QUALITY_TYPE_CHECK_TOOL
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_pyright_no_npx'
       After 'cleanup_pyright_no_npx'
@@ -216,22 +192,16 @@ MOCKEOF
 
     Describe "Tier 3: auto-detect tsconfig.json"
       setup_ts_auto() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock.log"
         printf '{"compilerOptions":{}}\n' > "${TEST_WS}/tsconfig.json"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/npx" << MOCKEOF
-#!/usr/bin/env bash
-printf 'npx %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/npx"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_logging "npx" "$MOCK_LOG"
+        mock.activate
       }
       cleanup_ts_auto() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_ts_auto'
       After 'cleanup_ts_auto'
@@ -248,22 +218,16 @@ MOCKEOF
 
     Describe "Tier 3: auto-detect mypy.ini"
       setup_mypy_auto() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock.log"
         printf '[mypy]\nstrict = True\n' > "${TEST_WS}/mypy.ini"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/mypy" << MOCKEOF
-#!/usr/bin/env bash
-printf 'mypy %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/mypy"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_logging "mypy" "$MOCK_LOG"
+        mock.activate
       }
       cleanup_mypy_auto() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_mypy_auto'
       After 'cleanup_mypy_auto'
@@ -280,22 +244,16 @@ MOCKEOF
 
     Describe "Tier 3: auto-detect [tool.mypy] in pyproject.toml"
       setup_mypy_pyproject() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock.log"
         printf '[project]\nname = "test"\n\n[tool.mypy]\nstrict = true\n' > "${TEST_WS}/pyproject.toml"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/mypy" << MOCKEOF
-#!/usr/bin/env bash
-printf 'mypy %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/mypy"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_logging "mypy" "$MOCK_LOG"
+        mock.activate
       }
       cleanup_mypy_pyproject() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_mypy_pyproject'
       After 'cleanup_mypy_pyproject'
@@ -325,21 +283,16 @@ MOCKEOF
 
     Describe "Tier 2: custom tool found on PATH"
       setup_raw() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/my-type-checker" << 'EOF'
-#!/usr/bin/env bash
-exit 0
-EOF
-        chmod +x "${MOCK_BIN}/my-type-checker"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_exit "my-type-checker" 0
+        mock.activate
         export BRIK_QUALITY_TYPE_CHECK_TOOL="my-type-checker"
       }
       cleanup_raw() {
-        export PATH="$ORIG_PATH"
         unset BRIK_QUALITY_TYPE_CHECK_TOOL
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_raw'
       After 'cleanup_raw'
@@ -372,20 +325,15 @@ EOF
 
     Describe "with failing type checker"
       setup_fail() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         printf '{"compilerOptions":{}}\n' > "${TEST_WS}/tsconfig.json"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/npx" << 'EOF'
-#!/usr/bin/env bash
-exit 1
-EOF
-        chmod +x "${MOCK_BIN}/npx"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_exit "npx" 1
+        mock.activate
       }
       cleanup_fail() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_fail'
       After 'cleanup_fail'

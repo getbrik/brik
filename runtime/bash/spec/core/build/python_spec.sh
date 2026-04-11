@@ -2,6 +2,7 @@ Describe "build/python.sh"
   Include "$BRIK_RUNTIME_LIB/logging.sh"
   Include "$BRIK_RUNTIME_LIB/tools.sh"
   Include "$BRIK_CORE_LIB/build/python.sh"
+  Include "$BRIK_HOME/runtime/bash/spec/support/mock_helper.sh"
 
   Describe "_build.python._detect_pm"
     It "detects poetry from poetry.lock"
@@ -62,15 +63,14 @@ Describe "build/python.sh"
 
     Describe "require_tool pip failure"
       setup_no_pip() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         printf '[project]\nname = "test"\n' > "${TEST_WS}/pyproject.toml"
-        MOCK_BIN="$(mktemp -d)"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}"
+        mock.isolate
       }
       cleanup_no_pip() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_no_pip'
       After 'cleanup_no_pip'
@@ -84,27 +84,17 @@ Describe "build/python.sh"
 
     Describe "with mock pip and pyproject.toml (python -m build available)"
       setup_pip() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock.log"
         printf '[project]\nname = "test"\n' > "${TEST_WS}/pyproject.toml"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/pip" << MOCKEOF
-#!/usr/bin/env bash
-printf 'pip %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        cat > "${MOCK_BIN}/python" << MOCKEOF
-#!/usr/bin/env bash
-printf 'python %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/pip" "${MOCK_BIN}/python"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_logging "pip" "$MOCK_LOG"
+        mock.create_logging "python" "$MOCK_LOG"
+        mock.activate
       }
       cleanup_pip() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_pip'
       After 'cleanup_pip'
@@ -127,27 +117,17 @@ MOCKEOF
 
     Describe "with mock pip fallback (python -m build unavailable)"
       setup_pip_fallback() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock.log"
         printf '[project]\nname = "test"\n' > "${TEST_WS}/pyproject.toml"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/pip" << MOCKEOF
-#!/usr/bin/env bash
-printf 'pip %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        cat > "${MOCK_BIN}/python" << 'MOCKEOF'
-#!/usr/bin/env bash
-# Simulate build module not installed
-exit 1
-MOCKEOF
-        chmod +x "${MOCK_BIN}/pip" "${MOCK_BIN}/python"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_logging "pip" "$MOCK_LOG"
+        mock.create_exit "python" 1
+        mock.activate
       }
       cleanup_pip_fallback() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_pip_fallback'
       After 'cleanup_pip_fallback'
@@ -164,27 +144,17 @@ MOCKEOF
 
     Describe "with mock pip and setup.py"
       setup_pip_setup() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock.log"
         printf 'from setuptools import setup\nsetup(name="test")\n' > "${TEST_WS}/setup.py"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/pip" << MOCKEOF
-#!/usr/bin/env bash
-printf 'pip %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        cat > "${MOCK_BIN}/python" << MOCKEOF
-#!/usr/bin/env bash
-printf 'python %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/pip" "${MOCK_BIN}/python"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_logging "pip" "$MOCK_LOG"
+        mock.create_logging "python" "$MOCK_LOG"
+        mock.activate
       }
       cleanup_pip_setup() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_pip_setup'
       After 'cleanup_pip_setup'
@@ -201,23 +171,17 @@ MOCKEOF
 
     Describe "with mock poetry"
       setup_poetry() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock_poetry.log"
         printf '[tool.poetry]\nname = "test"\n\n[project]\nname = "test"\n' > "${TEST_WS}/pyproject.toml"
         touch "${TEST_WS}/poetry.lock"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/poetry" << MOCKEOF
-#!/usr/bin/env bash
-printf 'poetry %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/poetry"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_logging "poetry" "$MOCK_LOG"
+        mock.activate
       }
       cleanup_poetry() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_poetry'
       After 'cleanup_poetry'
@@ -242,22 +206,16 @@ MOCKEOF
 
     Describe "with mock pipenv"
       setup_pipenv() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock_pipenv.log"
         printf '[packages]\n' > "${TEST_WS}/Pipfile"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/pipenv" << MOCKEOF
-#!/usr/bin/env bash
-printf 'pipenv %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/pipenv"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_logging "pipenv" "$MOCK_LOG"
+        mock.activate
       }
       cleanup_pipenv() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_pipenv'
       After 'cleanup_pipenv'
@@ -274,24 +232,16 @@ MOCKEOF
 
     Describe "with failing pip (both python -m build and pip wheel fail)"
       setup_fail() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         printf '[project]\nname = "test"\n' > "${TEST_WS}/pyproject.toml"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/pip" << 'EOF'
-#!/usr/bin/env bash
-exit 1
-EOF
-        cat > "${MOCK_BIN}/python" << 'EOF'
-#!/usr/bin/env bash
-exit 1
-EOF
-        chmod +x "${MOCK_BIN}/pip" "${MOCK_BIN}/python"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_exit "pip" 1
+        mock.create_exit "python" 1
+        mock.activate
       }
       cleanup_fail() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_fail'
       After 'cleanup_fail'
@@ -305,21 +255,16 @@ EOF
 
     Describe "with failing poetry"
       setup_poetry_fail() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         printf '[tool.poetry]\nname = "test"\n\n[project]\nname = "test"\n' > "${TEST_WS}/pyproject.toml"
         touch "${TEST_WS}/poetry.lock"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/poetry" << 'EOF'
-#!/usr/bin/env bash
-exit 1
-EOF
-        chmod +x "${MOCK_BIN}/poetry"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_exit "poetry" 1
+        mock.activate
       }
       cleanup_poetry_fail() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_poetry_fail'
       After 'cleanup_poetry_fail'
@@ -333,20 +278,15 @@ EOF
 
     Describe "with failing pipenv"
       setup_pipenv_fail() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         printf '[packages]\n' > "${TEST_WS}/Pipfile"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/pipenv" << 'EOF'
-#!/usr/bin/env bash
-exit 1
-EOF
-        chmod +x "${MOCK_BIN}/pipenv"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_exit "pipenv" 1
+        mock.activate
       }
       cleanup_pipenv_fail() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_pipenv_fail'
       After 'cleanup_pipenv_fail'
@@ -360,27 +300,17 @@ EOF
 
     Describe "pip install . for project installation"
       setup_pip_install() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock.log"
         printf '[project]\nname = "test"\n' > "${TEST_WS}/pyproject.toml"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/pip" << MOCKEOF
-#!/usr/bin/env bash
-printf 'pip %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        cat > "${MOCK_BIN}/python" << MOCKEOF
-#!/usr/bin/env bash
-printf 'python %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/pip" "${MOCK_BIN}/python"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_logging "pip" "$MOCK_LOG"
+        mock.create_logging "python" "$MOCK_LOG"
+        mock.activate
       }
       cleanup_pip_install() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_pip_install'
       After 'cleanup_pip_install'
@@ -409,31 +339,21 @@ MOCKEOF
 
     Describe "pip install . failure is non-fatal"
       setup_pip_install_fail() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock.log"
         printf '[project]\nname = "test"\n' > "${TEST_WS}/pyproject.toml"
-        MOCK_BIN="$(mktemp -d)"
-        # pip install . fails, but pip wheel succeeds
-        cat > "${MOCK_BIN}/pip" << MOCKEOF
-#!/usr/bin/env bash
-printf 'pip %s\n' "\$*" >> "$MOCK_LOG"
-if echo "\$*" | grep -q "install \."; then
+        mock.create_script "pip" "printf 'pip %s\\n' \"\$*\" >> \"$MOCK_LOG\"
+if echo \"\$*\" | grep -q \"install \\.\"; then
   exit 1
 fi
-exit 0
-MOCKEOF
-        cat > "${MOCK_BIN}/python" << 'MOCKEOF'
-#!/usr/bin/env bash
-# python -m build fails so pip wheel fallback is used
-exit 1
-MOCKEOF
-        chmod +x "${MOCK_BIN}/pip" "${MOCK_BIN}/python"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+exit 0"
+        mock.create_exit "python" 1
+        mock.activate
       }
       cleanup_pip_install_fail() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_pip_install_fail'
       After 'cleanup_pip_install_fail'
@@ -447,28 +367,18 @@ MOCKEOF
 
     Describe "explicit --tool override"
       setup_tool_override() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock.log"
         printf '[tool.poetry]\nname = "test"\n\n[project]\nname = "test"\n' > "${TEST_WS}/pyproject.toml"
         touch "${TEST_WS}/poetry.lock"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/pip" << MOCKEOF
-#!/usr/bin/env bash
-printf 'pip %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        cat > "${MOCK_BIN}/python" << MOCKEOF
-#!/usr/bin/env bash
-printf 'python %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/pip" "${MOCK_BIN}/python"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_logging "pip" "$MOCK_LOG"
+        mock.create_logging "python" "$MOCK_LOG"
+        mock.activate
       }
       cleanup_tool_override() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_tool_override'
       After 'cleanup_tool_override'

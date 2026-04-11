@@ -4,25 +4,20 @@ Describe "security/container.sh"
   Include "$BRIK_CORE_LIB/_loader.sh"
   Include "$BRIK_CORE_LIB/quality/_tools.sh"
   Include "$BRIK_CORE_LIB/security/container.sh"
+  Include "$BRIK_HOME/runtime/bash/spec/support/mock_helper.sh"
 
   Describe "security.container.run"
     Describe "Tier 3: auto-detect grype"
       setup_grype() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock.log"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/grype" << MOCKEOF
-#!/usr/bin/env bash
-printf 'grype %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/grype"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_logging "grype" "$MOCK_LOG"
+        mock.activate
       }
       cleanup_grype() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_grype'
       After 'cleanup_grype'
@@ -39,14 +34,13 @@ MOCKEOF
 
     Describe "no scanner available"
       setup_none() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
-        MOCK_BIN="$(mktemp -d)"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}"
+        mock.isolate
       }
       cleanup_none() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_none'
       After 'cleanup_none'

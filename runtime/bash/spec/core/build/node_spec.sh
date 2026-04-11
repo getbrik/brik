@@ -2,6 +2,7 @@ Describe "build/node.sh"
   Include "$BRIK_RUNTIME_LIB/logging.sh"
   Include "$BRIK_RUNTIME_LIB/tools.sh"
   Include "$BRIK_CORE_LIB/build/node.sh"
+  Include "$BRIK_HOME/runtime/bash/spec/support/mock_helper.sh"
 
   Describe "_build.node._detect_pm"
     It "detects yarn from yarn.lock"
@@ -35,23 +36,17 @@ Describe "build/node.sh"
 
     Describe "with mock npm and package-lock.json"
       setup_npm() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock_npm.log"
         printf '{"name":"test","version":"1.0.0"}\n' > "${TEST_WS}/package.json"
         printf '{"lockfileVersion":2}\n' > "${TEST_WS}/package-lock.json"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/npm" << MOCKEOF
-#!/usr/bin/env bash
-printf '%s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/npm"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_script "npm" "printf '%s\\n' \"\$*\" >> \"$MOCK_LOG\""
+        mock.activate
       }
       cleanup_npm() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_npm'
       After 'cleanup_npm'
@@ -68,22 +63,16 @@ MOCKEOF
 
     Describe "with mock npm and no lock file"
       setup_npm_no_lock() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock_npm.log"
         printf '{"name":"test","version":"1.0.0"}\n' > "${TEST_WS}/package.json"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/npm" << MOCKEOF
-#!/usr/bin/env bash
-printf '%s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/npm"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_script "npm" "printf '%s\\n' \"\$*\" >> \"$MOCK_LOG\""
+        mock.activate
       }
       cleanup_npm_no_lock() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_npm_no_lock'
       After 'cleanup_npm_no_lock'
@@ -100,23 +89,17 @@ MOCKEOF
 
     Describe "with mock yarn"
       setup_yarn() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock_yarn.log"
         printf '{"name":"test","version":"1.0.0"}\n' > "${TEST_WS}/package.json"
         printf '# yarn lockfile v1\n' > "${TEST_WS}/yarn.lock"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/yarn" << MOCKEOF
-#!/usr/bin/env bash
-printf '%s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/yarn"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_script "yarn" "printf '%s\\n' \"\$*\" >> \"$MOCK_LOG\""
+        mock.activate
       }
       cleanup_yarn() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_yarn'
       After 'cleanup_yarn'
@@ -133,20 +116,15 @@ MOCKEOF
 
     Describe "with failing npm"
       setup_fail() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         printf '{"name":"test","version":"1.0.0"}\n' > "${TEST_WS}/package.json"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/npm" << 'EOF'
-#!/usr/bin/env bash
-exit 1
-EOF
-        chmod +x "${MOCK_BIN}/npm"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_exit "npm" 1
+        mock.activate
       }
       cleanup_fail() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_fail'
       After 'cleanup_fail'
@@ -168,28 +146,18 @@ EOF
 
     Describe "with mock npm and node_modules present"
       setup_run() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         printf '{"name":"test","version":"1.0.0","scripts":{"build":"echo ok"}}\n' > "${TEST_WS}/package.json"
         mkdir -p "${TEST_WS}/node_modules"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/npm" << 'EOF'
-#!/usr/bin/env bash
-printf "mock-npm %s\n" "$*"
-exit 0
-EOF
-        chmod +x "${MOCK_BIN}/npm"
-        # Provide node mock too
-        cat > "${MOCK_BIN}/node" << 'EOF'
-#!/usr/bin/env bash
-exit 0
-EOF
-        chmod +x "${MOCK_BIN}/node"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_script "npm" 'printf "mock-npm %s\n" "$*"
+exit 0'
+        mock.create_exit "node" 0
+        mock.activate
       }
       cleanup_run() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_run'
       After 'cleanup_run'
@@ -204,30 +172,20 @@ EOF
 
     Describe "with mock npm, no node_modules (auto-install)"
       setup_auto() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         printf '{"name":"test","version":"1.0.0","scripts":{"build":"echo ok"}}\n' > "${TEST_WS}/package.json"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/npm" << 'EOF'
-#!/usr/bin/env bash
-# Create node_modules when install is called
-if [[ "$1" == "install" || "$1" == "ci" ]]; then
+        mock.create_script "npm" 'if [ "$1" = "install" ] || [ "$1" = "ci" ]; then
   mkdir -p node_modules
 fi
 printf "mock-npm %s\n" "$*"
-exit 0
-EOF
-        chmod +x "${MOCK_BIN}/npm"
-        cat > "${MOCK_BIN}/node" << 'EOF'
-#!/usr/bin/env bash
-exit 0
-EOF
-        chmod +x "${MOCK_BIN}/node"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+exit 0'
+        mock.create_exit "node" 0
+        mock.activate
       }
       cleanup_auto() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_auto'
       After 'cleanup_auto'
@@ -243,27 +201,18 @@ EOF
 
     Describe "with failing build"
       setup_fail_build() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         printf '{"name":"test","version":"1.0.0","scripts":{"build":"exit 1"}}\n' > "${TEST_WS}/package.json"
         mkdir -p "${TEST_WS}/node_modules"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/npm" << 'EOF'
-#!/usr/bin/env bash
-if [[ "$1" == "run" ]]; then exit 1; fi
-exit 0
-EOF
-        chmod +x "${MOCK_BIN}/npm"
-        cat > "${MOCK_BIN}/node" << 'EOF'
-#!/usr/bin/env bash
-exit 0
-EOF
-        chmod +x "${MOCK_BIN}/node"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_script "npm" 'if [ "$1" = "run" ]; then exit 1; fi
+exit 0'
+        mock.create_exit "node" 0
+        mock.activate
       }
       cleanup_fail_build() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_fail_build'
       After 'cleanup_fail_build'

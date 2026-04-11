@@ -2,11 +2,6 @@ Describe "context.sh"
   Include "$BRIK_RUNTIME_LIB/context.sh"
 
   Describe "context.create"
-    setup() { export BRIK_LOG_DIR; BRIK_LOG_DIR="$(mktemp -d)"; }
-    cleanup() { rm -rf "$BRIK_LOG_DIR"; }
-    Before 'setup'
-    After 'cleanup'
-
     It "creates a context file and prints its path"
       When call context.create "build"
       The status should be success

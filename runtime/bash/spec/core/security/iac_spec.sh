@@ -4,6 +4,7 @@ Describe "security/iac.sh"
   Include "$BRIK_CORE_LIB/_loader.sh"
   Include "$BRIK_CORE_LIB/quality/_tools.sh"
   Include "$BRIK_CORE_LIB/security/iac.sh"
+  Include "$BRIK_HOME/runtime/bash/spec/support/mock_helper.sh"
 
   Describe "security.iac.run"
     It "returns 6 for nonexistent workspace"
@@ -14,21 +15,16 @@ Describe "security/iac.sh"
 
     Describe "Tier 1: command override"
       setup_cmd() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/my-iac-scanner" << 'EOF'
-#!/usr/bin/env bash
-exit 0
-EOF
-        chmod +x "${MOCK_BIN}/my-iac-scanner"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_exit "my-iac-scanner" 0
+        mock.activate
         export BRIK_SECURITY_IAC_COMMAND="my-iac-scanner"
       }
       cleanup_cmd() {
-        export PATH="$ORIG_PATH"
         unset BRIK_SECURITY_IAC_COMMAND
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_cmd'
       After 'cleanup_cmd'
@@ -42,23 +38,17 @@ EOF
 
     Describe "Tier 2: explicit tool (checkov)"
       setup_tool() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock.log"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/checkov" << MOCKEOF
-#!/usr/bin/env bash
-printf 'checkov %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/checkov"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_logging "checkov" "$MOCK_LOG"
+        mock.activate
         export BRIK_SECURITY_IAC_TOOL="checkov"
       }
       cleanup_tool() {
-        export PATH="$ORIG_PATH"
         unset BRIK_SECURITY_IAC_TOOL
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_tool'
       After 'cleanup_tool'
@@ -75,23 +65,17 @@ MOCKEOF
 
     Describe "Tier 2: explicit tool (tfsec)"
       setup_tfsec() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock.log"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/tfsec" << MOCKEOF
-#!/usr/bin/env bash
-printf 'tfsec %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/tfsec"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_logging "tfsec" "$MOCK_LOG"
+        mock.activate
         export BRIK_SECURITY_IAC_TOOL="tfsec"
       }
       cleanup_tfsec() {
-        export PATH="$ORIG_PATH"
         unset BRIK_SECURITY_IAC_TOOL
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_tfsec'
       After 'cleanup_tfsec'
@@ -108,16 +92,15 @@ MOCKEOF
 
     Describe "Tier 2: tool not found"
       setup_missing() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
-        MOCK_BIN="$(mktemp -d)"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}"
+        mock.isolate
         export BRIK_SECURITY_IAC_TOOL="checkov"
       }
       cleanup_missing() {
-        export PATH="$ORIG_PATH"
         unset BRIK_SECURITY_IAC_TOOL
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_missing'
       After 'cleanup_missing'
@@ -131,23 +114,17 @@ MOCKEOF
 
     Describe "Tier 3: auto-detect checkov"
       setup_auto() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock.log"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/checkov" << MOCKEOF
-#!/usr/bin/env bash
-printf 'checkov %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/checkov"
+        mock.create_logging "checkov" "$MOCK_LOG"
         ln -sf "$(command -v bash)" "${MOCK_BIN}/bash"
         ln -sf "$(command -v grep)" "${MOCK_BIN}/grep"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}"
+        mock.isolate
       }
       cleanup_auto() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_auto'
       After 'cleanup_auto'
@@ -164,14 +141,13 @@ MOCKEOF
 
     Describe "no tool available"
       setup_none() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
-        MOCK_BIN="$(mktemp -d)"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}"
+        mock.isolate
       }
       cleanup_none() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_none'
       After 'cleanup_none'
@@ -185,21 +161,16 @@ MOCKEOF
 
     Describe "Tier 1: command override fails"
       setup_fail() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/failing-scanner" << 'EOF'
-#!/usr/bin/env bash
-exit 1
-EOF
-        chmod +x "${MOCK_BIN}/failing-scanner"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_exit "failing-scanner" 1
+        mock.activate
         export BRIK_SECURITY_IAC_COMMAND="failing-scanner"
       }
       cleanup_fail() {
-        export PATH="$ORIG_PATH"
         unset BRIK_SECURITY_IAC_COMMAND
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_fail'
       After 'cleanup_fail'

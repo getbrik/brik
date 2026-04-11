@@ -1,27 +1,17 @@
 Describe "quality/_tools.sh"
   Include "$BRIK_RUNTIME_LIB/logging.sh"
   Include "$BRIK_CORE_LIB/quality/_tools.sh"
+  Include "$BRIK_HOME/runtime/bash/spec/support/mock_helper.sh"
 
   Describe "quality.tool.register + quality.tool.resolve"
     setup_tools() {
-      MOCK_BIN="$(mktemp -d)"
-      cat > "${MOCK_BIN}/grype" << 'EOF'
-#!/usr/bin/env bash
-exit 0
-EOF
-      chmod +x "${MOCK_BIN}/grype"
-      cat > "${MOCK_BIN}/dockle" << 'EOF'
-#!/usr/bin/env bash
-exit 0
-EOF
-      chmod +x "${MOCK_BIN}/dockle"
-      ORIG_PATH="$PATH"
-      export PATH="${MOCK_BIN}:${PATH}"
+      mock.setup
+      mock.create_exit "grype" 0
+      mock.create_exit "dockle" 0
+      mock.activate
     }
     cleanup_tools() {
-      export PATH="$ORIG_PATH"
-      rm -rf "$MOCK_BIN"
-      # Clean up registry vars
+      mock.cleanup
       for v in $(compgen -v _BRIK_TOOL_ 2>/dev/null); do unset "$v"; done
       _BRIK_TOOL_COUNTER=0
     }
@@ -41,7 +31,6 @@ EOF
 
     It "resolves lower-priority tool when higher not available"
       invoke_fallback() {
-        # Register a tool whose binary doesn't exist
         quality.tool.register testcat2 missing missing_bin "missing {x}" 10
         quality.tool.register testcat2 dockle dockle "dockle {x}" 20
         quality.tool.resolve testcat2
@@ -54,15 +43,13 @@ EOF
 
   Describe "Tier 1: command override"
     setup_cmd() {
-      MOCK_BIN="$(mktemp -d)"
-      ORIG_PATH="$PATH"
-      export PATH="${MOCK_BIN}:${PATH}"
+      mock.setup
+      mock.activate
       export BRIK_QUALITY_MYCAT_COMMAND="echo hello"
     }
     cleanup_cmd() {
-      export PATH="$ORIG_PATH"
       unset BRIK_QUALITY_MYCAT_COMMAND
-      rm -rf "$MOCK_BIN"
+      mock.cleanup
       for v in $(compgen -v _BRIK_TOOL_ 2>/dev/null); do unset "$v"; done
       _BRIK_TOOL_COUNTER=0
     }
@@ -82,18 +69,12 @@ EOF
 
   Describe "Tier 2: explicit tool selection"
     setup_tier2() {
-      MOCK_BIN="$(mktemp -d)"
-      cat > "${MOCK_BIN}/dockle" << 'EOF'
-#!/usr/bin/env bash
-exit 0
-EOF
-      chmod +x "${MOCK_BIN}/dockle"
-      ORIG_PATH="$PATH"
-      export PATH="${MOCK_BIN}:${PATH}"
+      mock.setup
+      mock.create_exit "dockle" 0
+      mock.activate
     }
     cleanup_tier2() {
-      export PATH="$ORIG_PATH"
-      rm -rf "$MOCK_BIN"
+      mock.cleanup
       for v in $(compgen -v _BRIK_TOOL_ 2>/dev/null); do unset "$v"; done
       _BRIK_TOOL_COUNTER=0
     }
@@ -114,13 +95,11 @@ EOF
 
   Describe "no tool available"
     setup_none() {
-      MOCK_BIN="$(mktemp -d)"
-      ORIG_PATH="$PATH"
-      export PATH="${MOCK_BIN}"
+      mock.setup
+      mock.isolate
     }
     cleanup_none() {
-      export PATH="$ORIG_PATH"
-      rm -rf "$MOCK_BIN"
+      mock.cleanup
       for v in $(compgen -v _BRIK_TOOL_ 2>/dev/null); do unset "$v"; done
       _BRIK_TOOL_COUNTER=0
     }
@@ -140,13 +119,11 @@ EOF
 
   Describe "explicit tool missing returns 3"
     setup_missing() {
-      MOCK_BIN="$(mktemp -d)"
-      ORIG_PATH="$PATH"
-      export PATH="${MOCK_BIN}"
+      mock.setup
+      mock.isolate
     }
     cleanup_missing() {
-      export PATH="$ORIG_PATH"
-      rm -rf "$MOCK_BIN"
+      mock.cleanup
       for v in $(compgen -v _BRIK_TOOL_ 2>/dev/null); do unset "$v"; done
       _BRIK_TOOL_COUNTER=0
     }
@@ -165,13 +142,11 @@ EOF
 
   Describe "unknown tool returns 7"
     setup_unknown() {
-      MOCK_BIN="$(mktemp -d)"
-      ORIG_PATH="$PATH"
-      export PATH="${MOCK_BIN}:${PATH}"
+      mock.setup
+      mock.activate
     }
     cleanup_unknown() {
-      export PATH="$ORIG_PATH"
-      rm -rf "$MOCK_BIN"
+      mock.cleanup
       for v in $(compgen -v _BRIK_TOOL_ 2>/dev/null); do unset "$v"; done
       _BRIK_TOOL_COUNTER=0
     }
@@ -190,20 +165,15 @@ EOF
 
   Describe "quality.tool.exec"
     setup_exec() {
-      MOCK_BIN="$(mktemp -d)"
+      mock.setup
       TEST_LOG="$(mktemp)"
-      cat > "${MOCK_BIN}/grype" << MOCKEOF
-#!/usr/bin/env bash
-printf '%s\n' "\$*" > "$TEST_LOG"
-exit 0
-MOCKEOF
-      chmod +x "${MOCK_BIN}/grype"
-      ORIG_PATH="$PATH"
-      export PATH="${MOCK_BIN}:${PATH}"
+      mock.create_script "grype" "printf '%s\n' \"\$*\" > \"$TEST_LOG\"
+exit 0"
+      mock.activate
     }
     cleanup_exec() {
-      export PATH="$ORIG_PATH"
-      rm -rf "$MOCK_BIN" "$TEST_LOG"
+      mock.cleanup
+      rm -f "$TEST_LOG"
       for v in $(compgen -v _BRIK_TOOL_ 2>/dev/null); do unset "$v"; done
       _BRIK_TOOL_COUNTER=0
     }
@@ -223,22 +193,17 @@ MOCKEOF
 
   Describe "quality.tool.exec with command override"
     setup_cmd_exec() {
-      MOCK_BIN="$(mktemp -d)"
+      mock.setup
       TEST_LOG="$(mktemp)"
-      cat > "${MOCK_BIN}/my-scanner" << MOCKEOF
-#!/usr/bin/env bash
-printf 'my-scanner ran\n' > "$TEST_LOG"
-exit 0
-MOCKEOF
-      chmod +x "${MOCK_BIN}/my-scanner"
-      ORIG_PATH="$PATH"
-      export PATH="${MOCK_BIN}:${PATH}"
+      mock.create_script "my-scanner" "printf 'my-scanner ran\n' > \"$TEST_LOG\"
+exit 0"
+      mock.activate
       export BRIK_QUALITY_CMDCAT_COMMAND="my-scanner"
     }
     cleanup_cmd_exec() {
-      export PATH="$ORIG_PATH"
       unset BRIK_QUALITY_CMDCAT_COMMAND
-      rm -rf "$MOCK_BIN" "$TEST_LOG"
+      mock.cleanup
+      rm -f "$TEST_LOG"
       for v in $(compgen -v _BRIK_TOOL_ 2>/dev/null); do unset "$v"; done
       _BRIK_TOOL_COUNTER=0
     }

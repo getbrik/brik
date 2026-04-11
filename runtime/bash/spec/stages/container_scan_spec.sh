@@ -6,6 +6,7 @@ Describe "stages/container_scan.sh"
   Include "$BRIK_CORE_LIB/config.sh"
   Include "$BRIK_CORE_LIB/security.sh"
   Include "$BRIK_HOME/runtime/bash/lib/stages/container_scan.sh"
+  Include "$BRIK_HOME/runtime/bash/spec/support/mock_helper.sh"
 
   Describe "stages.container_scan"
     Describe "no image configured"
@@ -43,20 +44,14 @@ Describe "stages/container_scan.sh"
         CTX_FILE="$(mktemp)"
         export BRIK_WORKSPACE
         BRIK_WORKSPACE="$(mktemp -d)"
-        # Provide mock scanner tools so container.run resolves
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/grype" << 'EOF'
-#!/usr/bin/env bash
-exit 0
-EOF
-        chmod +x "${MOCK_BIN}/grype"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.setup
+        mock.create_exit "grype" 0
+        mock.activate
       }
       cleanup_autoload() {
-        export PATH="$ORIG_PATH"
+        mock.cleanup
         rm -f "$BRIK_CONFIG_FILE" "$CTX_FILE"
-        rm -rf "$BRIK_WORKSPACE" "$MOCK_BIN"
+        rm -rf "$BRIK_WORKSPACE"
       }
       Before 'setup_autoload'
       After 'cleanup_autoload'

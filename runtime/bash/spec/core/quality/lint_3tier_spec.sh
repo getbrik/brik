@@ -2,25 +2,21 @@ Describe "quality/lint.sh - 3-tier resolution"
   Include "$BRIK_RUNTIME_LIB/logging.sh"
   Include "$BRIK_RUNTIME_LIB/tools.sh"
   Include "$BRIK_CORE_LIB/quality/lint.sh"
+  Include "$BRIK_HOME/runtime/bash/spec/support/mock_helper.sh"
 
   Describe "Tier 1: BRIK_QUALITY_LINT_COMMAND override"
     setup_cmd_override() {
+      mock.setup
       TEST_WS="$(mktemp -d)"
-      MOCK_BIN="$(mktemp -d)"
-      cat > "${MOCK_BIN}/biome" << 'EOF'
-#!/usr/bin/env bash
-printf "biome %s\n" "$*"
-exit 0
-EOF
-      chmod +x "${MOCK_BIN}/biome"
-      ORIG_PATH="$PATH"
-      export PATH="${MOCK_BIN}:${PATH}"
+      mock.create_script "biome" 'printf "biome %s\n" "$*"
+exit 0'
+      mock.activate
       export BRIK_QUALITY_LINT_COMMAND="biome check ."
     }
     cleanup_cmd_override() {
-      export PATH="$ORIG_PATH"
       unset BRIK_QUALITY_LINT_COMMAND
-      rm -rf "$TEST_WS" "$MOCK_BIN"
+      mock.cleanup
+      rm -rf "$TEST_WS"
     }
     Before 'setup_cmd_override'
     After 'cleanup_cmd_override'
@@ -35,24 +31,18 @@ EOF
 
   Describe "Tier 2: BRIK_QUALITY_LINT_TOOL override"
     setup_tool_override() {
+      mock.setup
       TEST_WS="$(mktemp -d)"
       MOCK_LOG="${TEST_WS}/mock.log"
       printf '{"name":"test"}\n' > "${TEST_WS}/package.json"
-      MOCK_BIN="$(mktemp -d)"
-      cat > "${MOCK_BIN}/npx" << MOCKEOF
-#!/usr/bin/env bash
-printf 'npx %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-      chmod +x "${MOCK_BIN}/npx"
-      ORIG_PATH="$PATH"
-      export PATH="${MOCK_BIN}:${PATH}"
+      mock.create_logging "npx" "$MOCK_LOG"
+      mock.activate
       export BRIK_QUALITY_LINT_TOOL="biome"
     }
     cleanup_tool_override() {
-      export PATH="$ORIG_PATH"
       unset BRIK_QUALITY_LINT_TOOL
-      rm -rf "$TEST_WS" "$MOCK_BIN"
+      mock.cleanup
+      rm -rf "$TEST_WS"
     }
     Before 'setup_tool_override'
     After 'cleanup_tool_override'
@@ -69,22 +59,16 @@ MOCKEOF
 
   Describe "Java lint with checkstyle"
     setup_java_lint() {
+      mock.setup
       TEST_WS="$(mktemp -d)"
       MOCK_LOG="${TEST_WS}/mock.log"
       printf '<project/>\n' > "${TEST_WS}/pom.xml"
-      MOCK_BIN="$(mktemp -d)"
-      cat > "${MOCK_BIN}/mvn" << MOCKEOF
-#!/usr/bin/env bash
-printf 'mvn %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-      chmod +x "${MOCK_BIN}/mvn"
-      ORIG_PATH="$PATH"
-      export PATH="${MOCK_BIN}:${PATH}"
+      mock.create_logging "mvn" "$MOCK_LOG"
+      mock.activate
     }
     cleanup_java_lint() {
-      export PATH="$ORIG_PATH"
-      rm -rf "$TEST_WS" "$MOCK_BIN"
+      mock.cleanup
+      rm -rf "$TEST_WS"
     }
     Before 'setup_java_lint'
     After 'cleanup_java_lint'
@@ -101,22 +85,16 @@ MOCKEOF
 
   Describe ".NET lint with dotnet format"
     setup_dotnet_lint() {
+      mock.setup
       TEST_WS="$(mktemp -d)"
       MOCK_LOG="${TEST_WS}/mock.log"
       printf '<Project Sdk="Microsoft.NET.Sdk"></Project>\n' > "${TEST_WS}/Test.csproj"
-      MOCK_BIN="$(mktemp -d)"
-      cat > "${MOCK_BIN}/dotnet" << MOCKEOF
-#!/usr/bin/env bash
-printf 'dotnet %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-      chmod +x "${MOCK_BIN}/dotnet"
-      ORIG_PATH="$PATH"
-      export PATH="${MOCK_BIN}:${PATH}"
+      mock.create_logging "dotnet" "$MOCK_LOG"
+      mock.activate
     }
     cleanup_dotnet_lint() {
-      export PATH="$ORIG_PATH"
-      rm -rf "$TEST_WS" "$MOCK_BIN"
+      mock.cleanup
+      rm -rf "$TEST_WS"
     }
     Before 'setup_dotnet_lint'
     After 'cleanup_dotnet_lint'

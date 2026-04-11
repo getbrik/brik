@@ -3,6 +3,7 @@ Describe "build.sh"
   Include "$BRIK_RUNTIME_LIB/tools.sh"
   Include "$BRIK_CORE_LIB/_loader.sh"
   Include "$BRIK_CORE_LIB/build.sh"
+  Include "$BRIK_HOME/runtime/bash/spec/support/mock_helper.sh"
 
   Describe "build.detect_stack"
     It "detects node from package.json"
@@ -76,24 +77,15 @@ Describe "build.sh"
         TEST_WS="$(mktemp -d)"
         printf '{"name":"test","version":"1.0.0","scripts":{"build":"echo ok"}}\n' > "${TEST_WS}/package.json"
         mkdir -p "${TEST_WS}/node_modules"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/npm" << 'EOF'
-#!/usr/bin/env bash
-printf "mock-npm %s\n" "$*"
-exit 0
-EOF
-        chmod +x "${MOCK_BIN}/npm"
-        cat > "${MOCK_BIN}/node" << 'EOF'
-#!/usr/bin/env bash
-exit 0
-EOF
-        chmod +x "${MOCK_BIN}/node"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.setup
+        mock.create_script "npm" 'printf "mock-npm %s\n" "$*"
+exit 0'
+        mock.create_exit "node" 0
+        mock.activate
       }
       cleanup_node_build() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_node_build'
       After 'cleanup_node_build'

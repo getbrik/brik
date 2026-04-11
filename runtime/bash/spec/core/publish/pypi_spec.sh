@@ -3,6 +3,7 @@ Describe "publish/pypi.sh"
   Include "$BRIK_RUNTIME_LIB/tools.sh"
   Include "$BRIK_CORE_LIB/publish.sh"
   Include "$BRIK_CORE_LIB/publish/pypi.sh"
+  Include "$BRIK_HOME/runtime/bash/spec/support/mock_helper.sh"
 
   Describe "publish.pypi.run"
     It "returns 2 for unknown option"
@@ -13,28 +14,22 @@ Describe "publish/pypi.sh"
 
     Describe "with mock twine"
       setup_twine() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock_twine.log"
         mkdir -p "${TEST_WS}/dist"
         printf 'pkg\n' > "${TEST_WS}/dist/test-1.0.0.tar.gz"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/twine" << MOCKEOF
-#!/usr/bin/env bash
-printf 'twine %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/twine"
+        mock.create_logging "twine" "$MOCK_LOG"
         # Only twine on PATH (no uv/poetry to avoid precedence), plus essentials
-        ORIG_PATH="$PATH"
         export PATH="${MOCK_BIN}:/usr/bin:/bin"
         ORIG_DIR="$(pwd)"
         cd "$TEST_WS" || return 1
       }
       cleanup_twine() {
         cd "$ORIG_DIR" || true
-        export PATH="$ORIG_PATH"
+        mock.cleanup
         unset BRIK_DRY_RUN BRIK_PUBLISH_PYPI_REPOSITORY BRIK_PUBLISH_PYPI_TOKEN_VAR 2>/dev/null
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        rm -rf "$TEST_WS"
       }
       Before 'setup_twine'
       After 'cleanup_twine'
@@ -77,6 +72,7 @@ MOCKEOF
 
     Describe "with poetry project"
       setup_poetry() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock_poetry.log"
         cat > "${TEST_WS}/pyproject.toml" << 'EOF'
@@ -84,23 +80,16 @@ MOCKEOF
 name = "test"
 version = "1.0.0"
 EOF
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/poetry" << MOCKEOF
-#!/usr/bin/env bash
-printf 'poetry %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/poetry"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_logging "poetry" "$MOCK_LOG"
+        mock.activate
         ORIG_DIR="$(pwd)"
         cd "$TEST_WS" || return 1
       }
       cleanup_poetry() {
         cd "$ORIG_DIR" || true
-        export PATH="$ORIG_PATH"
+        mock.cleanup
         unset BRIK_DRY_RUN BRIK_PUBLISH_PYPI_REPOSITORY BRIK_PUBLISH_PYPI_TOKEN_VAR POETRY_PYPI_TOKEN_PYPI 2>/dev/null
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        rm -rf "$TEST_WS"
       }
       Before 'setup_poetry'
       After 'cleanup_poetry'
@@ -143,16 +132,10 @@ MOCKEOF
 
     Describe "with mock uv"
       setup_uv() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock_uv.log"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/uv" << MOCKEOF
-#!/usr/bin/env bash
-printf 'uv %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/uv"
-        ORIG_PATH="$PATH"
+        mock.create_logging "uv" "$MOCK_LOG"
         # Only uv on PATH (no poetry/twine), plus essentials
         export PATH="${MOCK_BIN}:/usr/bin:/bin"
         ORIG_DIR="$(pwd)"
@@ -160,9 +143,9 @@ MOCKEOF
       }
       cleanup_uv() {
         cd "$ORIG_DIR" || true
-        export PATH="$ORIG_PATH"
+        mock.cleanup
         unset BRIK_DRY_RUN BRIK_PUBLISH_PYPI_REPOSITORY BRIK_PUBLISH_PYPI_TOKEN_VAR 2>/dev/null
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        rm -rf "$TEST_WS"
       }
       Before 'setup_uv'
       After 'cleanup_uv'
@@ -199,27 +182,21 @@ MOCKEOF
 
     Describe "twine with basic auth (user:password)"
       setup_basic_auth() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock_twine.log"
         mkdir -p "${TEST_WS}/dist"
         printf 'pkg\n' > "${TEST_WS}/dist/test-1.0.0.tar.gz"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/twine" << MOCKEOF
-#!/usr/bin/env bash
-printf 'twine %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/twine"
-        ORIG_PATH="$PATH"
+        mock.create_logging "twine" "$MOCK_LOG"
         export PATH="${MOCK_BIN}:/usr/bin:/bin"
         ORIG_DIR="$(pwd)"
         cd "$TEST_WS" || return 1
       }
       cleanup_basic_auth() {
         cd "$ORIG_DIR" || true
-        export PATH="$ORIG_PATH"
+        mock.cleanup
         unset TWINE_USERNAME TWINE_PASSWORD MY_BASIC_TOKEN 2>/dev/null
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        rm -rf "$TEST_WS"
       }
       Before 'setup_basic_auth'
       After 'cleanup_basic_auth'
@@ -238,35 +215,24 @@ MOCKEOF
 
     Describe "twine with auto-build"
       setup_autobuild() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock_twine.log"
         # No dist/ directory - triggers auto-build
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/twine" << MOCKEOF
-#!/usr/bin/env bash
-printf 'twine %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/twine"
-        cat > "${MOCK_BIN}/python" << MOCKEOF
-#!/usr/bin/env bash
-# Simulate python -m build creating dist files
-if [[ "\$2" == "build" ]]; then
-  mkdir -p "$TEST_WS/dist"
-  printf 'pkg\n' > "$TEST_WS/dist/test-1.0.0.tar.gz"
+        mock.create_logging "twine" "$MOCK_LOG"
+        mock.create_script "python" "if [ \"\$2\" = \"build\" ]; then
+  mkdir -p \"$TEST_WS/dist\"
+  printf 'pkg\n' > \"$TEST_WS/dist/test-1.0.0.tar.gz\"
 fi
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/python"
-        ORIG_PATH="$PATH"
+exit 0"
         export PATH="${MOCK_BIN}:/usr/bin:/bin"
         ORIG_DIR="$(pwd)"
         cd "$TEST_WS" || return 1
       }
       cleanup_autobuild() {
         cd "$ORIG_DIR" || true
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_autobuild'
       After 'cleanup_autobuild'
@@ -283,24 +249,19 @@ MOCKEOF
 
     Describe "twine publish failure"
       setup_fail_twine() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         mkdir -p "${TEST_WS}/dist"
         printf 'pkg\n' > "${TEST_WS}/dist/test-1.0.0.tar.gz"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/twine" << 'FAILEOF'
-#!/usr/bin/env bash
-exit 1
-FAILEOF
-        chmod +x "${MOCK_BIN}/twine"
-        ORIG_PATH="$PATH"
+        mock.create_exit "twine" 1
         export PATH="${MOCK_BIN}:/usr/bin:/bin"
         ORIG_DIR="$(pwd)"
         cd "$TEST_WS" || return 1
       }
       cleanup_fail_twine() {
         cd "$ORIG_DIR" || true
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_fail_twine'
       After 'cleanup_fail_twine'
@@ -314,30 +275,19 @@ FAILEOF
 
     Describe "CI auto-install of twine"
       setup_ci_install() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
-        MOCK_BIN="$(mktemp -d)"
-        # Mock pip to "install" twine
-        cat > "${MOCK_BIN}/pip" << MOCKEOF
-#!/usr/bin/env bash
-# Simulate installing twine by creating a mock twine
-cat > "${MOCK_BIN}/twine" << 'INNER'
+        mock.create_script "pip" "cat > \"${MOCK_BIN}/twine\" << 'INNER'
 #!/usr/bin/env bash
 exit 0
 INNER
-chmod +x "${MOCK_BIN}/twine"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/pip"
-        cat > "${MOCK_BIN}/python" << MOCKEOF
-#!/usr/bin/env bash
-if [[ "\$2" == "build" ]]; then
-  mkdir -p "$TEST_WS/dist"
-  printf 'pkg\n' > "$TEST_WS/dist/test-1.0.0.tar.gz"
+chmod +x \"${MOCK_BIN}/twine\"
+exit 0"
+        mock.create_script "python" "if [ \"\$2\" = \"build\" ]; then
+  mkdir -p \"$TEST_WS/dist\"
+  printf 'pkg\n' > \"$TEST_WS/dist/test-1.0.0.tar.gz\"
 fi
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/python"
-        ORIG_PATH="$PATH"
+exit 0"
         export PATH="${MOCK_BIN}:/usr/bin:/bin"
         export CI="true"
         ORIG_DIR="$(pwd)"
@@ -345,9 +295,9 @@ MOCKEOF
       }
       cleanup_ci_install() {
         cd "$ORIG_DIR" || true
-        export PATH="$ORIG_PATH"
+        mock.cleanup
         unset CI 2>/dev/null
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        rm -rf "$TEST_WS"
       }
       Before 'setup_ci_install'
       After 'cleanup_ci_install'
@@ -361,9 +311,8 @@ MOCKEOF
 
     Describe "no publish tool"
       setup_no_tool() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
-        MOCK_BIN="$(mktemp -d)"
-        ORIG_PATH="$PATH"
         ORIG_CI="${CI:-}"
         # Empty PATH - no tools (no pip/twine/uv/poetry)
         export PATH="${MOCK_BIN}:/usr/bin:/bin"
@@ -374,9 +323,9 @@ MOCKEOF
       }
       cleanup_no_tool() {
         cd "$ORIG_DIR" || true
-        export PATH="$ORIG_PATH"
+        mock.cleanup
         [[ -n "$ORIG_CI" ]] && export CI="$ORIG_CI"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        rm -rf "$TEST_WS"
       }
       Before 'setup_no_tool'
       After 'cleanup_no_tool'

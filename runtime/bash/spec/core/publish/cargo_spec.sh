@@ -3,6 +3,7 @@ Describe "publish/cargo.sh"
   Include "$BRIK_RUNTIME_LIB/tools.sh"
   Include "$BRIK_CORE_LIB/publish.sh"
   Include "$BRIK_CORE_LIB/publish/cargo.sh"
+  Include "$BRIK_HOME/runtime/bash/spec/support/mock_helper.sh"
 
   Describe "publish.cargo.run"
     It "returns 2 for unknown option"
@@ -13,22 +14,17 @@ Describe "publish/cargo.sh"
 
     Describe "missing Cargo.toml"
       setup_no_cargo() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/cargo" << 'EOF'
-#!/usr/bin/env bash
-exit 0
-EOF
-        chmod +x "${MOCK_BIN}/cargo"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_exit "cargo" 0
+        mock.activate
         ORIG_DIR="$(pwd)"
         cd "$TEST_WS" || return 1
       }
       cleanup_no_cargo() {
         cd "$ORIG_DIR" || true
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_no_cargo'
       After 'cleanup_no_cargo'
@@ -42,26 +38,20 @@ EOF
 
     Describe "with mock cargo"
       setup_cargo() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock_cargo.log"
         printf '[package]\nname = "test"\nversion = "1.0.0"\n' > "${TEST_WS}/Cargo.toml"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/cargo" << MOCKEOF
-#!/usr/bin/env bash
-printf 'cargo %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/cargo"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_logging "cargo" "$MOCK_LOG"
+        mock.activate
         ORIG_DIR="$(pwd)"
         cd "$TEST_WS" || return 1
       }
       cleanup_cargo() {
         cd "$ORIG_DIR" || true
-        export PATH="$ORIG_PATH"
+        mock.cleanup
         unset BRIK_DRY_RUN 2>/dev/null
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        rm -rf "$TEST_WS"
       }
       Before 'setup_cargo'
       After 'cleanup_cargo'

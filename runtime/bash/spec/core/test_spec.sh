@@ -4,6 +4,7 @@ Describe "test.sh"
   Include "$BRIK_CORE_LIB/_loader.sh"
   Include "$BRIK_CORE_LIB/build.sh"
   Include "$BRIK_CORE_LIB/test.sh"
+  Include "$BRIK_HOME/runtime/bash/spec/support/mock_helper.sh"
 
   Describe "test.run"
     It "returns 6 for nonexistent workspace"
@@ -29,29 +30,18 @@ Describe "test.sh"
 
     Describe "with Node.js workspace"
       setup_node() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock_npm.log"
         printf '{"name":"test","scripts":{"test":"echo ok"}}\n' > "${TEST_WS}/package.json"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/npm" << MOCKEOF
-#!/usr/bin/env bash
-printf 'npm %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/npm"
-        # Mock node for test script detection (returns "yes" for -e flag)
-        cat > "${MOCK_BIN}/node" << 'NODEEOF'
-#!/usr/bin/env bash
-if [[ "$1" == "-e" ]]; then printf 'yes\n'; fi
-exit 0
-NODEEOF
-        chmod +x "${MOCK_BIN}/node"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_logging "npm" "$MOCK_LOG"
+        mock.create_script "node" 'if [ "$1" = "-e" ]; then printf "yes\n"; fi
+exit 0'
+        mock.activate
       }
       cleanup_node() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_node'
       After 'cleanup_node'
@@ -80,22 +70,16 @@ NODEEOF
 
     Describe "with Python workspace"
       setup_py() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock_python.log"
         printf '[project]\nname = "test"\n' > "${TEST_WS}/pyproject.toml"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/python" << MOCKEOF
-#!/usr/bin/env bash
-printf 'python %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/python"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_logging "python" "$MOCK_LOG"
+        mock.activate
       }
       cleanup_py() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_py'
       After 'cleanup_py'
@@ -121,22 +105,16 @@ MOCKEOF
 
     Describe "with Java Maven workspace"
       setup_java() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock_mvn.log"
         printf '<project/>\n' > "${TEST_WS}/pom.xml"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/mvn" << MOCKEOF
-#!/usr/bin/env bash
-printf 'mvn %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/mvn"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_logging "mvn" "$MOCK_LOG"
+        mock.activate
       }
       cleanup_java() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_java'
       After 'cleanup_java'
@@ -162,22 +140,16 @@ MOCKEOF
 
     Describe "with Gradle workspace"
       setup_gradle() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock_gradle.log"
         printf 'plugins { id "java" }\n' > "${TEST_WS}/build.gradle"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/gradle" << MOCKEOF
-#!/usr/bin/env bash
-printf 'gradle %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/gradle"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_logging "gradle" "$MOCK_LOG"
+        mock.activate
       }
       cleanup_gradle() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_gradle'
       After 'cleanup_gradle'
@@ -194,22 +166,16 @@ MOCKEOF
 
     Describe "with build.gradle.kts workspace"
       setup_gradle_kts() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock_gradle.log"
         printf 'plugins { id("java") }\n' > "${TEST_WS}/build.gradle.kts"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/gradle" << MOCKEOF
-#!/usr/bin/env bash
-printf 'gradle %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/gradle"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_logging "gradle" "$MOCK_LOG"
+        mock.activate
       }
       cleanup_gradle_kts() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_gradle_kts'
       After 'cleanup_gradle_kts'
@@ -226,6 +192,7 @@ MOCKEOF
 
     Describe "with Gradle wrapper"
       setup_gradlew() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock_gradlew.log"
         printf 'plugins { id "java" }\n' > "${TEST_WS}/build.gradle"
@@ -235,15 +202,13 @@ printf 'gradlew %s\n' "\$*" >> "$MOCK_LOG"
 exit 0
 MOCKEOF
         chmod +x "${TEST_WS}/gradlew"
-        ORIG_PATH="$PATH"
-        MOCK_BIN="$(mktemp -d)"
+        mock.preserve_cmds
         ln -sf "$(command -v bash)" "${MOCK_BIN}/bash"
-        ln -sf "$(command -v grep)" "${MOCK_BIN}/grep"
-        export PATH="${MOCK_BIN}"
+        mock.isolate
       }
       cleanup_gradlew() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_gradlew'
       After 'cleanup_gradlew'
@@ -260,21 +225,15 @@ MOCKEOF
 
     Describe "with --framework override"
       setup_framework() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock_cargo.log"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/cargo" << MOCKEOF
-#!/usr/bin/env bash
-printf 'cargo %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/cargo"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_logging "cargo" "$MOCK_LOG"
+        mock.activate
       }
       cleanup_framework() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_framework'
       After 'cleanup_framework'
@@ -297,21 +256,15 @@ MOCKEOF
 
     Describe "with --framework npm"
       setup_npm() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock_npm.log"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/npm" << MOCKEOF
-#!/usr/bin/env bash
-printf 'npm %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/npm"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_logging "npm" "$MOCK_LOG"
+        mock.activate
       }
       cleanup_npm() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_npm'
       After 'cleanup_npm'
@@ -328,21 +281,15 @@ MOCKEOF
 
     Describe "with --framework dotnet"
       setup_dotnet() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock_dotnet.log"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/dotnet" << MOCKEOF
-#!/usr/bin/env bash
-printf 'dotnet %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/dotnet"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_logging "dotnet" "$MOCK_LOG"
+        mock.activate
       }
       cleanup_dotnet() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_dotnet'
       After 'cleanup_dotnet'
@@ -359,22 +306,16 @@ MOCKEOF
 
     Describe "with Rust workspace (Cargo.toml)"
       setup_rust() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock_cargo.log"
         printf '[package]\nname = "test"\n' > "${TEST_WS}/Cargo.toml"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/cargo" << MOCKEOF
-#!/usr/bin/env bash
-printf 'cargo %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/cargo"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_logging "cargo" "$MOCK_LOG"
+        mock.activate
       }
       cleanup_rust() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_rust'
       After 'cleanup_rust'
@@ -406,20 +347,15 @@ MOCKEOF
 
     Describe "with failing test command"
       setup_fail() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         printf '{"name":"test"}\n' > "${TEST_WS}/package.json"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/npx" << 'EOF'
-#!/usr/bin/env bash
-exit 1
-EOF
-        chmod +x "${MOCK_BIN}/npx"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_exit "npx" 1
+        mock.activate
       }
       cleanup_fail() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_fail'
       After 'cleanup_fail'
@@ -433,24 +369,17 @@ EOF
 
     Describe "Node.js without npx"
       setup_no_npx() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock_npm.log"
         printf '{"name":"test","scripts":{"test":"echo ok"}}\n' > "${TEST_WS}/package.json"
-        MOCK_BIN="$(mktemp -d)"
-        # Only provide npm, no npx, no node (so can't detect test script)
-        cat > "${MOCK_BIN}/npm" << MOCKEOF
-#!/usr/bin/env bash
-printf 'npm %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/npm"
+        mock.create_logging "npm" "$MOCK_LOG"
         ln -sf "$(command -v bash)" "${MOCK_BIN}/bash"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}"
+        mock.isolate
       }
       cleanup_no_npx() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_no_npx'
       After 'cleanup_no_npx'
@@ -465,12 +394,10 @@ MOCKEOF
 
   Describe "test.publish_report"
     setup() {
-      export BRIK_LOG_DIR
-      BRIK_LOG_DIR="$(mktemp -d)"
       REPORT_FILE="$(mktemp)"
       printf '<testsuites><testsuite tests="1"/></testsuites>\n' > "$REPORT_FILE"
     }
-    cleanup() { rm -rf "$BRIK_LOG_DIR" "$REPORT_FILE"; }
+    cleanup() { rm -rf "$REPORT_FILE"; }
     Before 'setup'
     After 'cleanup'
 

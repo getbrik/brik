@@ -3,6 +3,7 @@ Describe "publish/nuget.sh"
   Include "$BRIK_RUNTIME_LIB/tools.sh"
   Include "$BRIK_CORE_LIB/publish.sh"
   Include "$BRIK_CORE_LIB/publish/nuget.sh"
+  Include "$BRIK_HOME/runtime/bash/spec/support/mock_helper.sh"
 
   Describe "publish.nuget.run"
     It "returns 2 for unknown option"
@@ -13,22 +14,17 @@ Describe "publish/nuget.sh"
 
     Describe "no nupkg files"
       setup_no_pkg() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/dotnet" << 'EOF'
-#!/usr/bin/env bash
-exit 0
-EOF
-        chmod +x "${MOCK_BIN}/dotnet"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_exit "dotnet" 0
+        mock.activate
         ORIG_DIR="$(pwd)"
         cd "$TEST_WS" || return 1
       }
       cleanup_no_pkg() {
         cd "$ORIG_DIR" || true
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_no_pkg'
       After 'cleanup_no_pkg'
@@ -42,27 +38,21 @@ EOF
 
     Describe "with mock dotnet"
       setup_dotnet() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock_dotnet.log"
         mkdir -p "${TEST_WS}/bin/Release"
         printf 'pkg\n' > "${TEST_WS}/bin/Release/Test.1.0.0.nupkg"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/dotnet" << MOCKEOF
-#!/usr/bin/env bash
-printf 'dotnet %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/dotnet"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_logging "dotnet" "$MOCK_LOG"
+        mock.activate
         ORIG_DIR="$(pwd)"
         cd "$TEST_WS" || return 1
       }
       cleanup_dotnet() {
         cd "$ORIG_DIR" || true
-        export PATH="$ORIG_PATH"
+        mock.cleanup
         unset BRIK_DRY_RUN 2>/dev/null
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        rm -rf "$TEST_WS"
       }
       Before 'setup_dotnet'
       After 'cleanup_dotnet'
@@ -140,27 +130,21 @@ FAILEOF
 
     Describe "with HTTP source (NuGet.Config)"
       setup_http() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock_dotnet.log"
         mkdir -p "${TEST_WS}/out"
         printf 'pkg\n' > "${TEST_WS}/out/Http.1.0.0.nupkg"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/dotnet" << MOCKEOF
-#!/usr/bin/env bash
-printf 'dotnet %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/dotnet"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_logging "dotnet" "$MOCK_LOG"
+        mock.activate
         ORIG_DIR="$(pwd)"
         cd "$TEST_WS" || return 1
       }
       cleanup_http() {
         cd "$ORIG_DIR" || true
-        export PATH="$ORIG_PATH"
+        mock.cleanup
         unset BRIK_DRY_RUN MY_HTTP_KEY 2>/dev/null
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        rm -rf "$TEST_WS"
       }
       Before 'setup_http'
       After 'cleanup_http'
@@ -204,29 +188,23 @@ MOCKEOF
 
     Describe "auto-pack success"
       setup_autopack() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock_dotnet.log"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/dotnet" << MOCKEOF
-#!/usr/bin/env bash
-printf 'dotnet %s\n' "\$*" >> "$MOCK_LOG"
-# Simulate dotnet pack creating a nupkg
-if [[ "\$1" == "pack" ]]; then
-  mkdir -p "$TEST_WS/nupkg"
-  printf 'pkg\n' > "$TEST_WS/nupkg/Auto.1.0.0.nupkg"
+        mock.create_script "dotnet" "printf 'dotnet %s\n' \"\$*\" >> \"$MOCK_LOG\"
+if [ \"\$1\" = \"pack\" ]; then
+  mkdir -p \"$TEST_WS/nupkg\"
+  printf 'pkg\n' > \"$TEST_WS/nupkg/Auto.1.0.0.nupkg\"
 fi
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/dotnet"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+exit 0"
+        mock.activate
         ORIG_DIR="$(pwd)"
         cd "$TEST_WS" || return 1
       }
       cleanup_autopack() {
         cd "$ORIG_DIR" || true
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_autopack'
       After 'cleanup_autopack'

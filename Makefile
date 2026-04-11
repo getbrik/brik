@@ -6,13 +6,15 @@ help: ## Show available targets
 lint: ## Run shellcheck on all Bash sources
 	shellcheck --severity=warning -x bin/brik $$(find runtime/bash/lib shared-libs -name '*.sh' -not -path '*/spec/*')
 
-test: ## Run all ShellSpec tests
-	shellspec
+SHELLSPEC_JOBS ?= $(shell nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 0)
+
+test: ## Run all ShellSpec tests (parallel)
+	shellspec --jobs $(SHELLSPEC_JOBS)
 
 test-quick: ## Run tests, stop on first failure
-	shellspec --fail-fast
+	shellspec --jobs $(SHELLSPEC_JOBS) --fail-fast
 
-coverage: ## Run tests with kcov coverage report
+coverage: ## Run tests with kcov coverage report (--jobs ignored: kcov disables parallelism)
 	ulimit -n 1024 && shellspec --kcov
 
 validate: ## Validate example brik.yml files

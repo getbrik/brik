@@ -4,6 +4,7 @@ Describe "security/sast.sh"
   Include "$BRIK_CORE_LIB/_loader.sh"
   Include "$BRIK_CORE_LIB/quality/_tools.sh"
   Include "$BRIK_CORE_LIB/security/sast.sh"
+  Include "$BRIK_HOME/runtime/bash/spec/support/mock_helper.sh"
 
   Describe "security.sast.run"
     It "returns 6 for nonexistent workspace"
@@ -14,21 +15,16 @@ Describe "security/sast.sh"
 
     Describe "Tier 1: command override"
       setup_cmd() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/my-sast" << 'EOF'
-#!/usr/bin/env bash
-exit 0
-EOF
-        chmod +x "${MOCK_BIN}/my-sast"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_exit "my-sast" 0
+        mock.activate
         export BRIK_SECURITY_SAST_COMMAND="my-sast"
       }
       cleanup_cmd() {
-        export PATH="$ORIG_PATH"
         unset BRIK_SECURITY_SAST_COMMAND
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_cmd'
       After 'cleanup_cmd'
@@ -42,21 +38,16 @@ EOF
 
     Describe "Tier 1: command fails"
       setup_cmd_fail() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/failing-sast" << 'EOF'
-#!/usr/bin/env bash
-exit 1
-EOF
-        chmod +x "${MOCK_BIN}/failing-sast"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_exit "failing-sast" 1
+        mock.activate
         export BRIK_SECURITY_SAST_COMMAND="failing-sast"
       }
       cleanup_cmd_fail() {
-        export PATH="$ORIG_PATH"
         unset BRIK_SECURITY_SAST_COMMAND
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_cmd_fail'
       After 'cleanup_cmd_fail'
@@ -70,23 +61,17 @@ EOF
 
     Describe "Tier 2: explicit tool semgrep"
       setup_tool() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock.log"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/semgrep" << MOCKEOF
-#!/usr/bin/env bash
-printf 'semgrep %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/semgrep"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_logging "semgrep" "$MOCK_LOG"
+        mock.activate
         export BRIK_SECURITY_SAST_TOOL="semgrep"
       }
       cleanup_tool() {
-        export PATH="$ORIG_PATH"
         unset BRIK_SECURITY_SAST_TOOL BRIK_SECURITY_SAST_RULESET
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_tool'
       After 'cleanup_tool'
@@ -113,16 +98,15 @@ MOCKEOF
 
     Describe "Tier 2: tool not found"
       setup_missing() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
-        MOCK_BIN="$(mktemp -d)"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}"
+        mock.isolate
         export BRIK_SECURITY_SAST_TOOL="semgrep"
       }
       cleanup_missing() {
-        export PATH="$ORIG_PATH"
         unset BRIK_SECURITY_SAST_TOOL
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_missing'
       After 'cleanup_missing'
@@ -136,21 +120,16 @@ MOCKEOF
 
     Describe "Tier 2: tool fails"
       setup_tool_fail() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/semgrep" << 'EOF'
-#!/usr/bin/env bash
-exit 1
-EOF
-        chmod +x "${MOCK_BIN}/semgrep"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_exit "semgrep" 1
+        mock.activate
         export BRIK_SECURITY_SAST_TOOL="semgrep"
       }
       cleanup_tool_fail() {
-        export PATH="$ORIG_PATH"
         unset BRIK_SECURITY_SAST_TOOL
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_tool_fail'
       After 'cleanup_tool_fail'
@@ -164,23 +143,17 @@ EOF
 
     Describe "Tier 3: auto-detect semgrep"
       setup_auto() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock.log"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/semgrep" << MOCKEOF
-#!/usr/bin/env bash
-printf 'semgrep %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/semgrep"
+        mock.create_logging "semgrep" "$MOCK_LOG"
         ln -sf "$(command -v bash)" "${MOCK_BIN}/bash"
         ln -sf "$(command -v grep)" "${MOCK_BIN}/grep"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}"
+        mock.isolate
       }
       cleanup_auto() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_auto'
       After 'cleanup_auto'
@@ -197,14 +170,13 @@ MOCKEOF
 
     Describe "no tool available"
       setup_none() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
-        MOCK_BIN="$(mktemp -d)"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}"
+        mock.isolate
       }
       cleanup_none() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_none'
       After 'cleanup_none'

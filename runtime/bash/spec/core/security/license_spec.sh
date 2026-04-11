@@ -4,6 +4,7 @@ Describe "security/license.sh"
   Include "$BRIK_CORE_LIB/_loader.sh"
   Include "$BRIK_CORE_LIB/quality/_tools.sh"
   Include "$BRIK_CORE_LIB/security/license.sh"
+  Include "$BRIK_HOME/runtime/bash/spec/support/mock_helper.sh"
 
   Describe "security.license.run"
     It "returns 6 for nonexistent workspace"
@@ -14,22 +15,16 @@ Describe "security/license.sh"
 
     Describe "license_finder available"
       setup_lf() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock.log"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/license_finder" << MOCKEOF
-#!/usr/bin/env bash
-printf 'license_finder %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/license_finder"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_logging "license_finder" "$MOCK_LOG"
+        mock.activate
       }
       cleanup_lf() {
-        export PATH="$ORIG_PATH"
         unset BRIK_SECURITY_LICENSE_ALLOWED BRIK_SECURITY_LICENSE_DENIED
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_lf'
       After 'cleanup_lf'
@@ -72,22 +67,17 @@ MOCKEOF
 
     Describe "license_finder fails"
       setup_lf_fail() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/license_finder" << 'MOCKEOF'
-#!/usr/bin/env bash
-if [[ "$1" == "action_items" ]]; then
+        mock.create_script "license_finder" 'if [ "$1" = "action_items" ]; then
   exit 1
 fi
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/license_finder"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+exit 0'
+        mock.activate
       }
       cleanup_lf_fail() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_lf_fail'
       After 'cleanup_lf_fail'
@@ -101,23 +91,17 @@ MOCKEOF
 
     Describe "fallback via registry (syft)"
       setup_syft() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock.log"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/syft" << MOCKEOF
-#!/usr/bin/env bash
-printf 'syft %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/syft"
+        mock.create_logging "syft" "$MOCK_LOG"
         ln -sf "$(command -v bash)" "${MOCK_BIN}/bash"
         ln -sf "$(command -v grep)" "${MOCK_BIN}/grep"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}"
+        mock.isolate
       }
       cleanup_syft() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_syft'
       After 'cleanup_syft'
@@ -134,14 +118,13 @@ MOCKEOF
 
     Describe "no tool available"
       setup_none() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
-        MOCK_BIN="$(mktemp -d)"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}"
+        mock.isolate
       }
       cleanup_none() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_none'
       After 'cleanup_none'

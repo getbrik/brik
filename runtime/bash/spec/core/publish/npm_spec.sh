@@ -3,6 +3,7 @@ Describe "publish/npm.sh"
   Include "$BRIK_RUNTIME_LIB/tools.sh"
   Include "$BRIK_CORE_LIB/publish.sh"
   Include "$BRIK_CORE_LIB/publish/npm.sh"
+  Include "$BRIK_HOME/runtime/bash/spec/support/mock_helper.sh"
 
   Describe "publish.npm.run"
     It "returns 2 for unknown option"
@@ -13,15 +14,14 @@ Describe "publish/npm.sh"
 
     Describe "require_tool npm failure"
       setup_no_npm() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         printf '{"name":"test","version":"1.0.0"}\n' > "${TEST_WS}/package.json"
-        MOCK_BIN="$(mktemp -d)"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}"
+        mock.isolate
       }
       cleanup_no_npm() {
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_no_npm'
       After 'cleanup_no_npm'
@@ -35,22 +35,17 @@ Describe "publish/npm.sh"
 
     Describe "missing package.json"
       setup_no_pkg() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/npm" << 'EOF'
-#!/usr/bin/env bash
-exit 0
-EOF
-        chmod +x "${MOCK_BIN}/npm"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_exit "npm" 0
+        mock.activate
         ORIG_DIR="$(pwd)"
         cd "$TEST_WS" || return 1
       }
       cleanup_no_pkg() {
         cd "$ORIG_DIR" || true
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_no_pkg'
       After 'cleanup_no_pkg'
@@ -64,27 +59,21 @@ EOF
 
     Describe "with mock npm"
       setup_npm() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock_npm.log"
         printf '{"name":"test","version":"1.0.0"}\n' > "${TEST_WS}/package.json"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/npm" << MOCKEOF
-#!/usr/bin/env bash
-printf 'npm %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-        chmod +x "${MOCK_BIN}/npm"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_logging "npm" "$MOCK_LOG"
+        mock.activate
         ORIG_DIR="$(pwd)"
         cd "$TEST_WS" || return 1
       }
       cleanup_npm() {
         cd "$ORIG_DIR" || true
-        export PATH="$ORIG_PATH"
+        mock.cleanup
         unset BRIK_DRY_RUN BRIK_PUBLISH_NPM_REGISTRY BRIK_PUBLISH_NPM_TAG 2>/dev/null
         unset BRIK_PUBLISH_NPM_ACCESS BRIK_PUBLISH_NPM_TOKEN_VAR NPM_TOKEN 2>/dev/null
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        rm -rf "$TEST_WS"
       }
       Before 'setup_npm'
       After 'cleanup_npm'
@@ -180,23 +169,18 @@ MOCKEOF
 
     Describe "with failing npm"
       setup_fail() {
+        mock.setup
         TEST_WS="$(mktemp -d)"
         printf '{"name":"test","version":"1.0.0"}\n' > "${TEST_WS}/package.json"
-        MOCK_BIN="$(mktemp -d)"
-        cat > "${MOCK_BIN}/npm" << 'EOF'
-#!/usr/bin/env bash
-exit 1
-EOF
-        chmod +x "${MOCK_BIN}/npm"
-        ORIG_PATH="$PATH"
-        export PATH="${MOCK_BIN}:${PATH}"
+        mock.create_exit "npm" 1
+        mock.activate
         ORIG_DIR="$(pwd)"
         cd "$TEST_WS" || return 1
       }
       cleanup_fail() {
         cd "$ORIG_DIR" || true
-        export PATH="$ORIG_PATH"
-        rm -rf "$TEST_WS" "$MOCK_BIN"
+        mock.cleanup
+        rm -rf "$TEST_WS"
       }
       Before 'setup_fail'
       After 'cleanup_fail'

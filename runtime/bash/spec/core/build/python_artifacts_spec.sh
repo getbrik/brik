@@ -2,33 +2,24 @@ Describe "build/python artifacts - all package managers produce dist/"
   Include "$BRIK_RUNTIME_LIB/logging.sh"
   Include "$BRIK_RUNTIME_LIB/tools.sh"
   Include "$BRIK_CORE_LIB/build/python.sh"
+  Include "$BRIK_HOME/runtime/bash/spec/support/mock_helper.sh"
 
   Describe "pip produces artifacts in dist/"
     setup_pip_artifacts() {
+      mock.setup
       TEST_WS="$(mktemp -d)"
       MOCK_LOG="${TEST_WS}/mock.log"
       printf '[project]\nname = "test"\n' > "${TEST_WS}/pyproject.toml"
-      MOCK_BIN="$(mktemp -d)"
-      cat > "${MOCK_BIN}/python" << MOCKEOF
-#!/usr/bin/env bash
-printf 'python %s\n' "\$*" >> "$MOCK_LOG"
-# Simulate python -m build creating dist/
+      mock.create_script "python" "printf 'python %s\\n' \"\$*\" >> \"$MOCK_LOG\"
 mkdir -p dist
 touch dist/test-0.1.0.tar.gz dist/test-0.1.0-py3-none-any.whl
-exit 0
-MOCKEOF
-      cat > "${MOCK_BIN}/pip" << MOCKEOF
-#!/usr/bin/env bash
-printf 'pip %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-      chmod +x "${MOCK_BIN}/python" "${MOCK_BIN}/pip"
-      ORIG_PATH="$PATH"
-      export PATH="${MOCK_BIN}:${PATH}"
+exit 0"
+      mock.create_logging "pip" "$MOCK_LOG"
+      mock.activate
     }
     cleanup_pip_artifacts() {
-      export PATH="$ORIG_PATH"
-      rm -rf "$TEST_WS" "$MOCK_BIN"
+      mock.cleanup
+      rm -rf "$TEST_WS"
     }
     Before 'setup_pip_artifacts'
     After 'cleanup_pip_artifacts'
@@ -45,31 +36,22 @@ MOCKEOF
 
   Describe "pip fallback produces artifacts via pip wheel"
     setup_pip_wheel() {
+      mock.setup
       TEST_WS="$(mktemp -d)"
       MOCK_LOG="${TEST_WS}/mock.log"
       printf '[project]\nname = "test"\n' > "${TEST_WS}/pyproject.toml"
-      MOCK_BIN="$(mktemp -d)"
-      cat > "${MOCK_BIN}/python" << 'MOCKEOF'
-#!/usr/bin/env bash
-exit 1
-MOCKEOF
-      cat > "${MOCK_BIN}/pip" << MOCKEOF
-#!/usr/bin/env bash
-printf 'pip %s\n' "\$*" >> "$MOCK_LOG"
-# Simulate pip wheel creating dist/
-if echo "\$*" | grep -q "wheel"; then
+      mock.create_exit "python" 1
+      mock.create_script "pip" "printf 'pip %s\\n' \"\$*\" >> \"$MOCK_LOG\"
+if echo \"\$*\" | grep -q \"wheel\"; then
   mkdir -p dist
   touch dist/test-0.1.0-py3-none-any.whl
 fi
-exit 0
-MOCKEOF
-      chmod +x "${MOCK_BIN}/python" "${MOCK_BIN}/pip"
-      ORIG_PATH="$PATH"
-      export PATH="${MOCK_BIN}:${PATH}"
+exit 0"
+      mock.activate
     }
     cleanup_pip_wheel() {
-      export PATH="$ORIG_PATH"
-      rm -rf "$TEST_WS" "$MOCK_BIN"
+      mock.cleanup
+      rm -rf "$TEST_WS"
     }
     Before 'setup_pip_wheel'
     After 'cleanup_pip_wheel'
@@ -86,23 +68,17 @@ MOCKEOF
 
   Describe "poetry produces artifacts in dist/"
     setup_poetry_artifacts() {
+      mock.setup
       TEST_WS="$(mktemp -d)"
       MOCK_LOG="${TEST_WS}/mock.log"
       printf '[tool.poetry]\nname = "test"\n\n[project]\nname = "test"\n' > "${TEST_WS}/pyproject.toml"
       touch "${TEST_WS}/poetry.lock"
-      MOCK_BIN="$(mktemp -d)"
-      cat > "${MOCK_BIN}/poetry" << MOCKEOF
-#!/usr/bin/env bash
-printf 'poetry %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-      chmod +x "${MOCK_BIN}/poetry"
-      ORIG_PATH="$PATH"
-      export PATH="${MOCK_BIN}:${PATH}"
+      mock.create_logging "poetry" "$MOCK_LOG"
+      mock.activate
     }
     cleanup_poetry_artifacts() {
-      export PATH="$ORIG_PATH"
-      rm -rf "$TEST_WS" "$MOCK_BIN"
+      mock.cleanup
+      rm -rf "$TEST_WS"
     }
     Before 'setup_poetry_artifacts'
     After 'cleanup_poetry_artifacts'
@@ -119,23 +95,17 @@ MOCKEOF
 
   Describe "uv produces artifacts in dist/"
     setup_uv_artifacts() {
+      mock.setup
       TEST_WS="$(mktemp -d)"
       MOCK_LOG="${TEST_WS}/mock.log"
       printf '[project]\nname = "test"\n' > "${TEST_WS}/pyproject.toml"
       touch "${TEST_WS}/uv.lock"
-      MOCK_BIN="$(mktemp -d)"
-      cat > "${MOCK_BIN}/uv" << MOCKEOF
-#!/usr/bin/env bash
-printf 'uv %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-      chmod +x "${MOCK_BIN}/uv"
-      ORIG_PATH="$PATH"
-      export PATH="${MOCK_BIN}:${PATH}"
+      mock.create_logging "uv" "$MOCK_LOG"
+      mock.activate
     }
     cleanup_uv_artifacts() {
-      export PATH="$ORIG_PATH"
-      rm -rf "$TEST_WS" "$MOCK_BIN"
+      mock.cleanup
+      rm -rf "$TEST_WS"
     }
     Before 'setup_uv_artifacts'
     After 'cleanup_uv_artifacts'
@@ -152,22 +122,16 @@ MOCKEOF
 
   Describe "pipenv produces artifacts in dist/"
     setup_pipenv_artifacts() {
+      mock.setup
       TEST_WS="$(mktemp -d)"
       MOCK_LOG="${TEST_WS}/mock.log"
       printf '[packages]\n' > "${TEST_WS}/Pipfile"
-      MOCK_BIN="$(mktemp -d)"
-      cat > "${MOCK_BIN}/pipenv" << MOCKEOF
-#!/usr/bin/env bash
-printf 'pipenv %s\n' "\$*" >> "$MOCK_LOG"
-exit 0
-MOCKEOF
-      chmod +x "${MOCK_BIN}/pipenv"
-      ORIG_PATH="$PATH"
-      export PATH="${MOCK_BIN}:${PATH}"
+      mock.create_logging "pipenv" "$MOCK_LOG"
+      mock.activate
     }
     cleanup_pipenv_artifacts() {
-      export PATH="$ORIG_PATH"
-      rm -rf "$TEST_WS" "$MOCK_BIN"
+      mock.cleanup
+      rm -rf "$TEST_WS"
     }
     Before 'setup_pipenv_artifacts'
     After 'cleanup_pipenv_artifacts'
