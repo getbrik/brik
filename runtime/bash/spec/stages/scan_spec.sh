@@ -2,6 +2,7 @@ Describe "stages.scan"
   Include "$BRIK_HOME/runtime/bash/lib/runtime/stage.sh"
   Include "$BRIK_HOME/runtime/bash/lib/core/_loader.sh"
   Include "$BRIK_HOME/runtime/bash/lib/core/config.sh"
+  Include "$BRIK_HOME/runtime/bash/lib/core/security.sh"
   Include "$BRIK_HOME/runtime/bash/lib/stages/scan.sh"
 
   setup_env() {

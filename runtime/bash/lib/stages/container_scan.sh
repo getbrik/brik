@@ -20,20 +20,13 @@ stages.container_scan() {
 
     log.info "container scan stage - scanning image: $image"
 
-    if ! declare -f security.container.run >/dev/null 2>&1; then
-        brik.use "security.container"
-    fi
-
-    if ! declare -f security.container.run >/dev/null 2>&1; then
-        log.warn "security.container module not available - skipping container scan"
-        context.set "$context_file" "BRIK_CONTAINER_SCAN_STATUS" "skipped"
-        return 0
-    fi
-
     local severity="${BRIK_SECURITY_CONTAINER_SEVERITY:-${BRIK_SECURITY_SEVERITY_THRESHOLD:-high}}"
-    local scan_args=("${BRIK_WORKSPACE}" --image "$image" --severity "$severity")
 
-    security.container.run "${scan_args[@]}"
+    if ! declare -f security.run >/dev/null 2>&1; then
+        brik.use "security"
+    fi
+
+    security.run "${BRIK_WORKSPACE}" --scans "container" --image "$image" --severity "$severity"
     local result=$?
 
     context.set_result "$context_file" "BRIK_CONTAINER_SCAN_STATUS" "$result"

@@ -1,8 +1,10 @@
 Describe "stages/container_scan.sh"
   Include "$BRIK_RUNTIME_LIB/logging.sh"
+  Include "$BRIK_RUNTIME_LIB/tools.sh"
   Include "$BRIK_RUNTIME_LIB/context.sh"
   Include "$BRIK_CORE_LIB/_loader.sh"
   Include "$BRIK_CORE_LIB/config.sh"
+  Include "$BRIK_CORE_LIB/security.sh"
   Include "$BRIK_HOME/runtime/bash/lib/stages/container_scan.sh"
 
   Describe "stages.container_scan"
@@ -129,7 +131,7 @@ EOF
           return $status
         }
         When call invoke_fail
-        The status should equal 1
+        The status should equal 10
         The output should equal "failed"
       End
     End

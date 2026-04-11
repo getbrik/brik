@@ -3,7 +3,7 @@
 # @description SAST stage - static analysis, license, and IaC scans.
 # Runs in the analysis image (Python/Ruby tools like semgrep, checkov).
 
-# SAST stage: run SAST, license, and IaC scans via brik-lib.
+# SAST stage: run SAST, license, and IaC scans via security.run facade.
 # Usage: stages.sast <context_file>
 stages.sast() {
     local context_file="$1"
@@ -12,74 +12,34 @@ stages.sast() {
 
     log.info "sast stage - running static analysis scans"
 
-    local failed=0 total=0 passed=0
-
-    # SAST scan (non-negotiable: defaults to semgrep if not configured)
+    # Set tool defaults
     export BRIK_SECURITY_SAST_TOOL="${BRIK_SECURITY_SAST_TOOL:-semgrep}"
-    total=$((total + 1))
-    if ! declare -f security.sast.run >/dev/null 2>&1; then
-        brik.use "security.sast"
-    fi
-    if declare -f security.sast.run >/dev/null 2>&1; then
-        log.info "running SAST scan (tool=${BRIK_SECURITY_SAST_TOOL})"
-        if security.sast.run "${BRIK_WORKSPACE}"; then
-            passed=$((passed + 1))
-            log.info "SAST scan passed"
-        else
-            failed=$((failed + 1))
-            log.warn "SAST scan failed"
-        fi
-    else
-        log.warn "SAST module not available - skipping"
-    fi
 
-    # License scan
+    # Build scans list: sast is always included
+    local scans="sast"
+
+    # License scan: only if configured
     if [[ -n "${BRIK_SECURITY_LICENSE_ALLOWED:-}" || -n "${BRIK_SECURITY_LICENSE_DENIED:-}" ]]; then
-        total=$((total + 1))
-        if ! declare -f security.license.run >/dev/null 2>&1; then
-            brik.use "security.license"
-        fi
-        if declare -f security.license.run >/dev/null 2>&1; then
-            log.info "running license scan"
-            if security.license.run "${BRIK_WORKSPACE}"; then
-                passed=$((passed + 1))
-                log.info "license scan passed"
-            else
-                failed=$((failed + 1))
-                log.warn "license scan failed"
-            fi
-        else
-            log.warn "license module not available - skipping"
-        fi
+        scans="${scans},license"
     fi
 
-    # IaC scan
+    # IaC scan: only if configured
     if [[ -n "${BRIK_SECURITY_IAC_TOOL:-}" || -n "${BRIK_SECURITY_IAC_COMMAND:-}" ]]; then
-        total=$((total + 1))
-        if ! declare -f security.iac.run >/dev/null 2>&1; then
-            brik.use "security.iac"
-        fi
-        if declare -f security.iac.run >/dev/null 2>&1; then
-            log.info "running IaC scan"
-            if security.iac.run "${BRIK_WORKSPACE}"; then
-                passed=$((passed + 1))
-                log.info "IaC scan passed"
-            else
-                failed=$((failed + 1))
-                log.warn "IaC scan failed"
-            fi
-        else
-            log.warn "IaC module not available - skipping"
-        fi
+        scans="${scans},iac"
     fi
 
-    log.info "sast summary: $passed/$total passed, $failed failed"
+    if ! declare -f security.run >/dev/null 2>&1; then
+        brik.use "security"
+    fi
 
-    if [[ "$failed" -gt 0 ]]; then
+    security.run "${BRIK_WORKSPACE}" --scans "$scans"
+    local result=$?
+
+    if [[ "$result" -eq 0 ]]; then
+        context.set "$context_file" "BRIK_SAST_STATUS" "success"
+    else
         context.set "$context_file" "BRIK_SAST_STATUS" "failed"
-        return "$BRIK_EXIT_CHECK_FAILED"
     fi
 
-    context.set "$context_file" "BRIK_SAST_STATUS" "success"
-    return 0
+    return "$result"
 }

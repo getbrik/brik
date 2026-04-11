@@ -2,6 +2,7 @@ Describe "stages.sast"
   Include "$BRIK_HOME/runtime/bash/lib/runtime/stage.sh"
   Include "$BRIK_HOME/runtime/bash/lib/core/_loader.sh"
   Include "$BRIK_HOME/runtime/bash/lib/core/config.sh"
+  Include "$BRIK_HOME/runtime/bash/lib/core/security.sh"
   Include "$BRIK_HOME/runtime/bash/lib/stages/sast.sh"
 
   setup_env() {

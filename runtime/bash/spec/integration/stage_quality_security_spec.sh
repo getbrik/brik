@@ -170,7 +170,7 @@ EOF
       After 'cleanup_container'
 
       It "runs all three scans including container"
-        When call security.run "$TEST_WS" --container-scan true --image "myapp:1.0"
+        When call security.run "$TEST_WS" --scans "deps,secret,container" --image "myapp:1.0"
         The status should be success
         The stderr should include "3/3 scans passed"
       End
