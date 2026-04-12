@@ -9,10 +9,9 @@ _BRIK_CORE_DEPLOY_SSH_LOADED=1
 
 # Deploy files via rsync over SSH.
 # Usage: deploy.ssh.run --host <host> --remote-path <path>
-#        [--manifest <source>] [--restart-cmd <cmd>] [--namespace <ns>]
-#        [--dry-run]
+#        [--manifest <source>] [--restart-cmd <cmd>] [--dry-run]
 deploy.ssh.run() {
-    local host="" remote_path="" restart_cmd="" manifest="" namespace=""
+    local host="" remote_path="" restart_cmd="" manifest=""
     local dry_run="${BRIK_DRY_RUN:-}"
 
     while [[ $# -gt 0 ]]; do
@@ -21,7 +20,6 @@ deploy.ssh.run() {
             --remote-path)  remote_path="$2";  shift 2 ;;
             --restart-cmd)  restart_cmd="$2";  shift 2 ;;
             --manifest)     manifest="$2";     shift 2 ;;
-            --namespace)    namespace="$2";    shift 2 ;;
             --dry-run)      dry_run="true";    shift ;;
             # Ignore deploy.run passthrough options
             --target|--env) shift 2 ;;
