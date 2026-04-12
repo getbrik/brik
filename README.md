@@ -397,7 +397,7 @@ Tracked automatically via [shellmetrics](https://github.com/shellspec/shellmetri
 - [x] Deploy targets: k8s, gitops, helm, compose, ssh, argocd
 - [x] Deployment strategies: rolling, blue-green, canary
 - [x] Health checks (HTTP polling, k8s rollout)
-- [x] 1867 tests (ShellSpec + ShellCheck + kcov, 92% coverage) + 13 E2E scenarios
+- [x] 1936 tests (ShellSpec + ShellCheck + kcov, 92% coverage) + 24 E2E scenarios (GitLab + Jenkins)
 
 **Next:**
 - [ ] GitHub Actions reusable workflows
