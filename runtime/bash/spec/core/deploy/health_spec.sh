@@ -69,10 +69,10 @@ Describe "deploy/health.sh"
       Before 'setup_curl_503'
       After 'cleanup_curl_503'
 
-      It "returns 1 when status does not match expected"
+      It "returns BRIK_EXIT_CHECK_FAILED when status does not match expected"
         invoke_check_503() { deploy.health.check --url "http://example.com/health" 2>/dev/null; }
         When call invoke_check_503
-        The status should equal 1
+        The status should equal 10
       End
     End
 
@@ -94,10 +94,10 @@ Describe "deploy/health.sh"
         The status should be success
       End
 
-      It "returns 1 when status does not match custom --expected-status 200"
+      It "returns BRIK_EXIT_CHECK_FAILED when status does not match custom --expected-status 200"
         invoke_check_mismatch() { deploy.health.check --url "http://example.com/health" --expected-status 200 2>/dev/null; }
         When call invoke_check_mismatch
-        The status should equal 1
+        The status should equal 10
       End
     End
   End
@@ -150,10 +150,10 @@ Describe "deploy/health.sh"
       Before 'setup_curl_503'
       After 'cleanup_curl_503'
 
-      It "returns 1 when timeout is reached without healthy response"
+      It "returns BRIK_EXIT_TIMEOUT when timeout is reached without healthy response"
         # Use very short timeout to avoid slow tests
         When call deploy.health.wait --url "http://example.com/health" --timeout 2 --interval 1
-        The status should equal 1
+        The status should equal 8
         The stderr should include "timeout"
       End
     End

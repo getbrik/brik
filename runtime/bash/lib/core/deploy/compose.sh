@@ -8,7 +8,7 @@
 _BRIK_CORE_DEPLOY_COMPOSE_LOADED=1
 
 # Deploy using Docker Compose.
-# Usage: deploy.compose.run [--namespace <project>] [--compose-file <file>]
+# Usage: deploy.compose.run [--namespace <project>] [--file <compose_file>]
 #        [--host <host>] [--remote-path <path>] [--dry-run]
 deploy.compose.run() {
     local namespace="" compose_file="" host="" remote_path=""
@@ -17,7 +17,7 @@ deploy.compose.run() {
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --namespace)    namespace="$2";    shift 2 ;;
-            --compose-file) compose_file="$2"; shift 2 ;;
+            --file)         compose_file="$2"; shift 2 ;;
             --host)         host="$2";         shift 2 ;;
             --remote-path)  remote_path="$2";  shift 2 ;;
             --dry-run)      dry_run="true";    shift ;;
@@ -34,9 +34,13 @@ deploy.compose.run() {
 
     runtime.require_tool docker || return "$BRIK_EXIT_MISSING_DEP"
 
-    # Determine compose file: --compose-file or default
+    # Determine compose file: --file or auto-detect (compose.yaml > docker-compose.yml)
     if [[ -z "$compose_file" ]]; then
-        compose_file="docker-compose.yml"
+        if [[ -f "compose.yaml" ]]; then
+            compose_file="compose.yaml"
+        else
+            compose_file="docker-compose.yml"
+        fi
     fi
 
     # Use namespace as project name

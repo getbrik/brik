@@ -69,9 +69,9 @@ Describe "deploy/helm.sh"
         The status should be success
       End
 
-      It "uses --release-name when provided"
+      It "uses --release when provided"
         invoke_release() {
-          deploy.helm.run --chart "my-app/my-chart" --release-name "my-release" 2>/dev/null || return 1
+          deploy.helm.run --chart "my-app/my-chart" --release "my-release" 2>/dev/null || return 1
           grep -q "my-release" "$MOCK_LOG"
         }
         When call invoke_release
@@ -81,7 +81,7 @@ Describe "deploy/helm.sh"
       It "derives release name from chart when not provided"
         invoke_derived() {
           deploy.helm.run --chart "my-app/my-chart" 2>/dev/null || return 1
-          # When no --release-name, it should use the chart basename (my-chart)
+          # When no --release, it should use the chart basename (my-chart)
           grep -q "my-chart" "$MOCK_LOG"
         }
         When call invoke_derived
@@ -223,7 +223,7 @@ Describe "deploy/helm.sh"
       Before 'setup_env_release'
       After 'cleanup_env_release'
 
-      It "uses BRIK_DEPLOY_{ENV}_RELEASE_NAME when --env is set and no --release-name"
+      It "uses BRIK_DEPLOY_{ENV}_RELEASE_NAME when --env is set and no --release"
         invoke_env_release() {
           deploy.helm.run --chart "my-app/my-chart" --env production 2>/dev/null || return 1
           grep -q "prod-release" "$MOCK_LOG"

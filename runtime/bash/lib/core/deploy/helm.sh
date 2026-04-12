@@ -8,7 +8,7 @@
 _BRIK_CORE_DEPLOY_HELM_LOADED=1
 
 # Deploy a Helm chart via helm upgrade --install.
-# Usage: deploy.helm.run --chart <chart> [--release-name <name>]
+# Usage: deploy.helm.run --chart <chart> [--release <name>]
 #        [--namespace <ns>] [--values <file>] [--env <env>] [--dry-run]
 deploy.helm.run() {
     local chart="" release_name="" namespace="" values="" environment=""
@@ -17,7 +17,7 @@ deploy.helm.run() {
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --chart)        chart="$2";        shift 2 ;;
-            --release-name) release_name="$2"; shift 2 ;;
+            --release)      release_name="$2"; shift 2 ;;
             --namespace)    namespace="$2";    shift 2 ;;
             --values)       values="$2";       shift 2 ;;
             --dry-run)      dry_run="true";    shift ;;

@@ -8,18 +8,18 @@
 _BRIK_CORE_DEPLOY_SSH_LOADED=1
 
 # Deploy files via rsync over SSH.
-# Usage: deploy.ssh.run --host <host> --remote-path <path>
-#        [--manifest <source>] [--restart-cmd <cmd>] [--dry-run]
+# Usage: deploy.ssh.run --host <host> --path <remote_path>
+#        [--source <local_path>] [--restart-cmd <cmd>] [--dry-run]
 deploy.ssh.run() {
-    local host="" remote_path="" restart_cmd="" manifest=""
+    local host="" remote_path="" restart_cmd="" source=""
     local dry_run="${BRIK_DRY_RUN:-}"
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --host)         host="$2";         shift 2 ;;
-            --remote-path)  remote_path="$2";  shift 2 ;;
+            --path)         remote_path="$2";  shift 2 ;;
             --restart-cmd)  restart_cmd="$2";  shift 2 ;;
-            --manifest)     manifest="$2";     shift 2 ;;
+            --source)       source="$2";       shift 2 ;;
             --dry-run)      dry_run="true";    shift ;;
             # Ignore deploy.run passthrough options
             --target|--env) shift 2 ;;
@@ -33,7 +33,7 @@ deploy.ssh.run() {
     fi
 
     if [[ -z "$remote_path" ]]; then
-        log.error "remote-path is required (--remote-path)"
+        log.error "path is required (--path)"
         return "$BRIK_EXIT_INVALID_INPUT"
     fi
 
@@ -42,13 +42,13 @@ deploy.ssh.run() {
 
     local -a ssh_opts=(-o BatchMode=yes -o StrictHostKeyChecking=yes)
 
-    # Determine source files: --manifest or current directory
-    local source="${manifest:-.}"
+    # Determine source files: --source or current directory
+    local src="${source:-.}"
 
     # Build rsync command
     local -a rsync_cmd=(rsync -avz --delete -e "ssh ${ssh_opts[*]}")
     [[ "$dry_run" == "true" ]] && rsync_cmd+=(--dry-run)
-    rsync_cmd+=("${source}/" "${host}:${remote_path}/")
+    rsync_cmd+=("${src}/" "${host}:${remote_path}/")
 
     if [[ "$dry_run" == "true" ]]; then
         log.info "[dry-run] ${rsync_cmd[*]}"

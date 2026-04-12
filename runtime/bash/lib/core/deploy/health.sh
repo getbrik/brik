@@ -13,7 +13,7 @@
 _BRIK_CORE_DEPLOY_HEALTH_LOADED=1
 
 # Perform a single HTTP health check.
-# Returns 0 if the HTTP status code matches the expected code, 1 otherwise.
+# Returns 0 if the HTTP status code matches the expected code, BRIK_EXIT_CHECK_FAILED otherwise.
 #
 # Usage: deploy.health.check --url <url> [--expected-status <code>]
 deploy.health.check() {
@@ -60,17 +60,17 @@ deploy.health.check() {
         return 0
     else
         log.warn "health check failed: ${url} returned ${actual_status} (expected ${expected_status})"
-        return 1
+        return "$BRIK_EXIT_CHECK_FAILED"
     fi
 }
 
 # Poll a URL repeatedly until the expected HTTP status is returned or timeout is reached.
-# Returns 0 if healthy before timeout, 1 if timeout reached.
+# Returns 0 if healthy before timeout, BRIK_EXIT_TIMEOUT if timeout reached.
 #
 # Usage: deploy.health.wait --url <url> [--timeout <seconds>] [--interval <seconds>]
 #        [--expected-status <code>] [--dry-run]
 deploy.health.wait() {
-    local url="" timeout="120" interval="5" expected_status="200"
+    local url="" timeout="300" interval="10" expected_status="200"
     local dry_run="${BRIK_DRY_RUN:-}"
 
     while [[ $# -gt 0 ]]; do
@@ -135,7 +135,7 @@ deploy.health.wait() {
     done
 
     log.error "health check timeout after ${timeout}s: ${url} did not return ${expected_status}"
-    return 1
+    return "$BRIK_EXIT_TIMEOUT"
 }
 
 # Wait for a Kubernetes deployment rollout to complete.

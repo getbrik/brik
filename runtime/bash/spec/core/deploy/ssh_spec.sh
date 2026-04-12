@@ -12,15 +12,15 @@ Describe "deploy/ssh.sh"
     End
 
     It "returns 2 when --host is missing"
-      When call deploy.ssh.run --remote-path /srv/myapp
+      When call deploy.ssh.run --path /srv/myapp
       The status should equal 2
       The stderr should include "host is required"
     End
 
-    It "returns 2 when --remote-path is missing"
+    It "returns 2 when --path is missing"
       When call deploy.ssh.run --host deploy.example.com
       The status should equal 2
-      The stderr should include "remote-path is required"
+      The stderr should include "path is required"
     End
 
     Describe "require_tool rsync failure"
@@ -35,7 +35,7 @@ Describe "deploy/ssh.sh"
       After 'cleanup_no_rsync'
 
       It "returns 3 when rsync is not on PATH"
-        When call deploy.ssh.run --host deploy.example.com --remote-path /srv/myapp
+        When call deploy.ssh.run --host deploy.example.com --path /srv/myapp
         The status should equal 3
         The stderr should include "required tool not found"
       End
@@ -54,7 +54,7 @@ Describe "deploy/ssh.sh"
       After 'cleanup_no_ssh'
 
       It "returns 3 when ssh is not on PATH"
-        When call deploy.ssh.run --host deploy.example.com --remote-path /srv/myapp
+        When call deploy.ssh.run --host deploy.example.com --path /srv/myapp
         The status should equal 3
         The stderr should include "required tool not found"
       End
@@ -79,7 +79,7 @@ Describe "deploy/ssh.sh"
 
       It "runs rsync with -avz --delete flags"
         invoke_rsync_flags() {
-          deploy.ssh.run --host deploy.example.com --remote-path /srv/myapp 2>/dev/null || return 1
+          deploy.ssh.run --host deploy.example.com --path /srv/myapp 2>/dev/null || return 1
           grep -q "\-avz" "$MOCK_LOG" && grep -q "\-\-delete" "$MOCK_LOG"
         }
         When call invoke_rsync_flags
@@ -88,26 +88,26 @@ Describe "deploy/ssh.sh"
 
       It "passes host:remote-path as rsync destination"
         invoke_rsync_dest() {
-          deploy.ssh.run --host deploy.example.com --remote-path /srv/myapp 2>/dev/null || return 1
+          deploy.ssh.run --host deploy.example.com --path /srv/myapp 2>/dev/null || return 1
           grep -q "deploy.example.com:/srv/myapp" "$MOCK_LOG"
         }
         When call invoke_rsync_dest
         The status should be success
       End
 
-      It "uses --manifest as rsync source when provided"
+      It "uses --source as rsync source directory when provided"
         invoke_manifest_src() {
-          deploy.ssh.run --host deploy.example.com --remote-path /srv/myapp \
-            --manifest "${TEST_WS}" 2>/dev/null || return 1
+          deploy.ssh.run --host deploy.example.com --path /srv/myapp \
+            --source "${TEST_WS}" 2>/dev/null || return 1
           grep -q "${TEST_WS}" "$MOCK_LOG"
         }
         When call invoke_manifest_src
         The status should be success
       End
 
-      It "defaults to '.' as rsync source when no --manifest"
+      It "defaults to '.' as rsync source when --source not provided"
         invoke_default_src() {
-          deploy.ssh.run --host deploy.example.com --remote-path /srv/myapp 2>/dev/null || return 1
+          deploy.ssh.run --host deploy.example.com --path /srv/myapp 2>/dev/null || return 1
           grep -qE "rsync.*\.\s" "$MOCK_LOG" || grep -qE "rsync.* \.$" "$MOCK_LOG" || grep -q "rsync -avz --delete ." "$MOCK_LOG"
         }
         When call invoke_default_src
@@ -116,7 +116,7 @@ Describe "deploy/ssh.sh"
 
       It "executes --restart-cmd via ssh after rsync"
         invoke_restart() {
-          deploy.ssh.run --host deploy.example.com --remote-path /srv/myapp \
+          deploy.ssh.run --host deploy.example.com --path /srv/myapp \
             --restart-cmd "systemctl restart myapp" 2>/dev/null || return 1
           grep -q "^ssh" "$MOCK_LOG"
         }
@@ -126,7 +126,7 @@ Describe "deploy/ssh.sh"
 
       It "passes restart-cmd to ssh"
         invoke_restart_cmd() {
-          deploy.ssh.run --host deploy.example.com --remote-path /srv/myapp \
+          deploy.ssh.run --host deploy.example.com --path /srv/myapp \
             --restart-cmd "systemctl restart myapp" 2>/dev/null || return 1
           grep -q "systemctl restart myapp" "$MOCK_LOG"
         }
@@ -136,7 +136,7 @@ Describe "deploy/ssh.sh"
 
       It "skips ssh when no --restart-cmd"
         invoke_no_restart() {
-          deploy.ssh.run --host deploy.example.com --remote-path /srv/myapp 2>/dev/null || return 1
+          deploy.ssh.run --host deploy.example.com --path /srv/myapp 2>/dev/null || return 1
           # ssh should not be in log if no restart-cmd
           ! grep -q "^ssh" "$MOCK_LOG"
         }
@@ -145,14 +145,14 @@ Describe "deploy/ssh.sh"
       End
 
       It "succeeds and reports deployment completed"
-        When call deploy.ssh.run --host deploy.example.com --remote-path /srv/myapp
+        When call deploy.ssh.run --host deploy.example.com --path /srv/myapp
         The status should be success
         The stderr should include "ssh deployment completed"
       End
 
       It "dry-run mode: uses rsync --dry-run flag"
         invoke_dryrun_rsync() {
-          deploy.ssh.run --host deploy.example.com --remote-path /srv/myapp \
+          deploy.ssh.run --host deploy.example.com --path /srv/myapp \
             --dry-run 2>/dev/null || return 1
           grep -q "\-\-dry-run" "$MOCK_LOG"
         }
@@ -162,7 +162,7 @@ Describe "deploy/ssh.sh"
 
       It "dry-run mode: logs ssh command without executing it"
         invoke_dryrun_ssh_log() {
-          deploy.ssh.run --host deploy.example.com --remote-path /srv/myapp \
+          deploy.ssh.run --host deploy.example.com --path /srv/myapp \
             --restart-cmd "systemctl restart myapp" \
             --dry-run 2>&1 | grep -q "\[dry-run\]"
         }
@@ -173,7 +173,7 @@ Describe "deploy/ssh.sh"
       It "dry-run mode: does not execute ssh restart"
         invoke_dryrun_nossh() {
           local log="${TEST_WS}/mock_cmds.log"
-          deploy.ssh.run --host deploy.example.com --remote-path /srv/myapp \
+          deploy.ssh.run --host deploy.example.com --path /srv/myapp \
             --restart-cmd "systemctl restart myapp" \
             --dry-run 2>/dev/null
           [[ ! -f "$log" ]] || ! grep -q "^ssh" "$log"
@@ -200,7 +200,7 @@ Describe "deploy/ssh.sh"
       After 'cleanup_fail_rsync'
 
       It "returns 5 when rsync fails"
-        When call deploy.ssh.run --host deploy.example.com --remote-path /srv/myapp
+        When call deploy.ssh.run --host deploy.example.com --path /srv/myapp
         The status should equal 5
         The stderr should include "rsync failed"
       End
@@ -226,7 +226,7 @@ Describe "deploy/ssh.sh"
 
       It "respects BRIK_DRY_RUN env var and uses rsync --dry-run"
         invoke_env_dryrun() {
-          deploy.ssh.run --host deploy.example.com --remote-path /srv/myapp 2>/dev/null || return 1
+          deploy.ssh.run --host deploy.example.com --path /srv/myapp 2>/dev/null || return 1
           grep -q "\-\-dry-run" "$MOCK_LOG"
         }
         When call invoke_env_dryrun

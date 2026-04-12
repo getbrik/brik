@@ -46,7 +46,7 @@ Describe "deploy/compose.sh"
       Before 'setup_docker'
       After 'cleanup_docker'
 
-      It "uses default docker-compose.yml when no --compose-file"
+      It "uses default docker-compose.yml when --file not provided"
         invoke_default_file() {
           cd "$TEST_WS" || return 1
           deploy.compose.run --namespace myapp 2>/dev/null || return 1
@@ -56,10 +56,10 @@ Describe "deploy/compose.sh"
         The status should be success
       End
 
-      It "uses custom --compose-file when provided"
+      It "uses custom compose file when --file provided"
         invoke_custom_file() {
           deploy.compose.run --namespace myapp \
-            --compose-file "${TEST_WS}/docker-compose.yml" 2>/dev/null || return 1
+            --file "${TEST_WS}/docker-compose.yml" 2>/dev/null || return 1
           grep -q "docker-compose.yml" "$MOCK_LOG"
         }
         When call invoke_custom_file
@@ -69,7 +69,7 @@ Describe "deploy/compose.sh"
       It "runs docker compose up -d for local deploy"
         invoke_local() {
           deploy.compose.run --namespace myapp \
-            --compose-file "${TEST_WS}/docker-compose.yml" 2>/dev/null || return 1
+            --file "${TEST_WS}/docker-compose.yml" 2>/dev/null || return 1
           grep -q "up -d" "$MOCK_LOG"
         }
         When call invoke_local
@@ -79,7 +79,7 @@ Describe "deploy/compose.sh"
       It "uses --namespace as project name"
         invoke_project() {
           deploy.compose.run --namespace my-project \
-            --compose-file "${TEST_WS}/docker-compose.yml" 2>/dev/null || return 1
+            --file "${TEST_WS}/docker-compose.yml" 2>/dev/null || return 1
           grep -q "my-project" "$MOCK_LOG"
         }
         When call invoke_project
@@ -89,7 +89,7 @@ Describe "deploy/compose.sh"
       It "passes -p flag with project name"
         invoke_flag_p() {
           deploy.compose.run --namespace my-project \
-            --compose-file "${TEST_WS}/docker-compose.yml" 2>/dev/null || return 1
+            --file "${TEST_WS}/docker-compose.yml" 2>/dev/null || return 1
           grep -q "\-p my-project" "$MOCK_LOG"
         }
         When call invoke_flag_p
@@ -98,7 +98,7 @@ Describe "deploy/compose.sh"
 
       It "succeeds and reports deployment completed"
         When call deploy.compose.run --namespace myapp \
-          --compose-file "${TEST_WS}/docker-compose.yml"
+          --file "${TEST_WS}/docker-compose.yml"
         The status should be success
         The stderr should include "compose deployment completed"
       End
@@ -106,7 +106,7 @@ Describe "deploy/compose.sh"
       It "dry-run mode: logs without executing"
         invoke_dryrun() {
           deploy.compose.run --namespace myapp \
-            --compose-file "${TEST_WS}/docker-compose.yml" \
+            --file "${TEST_WS}/docker-compose.yml" \
             --dry-run 2>&1 | grep -q "\[dry-run\]"
         }
         When call invoke_dryrun
@@ -117,7 +117,7 @@ Describe "deploy/compose.sh"
         invoke_dryrun_noexec() {
           local log="${TEST_WS}/mock_docker.log"
           deploy.compose.run --namespace myapp \
-            --compose-file "${TEST_WS}/docker-compose.yml" \
+            --file "${TEST_WS}/docker-compose.yml" \
             --dry-run 2>/dev/null
           # docker should not have been called with up in dry-run
           [[ ! -f "$log" ]] || ! grep -q "up" "$log"
@@ -149,7 +149,7 @@ Describe "deploy/compose.sh"
       It "uses scp to copy compose file to remote host"
         invoke_scp() {
           deploy.compose.run --namespace myapp \
-            --compose-file "${TEST_WS}/docker-compose.yml" \
+            --file "${TEST_WS}/docker-compose.yml" \
             --host deploy.example.com \
             --remote-path /srv/myapp 2>/dev/null || return 1
           grep -q "^scp" "$MOCK_LOG"
@@ -161,7 +161,7 @@ Describe "deploy/compose.sh"
       It "uses --remote-path for scp destination"
         invoke_remote_path() {
           deploy.compose.run --namespace myapp \
-            --compose-file "${TEST_WS}/docker-compose.yml" \
+            --file "${TEST_WS}/docker-compose.yml" \
             --host deploy.example.com \
             --remote-path /srv/myapp 2>/dev/null || return 1
           grep -q "/srv/myapp" "$MOCK_LOG"
@@ -173,7 +173,7 @@ Describe "deploy/compose.sh"
       It "uses ssh to run docker compose on remote host"
         invoke_ssh() {
           deploy.compose.run --namespace myapp \
-            --compose-file "${TEST_WS}/docker-compose.yml" \
+            --file "${TEST_WS}/docker-compose.yml" \
             --host deploy.example.com \
             --remote-path /srv/myapp 2>/dev/null || return 1
           grep -q "^ssh" "$MOCK_LOG"
@@ -185,7 +185,7 @@ Describe "deploy/compose.sh"
       It "passes host to ssh command"
         invoke_ssh_host() {
           deploy.compose.run --namespace myapp \
-            --compose-file "${TEST_WS}/docker-compose.yml" \
+            --file "${TEST_WS}/docker-compose.yml" \
             --host deploy.example.com \
             --remote-path /srv/myapp 2>/dev/null || return 1
           grep -q "deploy.example.com" "$MOCK_LOG"
@@ -197,7 +197,7 @@ Describe "deploy/compose.sh"
       It "dry-run with host: logs without executing scp and ssh"
         invoke_remote_dryrun() {
           deploy.compose.run --namespace myapp \
-            --compose-file "${TEST_WS}/docker-compose.yml" \
+            --file "${TEST_WS}/docker-compose.yml" \
             --host deploy.example.com \
             --remote-path /srv/myapp \
             --dry-run 2>&1 | grep -q "\[dry-run\]"
@@ -210,7 +210,7 @@ Describe "deploy/compose.sh"
         invoke_remote_dryrun_noscp() {
           local log="${TEST_WS}/mock_cmds.log"
           deploy.compose.run --namespace myapp \
-            --compose-file "${TEST_WS}/docker-compose.yml" \
+            --file "${TEST_WS}/docker-compose.yml" \
             --host deploy.example.com \
             --remote-path /srv/myapp \
             --dry-run 2>/dev/null
@@ -243,7 +243,7 @@ Describe "deploy/compose.sh"
         invoke_env_dryrun() {
           local log="${TEST_WS}/mock_docker.log"
           deploy.compose.run --namespace myapp \
-            --compose-file "${TEST_WS}/docker-compose.yml" 2>/dev/null
+            --file "${TEST_WS}/docker-compose.yml" 2>/dev/null
           [[ ! -f "$log" ]] || ! grep -q "up" "$log"
         }
         When call invoke_env_dryrun
