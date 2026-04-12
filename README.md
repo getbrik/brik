@@ -142,7 +142,7 @@ Lint/SAST/Scan to succeed (or be skipped).
 | Test | Test suite | Runs in parallel with Lint/SAST/Scan |
 | Package | Artifacts | Docker image build + artifact publishing (npm, maven, pypi, cargo, nuget) |
 | Container Scan | Image security | Scan built container images for vulnerabilities |
-| Deploy | Deployment | Multi-environment, condition-based (branch/tag) |
+| Deploy | Deployment | Multi-environment with Git workflow profiles, condition-based (branch/tag) |
 | Notify | Notifications | Pipeline summary (always runs on CI; opt-in locally via `--with-deploy`) |
 
 The pipeline is fully deterministic -- no manual triggers. Release runs unconditionally
@@ -164,6 +164,42 @@ via `brik.yml`.
 | **rust** | `Cargo.toml` | cargo build | cargo | clippy |
 
 Stack is auto-detected from project files when not specified in `brik.yml`.
+
+## Deploy
+
+Brik supports multi-environment deployment driven by Git workflow conventions.
+Choose a workflow profile and Brik provides sensible per-environment defaults
+(branch/tag conditions, target, namespace). Your `brik.yml` overrides any default.
+
+| Workflow | Environments | Trigger |
+|----------|--------------|---------|
+| **trunk-based** | staging, production | `main` branch, `v*` tags |
+| **git-flow** | dev, staging, production | `develop`, `release/*`, `v*` tags |
+| **github-flow** | preview, production | `feature/*`, `main` branch |
+
+Deploy targets:
+
+| Target | Description |
+|--------|-------------|
+| **k8s** | `kubectl apply` with optional kustomize |
+| **gitops** | Clone config repo, update image tag, push (ArgoCD/FluxCD) |
+| **helm** | `helm upgrade --install` with values and namespace |
+| **compose** | `docker compose up` locally or via SSH |
+| **ssh** | rsync + restart command over SSH |
+| **argocd** | Direct ArgoCD sync, wait, rollback, diff, status |
+
+Deployment strategies: **rolling** (default), **blue-green** (service selector switch), **canary** (replica scaling).
+
+Post-deploy health checks: HTTP polling with configurable timeout/interval, Kubernetes rollout status.
+
+Conditions support `==`, `!=`, `=~` operators and compound `AND`/`OR` expressions:
+
+```yaml
+deploy:
+  environments:
+    production:
+      condition: "tag =~ 'v*' AND branch == 'main'"
+```
 
 ## Configuration (`brik.yml`)
 
@@ -200,6 +236,17 @@ security:
   deps:
     severity: high
   secrets: {}
+
+deploy:
+  workflow: trunk-based   # or git-flow, github-flow
+  environments:
+    staging:
+      target: k8s
+      namespace: staging
+    production:
+      target: helm
+      chart: ./charts/my-app
+      namespace: production
 ```
 
 - JSON Schema: [`schemas/config/v1/brik.schema.json`](schemas/config/v1/brik.schema.json)
@@ -346,11 +393,14 @@ Tracked automatically via [shellmetrics](https://github.com/shellspec/shellmetri
 - [x] CLI (validate, doctor, init, run stage, run pipeline, self-update, self-uninstall, version)
 - [x] Local pipeline execution (`brik run pipeline`)
 - [x] Official Docker images (`ghcr.io/getbrik/brik-runner-*`)
-- [x] 1600 tests (ShellSpec + ShellCheck + kcov) + 13 E2E scenarios
+- [x] Multi-environment deploy with Git workflow profiles (trunk-based, git-flow, github-flow)
+- [x] Deploy targets: k8s, gitops, helm, compose, ssh, argocd
+- [x] Deployment strategies: rolling, blue-green, canary
+- [x] Health checks (HTTP polling, k8s rollout)
+- [x] 1867 tests (ShellSpec + ShellCheck + kcov, 92% coverage) + 13 E2E scenarios
 
 **Next:**
 - [ ] GitHub Actions reusable workflows
-- [ ] Multi-environment deploy (Git Flow, trunk-based, GitHub Flow profiles)
 
 ## Related
 
