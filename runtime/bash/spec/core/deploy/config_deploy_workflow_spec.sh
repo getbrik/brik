@@ -284,4 +284,128 @@ YAML
       The output should equal "docker-compose.prod.yml"
     End
   End
+
+  # =========================================================================
+  # config.export_deploy_vars - workflow-only (profile provides environments)
+  # =========================================================================
+  Describe "config.export_deploy_vars - workflow-only produces environments from profile"
+    setup_workflow_only_export() {
+      TEMP_CONFIG="$(mktemp)"
+      cat > "$TEMP_CONFIG" <<'YAML'
+version: 1
+project:
+  name: test
+  stack: node
+deploy:
+  workflow: trunk-based
+YAML
+      export BRIK_CONFIG_FILE="$TEMP_CONFIG"
+    }
+    cleanup_workflow_only_export() {
+      rm -f "$TEMP_CONFIG"
+      unset BRIK_DEPLOY_WORKFLOW BRIK_DEPLOY_ENVIRONMENTS \
+            BRIK_DEPLOY_STAGING_TARGET BRIK_DEPLOY_STAGING_NAMESPACE \
+            BRIK_DEPLOY_STAGING_WHEN \
+            BRIK_DEPLOY_PRODUCTION_TARGET BRIK_DEPLOY_PRODUCTION_NAMESPACE \
+            BRIK_DEPLOY_PRODUCTION_WHEN 2>/dev/null || true
+    }
+    Before 'setup_workflow_only_export'
+    After 'cleanup_workflow_only_export'
+
+    It "exports BRIK_DEPLOY_ENVIRONMENTS with staging and production"
+      export_and_check() {
+        config.export_deploy_vars 2>/dev/null
+        printf '%s' "${BRIK_DEPLOY_ENVIRONMENTS:-}"
+      }
+      When call export_and_check
+      The output should include "staging"
+      The output should include "production"
+    End
+
+    It "exports BRIK_DEPLOY_STAGING_TARGET from profile defaults"
+      export_and_check() {
+        config.export_deploy_vars 2>/dev/null
+        printf '%s' "${BRIK_DEPLOY_STAGING_TARGET:-}"
+      }
+      When call export_and_check
+      The output should equal "k8s"
+    End
+
+    It "exports BRIK_DEPLOY_STAGING_NAMESPACE from profile defaults"
+      export_and_check() {
+        config.export_deploy_vars 2>/dev/null
+        printf '%s' "${BRIK_DEPLOY_STAGING_NAMESPACE:-}"
+      }
+      When call export_and_check
+      The output should equal "staging"
+    End
+
+    It "exports BRIK_DEPLOY_PRODUCTION_NAMESPACE from profile defaults"
+      export_and_check() {
+        config.export_deploy_vars 2>/dev/null
+        printf '%s' "${BRIK_DEPLOY_PRODUCTION_NAMESPACE:-}"
+      }
+      When call export_and_check
+      The output should equal "production"
+    End
+  End
+
+  # =========================================================================
+  # config.export_deploy_vars - workflow with user override (deep merge)
+  # =========================================================================
+  Describe "config.export_deploy_vars - user override takes precedence over profile"
+    setup_override_export() {
+      TEMP_CONFIG="$(mktemp)"
+      cat > "$TEMP_CONFIG" <<'YAML'
+version: 1
+project:
+  name: test
+  stack: node
+deploy:
+  workflow: trunk-based
+  environments:
+    staging:
+      target: helm
+      namespace: my-staging
+YAML
+      export BRIK_CONFIG_FILE="$TEMP_CONFIG"
+    }
+    cleanup_override_export() {
+      rm -f "$TEMP_CONFIG"
+      unset BRIK_DEPLOY_WORKFLOW BRIK_DEPLOY_ENVIRONMENTS \
+            BRIK_DEPLOY_STAGING_TARGET BRIK_DEPLOY_STAGING_NAMESPACE \
+            BRIK_DEPLOY_STAGING_WHEN \
+            BRIK_DEPLOY_PRODUCTION_TARGET BRIK_DEPLOY_PRODUCTION_NAMESPACE \
+            BRIK_DEPLOY_PRODUCTION_WHEN 2>/dev/null || true
+    }
+    Before 'setup_override_export'
+    After 'cleanup_override_export'
+
+    It "user target overrides profile default"
+      export_and_check() {
+        config.export_deploy_vars 2>/dev/null
+        printf '%s' "${BRIK_DEPLOY_STAGING_TARGET:-}"
+      }
+      When call export_and_check
+      The output should equal "helm"
+    End
+
+    It "user namespace overrides profile default"
+      export_and_check() {
+        config.export_deploy_vars 2>/dev/null
+        printf '%s' "${BRIK_DEPLOY_STAGING_NAMESPACE:-}"
+      }
+      When call export_and_check
+      The output should equal "my-staging"
+    End
+
+    It "production still gets profile defaults (user did not override)"
+      export_and_check() {
+        config.export_deploy_vars 2>/dev/null
+        printf '%s' "${BRIK_DEPLOY_PRODUCTION_TARGET:-}"
+      }
+      When call export_and_check
+      The output should equal "k8s"
+    End
+  End
 End
