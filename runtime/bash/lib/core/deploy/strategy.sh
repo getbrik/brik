@@ -1,27 +1,195 @@
 #!/usr/bin/env bash
 # @module deploy.strategy
-# @requires kubectl
-# @description Deployment strategy implementations for Brik pipelines.
+# @description Deployment strategy orchestrator with functional composition.
 #
-# Provides basic kubectl-based deployment strategies:
-#   - rolling: default strategy via kubectl rollout status
-#   - blue_green: traffic switch by patching service selector
-#   - canary: gradual rollout by scaling canary deployment replicas
+# deploy.strategy.run dispatches deployment by strategy type (rolling,
+# blue-green, canary), calling user-provided --deploy-fn and --rollback-fn.
 #
-# Note: These are simplified implementations. Real blue-green/canary
-# typically use service meshes (Istio) or specialized controllers.
+# Internal kubectl-based helpers are kept as fallback implementations:
+#   _deploy.strategy._rolling_kubectl  (delegates to deploy.health.k8s_wait)
+#   _deploy.strategy._blue_green_kubectl
+#   _deploy.strategy._canary_kubectl
 
 # Guard against double-sourcing
 [[ -n "${_BRIK_CORE_DEPLOY_STRATEGY_LOADED:-}" ]] && return 0
 _BRIK_CORE_DEPLOY_STRATEGY_LOADED=1
 
-# Monitor a rolling update via kubectl rollout status.
-# The rolling strategy itself is handled by the orchestrator (k8s/helm natively).
-# This function waits for the rollout to complete.
+# ---------------------------------------------------------------------------
+# deploy.strategy.run - Strategy orchestrator
+# ---------------------------------------------------------------------------
+
+# Execute a deployment using the specified strategy.
+# --deploy-fn and --rollback-fn are strings split on spaces into arrays.
+# The first word must be a declared Bash function (validated via declare -f).
 #
-# Usage: deploy.strategy.rolling --deployment <name> [--namespace <ns>]
-#        [--timeout <seconds>] [--dry-run]
-deploy.strategy.rolling() {
+# Usage: deploy.strategy.run --type <rolling|blue-green|canary>
+#        --deploy-fn <function+args> [--rollback-fn <function+args>] [--dry-run]
+#
+# Returns: 0=success, 1=deploy failed + rollback failed, 2=invalid input,
+#          5=deploy failed + rollback succeeded
+deploy.strategy.run() {
+    local strategy_type="" deploy_fn_str="" rollback_fn_str=""
+    local dry_run="${BRIK_DRY_RUN:-}"
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --type)        strategy_type="$2";  shift 2 ;;
+            --deploy-fn)   deploy_fn_str="$2";  shift 2 ;;
+            --rollback-fn) rollback_fn_str="$2"; shift 2 ;;
+            --dry-run)     dry_run="true";       shift ;;
+            --target|--env) shift 2 ;;
+            *) log.error "unknown option: $1"; return "$BRIK_EXIT_INVALID_INPUT" ;;
+        esac
+    done
+
+    if [[ -z "$strategy_type" ]]; then
+        log.error "type is required (--type)"
+        return "$BRIK_EXIT_INVALID_INPUT"
+    fi
+
+    case "$strategy_type" in
+        rolling|blue-green|canary) ;;
+        *) log.error "unknown strategy type: $strategy_type (expected: rolling, blue-green, canary)"
+           return "$BRIK_EXIT_INVALID_INPUT" ;;
+    esac
+
+    if [[ -z "$deploy_fn_str" ]]; then
+        log.error "deploy-fn is required (--deploy-fn)"
+        return "$BRIK_EXIT_INVALID_INPUT"
+    fi
+
+    # Parse deploy-fn string into array
+    local -a deploy_cmd
+    read -ra deploy_cmd <<< "$deploy_fn_str"
+    local deploy_fn_name="${deploy_cmd[0]}"
+    # shellcheck disable=SC2034
+    local -a deploy_args=("${deploy_cmd[@]:1}")
+
+    if ! declare -f "$deploy_fn_name" >/dev/null 2>&1; then
+        log.error "deploy-fn is not a declared function: $deploy_fn_name"
+        return "$BRIK_EXIT_INVALID_INPUT"
+    fi
+
+    # Parse rollback-fn if provided
+    local -a rollback_cmd=()
+    local rollback_fn_name=""
+    local -a rollback_args=()
+    if [[ -n "$rollback_fn_str" ]]; then
+        read -ra rollback_cmd <<< "$rollback_fn_str"
+        rollback_fn_name="${rollback_cmd[0]}"
+        # shellcheck disable=SC2034
+        rollback_args=("${rollback_cmd[@]:1}")
+        if ! declare -f "$rollback_fn_name" >/dev/null 2>&1; then
+            log.error "rollback-fn is not a declared function: $rollback_fn_name"
+            return "$BRIK_EXIT_INVALID_INPUT"
+        fi
+    fi
+
+    local -a common_args=()
+    [[ "$dry_run" == "true" ]] && common_args+=(--dry-run)
+
+    if [[ "$dry_run" == "true" ]]; then
+        log.info "[dry-run] strategy=${strategy_type} deploy-fn=${deploy_fn_str}"
+        if [[ -n "$rollback_fn_str" ]]; then
+            log.info "[dry-run] rollback-fn=${rollback_fn_str}"
+        fi
+    fi
+
+    log.info "deploying with strategy: ${strategy_type}"
+
+    case "$strategy_type" in
+        rolling)
+            _deploy.strategy._exec_rolling \
+                deploy_fn_name deploy_args rollback_fn_name rollback_args common_args
+            ;;
+        blue-green)
+            _deploy.strategy._exec_blue_green \
+                deploy_fn_name deploy_args rollback_fn_name rollback_args common_args
+            ;;
+        canary)
+            _deploy.strategy._exec_canary \
+                deploy_fn_name deploy_args rollback_fn_name rollback_args common_args
+            ;;
+    esac
+}
+
+# ---------------------------------------------------------------------------
+# Strategy execution helpers
+# ---------------------------------------------------------------------------
+
+# Rolling: deploy, if fail -> rollback
+_deploy.strategy._exec_rolling() {
+    local -n _dfn=$1 _dargs=$2 _rfn=$3 _rargs=$4 _cargs=$5
+
+    "$_dfn" "${_dargs[@]}" "${_cargs[@]}" || {
+        log.error "deploy failed (strategy: rolling)"
+        _deploy.strategy._try_rollback "$_rfn" _rargs _cargs
+        return $?
+    }
+
+    log.info "rolling deployment completed successfully"
+    return 0
+}
+
+# Blue-green: deploy to inactive env, then switch traffic
+# In a simplified model, deploy-fn deploys to the inactive side,
+# and success means we can consider it switched.
+_deploy.strategy._exec_blue_green() {
+    local -n _dfn=$1 _dargs=$2 _rfn=$3 _rargs=$4 _cargs=$5
+
+    "$_dfn" "${_dargs[@]}" "${_cargs[@]}" || {
+        log.error "deploy failed (strategy: blue-green)"
+        _deploy.strategy._try_rollback "$_rfn" _rargs _cargs
+        return $?
+    }
+
+    log.info "blue-green deployment completed successfully"
+    return 0
+}
+
+# Canary: deploy-fn runs the canary, success means promote.
+# Simplified: same as rolling for now (canary logic depends on mesh/controller).
+_deploy.strategy._exec_canary() {
+    local -n _dfn=$1 _dargs=$2 _rfn=$3 _rargs=$4 _cargs=$5
+
+    "$_dfn" "${_dargs[@]}" "${_cargs[@]}" || {
+        log.error "deploy failed (strategy: canary)"
+        _deploy.strategy._try_rollback "$_rfn" _rargs _cargs
+        return $?
+    }
+
+    log.info "canary deployment completed successfully"
+    return 0
+}
+
+# Try rollback; return 5 if rollback succeeds, 1 if rollback also fails
+_deploy.strategy._try_rollback() {
+    local rfn="$1"
+    local -n _rb_args=$2 _rb_cargs=$3
+
+    if [[ -z "$rfn" ]]; then
+        log.warn "no rollback-fn provided, cannot rollback"
+        return "$BRIK_EXIT_FAILURE"
+    fi
+
+    log.info "attempting rollback via: ${rfn}"
+    "$rfn" "${_rb_args[@]}" "${_rb_cargs[@]}" || {
+        log.error "rollback also failed"
+        return "$BRIK_EXIT_FAILURE"
+    }
+
+    log.info "rollback succeeded"
+    return "$BRIK_EXIT_EXTERNAL_FAIL"
+}
+
+# ---------------------------------------------------------------------------
+# Internal kubectl helpers (kept as concrete implementations)
+# ---------------------------------------------------------------------------
+
+# Rolling kubectl helper - delegates to deploy.health.k8s_wait.
+# Usage: _deploy.strategy._rolling_kubectl --deployment <name>
+#        [--namespace <ns>] [--timeout <s>] [--dry-run]
+_deploy.strategy._rolling_kubectl() {
     local deployment="" namespace="" timeout="300"
     local dry_run="${BRIK_DRY_RUN:-}"
 
@@ -46,6 +214,16 @@ deploy.strategy.rolling() {
         return "$BRIK_EXIT_INVALID_INPUT"
     fi
 
+    # Delegate to deploy.health.k8s_wait if namespace provided
+    if [[ -n "$namespace" ]]; then
+        brik.use deploy.health
+        local -a k8s_args=(--namespace "$namespace" --deployment "$deployment" --timeout "$timeout")
+        [[ "$dry_run" == "true" ]] && k8s_args+=(--dry-run)
+        deploy.health.k8s_wait "${k8s_args[@]}"
+        return $?
+    fi
+
+    # Fallback: direct kubectl (no namespace)
     runtime.require_tool kubectl || return "$BRIK_EXIT_MISSING_DEP"
 
     if [[ "$dry_run" == "true" ]]; then
@@ -54,7 +232,6 @@ deploy.strategy.rolling() {
     fi
 
     local -a cmd=(kubectl rollout status "deployment/${deployment}" "--timeout=${timeout}s")
-    [[ -n "$namespace" ]] && cmd+=(-n "$namespace")
 
     log.info "monitoring rolling update for deployment/${deployment}"
     "${cmd[@]}" || {
@@ -66,12 +243,10 @@ deploy.strategy.rolling() {
     return 0
 }
 
-# Switch traffic between blue and green deployments by patching the service selector.
-# Verifies the new deployment is present, then patches the service to point to it.
-#
-# Usage: deploy.strategy.blue_green --service <svc> --target-selector <label=value>
-#        [--namespace <ns>] [--dry-run]
-deploy.strategy.blue_green() {
+# Blue-green kubectl helper.
+# Usage: _deploy.strategy._blue_green_kubectl --service <svc>
+#        --target-selector <label=value> [--namespace <ns>] [--dry-run]
+_deploy.strategy._blue_green_kubectl() {
     local service="" target_selector="" namespace=""
     local dry_run="${BRIK_DRY_RUN:-}"
 
@@ -98,7 +273,6 @@ deploy.strategy.blue_green() {
 
     runtime.require_tool kubectl || return "$BRIK_EXIT_MISSING_DEP"
 
-    # Parse selector key=value
     local selector_key="${target_selector%%=*}"
     local selector_val="${target_selector#*=}"
 
@@ -132,13 +306,10 @@ deploy.strategy.blue_green() {
     return 0
 }
 
-# Gradual traffic shift via canary deployment replica scaling.
-# Scales the canary deployment to the specified number of replicas.
-# Simplified: uses kubectl scale to set canary replicas.
-#
-# Usage: deploy.strategy.canary --service <svc> --deployment <canary-name>
+# Canary kubectl helper.
+# Usage: _deploy.strategy._canary_kubectl --service <svc> --deployment <name>
 #        [--namespace <ns>] [--replicas <count>] [--dry-run]
-deploy.strategy.canary() {
+_deploy.strategy._canary_kubectl() {
     local service="" deployment="" namespace="" replicas="1"
     local dry_run="${BRIK_DRY_RUN:-}"
 
