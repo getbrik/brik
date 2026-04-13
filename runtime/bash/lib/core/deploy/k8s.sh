@@ -37,6 +37,9 @@ deploy.k8s.run() {
     local -a cmd=(kubectl apply -f "$manifest")
     [[ -n "$namespace" ]] && cmd+=(--namespace "$namespace")
     [[ -n "$context" ]] && cmd+=(--context "$context")
+    # Allow extra kubectl options via env (e.g. --validate=false for self-signed certs)
+    # shellcheck disable=SC2206
+    [[ -n "${BRIK_KUBECTL_OPTS:-}" ]] && cmd+=($BRIK_KUBECTL_OPTS)
 
     if [[ "$dry_run" == "true" ]]; then
         cmd+=(--dry-run=client)
