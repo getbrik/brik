@@ -42,7 +42,16 @@ def call(Map params = [:]) {
                     [pattern: 'node_modules/**', type: 'EXCLUDE'],
                 ]
             )
-            checkout scm
+            def scmVars = checkout scm
+
+            // Capture SCM variables from checkout and propagate via withEnv
+            // so they are available inside Docker containers (docker.image().inside())
+            def scmEnv = [
+                "GIT_BRANCH=${scmVars.GIT_BRANCH ?: ''}",
+                "GIT_COMMIT=${scmVars.GIT_COMMIT ?: ''}",
+            ]
+
+            withEnv(scmEnv) {
 
             // Jenkins clones Global Libraries into ${WORKSPACE}@libs/<hash>/
             // Discover the repo root by finding the directory with runtime/
@@ -66,6 +75,7 @@ def call(Map params = [:]) {
             def resolvedImage = ''
             def analysisImage = 'ghcr.io/getbrik/brik-runner-analysis:latest'
             def scannerImage = 'ghcr.io/getbrik/brik-runner-scanner:latest'
+            def deployImage = 'ghcr.io/getbrik/brik-runner-deploy:latest'
 
             try {
                 // Init stage always runs on the Jenkins agent (needs brik.yml)
@@ -96,7 +106,7 @@ def call(Map params = [:]) {
                 ).trim()
                 def networkArg = dockerNetwork ? "--network ${dockerNetwork}" : ''
                 // Export global node env vars to a file so Docker containers can access them
-                sh 'env | grep -E "^(NEXUS_|BRIK_|REGISTRY_)" > "${WORKSPACE}/.brik-env" 2>/dev/null || true'
+                sh 'env | grep -E "^(NEXUS_|BRIK_|REGISTRY_|ARGOCD_)" > "${WORKSPACE}/.brik-env" 2>/dev/null || true'
                 def envFile = "${env.WORKSPACE}/.brik-env"
                 def globalEnvArgs = fileExists(envFile) && readFile(envFile).trim() ? "--env-file ${envFile}" : ''
                 // HOME=$WORKSPACE redirects npm, pip, cargo, nuget caches into workspace.
@@ -124,6 +134,13 @@ def call(Map params = [:]) {
                         brikStage(name, brikHome)
                     }
                 }
+                def runInDeploy = { name ->
+                    if (useDocker) {
+                        docker.image(deployImage).inside(dockerArgs) { brikStage(name, brikHome) }
+                    } else {
+                        brikStage(name, brikHome)
+                    }
+                }
 
                 stage('Release') { runStage('release') }
                 stage('Build')   { runStage('build') }
@@ -137,10 +154,16 @@ def call(Map params = [:]) {
                 }
                 stage('Package') { runStage('package') }
                 stage('Container Scan') { runInScanner('container-scan') }
-                stage('Deploy')  { runStage('deploy') }
+                stage('Deploy') {
+                    // Copy kubeconfig to workspace for deploy containers (HOME=$WORKSPACE)
+                    sh 'mkdir -p "${WORKSPACE}/.kube" && cp /opt/brik/kubeconfig "${WORKSPACE}/.kube/config" 2>/dev/null || true'
+                    runInDeploy('deploy')
+                }
             } finally {
                 stage('Notify') { brikStage('notify', brikHome) }
             }
+
+            } // withEnv(scmEnv)
         }
         }
     }

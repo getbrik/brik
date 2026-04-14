@@ -87,6 +87,28 @@ Describe "gitlab-wrapper.sh"
         The output should equal "available"
       End
 
+      It "makes pipeline.env.init available after setup"
+        setup_and_check() {
+          brik.gitlab.setup "$BRIK_HOME" >/dev/null 2>&1
+          declare -f pipeline.env.init >/dev/null 2>&1 && echo "available" || echo "missing"
+        }
+        When call setup_and_check
+        The output should equal "available"
+      End
+
+      It "creates pipeline.env file during setup"
+        setup_and_check() {
+          brik.gitlab.setup "$BRIK_HOME" >/dev/null 2>&1
+          if [[ -f "${BRIK_LOG_DIR}/pipeline.env" ]]; then
+            echo "exists"
+          else
+            echo "missing"
+          fi
+        }
+        When call setup_and_check
+        The output should equal "exists"
+      End
+
       It "calls setup.prepare_env during setup"
         When call brik.gitlab.setup "$BRIK_HOME"
         The status should be success
@@ -170,6 +192,17 @@ Describe "gitlab-wrapper.sh"
         }
         When call setup_and_check
         The output should equal "42"
+      End
+
+      It "sets BRIK_LOG_DIR inside workspace when CI_PROJECT_DIR is set"
+        setup_and_check() {
+          export CI_PROJECT_DIR="/builds/my-group/my-project"
+          unset BRIK_LOG_DIR 2>/dev/null || true
+          brik.gitlab.setup "$BRIK_HOME" >/dev/null 2>&1
+          printf '%s' "$BRIK_LOG_DIR"
+        }
+        When call setup_and_check
+        The output should equal "/builds/my-group/my-project/.brik-logs"
       End
 
       It "exports empty BRIK_BRANCH when CI_COMMIT_BRANCH is unset"
@@ -435,14 +468,14 @@ Describe "gitlab-wrapper.sh"
 
     # --- Release stage ---
 
-    It "runs release stage and writes BRIK_VERSION to context"
+    It "runs release stage and writes BRIK_APP_VERSION to context"
       run_release_check() {
         brik.gitlab.run_stage "release" >/dev/null 2>&1
         local context_file
         context_file="$(ls "${BRIK_LOG_DIR}"/context-release-* 2>/dev/null | head -1)"
         if [[ -n "$context_file" ]]; then
           local version
-          version="$(grep "^BRIK_VERSION=" "$context_file" | cut -d= -f2)"
+          version="$(grep "^BRIK_APP_VERSION=" "$context_file" | cut -d= -f2)"
           if [[ -n "$version" ]]; then echo "has_version"; else echo "no_version"; fi
         else
           echo "no_context"

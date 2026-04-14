@@ -151,19 +151,19 @@ Describe "deploy/compose.sh"
           deploy.compose.run --namespace myapp \
             --file "${TEST_WS}/docker-compose.yml" \
             --host deploy.example.com \
-            --remote-path /srv/myapp 2>/dev/null || return 1
+            --path /srv/myapp 2>/dev/null || return 1
           grep -q "^scp" "$MOCK_LOG"
         }
         When call invoke_scp
         The status should be success
       End
 
-      It "uses --remote-path for scp destination"
+      It "uses --path for scp destination"
         invoke_remote_path() {
           deploy.compose.run --namespace myapp \
             --file "${TEST_WS}/docker-compose.yml" \
             --host deploy.example.com \
-            --remote-path /srv/myapp 2>/dev/null || return 1
+            --path /srv/myapp 2>/dev/null || return 1
           grep -q "/srv/myapp" "$MOCK_LOG"
         }
         When call invoke_remote_path
@@ -175,7 +175,7 @@ Describe "deploy/compose.sh"
           deploy.compose.run --namespace myapp \
             --file "${TEST_WS}/docker-compose.yml" \
             --host deploy.example.com \
-            --remote-path /srv/myapp 2>/dev/null || return 1
+            --path /srv/myapp 2>/dev/null || return 1
           grep -q "^ssh" "$MOCK_LOG"
         }
         When call invoke_ssh
@@ -187,7 +187,7 @@ Describe "deploy/compose.sh"
           deploy.compose.run --namespace myapp \
             --file "${TEST_WS}/docker-compose.yml" \
             --host deploy.example.com \
-            --remote-path /srv/myapp 2>/dev/null || return 1
+            --path /srv/myapp 2>/dev/null || return 1
           grep -q "deploy.example.com" "$MOCK_LOG"
         }
         When call invoke_ssh_host
@@ -199,7 +199,7 @@ Describe "deploy/compose.sh"
           deploy.compose.run --namespace myapp \
             --file "${TEST_WS}/docker-compose.yml" \
             --host deploy.example.com \
-            --remote-path /srv/myapp \
+            --path /srv/myapp \
             --dry-run 2>&1 | grep -q "\[dry-run\]"
         }
         When call invoke_remote_dryrun
@@ -212,11 +212,74 @@ Describe "deploy/compose.sh"
           deploy.compose.run --namespace myapp \
             --file "${TEST_WS}/docker-compose.yml" \
             --host deploy.example.com \
-            --remote-path /srv/myapp \
+            --path /srv/myapp \
             --dry-run 2>/dev/null
           [[ ! -f "$log" ]] || ! grep -q "^scp" "$log"
         }
         When call invoke_remote_dryrun_noscp
+        The status should be success
+      End
+    End
+
+    Describe "IMAGE_TAG export"
+      setup_image_tag() {
+        mock.setup
+        TEST_WS="$(mktemp -d)"
+        MOCK_LOG="${TEST_WS}/mock_docker.log"
+        printf 'version: "3"\nservices:\n  app:\n    image: myapp\n' > "${TEST_WS}/docker-compose.yml"
+        mock.create_logging "docker" "$MOCK_LOG"
+        mock.activate
+        unset IMAGE_TAG BRIK_APP_VERSION BRIK_COMMIT_SHORT_SHA 2>/dev/null
+      }
+      cleanup_image_tag() {
+        mock.cleanup
+        unset IMAGE_TAG BRIK_APP_VERSION BRIK_COMMIT_SHORT_SHA 2>/dev/null
+        rm -rf "$TEST_WS"
+      }
+      Before 'setup_image_tag'
+      After 'cleanup_image_tag'
+
+      It "exports IMAGE_TAG with BRIK_APP_VERSION when set"
+        check_image_tag_version() {
+          export BRIK_APP_VERSION="1.2.3"
+          cd "$TEST_WS" || return 1
+          deploy.compose.run --namespace myapp 2>/dev/null || return 1
+          [[ "$IMAGE_TAG" == "1.2.3" ]]
+        }
+        When call check_image_tag_version
+        The status should be success
+      End
+
+      It "exports IMAGE_TAG with BRIK_COMMIT_SHORT_SHA when no BRIK_APP_VERSION"
+        check_image_tag_sha() {
+          export BRIK_COMMIT_SHORT_SHA="abc1234"
+          cd "$TEST_WS" || return 1
+          deploy.compose.run --namespace myapp 2>/dev/null || return 1
+          [[ "$IMAGE_TAG" == "abc1234" ]]
+        }
+        When call check_image_tag_sha
+        The status should be success
+      End
+
+      It "exports IMAGE_TAG as 'latest' when no version or SHA"
+        check_image_tag_latest() {
+          cd "$TEST_WS" || return 1
+          deploy.compose.run --namespace myapp 2>/dev/null || return 1
+          [[ "$IMAGE_TAG" == "latest" ]]
+        }
+        When call check_image_tag_latest
+        The status should be success
+      End
+
+      It "prefers BRIK_APP_VERSION over BRIK_COMMIT_SHORT_SHA"
+        check_image_tag_priority() {
+          export BRIK_APP_VERSION="2.0.0"
+          export BRIK_COMMIT_SHORT_SHA="xyz5678"
+          cd "$TEST_WS" || return 1
+          deploy.compose.run --namespace myapp 2>/dev/null || return 1
+          [[ "$IMAGE_TAG" == "2.0.0" ]]
+        }
+        When call check_image_tag_priority
         The status should be success
       End
     End

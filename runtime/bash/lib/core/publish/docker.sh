@@ -39,9 +39,9 @@ publish.docker.run() {
 
     runtime.require_tool docker || return "$BRIK_EXIT_MISSING_DEP"
 
-    # Default tags to BRIK_VERSION if not specified
+    # Default tags to BRIK_APP_VERSION if not specified
     if [[ -z "$tags" ]]; then
-        tags="${BRIK_VERSION:-latest}"
+        tags="${BRIK_APP_VERSION:-${BRIK_COMMIT_SHORT_SHA:-latest}}"
     fi
 
     # Isolate credentials in a temporary directory

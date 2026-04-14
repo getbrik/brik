@@ -94,6 +94,28 @@ Describe "local-wrapper.sh"
         The output should equal "available"
       End
 
+      It "makes pipeline.env.init available after setup"
+        setup_and_check() {
+          brik.local.setup >/dev/null 2>&1
+          declare -f pipeline.env.init >/dev/null 2>&1 && echo "available" || echo "missing"
+        }
+        When call setup_and_check
+        The output should equal "available"
+      End
+
+      It "creates pipeline.env file during setup"
+        setup_and_check() {
+          brik.local.setup >/dev/null 2>&1
+          if [[ -f "${BRIK_LOG_DIR}/pipeline.env" ]]; then
+            echo "exists"
+          else
+            echo "missing"
+          fi
+        }
+        When call setup_and_check
+        The output should equal "exists"
+      End
+
       It "calls setup.prepare_env during setup"
         When call brik.local.setup
         The status should be success
@@ -420,7 +442,7 @@ Describe "local-wrapper.sh"
         context_file="$(ls "${BRIK_LOG_DIR}"/context-release-* 2>/dev/null | head -1)"
         if [[ -n "$context_file" ]]; then
           local version
-          version="$(grep "^BRIK_VERSION=" "$context_file" | cut -d= -f2)"
+          version="$(grep "^BRIK_APP_VERSION=" "$context_file" | cut -d= -f2)"
           if [[ -n "$version" ]]; then echo "has_version"; else echo "no_version"; fi
         else
           echo "no_context"

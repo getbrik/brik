@@ -48,7 +48,7 @@ Describe "publish/docker.sh"
         mock.cleanup
         unset BRIK_DRY_RUN BRIK_PUBLISH_DOCKER_IMAGE BRIK_PUBLISH_DOCKER_REGISTRY 2>/dev/null
         unset BRIK_PUBLISH_DOCKER_TAGS BRIK_PUBLISH_DOCKER_USERNAME_VAR BRIK_PUBLISH_DOCKER_PASSWORD_VAR 2>/dev/null
-        unset BRIK_VERSION 2>/dev/null
+        unset BRIK_APP_VERSION 2>/dev/null
         rm -rf "$TEST_WS"
       }
       Before 'setup_docker'
@@ -63,9 +63,9 @@ Describe "publish/docker.sh"
         The status should be success
       End
 
-      It "defaults tags to BRIK_VERSION"
+      It "defaults tags to BRIK_APP_VERSION"
         invoke_version_tag() {
-          export BRIK_VERSION="2.0.0"
+          export BRIK_APP_VERSION="2.0.0"
           publish.docker.run --image "myapp" 2>/dev/null || return 1
           grep -q "docker push myapp:2.0.0" "$MOCK_LOG"
         }
@@ -73,9 +73,9 @@ Describe "publish/docker.sh"
         The status should be success
       End
 
-      It "defaults tags to latest when no BRIK_VERSION"
+      It "defaults tags to latest when no BRIK_APP_VERSION"
         invoke_default_tag() {
-          unset BRIK_VERSION 2>/dev/null
+          unset BRIK_APP_VERSION 2>/dev/null
           publish.docker.run --image "myapp" 2>/dev/null || return 1
           grep -q "docker push myapp:latest" "$MOCK_LOG"
         }

@@ -3,6 +3,24 @@
 
 brik-notify:
   stage: notify
+  needs:
+    - job: brik-init
+      artifacts: true
+    - job: brik-release
+      artifacts: true
+      optional: true
+    - job: brik-build
+      artifacts: true
+      optional: true
+    - job: brik-test
+      artifacts: true
+      optional: true
+    - job: brik-package
+      artifacts: true
+      optional: true
+    - job: brik-deploy
+      artifacts: true
+      optional: true
   script:
     - bash -c '. /tmp/brik-bootstrap.sh && brik.gitlab.run_stage notify'
   when: always

@@ -41,6 +41,7 @@ stages.deploy() {
         local host_var="BRIK_DEPLOY_${upper_env}_HOST"
         local compose_file_var="BRIK_DEPLOY_${upper_env}_COMPOSE_FILE"
         local remote_path_var="BRIK_DEPLOY_${upper_env}_REMOTE_PATH"
+        local source_var="BRIK_DEPLOY_${upper_env}_SOURCE"
         local restart_cmd_var="BRIK_DEPLOY_${upper_env}_RESTART_CMD"
 
         local target="${!target_var:-}"
@@ -70,11 +71,12 @@ stages.deploy() {
         [[ -n "${!controller_var:-}" ]] && deploy_args+=(--controller "${!controller_var}")
         [[ -n "${!app_name_var:-}" ]] && deploy_args+=(--app-name "${!app_name_var}")
         [[ -n "${!chart_var:-}" ]] && deploy_args+=(--chart "${!chart_var}")
-        [[ -n "${!release_name_var:-}" ]] && deploy_args+=(--release-name "${!release_name_var}")
+        [[ -n "${!release_name_var:-}" ]] && deploy_args+=(--release "${!release_name_var}")
         [[ -n "${!values_var:-}" ]] && deploy_args+=(--values "${!values_var}")
         [[ -n "${!host_var:-}" ]] && deploy_args+=(--host "${!host_var}")
-        [[ -n "${!compose_file_var:-}" ]] && deploy_args+=(--compose-file "${!compose_file_var}")
-        [[ -n "${!remote_path_var:-}" ]] && deploy_args+=(--remote-path "${!remote_path_var}")
+        [[ -n "${!compose_file_var:-}" ]] && deploy_args+=(--file "${!compose_file_var}")
+        [[ -n "${!remote_path_var:-}" ]] && deploy_args+=(--path "${!remote_path_var}")
+        [[ -n "${!source_var:-}" ]] && deploy_args+=(--source "${!source_var}")
         [[ -n "${!restart_cmd_var:-}" ]] && deploy_args+=(--restart-cmd "${!restart_cmd_var}")
 
         deploy.run "${deploy_args[@]}" || ((deploy_failed++))

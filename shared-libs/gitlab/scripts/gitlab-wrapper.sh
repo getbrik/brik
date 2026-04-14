@@ -30,6 +30,9 @@ brik.gitlab.setup() {
     export BRIK_PROJECT_DIR="${BRIK_PROJECT_DIR:-${CI_PROJECT_DIR:-$(pwd)}}"
     export BRIK_PLATFORM="gitlab"
 
+    # Place runtime files inside the workspace so GitLab can export them as artifacts
+    export BRIK_LOG_DIR="${CI_PROJECT_DIR:-.}/.brik-logs"
+
     # Platform variable normalization (CI_* -> BRIK_*)
     export BRIK_BRANCH="${CI_COMMIT_BRANCH:-}"
     export BRIK_TAG="${CI_COMMIT_TAG:-}"

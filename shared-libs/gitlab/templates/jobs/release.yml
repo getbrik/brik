@@ -8,6 +8,11 @@ brik-release:
       artifacts: true
   script:
     - bash -c '. /tmp/brik-bootstrap.sh && brik.gitlab.run_stage release'
+  artifacts:
+    paths:
+      - .brik-logs/pipeline.env
+    when: always
+    expire_in: 1 hour
   rules:
     - if: '$CI_COMMIT_TAG'
       when: on_success

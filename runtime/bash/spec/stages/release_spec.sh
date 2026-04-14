@@ -37,13 +37,13 @@ Describe "stages.release"
     The status should be success
   End
 
-  It "writes BRIK_VERSION to context"
+  It "writes BRIK_APP_VERSION to context"
     run_release_check() {
       local ctx
       ctx="$(context.create "release")" 2>/dev/null || ctx="$(mktemp)"
       stages.release "$ctx" >/dev/null 2>&1
       local version
-      version="$(grep "^BRIK_VERSION=" "$ctx" | cut -d= -f2)"
+      version="$(grep "^BRIK_APP_VERSION=" "$ctx" | cut -d= -f2)"
       if [[ -n "$version" ]]; then echo "has_version"; else echo "no_version"; fi
     }
     When call run_release_check

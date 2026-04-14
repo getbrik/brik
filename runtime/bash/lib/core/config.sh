@@ -517,6 +517,9 @@ _config._export_deploy_env_vars() {
         val="$(config.get ".deploy.environments.${env_name}.restart_cmd" '')"
         [[ -n "$val" ]] && export "BRIK_DEPLOY_${upper_env}_RESTART_CMD=$val"
 
+        val="$(config.get ".deploy.environments.${env_name}.source" '')"
+        [[ -n "$val" ]] && export "BRIK_DEPLOY_${upper_env}_SOURCE=$val"
+
         val="$(config.get ".deploy.environments.${env_name}.strategy" '')"
         [[ -n "$val" ]] && export "BRIK_DEPLOY_${upper_env}_STRATEGY=$val"
     done <<< "$env_keys"

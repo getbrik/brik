@@ -16,12 +16,12 @@ variables:
   BRIK_LIB_REF: "v0.1.0"
   BRIK_REPO: "${CI_SERVER_URL}/brik/brik.git"
   BRIK_HOME: "/opt/brik"
-  BRIK_LOG_DIR: "/tmp/brik/logs"
   BRIK_LOG_LEVEL: "info"
   BRIK_PLATFORM: "gitlab"
   BRIK_CI_IMAGE: "ghcr.io/getbrik/brik-runner-base:latest"
   BRIK_ANALYSIS_IMAGE: "ghcr.io/getbrik/brik-runner-analysis:latest"
   BRIK_SCANNER_IMAGE: "ghcr.io/getbrik/brik-runner-scanner:latest"
+  BRIK_DEPLOY_IMAGE: "ghcr.io/getbrik/brik-runner-deploy:latest"
   # Cache relocation: redirect tool caches into $CI_PROJECT_DIR (GitLab constraint)
   PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
   MAVEN_OPTS: "-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository"
@@ -92,6 +92,11 @@ default:
         echo "[brik] Cloning Brik runtime (${BRIK_LIB_REF})..."
         git clone --depth 1 --branch "${BRIK_LIB_REF}" "${BRIK_REPO}" "${BRIK_HOME}" 2>/dev/null \
           || git clone --depth 1 "${BRIK_REPO}" "${BRIK_HOME}"
+      fi
+    # Protect .brik-logs from accidental git add
+    - |
+      if [ -d "${CI_PROJECT_DIR}/.git/info" ]; then
+        echo '.brik-logs/' >> "${CI_PROJECT_DIR}/.git/info/exclude"
       fi
     # Prepare Brik bootstrap script (sourced by each job via bash)
     # Stack tools (node, python, java, etc.) are installed by setup.prepare_env

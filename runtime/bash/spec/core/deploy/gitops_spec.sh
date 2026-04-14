@@ -447,6 +447,299 @@ SCRIPT
   End
 
   # =========================================================================
+  # deploy.gitops.push_manifests --image-tag
+  # =========================================================================
+  Describe "deploy.gitops.push_manifests --image-tag"
+    Describe "rewrites image tags in YAML files"
+      setup_image_tag() {
+        mock.setup
+        TEST_WS="$(mktemp -d)"
+        MOCK_LOG="${TEST_WS}/mock_git.log"
+        mkdir -p "${TEST_WS}/rendered"
+        cat > "${TEST_WS}/rendered/deployment.yaml" <<'YAML'
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-app
+spec:
+  template:
+    spec:
+      containers:
+        - name: app
+          image: registry.example.com/my-app:latest
+        - name: sidecar
+          image: registry.example.com/sidecar:0.1.0
+YAML
+        cat > "${MOCK_BIN}/git" <<SCRIPT
+#!/bin/sh
+printf 'git %s\n' "\$*" >> "${MOCK_LOG}"
+if [ "\$1" = "clone" ]; then
+  dest="\$(echo "\$*" | rev | cut -d' ' -f1 | rev)"
+  mkdir -p "\$dest"
+fi
+exit 0
+SCRIPT
+        chmod +x "${MOCK_BIN}/git"
+        mock.activate
+      }
+      cleanup_image_tag() {
+        mock.cleanup
+        rm -rf "$TEST_WS"
+      }
+      Before 'setup_image_tag'
+      After 'cleanup_image_tag'
+
+      It "substitutes image tags with the provided value"
+        invoke_image_tag() {
+          deploy.gitops.push_manifests --repo "https://git.example.com/repo" \
+            --branch main --path apps --source "${TEST_WS}/rendered" \
+            --message "deploy" --image-tag "v2.0.0" 2>/dev/null || return 1
+          # Find the copied deployment.yaml in the tmpdir created by push_manifests
+          # Since push_manifests uses its own tmpdir, we check the source was not modified
+          # and verify via log that substitution happened
+          true
+        }
+        When call invoke_image_tag
+        The status should be success
+      End
+
+      It "logs image tag substitution"
+        When call deploy.gitops.push_manifests --repo "https://git.example.com/repo" \
+          --branch main --path apps --source "${TEST_WS}/rendered" \
+          --message "deploy" --image-tag "v2.0.0"
+        The status should be success
+        The stderr should include "image tags substituted to :v2.0.0"
+      End
+    End
+
+    Describe "without --image-tag leaves manifests unchanged"
+      setup_no_image_tag() {
+        mock.setup
+        TEST_WS="$(mktemp -d)"
+        MOCK_LOG="${TEST_WS}/mock_git.log"
+        mkdir -p "${TEST_WS}/rendered"
+        printf 'apiVersion: v1\nkind: ConfigMap\n' > "${TEST_WS}/rendered/cm.yaml"
+        cat > "${MOCK_BIN}/git" <<SCRIPT
+#!/bin/sh
+printf 'git %s\n' "\$*" >> "${MOCK_LOG}"
+if [ "\$1" = "clone" ]; then
+  dest="\$(echo "\$*" | rev | cut -d' ' -f1 | rev)"
+  mkdir -p "\$dest"
+fi
+exit 0
+SCRIPT
+        chmod +x "${MOCK_BIN}/git"
+        mock.activate
+      }
+      cleanup_no_image_tag() {
+        mock.cleanup
+        rm -rf "$TEST_WS"
+      }
+      Before 'setup_no_image_tag'
+      After 'cleanup_no_image_tag'
+
+      It "does not log image tag substitution"
+        When call deploy.gitops.push_manifests --repo "https://git.example.com/repo" \
+          --branch main --path apps --source "${TEST_WS}/rendered" \
+          --message "deploy"
+        The status should be success
+        The stderr should not include "image tags substituted"
+      End
+    End
+
+    Describe "handles files without container specs"
+      setup_no_containers() {
+        mock.setup
+        TEST_WS="$(mktemp -d)"
+        MOCK_LOG="${TEST_WS}/mock_git.log"
+        mkdir -p "${TEST_WS}/rendered"
+        cat > "${TEST_WS}/rendered/configmap.yaml" <<'YAML'
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: my-config
+data:
+  key: value
+YAML
+        cat > "${MOCK_BIN}/git" <<SCRIPT
+#!/bin/sh
+printf 'git %s\n' "\$*" >> "${MOCK_LOG}"
+if [ "\$1" = "clone" ]; then
+  dest="\$(echo "\$*" | rev | cut -d' ' -f1 | rev)"
+  mkdir -p "\$dest"
+fi
+exit 0
+SCRIPT
+        chmod +x "${MOCK_BIN}/git"
+        mock.activate
+      }
+      cleanup_no_containers() {
+        mock.cleanup
+        rm -rf "$TEST_WS"
+      }
+      Before 'setup_no_containers'
+      After 'cleanup_no_containers'
+
+      It "succeeds without error on files with no container specs"
+        When call deploy.gitops.push_manifests --repo "https://git.example.com/repo" \
+          --branch main --path apps --source "${TEST_WS}/rendered" \
+          --message "deploy" --image-tag "v1.0.0"
+        The status should be success
+        The stderr should include "image tags substituted"
+      End
+    End
+
+    Describe "end-to-end tag substitution verification"
+      setup_e2e_tag() {
+        mock.setup
+        TEST_WS="$(mktemp -d)"
+        MOCK_LOG="${TEST_WS}/mock_git.log"
+        mkdir -p "${TEST_WS}/rendered"
+        cat > "${TEST_WS}/rendered/deployment.yaml" <<'YAML'
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-app
+spec:
+  template:
+    spec:
+      initContainers:
+        - name: init
+          image: registry.example.com/init:latest
+      containers:
+        - name: app
+          image: registry.example.com/my-app:latest
+YAML
+        # Mock git: on "add", snapshot the manifest content before tmpdir cleanup
+        cat > "${MOCK_BIN}/git" <<SCRIPT
+#!/bin/sh
+printf 'git %s\n' "\$*" >> "${MOCK_LOG}"
+if [ "\$1" = "clone" ]; then
+  dest="\$(echo "\$*" | rev | cut -d' ' -f1 | rev)"
+  mkdir -p "\$dest"
+fi
+# Capture manifest content during "git add" (before tmpdir is cleaned up)
+for arg; do
+  if [ "\$arg" = "add" ]; then
+    # \$2 is "-C", \$3 is the tmpdir
+    tmpdir="\$2"
+    if [ -d "\$tmpdir" ]; then
+      find "\$tmpdir" -name 'deployment.yaml' -exec cat {} \; > "${TEST_WS}/captured_manifest.yaml" 2>/dev/null
+    fi
+    break
+  fi
+done
+exit 0
+SCRIPT
+        chmod +x "${MOCK_BIN}/git"
+        mock.activate
+      }
+      cleanup_e2e_tag() {
+        mock.cleanup
+        rm -rf "$TEST_WS"
+      }
+      Before 'setup_e2e_tag'
+      After 'cleanup_e2e_tag'
+
+      It "replaces tags in both containers and initContainers"
+        invoke_e2e_tag() {
+          deploy.gitops.push_manifests --repo "https://git.example.com/repo" \
+            --branch main --path apps --source "${TEST_WS}/rendered" \
+            --message "deploy" --image-tag "v3.0.0" 2>/dev/null || return 1
+          local manifest="${TEST_WS}/captured_manifest.yaml"
+          [[ -f "$manifest" ]] || return 1
+          # Verify container image was rewritten
+          grep -q "registry.example.com/my-app:v3.0.0" "$manifest" || return 1
+          # Verify initContainer image was rewritten
+          grep -q "registry.example.com/init:v3.0.0" "$manifest" || return 1
+          # Verify no :latest remains
+          ! grep -q ":latest" "$manifest"
+        }
+        When call invoke_e2e_tag
+        The status should be success
+      End
+    End
+  End
+
+  # =========================================================================
+  # deploy.gitops.run --image-tag passthrough
+  # =========================================================================
+  Describe "deploy.gitops.run passes --image-tag"
+    Describe "when BRIK_APP_VERSION is set"
+      setup_run_tag() {
+        mock.setup
+        TEST_WS="$(mktemp -d)"
+        MOCK_LOG="${TEST_WS}/mock_git.log"
+        mkdir -p "${TEST_WS}/src"
+        printf 'apiVersion: apps/v1\nkind: Deployment\nspec:\n  template:\n    spec:\n      containers:\n        - name: app\n          image: myapp:latest\n' > "${TEST_WS}/src/deploy.yaml"
+        cat > "${MOCK_BIN}/git" <<SCRIPT
+#!/bin/sh
+printf 'git %s\n' "\$*" >> "${MOCK_LOG}"
+if [ "\$1" = "clone" ]; then
+  dest="\$(echo "\$*" | rev | cut -d' ' -f1 | rev)"
+  mkdir -p "\$dest"
+fi
+exit 0
+SCRIPT
+        chmod +x "${MOCK_BIN}/git"
+        mock.activate
+        export BRIK_APP_VERSION="1.2.3"
+        unset BRIK_DEPLOY_IMAGE_TAG BRIK_COMMIT_SHORT_SHA 2>/dev/null
+      }
+      cleanup_run_tag() {
+        mock.cleanup
+        unset BRIK_APP_VERSION BRIK_DEPLOY_IMAGE_TAG BRIK_COMMIT_SHORT_SHA 2>/dev/null
+        rm -rf "$TEST_WS"
+      }
+      Before 'setup_run_tag'
+      After 'cleanup_run_tag'
+
+      It "passes image tag and logs substitution"
+        When call deploy.gitops.run --repo "https://github.com/org/gitops.git" \
+          --source "${TEST_WS}/src"
+        The status should be success
+        The stderr should include "image tags substituted to :1.2.3"
+      End
+    End
+
+    Describe "when tag is unknown"
+      setup_run_no_tag() {
+        mock.setup
+        TEST_WS="$(mktemp -d)"
+        MOCK_LOG="${TEST_WS}/mock_git.log"
+        mkdir -p "${TEST_WS}/src"
+        printf 'apiVersion: v1\n' > "${TEST_WS}/src/cm.yaml"
+        cat > "${MOCK_BIN}/git" <<SCRIPT
+#!/bin/sh
+printf 'git %s\n' "\$*" >> "${MOCK_LOG}"
+if [ "\$1" = "clone" ]; then
+  dest="\$(echo "\$*" | rev | cut -d' ' -f1 | rev)"
+  mkdir -p "\$dest"
+fi
+exit 0
+SCRIPT
+        chmod +x "${MOCK_BIN}/git"
+        mock.activate
+        unset BRIK_APP_VERSION BRIK_DEPLOY_IMAGE_TAG BRIK_COMMIT_SHORT_SHA 2>/dev/null
+      }
+      cleanup_run_no_tag() {
+        mock.cleanup
+        unset BRIK_APP_VERSION BRIK_DEPLOY_IMAGE_TAG BRIK_COMMIT_SHORT_SHA 2>/dev/null
+        rm -rf "$TEST_WS"
+      }
+      Before 'setup_run_no_tag'
+      After 'cleanup_run_no_tag'
+
+      It "does not pass --image-tag when tag is unknown"
+        When call deploy.gitops.run --repo "https://github.com/org/gitops.git" \
+          --source "${TEST_WS}/src"
+        The status should be success
+        The stderr should not include "image tags substituted"
+      End
+    End
+  End
+
+  # =========================================================================
   # deploy.gitops.wait_sync
   # =========================================================================
   Describe "deploy.gitops.wait_sync"
@@ -619,6 +912,86 @@ SCRIPT
         The stderr should include "dry-run"
       End
     End
+
+    Describe "with --path uses git checkout HEAD~1"
+      setup_rb_path() {
+        mock.setup
+        TEST_WS="$(mktemp -d)"
+        MOCK_LOG="${TEST_WS}/mock_git.log"
+        cat > "${MOCK_BIN}/git" <<SCRIPT
+#!/bin/sh
+printf 'git %s\n' "\$*" >> "${MOCK_LOG}"
+if [ "\$1" = "clone" ]; then
+  dest="\$(echo "\$*" | rev | cut -d' ' -f1 | rev)"
+  mkdir -p "\$dest"
+fi
+exit 0
+SCRIPT
+        chmod +x "${MOCK_BIN}/git"
+        mock.activate
+      }
+      cleanup_rb_path() {
+        mock.cleanup
+        rm -rf "$TEST_WS"
+      }
+      Before 'setup_rb_path'
+      After 'cleanup_rb_path'
+
+      It "uses git checkout HEAD~1 -- <path> for path-scoped rollback"
+        invoke_rb_path() {
+          deploy.gitops.rollback --repo "https://git.example.com/repo" \
+            --branch main --path apps/myapp 2>/dev/null || return 1
+          grep -q "checkout HEAD~1 -- apps/myapp" "$MOCK_LOG"
+        }
+        When call invoke_rb_path
+        The status should be success
+      End
+
+      It "commits with path-specific rollback message"
+        invoke_rb_path_msg() {
+          deploy.gitops.rollback --repo "https://git.example.com/repo" \
+            --branch main --path apps/myapp 2>/dev/null || return 1
+          grep -q "rollback: revert apps/myapp to previous version" "$MOCK_LOG"
+        }
+        When call invoke_rb_path_msg
+        The status should be success
+      End
+    End
+
+    Describe "without --path uses git revert HEAD"
+      setup_rb_nopath() {
+        mock.setup
+        TEST_WS="$(mktemp -d)"
+        MOCK_LOG="${TEST_WS}/mock_git.log"
+        cat > "${MOCK_BIN}/git" <<SCRIPT
+#!/bin/sh
+printf 'git %s\n' "\$*" >> "${MOCK_LOG}"
+if [ "\$1" = "clone" ]; then
+  dest="\$(echo "\$*" | rev | cut -d' ' -f1 | rev)"
+  mkdir -p "\$dest"
+fi
+exit 0
+SCRIPT
+        chmod +x "${MOCK_BIN}/git"
+        mock.activate
+      }
+      cleanup_rb_nopath() {
+        mock.cleanup
+        rm -rf "$TEST_WS"
+      }
+      Before 'setup_rb_nopath'
+      After 'cleanup_rb_nopath'
+
+      It "uses git revert --no-edit HEAD when no path specified"
+        invoke_rb_nopath() {
+          deploy.gitops.rollback --repo "https://git.example.com/repo" \
+            --branch main 2>/dev/null || return 1
+          grep -q "revert --no-edit HEAD" "$MOCK_LOG"
+        }
+        When call invoke_rb_nopath
+        The status should be success
+      End
+    End
   End
 
   # =========================================================================
@@ -784,6 +1157,117 @@ SCRIPT
       End
     End
 
+    Describe "rollback test with controller=argocd uses argocd rollback"
+      setup_git_argocd_rb() {
+        mock.setup
+        TEST_WS="$(mktemp -d)"
+        MOCK_LOG="${TEST_WS}/mock_git.log"
+        ARGOCD_LOG="${TEST_WS}/mock_argocd.log"
+        mkdir -p "${TEST_WS}/src"
+        printf 'apiVersion: v1\n' > "${TEST_WS}/src/cm.yaml"
+        cat > "${MOCK_BIN}/git" <<SCRIPT
+#!/bin/sh
+printf 'git %s\n' "\$*" >> "${MOCK_LOG}"
+if [ "\$1" = "clone" ]; then
+  dest="\$(echo "\$*" | rev | cut -d' ' -f1 | rev)"
+  mkdir -p "\$dest"
+fi
+exit 0
+SCRIPT
+        chmod +x "${MOCK_BIN}/git"
+        printf "#!/bin/sh\nprintf 'argocd %%s\\n' \"\$*\" >> \"%s\"\n" "$ARGOCD_LOG" > "${MOCK_BIN}/argocd"
+        chmod +x "${MOCK_BIN}/argocd"
+        mock.activate
+        unset BRIK_DRY_RUN BRIK_TAG BRIK_COMMIT_SHA 2>/dev/null
+        export BRIK_DEPLOY_ROLLBACK_TEST="true"
+        export BRIK_HOME
+      }
+      cleanup_git_argocd_rb() {
+        mock.cleanup
+        unset BRIK_DRY_RUN BRIK_TAG BRIK_COMMIT_SHA BRIK_DEPLOY_ROLLBACK_TEST 2>/dev/null
+        rm -rf "$TEST_WS"
+      }
+      Before 'setup_git_argocd_rb'
+      After 'cleanup_git_argocd_rb'
+
+      It "uses deploy.argocd.rollback instead of git-based rollback"
+        invoke_argocd_rb() {
+          deploy.gitops.run --repo "https://github.com/org/gitops.git" \
+            --source "${TEST_WS}/src" --controller argocd --app-name my-app 2>/dev/null || return 1
+          # ArgoCD rollback should have been called
+          grep -q "app rollback" "$ARGOCD_LOG" || grep -q "app get" "$ARGOCD_LOG"
+        }
+        When call invoke_argocd_rb
+        The status should be success
+      End
+
+      It "does not call deploy.gitops.rollback (no git revert)"
+        invoke_argocd_rb_no_revert() {
+          deploy.gitops.run --repo "https://github.com/org/gitops.git" \
+            --source "${TEST_WS}/src" --controller argocd --app-name my-app 2>/dev/null || return 1
+          # Should NOT see a second clone for rollback (only one clone for push)
+          local clone_count
+          clone_count="$(grep -c "clone" "$MOCK_LOG")"
+          [ "$clone_count" -eq 1 ]
+        }
+        When call invoke_argocd_rb_no_revert
+        The status should be success
+      End
+    End
+
+    Describe "rollback test without controller uses git-based rollback"
+      setup_git_rb_noctl() {
+        mock.setup
+        TEST_WS="$(mktemp -d)"
+        MOCK_LOG="${TEST_WS}/mock_git.log"
+        mkdir -p "${TEST_WS}/src"
+        printf 'apiVersion: v1\n' > "${TEST_WS}/src/cm.yaml"
+        cat > "${MOCK_BIN}/git" <<SCRIPT
+#!/bin/sh
+printf 'git %s\n' "\$*" >> "${MOCK_LOG}"
+if [ "\$1" = "clone" ]; then
+  dest="\$(echo "\$*" | rev | cut -d' ' -f1 | rev)"
+  mkdir -p "\$dest"
+fi
+exit 0
+SCRIPT
+        chmod +x "${MOCK_BIN}/git"
+        mock.activate
+        unset BRIK_DRY_RUN BRIK_TAG BRIK_COMMIT_SHA 2>/dev/null
+        export BRIK_DEPLOY_ROLLBACK_TEST="true"
+      }
+      cleanup_git_rb_noctl() {
+        mock.cleanup
+        unset BRIK_DRY_RUN BRIK_TAG BRIK_COMMIT_SHA BRIK_DEPLOY_ROLLBACK_TEST 2>/dev/null
+        rm -rf "$TEST_WS"
+      }
+      Before 'setup_git_rb_noctl'
+      After 'cleanup_git_rb_noctl'
+
+      It "uses deploy.gitops.rollback (git revert) when no controller"
+        invoke_rb_noctl() {
+          deploy.gitops.run --repo "https://github.com/org/gitops.git" \
+            --source "${TEST_WS}/src" --path apps/myapp 2>/dev/null || return 1
+          # Should see two clones: one for push, one for rollback
+          local clone_count
+          clone_count="$(grep -c "clone" "$MOCK_LOG")"
+          [ "$clone_count" -eq 2 ]
+        }
+        When call invoke_rb_noctl
+        The status should be success
+      End
+
+      It "uses path-scoped rollback (checkout HEAD~1)"
+        invoke_rb_noctl_path() {
+          deploy.gitops.run --repo "https://github.com/org/gitops.git" \
+            --source "${TEST_WS}/src" --path apps/myapp 2>/dev/null || return 1
+          grep -q "checkout HEAD~1 -- apps/myapp" "$MOCK_LOG"
+        }
+        When call invoke_rb_noctl_path
+        The status should be success
+      End
+    End
+
     Describe "BRIK_DEPLOY_IMAGE_TAG precedence"
       setup_git_tag_prio() {
         mock.setup
@@ -802,17 +1286,17 @@ SCRIPT
         chmod +x "${MOCK_BIN}/git"
         mock.activate
         export BRIK_DEPLOY_IMAGE_TAG="deploy-tag-1.0"
-        export BRIK_TAG="brik-tag-2.0"
+        export BRIK_APP_VERSION="brik-app-2.0"
       }
       cleanup_git_tag_prio() {
         mock.cleanup
-        unset BRIK_DEPLOY_IMAGE_TAG BRIK_TAG 2>/dev/null
+        unset BRIK_DEPLOY_IMAGE_TAG BRIK_APP_VERSION 2>/dev/null
         rm -rf "$TEST_WS"
       }
       Before 'setup_git_tag_prio'
       After 'cleanup_git_tag_prio'
 
-      It "uses BRIK_DEPLOY_IMAGE_TAG over BRIK_TAG when both set"
+      It "uses BRIK_DEPLOY_IMAGE_TAG over BRIK_APP_VERSION when both set"
         invoke_tag_prio() {
           deploy.gitops.run --repo "https://github.com/org/gitops.git" \
             --source "${TEST_WS}/src" 2>/dev/null

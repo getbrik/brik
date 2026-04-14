@@ -28,11 +28,11 @@ _deploy.argocd._validate_app_name() {
 # Populates the caller's cmd array via nameref.
 _deploy.argocd._add_server_auth() {
     local -n _cmd=$1
-    local server="$2"
+    local server="${2:-${ARGOCD_SERVER:-}}"
     local auth_token_var="$3"
 
     if [[ -n "$server" ]]; then
-        _cmd+=(--server "$server")
+        _cmd+=(--server "$server" --insecure)
     fi
     if [[ -n "$auth_token_var" ]]; then
         local token="${!auth_token_var:-}"
@@ -41,6 +41,8 @@ _deploy.argocd._add_server_auth() {
             return "$BRIK_EXIT_INVALID_ENV"
         fi
         _cmd+=(--auth-token "$token")
+    elif [[ -n "${ARGOCD_AUTH_TOKEN:-}" ]]; then
+        _cmd+=(--auth-token "$ARGOCD_AUTH_TOKEN")
     fi
 }
 

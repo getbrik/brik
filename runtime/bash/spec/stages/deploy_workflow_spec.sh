@@ -63,7 +63,7 @@ YAML
       The output should include "--chart ./charts/myapp"
     End
 
-    It "passes --release-name to deploy.run"
+    It "passes --release to deploy.run"
       run_deploy_release() {
         brik.use() { :; }
         deploy.run() { printf '%s ' "$@"; printf '\n'; return 0; }
@@ -72,7 +72,7 @@ YAML
         stages.deploy "$ctx" 2>/dev/null
       }
       When call run_deploy_release
-      The output should include "--release-name myapp-staging"
+      The output should include "--release myapp-staging"
     End
 
     It "passes --values to deploy.run"
@@ -122,7 +122,7 @@ YAML
       The output should include "--host prod.example.com"
     End
 
-    It "passes --remote-path to deploy.run"
+    It "passes --path to deploy.run"
       run_deploy_remote_path() {
         brik.use() { :; }
         deploy.run() { printf '%s ' "$@"; printf '\n'; return 0; }
@@ -131,7 +131,7 @@ YAML
         stages.deploy "$ctx" 2>/dev/null
       }
       When call run_deploy_remote_path
-      The output should include "--remote-path /opt/app"
+      The output should include "--path /opt/app"
     End
 
     It "passes --restart-cmd to deploy.run"
@@ -167,7 +167,7 @@ YAML
     }
     Before 'setup_compose'
 
-    It "passes --compose-file to deploy.run"
+    It "passes --file to deploy.run"
       run_deploy_compose() {
         brik.use() { :; }
         deploy.run() { printf '%s ' "$@"; printf '\n'; return 0; }
@@ -176,7 +176,7 @@ YAML
         stages.deploy "$ctx" 2>/dev/null
       }
       When call run_deploy_compose
-      The output should include "--compose-file docker-compose.prod.yml"
+      The output should include "--file docker-compose.prod.yml"
     End
   End
 

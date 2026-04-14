@@ -148,6 +148,26 @@ Describe "base-wrapper.sh"
       When call check_custom_logdir
       The output should equal "/custom/logs"
     End
+
+    It "generates unique BRIK_LOG_DIR when not pre-set"
+      check_unique_logdir() {
+        unset BRIK_LOG_DIR 2>/dev/null || true
+        unset BRIK_DEFAULT_LOG_DIR 2>/dev/null || true
+        brik.wrapper.set_standard_env
+        local dir1="$BRIK_LOG_DIR"
+        unset BRIK_LOG_DIR
+        sleep 1
+        brik.wrapper.set_standard_env
+        local dir2="$BRIK_LOG_DIR"
+        if [[ "$dir1" != "$dir2" ]]; then
+          echo "unique"
+        else
+          echo "same"
+        fi
+      }
+      When call check_unique_logdir
+      The output should equal "unique"
+    End
   End
 
   # =========================================================================
@@ -196,6 +216,28 @@ Describe "base-wrapper.sh"
       }
       When call check_stagesinit
       The output should equal "available"
+    End
+
+    It "makes pipeline.env.init available"
+      check_pipeline_env() {
+        brik.wrapper.bootstrap 2>/dev/null
+        declare -f pipeline.env.init >/dev/null 2>&1 && echo "available" || echo "missing"
+      }
+      When call check_pipeline_env
+      The output should equal "available"
+    End
+
+    It "creates pipeline.env file after bootstrap"
+      check_pipeline_env_file() {
+        brik.wrapper.bootstrap 2>/dev/null
+        if [[ -f "${BRIK_LOG_DIR}/pipeline.env" ]]; then
+          echo "exists"
+        else
+          echo "missing"
+        fi
+      }
+      When call check_pipeline_env_file
+      The output should equal "exists"
     End
   End
 
@@ -353,6 +395,16 @@ Describe "base-wrapper.sh"
       }
       When call run_lint_check
       The output should equal "skipped"
+    End
+
+    It "loads pipeline env variables before running stage"
+      check_pipeline_load() {
+        pipeline.env.set "BRIK_TEST_PIPELINE_VAR" "from_pipeline_env"
+        brik.wrapper.run_stage "init" >/dev/null 2>&1
+        printf '%s' "${BRIK_TEST_PIPELINE_VAR:-}"
+      }
+      When call check_pipeline_load
+      The output should equal "from_pipeline_env"
     End
 
     It "generates summary JSON with correct stage name"

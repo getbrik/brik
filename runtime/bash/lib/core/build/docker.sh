@@ -32,7 +32,7 @@ build.docker.run() {
     # Defaults
     [[ -z "$dockerfile" ]] && dockerfile="${workspace}/Dockerfile"
     [[ -z "$context" ]] && context="$workspace"
-    [[ -z "$tag" ]] && tag="${BRIK_PROJECT_NAME:-project}:${BRIK_VERSION:-latest}"
+    [[ -z "$tag" ]] && tag="${BRIK_PROJECT_NAME:-project}:${BRIK_APP_VERSION:-${BRIK_COMMIT_SHORT_SHA:-latest}}"
 
     runtime.require_file "$dockerfile" || return "$BRIK_EXIT_IO_FAILURE"
     runtime.require_tool docker || return "$BRIK_EXIT_MISSING_DEP"

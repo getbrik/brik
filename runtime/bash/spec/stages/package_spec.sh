@@ -12,13 +12,13 @@ Describe "stages.package"
     BRIK_WORKSPACE="$(mktemp -d)"
     export BRIK_PROJECT_DIR="$BRIK_WORKSPACE"
     export BRIK_PLATFORM="gitlab"
-    export BRIK_VERSION="1.0.0"
+    export BRIK_APP_VERSION="1.0.0"
     config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
   }
   cleanup_env() {
     rm -f "$BRIK_CONFIG_FILE"
     rm -rf "$BRIK_WORKSPACE"
-    unset BRIK_PACKAGE_DOCKER_IMAGE BRIK_VERSION 2>/dev/null || true
+    unset BRIK_PACKAGE_DOCKER_IMAGE BRIK_APP_VERSION 2>/dev/null || true
   }
   Before 'setup_env'
   After 'cleanup_env'

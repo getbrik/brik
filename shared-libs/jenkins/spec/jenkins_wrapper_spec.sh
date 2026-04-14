@@ -102,6 +102,28 @@ Describe "jenkins-wrapper.sh"
         The output should equal "available"
       End
 
+      It "makes pipeline.env.init available after setup"
+        setup_and_check() {
+          brik.jenkins.setup "$BRIK_HOME" >/dev/null 2>&1
+          declare -f pipeline.env.init >/dev/null 2>&1 && echo "available" || echo "missing"
+        }
+        When call setup_and_check
+        The output should equal "available"
+      End
+
+      It "creates pipeline.env file during setup"
+        setup_and_check() {
+          brik.jenkins.setup "$BRIK_HOME" >/dev/null 2>&1
+          if [[ -f "${BRIK_LOG_DIR}/pipeline.env" ]]; then
+            echo "exists"
+          else
+            echo "missing"
+          fi
+        }
+        When call setup_and_check
+        The output should equal "exists"
+      End
+
       It "calls setup.prepare_env during setup"
         When call brik.jenkins.setup "$BRIK_HOME"
         The status should be success

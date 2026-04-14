@@ -85,7 +85,7 @@ brik.wrapper.validate_home() {
 brik.wrapper.set_standard_env() {
     export BRIK_WORKSPACE="${BRIK_WORKSPACE:-${BRIK_PROJECT_DIR}}"
     export BRIK_CONFIG_FILE="${BRIK_CONFIG_FILE:-${BRIK_PROJECT_DIR}/brik.yml}"
-    export BRIK_LOG_DIR="${BRIK_LOG_DIR:-${BRIK_DEFAULT_LOG_DIR:-/tmp/brik/logs}}"
+    export BRIK_LOG_DIR="${BRIK_LOG_DIR:-${BRIK_DEFAULT_LOG_DIR:-/tmp/brik/logs/run-$(date +%s)-$$}}"
     export BRIK_LIB="${_BRIK_CORE_DIR}"
 }
 
@@ -115,6 +115,11 @@ brik.wrapper.bootstrap() {
             . "$stage_file"
         fi
     done
+
+    # Initialize pipeline environment for cross-stage variable sharing
+    pipeline.env.init || {
+        log.warn "pipeline env init failed, cross-stage variables may not work"
+    }
 }
 
 # ---------------------------------------------------------------------------
@@ -165,6 +170,9 @@ brik.wrapper.run_stage() {
     if [[ "$stage_name" == "init" ]]; then
         banner.brik "${BRIK_VERSION:-}"
     fi
+
+    # Load cross-stage variables from previous stages
+    pipeline.env.load
 
     local logic_function=""
 

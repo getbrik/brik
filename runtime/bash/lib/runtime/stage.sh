@@ -34,6 +34,8 @@ _stage._load_runtime() {
     [[ -z "${_BRIK_SUMMARY_LOADED:-}" ]] && . "${runtime_dir}/summary.sh"
     # shellcheck source=setup.sh
     [[ -z "${_BRIK_SETUP_LOADED:-}" ]] && . "${runtime_dir}/setup.sh"
+    # shellcheck source=pipeline-env.sh
+    [[ -z "${_BRIK_PIPELINE_ENV_LOADED:-}" ]] && . "${runtime_dir}/pipeline-env.sh"
     # shellcheck source=banner.sh
     [[ -z "${_BRIK_BANNER_LOADED:-}" ]] && . "${runtime_dir}/banner.sh"
 }
@@ -139,7 +141,15 @@ stage.run() {
     context.set "$context_file" "BRIK_FINISHED_AT" "$(date +"%Y-%m-%dT%H:%M:%S%z")" || true
 
     if [[ $exit_code -eq 0 ]]; then
-        log.info "stage $stage_name completed successfully"
+        # Check if the stage set its status to "skipped"
+        local _stage_upper _stage_status=""
+        _stage_upper="$(echo "$stage_name" | tr '[:lower:]-' '[:upper:]_')"
+        _stage_status="$(context.get "$context_file" "BRIK_${_stage_upper}_STATUS" 2>/dev/null)" || true
+        if [[ "$_stage_status" == "skipped" ]]; then
+            log.info "stage $stage_name skipped (not configured)"
+        else
+            log.info "stage $stage_name completed successfully"
+        fi
         hook.on_success "$stage_name" "$context_file" "$log_file" || true
     else
         log.error "stage $stage_name failed with exit code $exit_code"

@@ -26,8 +26,9 @@ stages.release() {
     }
 
     log.info "current version: $current_version"
-    export BRIK_VERSION="$current_version"
-    context.set "$context_file" "BRIK_VERSION" "$current_version"
+    export BRIK_APP_VERSION="$current_version"
+    context.set "$context_file" "BRIK_APP_VERSION" "$current_version"
+    pipeline.env.set "BRIK_APP_VERSION" "$current_version"
 
     # If on a tag (release trigger), prepare and finalize if release module available
     if [[ -n "${BRIK_TAG:-}" ]]; then

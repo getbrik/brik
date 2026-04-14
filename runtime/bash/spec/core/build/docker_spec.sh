@@ -55,7 +55,7 @@ Describe "build/docker.sh"
       }
       cleanup_docker() {
         mock.cleanup
-        unset BRIK_PROJECT_NAME BRIK_VERSION 2>/dev/null
+        unset BRIK_PROJECT_NAME BRIK_APP_VERSION 2>/dev/null
         rm -rf "$TEST_WS"
       }
       Before 'setup_docker'
@@ -76,10 +76,10 @@ Describe "build/docker.sh"
         The status should be success
       End
 
-      It "uses BRIK_PROJECT_NAME and BRIK_VERSION for default tag"
+      It "uses BRIK_PROJECT_NAME and BRIK_APP_VERSION for default tag"
         invoke_env_tag() {
           export BRIK_PROJECT_NAME="myapp"
-          export BRIK_VERSION="2.0"
+          export BRIK_APP_VERSION="2.0"
           build.docker.run "$TEST_WS" 2>/dev/null || return 1
           grep -q "\-t myapp:2.0" "$MOCK_LOG"
         }

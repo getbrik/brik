@@ -20,9 +20,11 @@ stages.package() {
         return 0
     fi
 
+    local _app_tag="${BRIK_APP_VERSION:-${BRIK_COMMIT_SHORT_SHA:-latest}}"
+
     local docker_args=("${BRIK_WORKSPACE}")
     [[ -n "${BRIK_PACKAGE_DOCKER_DOCKERFILE:-}" ]] && docker_args+=(--file "$BRIK_PACKAGE_DOCKER_DOCKERFILE")
-    docker_args+=(--tag "${BRIK_PACKAGE_DOCKER_IMAGE}:${BRIK_VERSION:-latest}")
+    docker_args+=(--tag "${BRIK_PACKAGE_DOCKER_IMAGE}:${_app_tag}")
     [[ -n "${BRIK_PACKAGE_DOCKER_CONTEXT:-}" ]] && docker_args+=(--context "$BRIK_PACKAGE_DOCKER_CONTEXT")
 
     # Add build args (split on comma, safe from glob expansion)
@@ -35,7 +37,7 @@ stages.package() {
         done
     fi
 
-    log.info "building image: ${BRIK_PACKAGE_DOCKER_IMAGE}:${BRIK_VERSION:-latest}"
+    log.info "building image: ${BRIK_PACKAGE_DOCKER_IMAGE}:${_app_tag}"
 
     build.docker.run "${docker_args[@]}"
     result=$?

@@ -6,10 +6,16 @@
 
 brik-deploy:
   stage: deploy
+  image: ${BRIK_DEPLOY_IMAGE}
   needs:
+    - job: brik-init
+      artifacts: true
+    - job: brik-release
+      artifacts: true
+      optional: true
     - job: brik-test
     - job: brik-package
-      artifacts: false
+      artifacts: true
       optional: true
     - job: brik-lint
       artifacts: false
@@ -25,3 +31,8 @@ brik-deploy:
       optional: true
   script:
     - bash -c '. /tmp/brik-bootstrap.sh && brik.gitlab.run_stage deploy'
+  artifacts:
+    paths:
+      - .brik-logs/pipeline.env
+    when: always
+    expire_in: 1 hour

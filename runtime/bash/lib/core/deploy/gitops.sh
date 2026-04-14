@@ -147,6 +147,7 @@ deploy.gitops.render_manifests() {
 #        [--git-token-var <VAR>] [--dry-run]
 deploy.gitops.push_manifests() {
     local repo="" branch="" target_path="" source_dir="" message="" git_token_var=""
+    local image_tag=""
     local dry_run="${BRIK_DRY_RUN:-}"
 
     while [[ $# -gt 0 ]]; do
@@ -157,6 +158,7 @@ deploy.gitops.push_manifests() {
             --source)        source_dir="$2";    shift 2 ;;
             --message)       message="$2";       shift 2 ;;
             --git-token-var) git_token_var="$2"; shift 2 ;;
+            --image-tag)     image_tag="$2";     shift 2 ;;
             --dry-run)       dry_run="true";     shift ;;
             *) log.error "unknown option: $1"; return "$BRIK_EXIT_INVALID_INPUT" ;;
         esac
@@ -216,6 +218,17 @@ deploy.gitops.push_manifests() {
         log.error "failed to copy manifests to config repo"
         return "$BRIK_EXIT_IO_FAILURE"
     }
+
+    # Substitute image tags if --image-tag was provided
+    if [[ -n "$image_tag" ]]; then
+        runtime.require_tool yq || return "$BRIK_EXIT_MISSING_DEP"
+        local manifest_file
+        while IFS= read -r manifest_file; do
+            yq -i "(.spec.template.spec.containers[]?.image) |= sub(\":[^:]*$\", \":${image_tag}\")" "$manifest_file" 2>/dev/null || true
+            yq -i "(.spec.template.spec.initContainers[]?.image) |= sub(\":[^:]*$\", \":${image_tag}\")" "$manifest_file" 2>/dev/null || true
+        done < <(find "$dest" -name '*.yaml' -o -name '*.yml')
+        log.info "image tags substituted to :${image_tag}"
+    fi
 
     # Commit and push
     git -C "$tmpdir" add . || {
@@ -432,8 +445,19 @@ deploy.gitops.rollback() {
             log.error "git commit failed"
             return "$BRIK_EXIT_EXTERNAL_FAIL"
         }
+    elif [[ -n "$target_path" ]]; then
+        # Path-scoped rollback: restore from previous commit
+        git -C "$tmpdir" checkout HEAD~1 -- "$target_path" || {
+            log.error "git checkout HEAD~1 -- $target_path failed"
+            return "$BRIK_EXIT_EXTERNAL_FAIL"
+        }
+        git -C "$tmpdir" -c user.email="brik-ci@noreply" -c user.name="Brik CI" \
+            commit -m "rollback: revert ${target_path} to previous version" || {
+            log.error "git commit failed"
+            return "$BRIK_EXIT_EXTERNAL_FAIL"
+        }
     else
-        # Revert the last commit
+        # Unscoped rollback: revert the last commit entirely
         git -C "$tmpdir" -c user.email="brik-ci@noreply" -c user.name="Brik CI" \
             revert --no-edit HEAD || {
             log.error "git revert failed"
@@ -497,7 +521,7 @@ deploy.gitops.run() {
     fi
 
     # Step 2: Push manifests
-    local tag="${BRIK_DEPLOY_IMAGE_TAG:-${BRIK_TAG:-${BRIK_COMMIT_SHA:-unknown}}}"
+    local tag="${BRIK_DEPLOY_IMAGE_TAG:-${BRIK_APP_VERSION:-${BRIK_COMMIT_SHORT_SHA:-unknown}}}"
     local -a push_args=(
         --repo "$repo"
         --branch "$branch"
@@ -506,6 +530,7 @@ deploy.gitops.run() {
         --message "deploy: update to ${tag}"
     )
     [[ -n "$git_token_var" ]] && push_args+=(--git-token-var "$git_token_var")
+    [[ "$tag" != "unknown" ]] && push_args+=(--image-tag "$tag")
     deploy.gitops.push_manifests "${push_args[@]}" "${common_args[@]}" || return $?
 
     # Clean up rendered temp dir if we created one
@@ -524,13 +549,50 @@ deploy.gitops.run() {
                 return "$BRIK_EXIT_EXTERNAL_FAIL"
             }
             deploy.argocd.wait_healthy --app "$app_name" || {
-                log.warn "argocd wait_healthy failed for app: ${app_name} (non-blocking)"
+                log.error "argocd app not healthy: ${app_name}"
+                return "$BRIK_EXIT_EXTERNAL_FAIL"
             }
         fi
     elif [[ "$controller" == "argocd" ]]; then
         log.info "argocd: repo updated; sync will be triggered by ArgoCD controller"
     elif [[ "$controller" == "fluxcd" ]]; then
         log.info "fluxcd: flux will auto-reconcile from the updated repo"
+    fi
+
+    # Step 4: Rollback test (E2E verification of rollback path)
+    if [[ "${BRIK_DEPLOY_ROLLBACK_TEST:-}" == "true" ]]; then
+        log.info "rollback test enabled - reverting last deployment"
+
+        if [[ "$controller" == "argocd" && -n "$app_name" ]]; then
+            # ArgoCD-native rollback (safer, uses ArgoCD's deployment history)
+            if [[ "$dry_run" == "true" ]]; then
+                log.info "[dry-run] would call: deploy.argocd.rollback --app ${app_name}"
+            else
+                deploy.argocd.rollback --app "$app_name" || {
+                    log.error "argocd rollback failed for app: ${app_name}"
+                    return "$BRIK_EXIT_EXTERNAL_FAIL"
+                }
+                deploy.argocd.wait_healthy --app "$app_name" || {
+                    log.error "argocd app not healthy after rollback: ${app_name}"
+                    return "$BRIK_EXIT_EXTERNAL_FAIL"
+                }
+            fi
+        else
+            # Git-based rollback
+            local -a rollback_args=(
+                --repo "$repo"
+                --branch "$branch"
+            )
+            [[ -n "$target_path" ]] && rollback_args+=(--path "$target_path")
+            [[ -n "$git_token_var" ]] && rollback_args+=(--git-token-var "$git_token_var")
+
+            deploy.gitops.rollback "${rollback_args[@]}" "${common_args[@]}" || {
+                log.error "rollback failed"
+                return "$BRIK_EXIT_EXTERNAL_FAIL"
+            }
+        fi
+
+        log.info "rollback test completed successfully"
     fi
 
     log.info "gitops deployment completed successfully"

@@ -35,7 +35,7 @@ security.container.run() {
         image="${BRIK_SECURITY_CONTAINER_IMAGE:-}"
     fi
     if [[ -z "$image" ]]; then
-        image="${BRIK_PROJECT_NAME:-project}:${BRIK_VERSION:-latest}"
+        image="${BRIK_PROJECT_NAME:-project}:${BRIK_APP_VERSION:-${BRIK_COMMIT_SHORT_SHA:-latest}}"
     fi
 
     if [[ -n "${BRIK_SECURITY_CONTAINER_SEVERITY:-}" && "$severity" == "HIGH" ]]; then

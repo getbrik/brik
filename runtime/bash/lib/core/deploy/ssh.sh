@@ -40,7 +40,11 @@ deploy.ssh.run() {
     runtime.require_tool rsync || return "$BRIK_EXIT_MISSING_DEP"
     runtime.require_tool ssh   || return "$BRIK_EXIT_MISSING_DEP"
 
-    local -a ssh_opts=(-o BatchMode=yes -o StrictHostKeyChecking=yes)
+    # Setup SSH agent with key from SSH_PRIVATE_KEY if available
+    _deploy.ssh.setup_agent
+
+    local strict_host="${BRIK_SSH_STRICT_HOST_KEY:-yes}"
+    local -a ssh_opts=(-o BatchMode=yes -o "StrictHostKeyChecking=${strict_host}")
 
     # Determine source files: --source or current directory
     local src="${source:-.}"
@@ -65,7 +69,7 @@ deploy.ssh.run() {
     if [[ -n "$restart_cmd" ]]; then
         # restart_cmd is trusted input from brik.yml - validated for basic safety
         local _unsafe_chars
-        _unsafe_chars="$(printf '%s' "$restart_cmd" | tr -d '[:alnum:][:blank:]._/-')"
+        _unsafe_chars="$(printf '%s' "$restart_cmd" | tr -d "[:alnum:][:blank:]._/='\"\\-")"
         if [[ -n "$_unsafe_chars" ]] || [[ "$restart_cmd" =~ $'\n'|$'\r' ]]; then
             log.error "restart-cmd contains unsafe characters: use simple commands only"
             return "$BRIK_EXIT_INVALID_INPUT"
@@ -83,4 +87,46 @@ deploy.ssh.run() {
 
     log.info "ssh deployment completed successfully"
     return 0
+}
+
+# Setup ssh-agent with SSH_PRIVATE_KEY if available.
+# SSH_PRIVATE_KEY can be a file path (GitLab file variable) or inline key content.
+# Idempotent: skips if agent is already running with identities.
+_deploy.ssh.setup_agent() {
+    # Skip if no key configured
+    [[ -z "${SSH_PRIVATE_KEY:-}" ]] && return 0
+
+    # Skip if agent already has identities
+    if ssh-add -l &>/dev/null; then
+        return 0
+    fi
+
+    # Start agent if not running
+    if [[ -z "${SSH_AUTH_SOCK:-}" ]]; then
+        eval "$(ssh-agent -s 2>/dev/null)"
+        log.info "ssh-agent started"
+    fi
+
+    # Add the key: SSH_PRIVATE_KEY may be a file path (GitLab file variable)
+    if [[ -f "$SSH_PRIVATE_KEY" ]]; then
+        local _key_file
+        _key_file="$(mktemp)"
+        cp "$SSH_PRIVATE_KEY" "$_key_file"
+        # Ensure trailing newline (required by OpenSSH)
+        [[ -s "$_key_file" && "$(tail -c1 "$_key_file" | wc -l)" -eq 0 ]] && printf '\n' >> "$_key_file"
+        chmod 600 "$_key_file"
+        ssh-add "$_key_file" 2>/dev/null || {
+            log.warn "failed to add SSH key from file: $(ssh-add "$_key_file" 2>&1)"
+            rm -f "$_key_file"
+            return 0
+        }
+        rm -f "$_key_file"
+    else
+        # Inline key content
+        ssh-add - <<< "$SSH_PRIVATE_KEY" 2>/dev/null || {
+            log.warn "failed to add inline SSH key"
+            return 0
+        }
+    fi
+    log.info "SSH key loaded into agent"
 }
