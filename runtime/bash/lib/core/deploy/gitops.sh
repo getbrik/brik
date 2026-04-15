@@ -199,29 +199,34 @@ deploy.gitops.push_manifests() {
         return 0
     fi
 
-    # Clone into temp directory with trap-based cleanup
+    # Clone into temp directory (explicit cleanup -- trap RETURN is
+    # incompatible with kcov which enables functrace)
     local tmpdir
     tmpdir="$(mktemp -d)"
-    trap 'rm -rf "$tmpdir"' RETURN
 
     log.info "cloning config repo: $safe_url (branch: $branch)"
-    GIT_TERMINAL_PROMPT=0 git clone --depth 1 --branch "$branch" "$clone_url" "$tmpdir" || {
+    if ! GIT_TERMINAL_PROMPT=0 git clone --depth 1 --branch "$branch" "$clone_url" "$tmpdir"; then
         log.error "git clone failed"
+        rm -rf "$tmpdir"
         return "$BRIK_EXIT_EXTERNAL_FAIL"
-    }
+    fi
 
     # Clear target path and copy new manifests
     local dest="${tmpdir}/${target_path}"
     mkdir -p "$dest"
     rm -rf "${dest:?}"/*
-    cp -r "${source_dir}/." "${dest}/" || {
+    if ! cp -r "${source_dir}/." "${dest}/"; then
         log.error "failed to copy manifests to config repo"
+        rm -rf "$tmpdir"
         return "$BRIK_EXIT_IO_FAILURE"
-    }
+    fi
 
     # Substitute image tags if --image-tag was provided
     if [[ -n "$image_tag" ]]; then
-        runtime.require_tool yq || return "$BRIK_EXIT_MISSING_DEP"
+        if ! runtime.require_tool yq; then
+            rm -rf "$tmpdir"
+            return "$BRIK_EXIT_MISSING_DEP"
+        fi
         local manifest_file
         while IFS= read -r manifest_file; do
             yq -i "(.spec.template.spec.containers[]?.image) |= sub(\":[^:]*$\", \":${image_tag}\")" "$manifest_file" 2>/dev/null || true
@@ -231,30 +236,35 @@ deploy.gitops.push_manifests() {
     fi
 
     # Commit and push
-    git -C "$tmpdir" add . || {
+    if ! git -C "$tmpdir" add .; then
         log.error "git add failed"
+        rm -rf "$tmpdir"
         return "$BRIK_EXIT_EXTERNAL_FAIL"
-    }
+    fi
 
     local commit_exit=0
     git -C "$tmpdir" -c user.email="brik-ci@noreply" -c user.name="Brik CI" commit -m "$message" || commit_exit=$?
     if [[ "$commit_exit" -eq 1 ]]; then
         log.info "no changes to commit (manifests already up-to-date)"
+        rm -rf "$tmpdir"
         return 0
     elif [[ "$commit_exit" -ne 0 ]]; then
         log.error "git commit failed"
+        rm -rf "$tmpdir"
         return "$BRIK_EXIT_EXTERNAL_FAIL"
     fi
 
     local push_err
-    push_err="$(GIT_TERMINAL_PROMPT=0 git -C "$tmpdir" push 2>&1)" || {
+    if ! push_err="$(GIT_TERMINAL_PROMPT=0 git -C "$tmpdir" push 2>&1)"; then
         local safe_err
         safe_err="$(printf '%s' "$push_err" | sed 's|://[^@]*@|://***@|')"
         log.error "git push failed: $safe_err"
+        rm -rf "$tmpdir"
         return "$BRIK_EXIT_EXTERNAL_FAIL"
-    }
+    fi
 
     log.info "manifests pushed successfully to ${safe_url}"
+    rm -rf "$tmpdir"
     return 0
 }
 
@@ -365,12 +375,12 @@ deploy.gitops.diff() {
 
     local tmpdir
     tmpdir="$(mktemp -d)"
-    trap 'rm -rf "$tmpdir"' RETURN
 
-    GIT_TERMINAL_PROMPT=0 git clone --depth 1 --branch "$branch" "$clone_url" "$tmpdir" 2>/dev/null || {
+    if ! GIT_TERMINAL_PROMPT=0 git clone --depth 1 --branch "$branch" "$clone_url" "$tmpdir" 2>/dev/null; then
         log.error "git clone failed"
+        rm -rf "$tmpdir"
         return "$BRIK_EXIT_EXTERNAL_FAIL"
-    }
+    fi
 
     local remote_path="${tmpdir}/${target_path}"
     if [[ ! -d "$remote_path" ]]; then
@@ -378,9 +388,8 @@ deploy.gitops.diff() {
         remote_path="$(mktemp -d)"
     fi
 
-    diff -ruN "$remote_path" "$source_dir" || return 0
-    # diff returns 0 when identical, 1 when different -- but we invert:
-    # identical = return 0, different = diff already printed, return 1
+    diff -ruN "$remote_path" "$source_dir" || true
+    rm -rf "$tmpdir"
     return 0
 }
 
@@ -427,50 +436,57 @@ deploy.gitops.rollback() {
 
     local tmpdir
     tmpdir="$(mktemp -d)"
-    trap 'rm -rf "$tmpdir"' RETURN
 
-    GIT_TERMINAL_PROMPT=0 git clone --depth 10 --branch "$branch" "$clone_url" "$tmpdir" || {
+    if ! GIT_TERMINAL_PROMPT=0 git clone --depth 10 --branch "$branch" "$clone_url" "$tmpdir"; then
         log.error "git clone failed"
+        rm -rf "$tmpdir"
         return "$BRIK_EXIT_EXTERNAL_FAIL"
-    }
+    fi
 
     if [[ -n "$to_commit" ]]; then
         # Restore specific path from a given commit
-        git -C "$tmpdir" checkout "$to_commit" -- "${target_path:-.}" || {
+        if ! git -C "$tmpdir" checkout "$to_commit" -- "${target_path:-.}"; then
             log.error "git checkout to commit $to_commit failed"
+            rm -rf "$tmpdir"
             return "$BRIK_EXIT_INVALID_INPUT"
-        }
-        git -C "$tmpdir" -c user.email="brik-ci@noreply" -c user.name="Brik CI" \
-            commit -m "rollback: restore ${target_path:-repo} to $to_commit" || {
+        fi
+        if ! git -C "$tmpdir" -c user.email="brik-ci@noreply" -c user.name="Brik CI" \
+            commit -m "rollback: restore ${target_path:-repo} to $to_commit"; then
             log.error "git commit failed"
+            rm -rf "$tmpdir"
             return "$BRIK_EXIT_EXTERNAL_FAIL"
-        }
+        fi
     elif [[ -n "$target_path" ]]; then
         # Path-scoped rollback: restore from previous commit
-        git -C "$tmpdir" checkout HEAD~1 -- "$target_path" || {
+        if ! git -C "$tmpdir" checkout HEAD~1 -- "$target_path"; then
             log.error "git checkout HEAD~1 -- $target_path failed"
+            rm -rf "$tmpdir"
             return "$BRIK_EXIT_EXTERNAL_FAIL"
-        }
-        git -C "$tmpdir" -c user.email="brik-ci@noreply" -c user.name="Brik CI" \
-            commit -m "rollback: revert ${target_path} to previous version" || {
+        fi
+        if ! git -C "$tmpdir" -c user.email="brik-ci@noreply" -c user.name="Brik CI" \
+            commit -m "rollback: revert ${target_path} to previous version"; then
             log.error "git commit failed"
+            rm -rf "$tmpdir"
             return "$BRIK_EXIT_EXTERNAL_FAIL"
-        }
+        fi
     else
         # Unscoped rollback: revert the last commit entirely
-        git -C "$tmpdir" -c user.email="brik-ci@noreply" -c user.name="Brik CI" \
-            revert --no-edit HEAD || {
+        if ! git -C "$tmpdir" -c user.email="brik-ci@noreply" -c user.name="Brik CI" \
+            revert --no-edit HEAD; then
             log.error "git revert failed"
+            rm -rf "$tmpdir"
             return "$BRIK_EXIT_EXTERNAL_FAIL"
-        }
+        fi
     fi
 
-    GIT_TERMINAL_PROMPT=0 git -C "$tmpdir" push || {
+    if ! GIT_TERMINAL_PROMPT=0 git -C "$tmpdir" push; then
         log.error "git push failed after rollback"
+        rm -rf "$tmpdir"
         return "$BRIK_EXIT_EXTERNAL_FAIL"
-    }
+    fi
 
     log.info "rollback pushed successfully to ${safe_url}"
+    rm -rf "$tmpdir"
     return 0
 }
 

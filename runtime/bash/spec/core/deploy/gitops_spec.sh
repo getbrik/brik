@@ -6,6 +6,43 @@ Describe "deploy/gitops.sh"
   Include "$BRIK_HOME/runtime/bash/spec/support/mock_helper.sh"
 
   # =========================================================================
+  # _deploy.gitops._safe_url
+  # =========================================================================
+  Describe "_deploy.gitops._safe_url"
+    It "masks credentials in URL"
+      When call _deploy.gitops._safe_url "https://token123@github.com/org/repo.git"
+      The output should equal "https://***@github.com/org/repo.git"
+    End
+
+    It "returns URL unchanged when no credentials"
+      When call _deploy.gitops._safe_url "https://github.com/org/repo.git"
+      The output should equal "https://github.com/org/repo.git"
+    End
+  End
+
+  # =========================================================================
+  # _deploy.gitops._inject_token
+  # =========================================================================
+  Describe "_deploy.gitops._inject_token"
+    It "returns URL unchanged when token_var is empty"
+      When call _deploy.gitops._inject_token "https://github.com/org/repo.git" ""
+      The output should equal "https://github.com/org/repo.git"
+    End
+
+    It "injects token into URL"
+      inject_token_test() {
+        export MY_GIT_TOKEN="secret123"
+        _deploy.gitops._inject_token "https://github.com/org/repo.git" "MY_GIT_TOKEN"
+        local rc=$?
+        unset MY_GIT_TOKEN
+        return $rc
+      }
+      When call inject_token_test
+      The output should equal "https://secret123@github.com/org/repo.git"
+    End
+  End
+
+  # =========================================================================
   # deploy.gitops.render_manifests
   # =========================================================================
   Describe "deploy.gitops.render_manifests"
@@ -98,12 +135,40 @@ Describe "deploy/gitops.sh"
       End
     End
 
+    Describe "plain type with --set values"
+      setup_plain_set() {
+        TEST_WS="$(mktemp -d)"
+        mkdir -p "${TEST_WS}/src"
+        printf 'image:\n  tag: old\n' > "${TEST_WS}/src/values.yaml"
+      }
+      cleanup_plain_set() {
+        rm -rf "$TEST_WS"
+      }
+      Before 'setup_plain_set'
+      After 'cleanup_plain_set'
+
+      It "applies --set values via yq on plain manifests"
+        invoke_plain_set() {
+          deploy.gitops.render_manifests --source "${TEST_WS}/src" \
+            --output "${TEST_WS}/out" --type plain \
+            --set "image.tag=v2.0" >/dev/null 2>/dev/null || return 1
+          grep -q "v2.0" "${TEST_WS}/out/values.yaml"
+        }
+        When call invoke_plain_set
+        The status should be success
+      End
+    End
+
     Describe "kustomize type - require_tool failure"
       setup_kust_no_tool() {
         TEST_WS="$(mktemp -d)"
         mkdir -p "${TEST_WS}/src" "${TEST_WS}/out"
+        # Save PATH and restrict to exclude kustomize (CI runners may have it)
+        _SAVED_PATH="$PATH"
+        PATH="/usr/bin:/bin"
       }
       cleanup_kust_no_tool() {
+        PATH="$_SAVED_PATH"
         rm -rf "$TEST_WS"
       }
       Before 'setup_kust_no_tool'
@@ -111,7 +176,6 @@ Describe "deploy/gitops.sh"
 
       It "returns 3 when kustomize not on PATH"
         invoke_kust_no_tool() {
-          # Ensure kustomize is not on PATH (it shouldn't be in CI either)
           deploy.gitops.render_manifests --source "${TEST_WS}/src" --output "${TEST_WS}/out" --type kustomize 2>/dev/null
         }
         When call invoke_kust_no_tool
@@ -618,17 +682,21 @@ if [ "\$1" = "clone" ]; then
   dest="\$(echo "\$*" | rev | cut -d' ' -f1 | rev)"
   mkdir -p "\$dest"
 fi
+# Parse -C <dir> to get the working directory
+gitdir=""
+if [ "\$1" = "-C" ]; then
+  gitdir="\$2"
+fi
 # Capture manifest content during "git add" (before tmpdir is cleaned up)
-for arg; do
-  if [ "\$arg" = "add" ]; then
-    # \$2 is "-C", \$3 is the tmpdir
-    tmpdir="\$2"
-    if [ -d "\$tmpdir" ]; then
-      find "\$tmpdir" -name 'deployment.yaml' -exec cat {} \; > "${TEST_WS}/captured_manifest.yaml" 2>/dev/null
+case "\$*" in
+  *" add "*)
+    if [ -n "\$gitdir" ] && [ -d "\$gitdir" ]; then
+      find "\$gitdir" -name 'deployment.yaml' -type f 2>/dev/null | while read -r f; do
+        cat "\$f"
+      done > "${TEST_WS}/captured_manifest.yaml"
     fi
-    break
-  fi
-done
+    ;;
+esac
 exit 0
 SCRIPT
         chmod +x "${MOCK_BIN}/git"
@@ -850,6 +918,111 @@ SCRIPT
         The stderr should include "required tool not found"
       End
     End
+
+    Describe "with mock git - clone failure"
+      setup_diff_clone_fail() {
+        mock.setup
+        mock.create_exit "git" 1
+        mock.activate
+      }
+      cleanup_diff_clone_fail() {
+        mock.cleanup
+      }
+      Before 'setup_diff_clone_fail'
+      After 'cleanup_diff_clone_fail'
+
+      It "returns 5 when git clone fails"
+        When call deploy.gitops.diff --repo "https://git.example.com/repo" \
+          --branch main --path apps --source /tmp/src
+        The status should equal 5
+        The stderr should include "git clone failed"
+      End
+    End
+
+    Describe "successful diff"
+      setup_diff_ok() {
+        mock.setup
+        TEST_WS="$(mktemp -d)"
+        mkdir -p "${TEST_WS}/source"
+        printf 'key: value\n' > "${TEST_WS}/source/config.yaml"
+        # Mock git clone to create a target dir with different content
+        cat > "${MOCK_BIN}/git" <<SCRIPT
+#!/bin/sh
+if [ "\$1" = "clone" ]; then
+  dest="\$(echo "\$*" | rev | cut -d' ' -f1 | rev)"
+  mkdir -p "\$dest/apps"
+  printf 'key: old-value\n' > "\$dest/apps/config.yaml"
+fi
+exit 0
+SCRIPT
+        chmod +x "${MOCK_BIN}/git"
+        mock.activate
+      }
+      cleanup_diff_ok() {
+        mock.cleanup
+        rm -rf "$TEST_WS"
+      }
+      Before 'setup_diff_ok'
+      After 'cleanup_diff_ok'
+
+      It "returns 0 and outputs diff"
+        invoke_diff_ok() {
+          deploy.gitops.diff --repo "https://git.example.com/repo" \
+            --branch main --path apps --source "${TEST_WS}/source" >/dev/null 2>/dev/null
+        }
+        When call invoke_diff_ok
+        The status should be success
+      End
+
+      It "accepts --git-token-var option"
+        invoke_diff_token() {
+          export MY_GIT_TOKEN="ghp_testtoken123"
+          deploy.gitops.diff --repo "https://git.example.com/repo" \
+            --branch main --path apps --source "${TEST_WS}/source" \
+            --git-token-var MY_GIT_TOKEN >/dev/null 2>/dev/null
+          local rc=$?
+          unset MY_GIT_TOKEN
+          return $rc
+        }
+        When call invoke_diff_token
+        The status should be success
+      End
+    End
+
+    Describe "diff with missing remote path"
+      setup_diff_no_remote_path() {
+        mock.setup
+        TEST_WS="$(mktemp -d)"
+        mkdir -p "${TEST_WS}/source"
+        printf 'key: value\n' > "${TEST_WS}/source/config.yaml"
+        # Mock git clone: creates repo root but NOT the target path
+        cat > "${MOCK_BIN}/git" <<SCRIPT
+#!/bin/sh
+if [ "\$1" = "clone" ]; then
+  dest="\$(echo "\$*" | rev | cut -d' ' -f1 | rev)"
+  mkdir -p "\$dest"
+fi
+exit 0
+SCRIPT
+        chmod +x "${MOCK_BIN}/git"
+        mock.activate
+      }
+      cleanup_diff_no_remote_path() {
+        mock.cleanup
+        rm -rf "$TEST_WS"
+      }
+      Before 'setup_diff_no_remote_path'
+      After 'cleanup_diff_no_remote_path'
+
+      It "treats all files as new when remote path does not exist"
+        invoke_diff_new() {
+          deploy.gitops.diff --repo "https://git.example.com/repo" \
+            --branch main --path nonexistent --source "${TEST_WS}/source" >/dev/null 2>/dev/null
+        }
+        When call invoke_diff_new
+        The status should be success
+      End
+    End
   End
 
   # =========================================================================
@@ -955,6 +1128,105 @@ SCRIPT
         }
         When call invoke_rb_path_msg
         The status should be success
+      End
+    End
+
+    Describe "with --to-commit restores specific commit"
+      setup_rb_commit() {
+        mock.setup
+        TEST_WS="$(mktemp -d)"
+        MOCK_LOG="${TEST_WS}/mock_git.log"
+        cat > "${MOCK_BIN}/git" <<SCRIPT
+#!/bin/sh
+printf 'git %s\n' "\$*" >> "${MOCK_LOG}"
+if [ "\$1" = "clone" ]; then
+  dest="\$(echo "\$*" | rev | cut -d' ' -f1 | rev)"
+  mkdir -p "\$dest"
+fi
+exit 0
+SCRIPT
+        chmod +x "${MOCK_BIN}/git"
+        mock.activate
+      }
+      cleanup_rb_commit() {
+        mock.cleanup
+        rm -rf "$TEST_WS"
+      }
+      Before 'setup_rb_commit'
+      After 'cleanup_rb_commit'
+
+      It "uses git checkout <commit> -- <path> for commit-specific rollback"
+        invoke_rb_commit() {
+          deploy.gitops.rollback --repo "https://git.example.com/repo" \
+            --branch main --path apps --to-commit abc123 2>/dev/null || return 1
+          grep -q "checkout abc123 -- apps" "$MOCK_LOG"
+        }
+        When call invoke_rb_commit
+        The status should be success
+      End
+
+      It "commits with commit-specific message"
+        invoke_rb_commit_msg() {
+          deploy.gitops.rollback --repo "https://git.example.com/repo" \
+            --branch main --path apps --to-commit abc123 2>/dev/null || return 1
+          grep -q "rollback: restore apps to abc123" "$MOCK_LOG"
+        }
+        When call invoke_rb_commit_msg
+        The status should be success
+      End
+    End
+
+    Describe "clone failure"
+      setup_rb_clone_fail() {
+        mock.setup
+        mock.create_exit "git" 1
+        mock.activate
+      }
+      cleanup_rb_clone_fail() {
+        mock.cleanup
+      }
+      Before 'setup_rb_clone_fail'
+      After 'cleanup_rb_clone_fail'
+
+      It "returns 5 when git clone fails"
+        When call deploy.gitops.rollback --repo "https://git.example.com/repo" --branch main
+        The status should equal 5
+        The stderr should include "git clone failed"
+      End
+    End
+
+    Describe "git push failure after rollback"
+      setup_rb_push_fail() {
+        mock.setup
+        TEST_WS="$(mktemp -d)"
+        MOCK_LOG="${TEST_WS}/mock_git.log"
+        cat > "${MOCK_BIN}/git" <<SCRIPT
+#!/bin/sh
+printf 'git %s\n' "\$*" >> "${MOCK_LOG}"
+if [ "\$1" = "clone" ]; then
+  dest="\$(echo "\$*" | rev | cut -d' ' -f1 | rev)"
+  mkdir -p "\$dest"
+fi
+# Fail on push
+case "\$*" in
+  *push*) exit 1 ;;
+esac
+exit 0
+SCRIPT
+        chmod +x "${MOCK_BIN}/git"
+        mock.activate
+      }
+      cleanup_rb_push_fail() {
+        mock.cleanup
+        rm -rf "$TEST_WS"
+      }
+      Before 'setup_rb_push_fail'
+      After 'cleanup_rb_push_fail'
+
+      It "returns 5 when git push fails after rollback"
+        When call deploy.gitops.rollback --repo "https://git.example.com/repo" --branch main
+        The status should equal 5
+        The stderr should include "git push failed"
       End
     End
 

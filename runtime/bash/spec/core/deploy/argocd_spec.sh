@@ -144,6 +144,19 @@ Describe "deploy/argocd.sh"
         The status should be success
       End
 
+      It "passes ARGOCD_AUTH_TOKEN env var as fallback auth"
+        invoke_env_token() {
+          export ARGOCD_AUTH_TOKEN="env-token-value"
+          deploy.argocd.sync --app my-app 2>/dev/null || return 1
+          local rc=0
+          grep -q "\-\-auth-token env-token-value" "$MOCK_LOG" || rc=1
+          unset ARGOCD_AUTH_TOKEN
+          return $rc
+        }
+        When call invoke_env_token
+        The status should be success
+      End
+
       It "returns 4 when auth-token-var points to empty variable"
         invoke_empty_token() {
           unset MY_EMPTY_TOKEN 2>/dev/null
@@ -438,6 +451,34 @@ Describe "deploy/argocd.sh"
         The status should be success
         The stderr should include "my-app"
       End
+
+      It "passes --server to argocd"
+        invoke_rollback_server() {
+          deploy.argocd.rollback --app my-app --server https://argocd.example.com 2>/dev/null || return 1
+          grep -q "\-\-server" "$MOCK_LOG"
+        }
+        When call invoke_rollback_server
+        The status should be success
+      End
+
+      It "passes --auth-token to argocd when --auth-token-var set"
+        invoke_rollback_auth() {
+          export MY_ARGOCD_TOKEN="test-token-123"
+          deploy.argocd.rollback --app my-app --auth-token-var MY_ARGOCD_TOKEN 2>/dev/null || return 1
+          grep -q "\-\-auth-token" "$MOCK_LOG"
+          local rc=$?
+          unset MY_ARGOCD_TOKEN
+          return $rc
+        }
+        When call invoke_rollback_auth
+        The status should be success
+      End
+
+      It "returns 2 for unknown option"
+        When call deploy.argocd.rollback --app my-app --badopt foo
+        The status should equal 2
+        The stderr should include "unknown option"
+      End
     End
 
     Describe "dry-run mode"
@@ -586,6 +627,37 @@ Describe "deploy/argocd.sh"
         When call deploy.argocd.diff --app my-app
         The status should be success
         The stderr should include "dry-run"
+      End
+    End
+
+    Describe "with --server flag"
+      setup_diff_server() {
+        mock.setup
+        TEST_WS="$(mktemp -d)"
+        MOCK_LOG="${TEST_WS}/mock_argocd.log"
+        mock.create_logging "argocd" "$MOCK_LOG"
+        mock.activate
+      }
+      cleanup_diff_server() {
+        mock.cleanup
+        rm -rf "$TEST_WS"
+      }
+      Before 'setup_diff_server'
+      After 'cleanup_diff_server'
+
+      It "passes --server to argocd diff command"
+        invoke_diff_server() {
+          deploy.argocd.diff --app my-app --server https://argocd.local 2>/dev/null || return 1
+          grep -q "\-\-server https://argocd.local" "$MOCK_LOG"
+        }
+        When call invoke_diff_server
+        The status should be success
+      End
+
+      It "returns 2 for unknown option"
+        When call deploy.argocd.diff --app my-app --badopt
+        The status should equal 2
+        The stderr should include "unknown option"
       End
     End
   End
@@ -845,6 +917,28 @@ SCRIPT
         The status should equal 1
       End
     End
+
+    Describe "Healthy but OutOfSync"
+      setup_partial_sync() {
+        mock.setup
+        mock.create_script "argocd" 'echo "{\"status\":{\"health\":{\"status\":\"Healthy\"},\"sync\":{\"status\":\"OutOfSync\"}}}"'
+        mock.create_script "jq" 'exec /usr/bin/jq "$@"'
+        mock.activate
+      }
+      cleanup_partial_sync() {
+        mock.cleanup
+      }
+      Before 'setup_partial_sync'
+      After 'cleanup_partial_sync'
+
+      It "returns 1 when Healthy but OutOfSync"
+        invoke_healthy_outofsync() {
+          deploy.argocd.is_synced --app my-app 2>/dev/null
+        }
+        When call invoke_healthy_outofsync
+        The status should equal 1
+      End
+    End
   End
 
   # ---------------------------------------------------------------------------
@@ -879,6 +973,20 @@ SCRIPT
       When call deploy.argocd.deploy --app my-app --repo https://git.example.com/config.git --branch main --path apps/myapp
       The status should equal 2
       The stderr should include "source is required"
+    End
+
+    It "returns 2 for unknown option"
+      When call deploy.argocd.deploy --app my-app --repo https://git.example.com/config.git \
+        --branch main --path apps --source /tmp/rendered --badopt foo
+      The status should equal 2
+      The stderr should include "unknown option"
+    End
+
+    It "returns 2 for invalid app name"
+      When call deploy.argocd.deploy --app MY_APP --repo https://git.example.com/config.git \
+        --branch main --path apps --source /tmp/rendered
+      The status should equal 2
+      The stderr should include "invalid ArgoCD app name"
     End
   End
 

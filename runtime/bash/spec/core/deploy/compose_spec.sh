@@ -284,6 +284,157 @@ Describe "deploy/compose.sh"
       End
     End
 
+    Describe "path traversal validation"
+      setup_path_traversal() {
+        mock.setup
+        TEST_WS="$(mktemp -d)"
+        mock.create_logging "docker" "${TEST_WS}/mock.log"
+        mock.activate
+      }
+      cleanup_path_traversal() {
+        mock.cleanup
+        rm -rf "$TEST_WS"
+      }
+      Before 'setup_path_traversal'
+      After 'cleanup_path_traversal'
+
+      It "returns 2 when --path contains .."
+        When call deploy.compose.run --namespace myapp \
+          --file "${TEST_WS}/docker-compose.yml" \
+          --host deploy.example.com --path "/srv/../../etc"
+        The status should equal 2
+        The stderr should include "must not contain '..'"
+      End
+    End
+
+    Describe "local deploy without namespace"
+      setup_no_ns() {
+        mock.setup
+        TEST_WS="$(mktemp -d)"
+        MOCK_LOG="${TEST_WS}/mock_docker.log"
+        printf 'version: "3"\n' > "${TEST_WS}/docker-compose.yml"
+        mock.create_logging "docker" "$MOCK_LOG"
+        mock.activate
+      }
+      cleanup_no_ns() {
+        mock.cleanup
+        rm -rf "$TEST_WS"
+      }
+      Before 'setup_no_ns'
+      After 'cleanup_no_ns'
+
+      It "omits -p flag when no --namespace"
+        invoke_no_ns() {
+          deploy.compose.run --file "${TEST_WS}/docker-compose.yml" 2>/dev/null || return 1
+          ! grep -q "\-p" "$MOCK_LOG"
+        }
+        When call invoke_no_ns
+        The status should be success
+      End
+    End
+
+    Describe "local docker failure"
+      setup_docker_fail() {
+        mock.setup
+        TEST_WS="$(mktemp -d)"
+        printf 'version: "3"\n' > "${TEST_WS}/docker-compose.yml"
+        mock.create_exit "docker" 1
+        mock.activate
+      }
+      cleanup_docker_fail() {
+        mock.cleanup
+        rm -rf "$TEST_WS"
+      }
+      Before 'setup_docker_fail'
+      After 'cleanup_docker_fail'
+
+      It "returns 5 when local docker compose fails"
+        When call deploy.compose.run --namespace myapp \
+          --file "${TEST_WS}/docker-compose.yml"
+        The status should equal 5
+        The stderr should include "docker compose failed"
+      End
+    End
+
+    Describe "scp failure"
+      setup_scp_fail() {
+        mock.setup
+        TEST_WS="$(mktemp -d)"
+        printf 'version: "3"\n' > "${TEST_WS}/docker-compose.yml"
+        mock.create_exit "scp" 1
+        mock.create_logging "ssh" "${TEST_WS}/mock.log"
+        mock.create_logging "docker" "${TEST_WS}/mock.log"
+        mock.activate
+      }
+      cleanup_scp_fail() {
+        mock.cleanup
+        rm -rf "$TEST_WS"
+      }
+      Before 'setup_scp_fail'
+      After 'cleanup_scp_fail'
+
+      It "returns 5 when scp fails"
+        When call deploy.compose.run --namespace myapp \
+          --file "${TEST_WS}/docker-compose.yml" \
+          --host deploy.example.com --path /srv/myapp
+        The status should equal 5
+        The stderr should include "scp failed"
+      End
+    End
+
+    Describe "remote ssh failure"
+      setup_ssh_fail() {
+        mock.setup
+        TEST_WS="$(mktemp -d)"
+        printf 'version: "3"\n' > "${TEST_WS}/docker-compose.yml"
+        mock.create_logging "scp" "${TEST_WS}/mock.log"
+        mock.create_exit "ssh" 1
+        mock.create_logging "docker" "${TEST_WS}/mock.log"
+        mock.activate
+      }
+      cleanup_ssh_fail() {
+        mock.cleanup
+        rm -rf "$TEST_WS"
+      }
+      Before 'setup_ssh_fail'
+      After 'cleanup_ssh_fail'
+
+      It "returns 5 when remote docker compose fails"
+        When call deploy.compose.run --namespace myapp \
+          --file "${TEST_WS}/docker-compose.yml" \
+          --host deploy.example.com --path /srv/myapp
+        The status should equal 5
+        The stderr should include "remote docker compose failed"
+      End
+    End
+
+    Describe "compose.yaml auto-detection"
+      setup_compose_yaml() {
+        mock.setup
+        TEST_WS="$(mktemp -d)"
+        MOCK_LOG="${TEST_WS}/mock_docker.log"
+        printf 'version: "3"\n' > "${TEST_WS}/compose.yaml"
+        mock.create_logging "docker" "$MOCK_LOG"
+        mock.activate
+      }
+      cleanup_compose_yaml() {
+        mock.cleanup
+        rm -rf "$TEST_WS"
+      }
+      Before 'setup_compose_yaml'
+      After 'cleanup_compose_yaml'
+
+      It "prefers compose.yaml over docker-compose.yml"
+        invoke_compose_yaml() {
+          cd "$TEST_WS" || return 1
+          deploy.compose.run --namespace myapp 2>/dev/null || return 1
+          grep -q "compose.yaml" "$MOCK_LOG"
+        }
+        When call invoke_compose_yaml
+        The status should be success
+      End
+    End
+
     Describe "BRIK_DRY_RUN env var"
       setup_env_dryrun() {
         mock.setup

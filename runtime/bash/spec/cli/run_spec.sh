@@ -152,7 +152,7 @@ Describe "brik run"
       When run script "$BRIK_BIN" run stage lint --workspace "$WORKSPACE" --config "$CONFIG"
       The status should be success
       The stdout should include "lint disabled"
-      The stderr should include "stage lint completed successfully"
+      The stderr should include "stage lint skipped"
     End
   End
 
