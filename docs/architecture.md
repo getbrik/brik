@@ -35,9 +35,10 @@ These principles guide every implementation decision in Brik.
 Every Brik pipeline follows the same stage sequence:
 
 ```
-Init -> Release -> Build -> Quality || Security -> Test -> Package -> Deploy -> Notify
+Init -> Release -> Build -> Lint || SAST || Scan || Test -> Package -> Container Scan -> Deploy -> Notify
 ```
 
+Lint, SAST, Scan, and Test all run **in parallel** after Build (same `verify` stage).
 Users do not define pipeline structure. They configure behavior within stages.
 This ensures consistency, auditability, and predictability across all projects.
 
@@ -69,8 +70,8 @@ and invoke `stage.run`. No business logic is allowed in shared libraries.
 ### 5. module.function naming
 
 Public functions use a dotted namespace mirroring the module hierarchy:
-`build.node`, `test.run`, `quality.lint`, `deploy.k8s`, `config.get`. This makes
-functions self-documenting and avoids name collisions.
+`build.node.run`, `test.node.cmd`, `quality.lint.run`, `deploy.k8s.run`, `config.get`.
+This makes functions self-documenting and avoids name collisions.
 
 ### 6. Test everything
 
@@ -107,7 +108,7 @@ and step summary generation. Knows nothing about CI/CD -- it only runs functions
 with observability.
 
 **Layer 1 -- brik-lib** (`runtime/bash/lib/core/`).
-Reusable CI/CD business functions organized by domain: `build.node`, `build.java`,
+Reusable CI/CD business functions organized by domain: `build.node.run`, `build.java.run`,
 `test.run`, `quality.lint.run`, `quality.format.run`, `security.run`, etc.
 Each function knows how to perform one CI/CD action for one stack or tool. Layer 1
 depends on Layer 0 for logging and context but has no knowledge of any CI platform.
@@ -127,19 +128,21 @@ overrides. Only `version` and `project.name` are required.
 
 ## Stage Flow
 
-The pipeline executes 11 stages in a fixed order. Lint, SAST, Scan, and Test run
-in parallel after Build. Package waits for Test to pass and for Lint/SAST/Scan to
-succeed (quality gate). Container Scan runs after Package.
+The pipeline executes 11 stages in a fixed order.
 
 ```
 init ─> release
          └─> build ─┬─> lint ──────────┐
-                     ├─> sast ──────────┤ quality gate
+                     ├─> sast ──────────┤ (optional for package/deploy)
                      ├─> scan ──────────┤
                      └─> test ──────────┼─> package ─> container_scan
-                                        │
-                                        └─> deploy ─> notify
+                                        │                    │ (optional)
+                                        └────────────────────┴─> deploy ─> notify
 ```
+
+Deploy has a **mandatory** dependency on Test and **optional** dependencies on
+Package, Container Scan, Lint, SAST, and Scan. Package waits for Test to pass
+and for Lint/SAST/Scan to succeed (quality gate).
 
 | Stage | File | What happens |
 |-------|------|--------------|
@@ -152,7 +155,7 @@ init ─> release
 | Test | `stages/test.sh` | Run test suite per stack (jest, junit, pytest, xunit, cargo test) |
 | Package | `stages/package.sh` | Build Docker image, create archives, publish artifacts |
 | Container Scan | `stages/container_scan.sh` | Scan built container images for vulnerabilities |
-| Deploy | `stages/deploy.sh` | Deploy to target environment (k8s, cloud, custom) |
+| Deploy | `stages/deploy.sh` | Deploy to target environment (k8s, helm, gitops, compose, ssh) |
 | Notify | `stages/notify.sh` | Send pipeline results (Slack, email, webhooks) |
 
 Lint, SAST, Scan, and Test run in parallel on GitLab CI (same `verify` stage).
@@ -168,6 +171,7 @@ Source: `runtime/bash/lib/runtime/stage.sh`.
 ```
 stage.run("build", stages.build)
   │
+  ├─ banner.stage              # Display stage banner (name + ASCII logo)
   ├─ context.create            # Create execution context (temp file)
   ├─ stage.create_log_file     # Create dedicated log file
   │
@@ -206,27 +210,54 @@ Key decisions:
 
 ```
 brik/
-├─ bin/brik                      # CLI (validate, doctor, init, run, version)
+├─ bin/brik                        # CLI (validate, doctor, init, run, version)
 ├─ runtime/bash/
 │  ├─ lib/
-│  │  ├─ runtime/                # Layer 0 -- stage.run, logging, hooks, context, errors
-│  │  ├─ core/                   # Layer 1 -- brik-lib business functions
-│  │  │  ├─ build.sh + build/    #   Dispatchers + stack-specific (node, java, python, docker)
-│  │  │  ├─ test.sh  + test/     #   Test runners per stack (node, java, python, rust, dotnet)
-│  │  │  ├─ quality.sh + quality/#   Lint, format, type_check
+│  │  ├─ runtime/                  # Layer 0 -- stage.run, logging, hooks, context, errors
+│  │  │  ├─ stage.sh               #   Lifecycle engine (stage.run)
+│  │  │  ├─ logging.sh             #   Structured logging (log.info, log.error, etc.)
+│  │  │  ├─ context.sh             #   Execution context (key-value store per stage)
+│  │  │  ├─ hooks.sh               #   Pre/post stage hooks
+│  │  │  ├─ error.sh               #   Exit codes and error handling
+│  │  │  ├─ summary.sh             #   Stage summary generation
+│  │  │  ├─ banner.sh              #   Stage banner display
+│  │  │  ├─ tools.sh               #   Tool requirement checks (runtime.require_tool)
+│  │  │  ├─ setup.sh               #   Prerequisite installation (yq, jq, stack tools)
+│  │  │  ├─ pipeline-env.sh        #   Pipeline environment propagation
+│  │  │  ├─ runner-images.sh       #   Runner image resolution
+│  │  │  └─ version-info.sh        #   Version and schema exports
+│  │  ├─ core/                     # Layer 1 -- brik-lib business functions
+│  │  │  ├─ build.sh + build/      #   Dispatchers + stack-specific (node, java, python, rust, dotnet, docker)
+│  │  │  ├─ test.sh  + test/       #   Test runners per stack (node, java, python, rust, dotnet)
+│  │  │  ├─ quality.sh + quality/  #   Lint, format, type_check
 │  │  │  ├─ security.sh + security/#  SAST, deps, secrets, license, IaC, container
-│  │  │  ├─ config.sh + config/  #   Config reader + stack defaults
-│  │  │  ├─ deploy.sh + deploy/  #   Deploy strategies (k8s)
-│  │  │  ├─ publish.sh + publish/#   Registry publishing (npm, pypi, maven, cargo, nuget, docker)
-│  │  │  └─ env.sh  git.sh  version.sh  condition.sh
-│  │  └─ stages/                 # 11 entry points (init, release, build, lint, sast, scan, ...)
-│  └─ spec/                      # ShellSpec tests (mirrors lib/ structure)
-├─ shared-libs/                  # Layer 2 -- platform adapters
-│  ├─ gitlab/                    #   GitLab CI pipeline template
-│  ├─ jenkins/                   #   Jenkins Shared Library (PoC)
-│  └─ github/                    #   GitHub Actions (planned)
-├─ schemas/config/v1/            # JSON Schema for brik.yml
-└─ examples/                     # minimal-node, java-maven, python-pytest, mono-dotnet
+│  │  │  ├─ config.sh + config/    #   Config reader + per-stack defaults
+│  │  │  ├─ deploy.sh + deploy/    #   Deploy targets (k8s, helm, gitops, compose, ssh, argocd)
+│  │  │  │                         #   + strategy, health checks, profiles
+│  │  │  ├─ publish.sh + publish/  #   Registry publishing (npm, pypi, maven, cargo, nuget, docker)
+│  │  │  ├─ notify.sh              #   Notification dispatcher (slack, email, webhook)
+│  │  │  ├─ doctor.sh              #   Prerequisite checks per stack
+│  │  │  ├─ validate.sh            #   Config validation against JSON Schema
+│  │  │  ├─ release.sh             #   Release version computation
+│  │  │  ├─ changelog.sh           #   Changelog generation
+│  │  │  ├─ artifact.sh            #   Artifact management
+│  │  │  ├─ cache.sh               #   Build cache management
+│  │  │  ├─ condition.sh           #   Deploy condition evaluation
+│  │  │  ├─ env.sh                 #   Environment variable helpers
+│  │  │  ├─ git.sh                 #   Git operations
+│  │  │  ├─ version.sh             #   Version parsing
+│  │  │  ├─ _loader.sh             #   Module loading (3-level resolution)
+│  │  │  └─ _deps.sh               #   Internal dependency declarations
+│  │  └─ stages/                   # 11 entry points (init, release, build, lint, sast, scan, ...)
+│  └─ spec/                        # ShellSpec tests (mirrors lib/ structure)
+├─ shared-libs/                    # Layer 2 -- platform adapters
+│  ├─ common/scripts/               #   Shared logic (base-wrapper.sh)
+│  ├─ gitlab/                      #   GitLab CI pipeline template
+│  ├─ jenkins/                     #   Jenkins Shared Library
+│  ├─ local/                       #   Local execution wrapper
+│  └─ github/                      #   GitHub Actions (planned)
+├─ schemas/config/v1/              # JSON Schema for brik.yml
+└─ examples/                       # minimal-node, java-maven, python-pytest, mono-dotnet
 ```
 
 ---
@@ -239,18 +270,21 @@ To add support for a new stack (e.g., `go`):
    and define any stack-specific properties (e.g., `go_version`).
 
 2. **Build module** -- create `runtime/bash/lib/core/build/go.sh` implementing
-   `build.go()` with the standard build logic for the stack.
+   `build.go.run()` with the standard build logic for the stack.
 
 3. **Test module** -- create `runtime/bash/lib/core/test/go.sh` implementing
-   `test.go()` with the stack's test runner.
+   `test.go.cmd()` (returns the test command) and `test.go.run_cmd()` (executes it).
 
 4. **Config module** -- create `runtime/bash/lib/core/config/go.sh` implementing
-   `config.go.defaults()` with sensible defaults for the stack.
+   `config.go.default()` (sensible defaults), `config.go.export_build_vars()` (export
+   stack-specific build variables), and `config.go.validate_coherence()` (cross-field
+   validation).
 
-5. **Dispatchers** -- add the `go)` case to the dispatchers in `core/build.sh`,
-   `core/test.sh`, and any other module that routes by stack.
+5. **Dynamic dispatch** -- no manual wiring needed. Dispatchers like `core/build.sh`
+   and `core/test.sh` use `brik.use "build.${stack}"` to dynamically load the correct
+   module at runtime. The new `build/go.sh` is picked up automatically.
 
-6. **CLI doctor** -- add Go-specific prerequisite checks to `bin/brik` (doctor command).
+6. **Doctor** -- add Go-specific prerequisite checks to `runtime/bash/lib/core/doctor.sh`.
 
 7. **Example** -- create `examples/minimal-go/brik.yml` with a minimal config.
 
@@ -286,7 +320,7 @@ Brik uses three levels of testing:
 
 ### Unit tests (ShellSpec)
 
-Hundreds of examples covering runtime modules, core library functions, and stage entry points.
+Nearly 2000 examples covering runtime modules, core library functions, and stage entry points.
 Each source file in `lib/` has a corresponding `_spec.sh` file in `spec/`. Tests use
 ShellSpec's mocking and assertion framework to test functions in isolation.
 

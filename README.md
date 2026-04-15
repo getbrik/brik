@@ -3,8 +3,8 @@
 </p>
 
 <p align="center">
-  <b>Brik, the portable pipeline standard.</b><br>
-  <b>Write once. Run everywhere.</b>
+  <b>A complete CI/CD pipeline, out of the box.</b><br>
+  <b>Describe your project. Brik does the rest.</b>
 </p>
 
 <p align="center">
@@ -21,77 +21,140 @@
   <a href="https://github.com/getbrik/briklab">Briklab</a>
 </p>
 
-## What is Brik
+## The problem
 
-Every team writes the same CI/CD logic -- build, test, lint, scan, deploy -- then
-rewrites it when switching platforms. Brik ends this cycle.
+CI/CD pipelines are:
 
-**Write once**: describe your project in a single `brik.yml` (stack, tools, thresholds).
-Brik handles the rest: a fixed pipeline with sensible defaults that works out of the box.
+- Rewritten in every project
+- Tied to specific platforms
+- Hard to maintain and evolve
 
-**Run everywhere**: the same `brik.yml` produces a production-grade pipeline on
-GitLab CI, Jenkins, and GitHub Actions. No per-platform glue, no vendor lock-in.
+Even though… they all do the same thing.
 
-- **4 lines to start** -- a minimal config gets you build, test, lint, and security scanning
-- **Portable by design** -- Bash runtime runs identically on any CI platform
-- **Battle-tested** -- ShellSpec unit tests, end-to-end tests, ShellCheck linting, kcov coverage
+## The solution: Brik
+
+Brik provides a **ready-to-use CI/CD pipeline** that works out of the box.
+
+- No need to write pipeline logic  
+- No need to learn platform-specific syntax  
+
+You just describe your project in `brik.yml`.
+
+## What you write
+
+```yaml
+version: 1
+
+project:
+  name: my-node-app
+  stack: node
+
+test:
+  coverage:
+    threshold: 80
+
+deploy:
+  workflow: trunk-based
+  environments:
+    staging:
+      target: k8s
+      namespace: staging
+    production:
+      target: helm
+      chart: ./charts/my-app
+```
+
+That’s it. Brik gives you build, test, lint, security scanning, and deployment (with sensible defaults you can override).
 
 ## How it works
 
 ```mermaid
 flowchart LR
-    A["<b>1. brik.yml</b><br/>Your pipeline config"]
-    B["<b>2. brik init</b>"]
+    A["<b>1. brik.yml</b><br/>Your project"]
+    B["<b>2. brik init</b><br/>One-time setup"]
     GL[".gitlab-ci.yml"]
-    GH[".github/workflows/ci.yml"]
     JK["Jenkinsfile"]
     LO["brik run"]
-    C["<b>3. Shared library</b><br/>Bash runtime<br/>(Git repo)"]
-    D["<b>4. CI/CD pipeline</b><br/>Build, lint, SAST,<br/>scan, test, deploy"]
+    C["<b>3. Pipeline runs</b><br/>Build, test, lint,<br/>scan, deploy"]
 
     A --> B
     B --> GL
-    B --> GH
     B --> JK
     B --> LO
     GL --> C
-    GH --> C
     JK --> C
     LO --> C
-    C --> D
 ```
 
-1. **`brik.yml`** -- describe your project: stack, tools, thresholds. One file, platform-agnostic.
-2. **`brik init`** -- generates the bootstrap file for your CI platform: `.gitlab-ci.yml`, GitHub workflow, or `Jenkinsfile`. You can also run locally with `brik run`.
-3. **Shared library** -- portable Bash scripts hosted in a Git repository. Each bootstrap file references it. The library reads `brik.yml` and executes each stage.
-4. **Pipeline runs** -- build, test, lint, security scan, deploy -- with sensible defaults. Same result whether on CI or locally.
+1. **Describe your project** -- stack, tools, thresholds in `brik.yml`
+2. **Run `brik init` once** -- generates a thin bootstrap file for your platform (`.gitlab-ci.yml`, `Jenkinsfile`). You can also run locally with `brik run`.
+3. **Your pipeline runs** -- build, test, lint, security scan, deploy. Same behavior on every platform.
 
-## Install
+## Getting started
+
+### GitLab CI
+
+1. Clone the Brik repo onto your GitLab instance (`brik/brik`)
+2. Push the GitLab templates as a separate project (`brik/gitlab-templates`)
+3. Add a `.gitlab-ci.yml` to your project:
+
+```yaml
+include:
+  - project: 'brik/gitlab-templates'
+    ref: v0.1.0
+    file: '/templates/pipeline.yml'
+```
+
+Requires a Runner with Docker executor. Use [brik-images](https://github.com/getbrik/brik-images)
+as runner images or ensure your images have bash, git, yq, jq, and your stack tools.
+
+See [shared-libs/gitlab/README.md](shared-libs/gitlab/README.md) for the full setup guide
+(runner configuration, image requirements, troubleshooting).
+
+### Jenkins
+
+1. Clone the Brik repo to a Git server accessible by Jenkins (GitHub, Gitea, etc.)
+2. Add it as a **trusted** Global Pipeline Library in Jenkins (via CasC or UI)
+3. Add a `Jenkinsfile` to your project:
+
+```groovy
+@Library('brik') _
+brikPipeline()
+```
+
+Agents must have bash 4+, yq, jq, and your stack tools. Use [brik-images](https://github.com/getbrik/brik-images)
+as Docker agents or install the tools on your nodes.
+
+See [shared-libs/jenkins/README.md](shared-libs/jenkins/README.md) for the full setup guide
+(CasC configuration, sandbox settings, variable mapping, troubleshooting).
+
+### Local (CLI)
+
+For running pipelines locally or validating your `brik.yml`:
 
 ```bash
-# One-liner (recommended)
+# One-liner
 curl -fsSL https://raw.githubusercontent.com/getbrik/brik/main/scripts/install.sh | bash
 
-# Homebrew (macOS/Linux)
+# or Homebrew (macOS/Linux)
 brew install getbrik/tap/brik
 ```
 
-After installation, run `brik doctor` to check your environment.
+Then run `brik doctor` to check your environment.
 
-<details>
-<summary><strong>Prerequisites (local usage only)</strong></summary>
+On CI, [brik-images](https://github.com/getbrik/brik-images) (`ghcr.io/getbrik/brik-runner-*`)
+provide pre-built runner images with all prerequisites and stack tools included.
+The shared library handles image selection automatically (see Getting started above).
 
-These tools are only needed to run `brik` commands locally (validate, doctor, run).
-On CI platforms, the shared library handles everything.
+For local usage, install the required tools:
 
-| OS | Command |
-|----|---------|
-| macOS | `brew install bash yq jq check-jsonschema` |
-| Debian/Ubuntu | `sudo apt install -y bash jq` + [yq](https://github.com/mikefarah/yq) + `pip install check-jsonschema` |
-| Fedora/RHEL | `sudo dnf install -y bash jq` + [yq](https://github.com/mikefarah/yq) + `pip install check-jsonschema` |
-| Windows | `scoop install git bash yq jq python` + `pip install check-jsonschema` |
-
-</details>
+| Brik core | Stack tools |
+|-----------|-------------|
+| bash 4+, [yq](https://github.com/mikefarah/yq), [jq](https://jqlang.github.io/jq/), [check-jsonschema](https://github.com/python-jsonschema/check-jsonschema) | **node**: node, npm/yarn/pnpm |
+| | **java**: java, mvn/gradle |
+| | **python**: python3, pip3/poetry/uv |
+| | **rust**: rustc, cargo |
+| | **dotnet**: dotnet |
 
 ## Pipeline Flow
 
@@ -143,7 +206,7 @@ Lint/SAST/Scan to succeed (or be skipped).
 | Package | Artifacts | Docker image build + artifact publishing (npm, maven, pypi, cargo, nuget) |
 | Container Scan | Image security | Scan built container images for vulnerabilities |
 | Deploy | Deployment | Multi-environment with Git workflow profiles, condition-based (branch/tag) |
-| Notify | Notifications | Pipeline summary (always runs on CI; opt-in locally via `--with-deploy`) |
+| Notify | Notifications | Pipeline summary (always runs on CI; included locally when using `--with-deploy`) |
 
 The pipeline is fully deterministic -- no manual triggers. Release runs unconditionally
 (computes version), but only finalizes on tag pushes. Package runs on tag pushes
@@ -159,7 +222,7 @@ via `brik.yml`.
 |-------|-----------|-------|------|------|
 | **node** | `package.json` | npm/yarn/pnpm | jest/npm | eslint/biome |
 | **java** | `pom.xml` / `build.gradle(.kts)` | mvn/gradle | junit/gradle | checkstyle |
-| **python** | `pyproject.toml` / `setup.py` / `Pipfile` | pip/poetry/uv/pipenv | pytest/unittest/tox | ruff |
+| **python** | `pyproject.toml` / `setup.py` / `requirements.txt` | pip/poetry/uv/pipenv | pytest/unittest/tox | ruff |
 | **dotnet** | `*.csproj` / `*.sln` | dotnet build | dotnet test | dotnet-format |
 | **rust** | `Cargo.toml` | cargo build | cargo | clippy |
 
@@ -182,23 +245,22 @@ Deploy targets:
 | Target | Description |
 |--------|-------------|
 | **k8s** | `kubectl apply` with optional kustomize |
-| **gitops** | Clone config repo, update image tag, push (ArgoCD/FluxCD) |
+| **gitops** | Clone config repo, update image tag, push (controller: `argocd`) |
 | **helm** | `helm upgrade --install` with values and namespace |
 | **compose** | `docker compose up` locally or via SSH |
 | **ssh** | rsync + restart command over SSH |
-| **argocd** | Direct ArgoCD sync, wait, rollback, diff, status |
 
 Deployment strategies: **rolling** (default), **blue-green** (service selector switch), **canary** (replica scaling).
 
 Post-deploy health checks: HTTP polling with configurable timeout/interval, Kubernetes rollout status.
 
-Conditions support `==`, `!=`, `=~` operators and compound `AND`/`OR` expressions:
+Conditions support `==` and `=~` operators and compound `AND`/`OR` expressions:
 
 ```yaml
 deploy:
   environments:
     production:
-      condition: "tag =~ 'v*' AND branch == 'main'"
+      when: "tag =~ 'v*' AND branch == 'main'"
 ```
 
 ## Configuration (`brik.yml`)
@@ -394,10 +456,10 @@ Tracked automatically via [shellmetrics](https://github.com/shellspec/shellmetri
 - [x] Local pipeline execution (`brik run pipeline`)
 - [x] Official Docker images (`ghcr.io/getbrik/brik-runner-*`)
 - [x] Multi-environment deploy with Git workflow profiles (trunk-based, git-flow, github-flow)
-- [x] Deploy targets: k8s, gitops, helm, compose, ssh, argocd
+- [x] Deploy targets: k8s, gitops (argocd), helm, compose, ssh
 - [x] Deployment strategies: rolling, blue-green, canary
 - [x] Health checks (HTTP polling, k8s rollout)
-- [x] 1936 tests (ShellSpec + ShellCheck + kcov, 92% coverage) + 24 E2E scenarios (GitLab + Jenkins)
+- [x] 2016 tests (ShellSpec + ShellCheck + kcov, 92% coverage) + 24 E2E scenarios (GitLab + Jenkins)
 
 **Next:**
 - [ ] GitHub Actions reusable workflows

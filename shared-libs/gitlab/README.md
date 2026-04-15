@@ -30,20 +30,22 @@ That's it. Your project now has a full CI/CD pipeline.
 The pipeline implements this stage sequence:
 
 ```
-Init -> Release -> Build -> Quality || Security -> Test -> Package -> Deploy -> Notify
+Init -> Release -> Build -> Lint||SAST||Scan||Test -> Package -> Container Scan -> Deploy -> Notify
 ```
 
 - **Init**: Detects stack, validates `brik.yml`, sets up environment
 - **Release**: Computes semantic version (conditional, on tags)
 - **Build**: Compiles/builds via `brik-lib` (`build.run`)
-- **Quality**: Lint + format checks (runs in parallel with Security)
-- **Security**: Dependency + secret scanning (runs in parallel with Quality)
-- **Test**: Runs tests via `brik-lib` (`test.run`)
+- **Lint**: Code quality checks (parallel with SAST/Scan/Test)
+- **SAST**: Static analysis, license, IaC scans (parallel, uses `brik-runner-analysis` image)
+- **Scan**: Dependency audit + secret scanning (parallel, uses `brik-runner-scanner` image)
+- **Test**: Runs tests via `brik-lib` (parallel with Lint/SAST/Scan)
 - **Package**: Container build (conditional, on tags)
-- **Deploy**: Deploy to target environment (conditional)
+- **Container Scan**: Image vulnerability scan (uses `brik-runner-scanner` image)
+- **Deploy**: Deploy to target environment (conditional, uses `brik-runner-deploy` image)
 - **Notify**: Pipeline summary (always runs)
 
-Quality and Security run in **parallel** (same GitLab stage with separate `needs`).
+Lint, SAST, Scan, and Test run in **parallel** (GitLab `verify` stage with separate `needs`).
 
 ## Setup on Your GitLab Instance
 
@@ -77,21 +79,89 @@ git push origin v0.1.0
 
 Create `.gitlab-ci.yml` in your project root (see Quick Start above).
 
+## Runner Images
+
+The pipeline uses specialized [brik-images](https://github.com/getbrik/brik-images) for each stage:
+
+| Variable | Default image | Used by |
+|----------|---------------|---------|
+| `BRIK_CI_IMAGE` | `ghcr.io/getbrik/brik-runner-base:latest` | Init, Release, Build, Lint, Test, Package, Notify |
+| `BRIK_ANALYSIS_IMAGE` | `ghcr.io/getbrik/brik-runner-analysis:latest` | SAST (semgrep, checkov, scancode, license_finder) |
+| `BRIK_SCANNER_IMAGE` | `ghcr.io/getbrik/brik-runner-scanner:latest` | Scan, Container Scan (grype, syft, osv-scanner, gitleaks, trufflehog, hadolint, dockle) |
+| `BRIK_DEPLOY_IMAGE` | `ghcr.io/getbrik/brik-runner-deploy:latest` | Deploy (helm, kubectl, argocd, docker compose, ssh, rsync) |
+
+All images include Brik prerequisites (bash, yq, jq, git, docker-cli). Images tagged with `/.brik-runner`
+marker file skip prerequisite installation automatically.
+
+### Stack-specific images
+
+The Init stage automatically resolves `BRIK_CI_IMAGE` from `project.stack` and
+`project.stack_version` in your `brik.yml`. No manual configuration needed.
+
+| Stack | Resolved image | Includes |
+|-------|----------------|----------|
+| node | `ghcr.io/getbrik/brik-runner-node:22` (or `:24`) | Node.js + npm + Brik prereqs |
+| java | `ghcr.io/getbrik/brik-runner-java:21` (or `:25`) | JDK + Maven + Brik prereqs |
+| python | `ghcr.io/getbrik/brik-runner-python:3.13` (or `:3.14`) | Python + pip + Brik prereqs |
+| rust | `ghcr.io/getbrik/brik-runner-rust:1` | Rust + Cargo + Clippy + Rustfmt + Brik prereqs |
+| dotnet | `ghcr.io/getbrik/brik-runner-dotnet:9.0` (or `:10.0`) | .NET SDK + Brik prereqs |
+
+If `stack` is not set or not recognized, the pipeline falls back to `brik-runner-base:latest`.
+
+> **Note**: Overriding `BRIK_CI_IMAGE` via `.gitlab-ci.yml` variables is not yet supported.
+> The Init stage always resolves the image from `brik.yml` and overwrites the variable.
+
+### Using custom images
+
+If you prefer your own images, ensure they have:
+- bash 4+, git, yq, jq (or let the `before_script` install them automatically)
+- Your stack tools (node, java, python, etc.)
+
+The `before_script` detects the package manager (apk, apt-get, yum, dnf) and installs
+missing prerequisites on the fly. Brik-runner images skip this step (detected via `/.brik-runner`).
+
 ## How It Works
 
 Each GitLab CI job:
 
-1. Installs `yq` and `jq` (if not present in the runner image)
-2. Clones the `brik/brik` repo to `/opt/brik`
-3. Sources the stage wrapper script
-4. Calls `brik.gitlab.run_stage <stage_name>`
-5. The stage wrapper invokes `stage.run` from the Brik runtime
+1. Checks for `/.brik-runner` marker (skips prereq install if present)
+2. Otherwise installs yq, jq, git, bash via the detected package manager
+3. Clones the `brik/brik` repo to `/opt/brik` (depth 1, pinned to `BRIK_LIB_REF`)
+4. Sources the GitLab wrapper script
+5. Calls `brik.gitlab.run_stage <stage_name>`
+6. The stage wrapper invokes `stage.run` from the Brik runtime
 
 The runtime handles logging, context, hooks, error handling, and summary generation.
+
+### Cache relocation
+
+GitLab CI requires caches to be within `$CI_PROJECT_DIR`. The pipeline template
+sets environment variables to redirect tool caches:
+
+| Variable | Path |
+|----------|------|
+| `PIP_CACHE_DIR` | `$CI_PROJECT_DIR/.cache/pip` |
+| `MAVEN_OPTS` | `-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository` |
+| `GRADLE_USER_HOME` | `$CI_PROJECT_DIR/.gradle` |
+| `CARGO_HOME` | `$CI_PROJECT_DIR/.cargo` |
+| `NUGET_PACKAGES` | `$CI_PROJECT_DIR/.nuget/packages` |
 
 ## Configuration
 
 See the [brik.yml specification](../../docs/specs/01-brik-yml.md) for all configuration options.
+
+### Pipeline variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `BRIK_LIB_REF` | `v0.1.0` | Git ref of the Brik runtime to clone |
+| `BRIK_REPO` | `${CI_SERVER_URL}/brik/brik.git` | URL of the Brik runtime repository |
+| `BRIK_HOME` | `/opt/brik` | Path where the runtime is cloned |
+| `BRIK_LOG_LEVEL` | `info` | Log verbosity (debug, info, warn, error) |
+| `BRIK_CI_IMAGE` | `ghcr.io/getbrik/brik-runner-base:latest` | Default runner image |
+| `BRIK_ANALYSIS_IMAGE` | `ghcr.io/getbrik/brik-runner-analysis:latest` | Analysis stage image |
+| `BRIK_SCANNER_IMAGE` | `ghcr.io/getbrik/brik-runner-scanner:latest` | Scanner stage image |
+| `BRIK_DEPLOY_IMAGE` | `ghcr.io/getbrik/brik-runner-deploy:latest` | Deploy stage image |
 
 ### Stack Defaults
 
@@ -105,37 +175,45 @@ When `project.stack` is set, default tools are applied:
 
 ## Requirements
 
-- GitLab CI Runner with Docker executor
-- Runner image with `bash`, `git`, `wget` (for yq download)
+- GitLab CI Runner with **Docker executor**
+- Access to `ghcr.io/getbrik/*` images (or mirror them to your private registry)
 - `brik/brik` and `brik/gitlab-templates` repos on the same GitLab instance
 
 ## Troubleshooting
 
-**yq not found**: The `before_script` downloads yq automatically. If it fails, ensure the runner has internet access or pre-install yq in your runner image.
+**yq not found**: The `before_script` downloads yq automatically. If it fails, ensure the runner
+has internet access or use a `brik-runner-*` image which has yq pre-installed.
 
-**Runtime not cloned**: Check that `brik/brik` exists on your GitLab instance and has the correct tag. Verify the runner can access the repo URL.
+**Runtime not cloned**: Check that `brik/brik` exists on your GitLab instance and has the correct
+tag. Verify the runner can access the repo URL.
 
 **Runner not registered**: Ensure the GitLab Runner is registered and has the Docker executor configured.
+
+**Private registry**: If your runners cannot pull from `ghcr.io`, mirror the brik-images to your
+private registry and override `BRIK_CI_IMAGE`, `BRIK_ANALYSIS_IMAGE`, `BRIK_SCANNER_IMAGE`, and
+`BRIK_DEPLOY_IMAGE` in your `.gitlab-ci.yml`.
 
 ## Directory Structure
 
 ```
 shared-libs/gitlab/
   scripts/
-    config-reader.sh    -- Reads brik.yml via yq
-    condition-eval.sh   -- Evaluates deploy conditions
-    gitlab-wrapper.sh   -- Bridges GitLab CI to stage.run
+    config-reader.sh    - Reads brik.yml via yq
+    condition-eval.sh   - Evaluates deploy conditions
+    gitlab-wrapper.sh   - Bridges GitLab CI to stage.run
   templates/
-    pipeline.yml        -- Main entry point (stages, defaults, includes)
+    pipeline.yml        - Main entry point (stages, defaults, includes)
     jobs/
-      init.yml          -- Init stage job
-      release.yml       -- Release stage job (conditional)
-      build.yml         -- Build stage job
-      quality.yml       -- Quality stage job (parallel with security)
-      security.yml      -- Security stage job (parallel with quality)
-      test.yml          -- Test stage job
-      package.yml       -- Package stage job (conditional)
-      deploy.yml        -- Deploy stage job (conditional)
-      notify.yml        -- Notify stage job (always)
-  spec/                 -- ShellSpec tests
+      init.yml          - Init stage job
+      release.yml       - Release stage job (conditional)
+      build.yml         - Build stage job
+      lint.yml          - Lint stage job (verify, parallel)
+      sast.yml          - SAST stage job (verify, parallel, analysis image)
+      scan.yml          - Scan stage job (verify, parallel, scanner image)
+      test.yml          - Test stage job (verify, parallel)
+      package.yml       - Package stage job (conditional)
+      container-scan.yml - Container scan job (scanner image)
+      deploy.yml        - Deploy stage job (conditional, deploy image)
+      notify.yml        - Notify stage job (always)
+  spec/                 - ShellSpec tests
 ```
