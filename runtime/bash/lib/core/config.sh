@@ -657,8 +657,8 @@ config.export_publish_vars() {
     val="$(config.get '.publish.nuget.source' '')"
     [[ -n "$val" ]] && export BRIK_PUBLISH_NUGET_SOURCE="$val"
 
-    val="$(config.get '.publish.nuget.api_key_var' '')"
-    [[ -n "$val" ]] && export BRIK_PUBLISH_NUGET_API_KEY_VAR="$val"
+    val="$(config.get '.publish.nuget.token_var' '')"
+    [[ -n "$val" ]] && export BRIK_PUBLISH_NUGET_TOKEN_VAR="$val"
 
     return 0
 }

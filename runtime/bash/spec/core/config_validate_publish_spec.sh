@@ -361,7 +361,7 @@ version: 1
 publish:
   nuget:
     source: https://api.nuget.org/v3/index.json
-    api_key_var: NUGET_KEY
+    token_var: NUGET_KEY
 YAML
         export BRIK_CONFIG_FILE="$TEMP_CONFIG"
       }
@@ -375,8 +375,8 @@ YAML
         The output should equal "https://api.nuget.org/v3/index.json"
       End
 
-      It "exports BRIK_PUBLISH_NUGET_API_KEY_VAR"
-        export_and_check() { config.export_publish_vars; printf '%s' "${BRIK_PUBLISH_NUGET_API_KEY_VAR:-}"; }
+      It "exports BRIK_PUBLISH_NUGET_TOKEN_VAR"
+        export_and_check() { config.export_publish_vars; printf '%s' "${BRIK_PUBLISH_NUGET_TOKEN_VAR:-}"; }
         When call export_and_check
         The output should equal "NUGET_KEY"
       End

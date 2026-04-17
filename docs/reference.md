@@ -460,7 +460,7 @@ Credential values are never stored in `brik.yml` -- only environment variable **
 | Key | Type | Required | Default | Description |
 |-----|------|----------|---------|-------------|
 | `publish.nuget.source` | string (URI) | no | `https://api.nuget.org/v3/index.json` | NuGet source URL. |
-| `publish.nuget.api_key_var` | string | no | -- | Environment variable name holding the NuGet API key. |
+| `publish.nuget.token_var` | string | no | -- | Environment variable name holding the NuGet token or API key. |
 
 ---
 

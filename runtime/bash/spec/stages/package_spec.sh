@@ -399,7 +399,7 @@ package:
     image: registry.example.com/myapp
 publish:
   nuget:
-    api_key_var: NUGET_API_KEY
+    token_var: NUGET_API_KEY
     source: https://nexus.example.com/repository/nuget-hosted/
 YAML
       config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true

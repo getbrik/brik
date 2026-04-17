@@ -8,18 +8,18 @@
 _BRIK_CORE_PUBLISH_NUGET_LOADED=1
 
 # Publish to NuGet.
-# Usage: publish.nuget.run [--source <url>] [--api-key-var <VAR>] [--dry-run]
+# Usage: publish.nuget.run [--source <url>] [--token-var <VAR>] [--dry-run]
 # Reads defaults from BRIK_PUBLISH_NUGET_* environment variables.
 # Auth: uses NUGET_API_KEY env var to avoid CLI credential exposure.
 publish.nuget.run() {
     local source="${BRIK_PUBLISH_NUGET_SOURCE:-}"
-    local api_key_var="${BRIK_PUBLISH_NUGET_API_KEY_VAR:-}"
+    local token_var="${BRIK_PUBLISH_NUGET_TOKEN_VAR:-}"
     local dry_run="${BRIK_DRY_RUN:-}"
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --source) source="$2"; shift 2 ;;
-            --api-key-var) api_key_var="$2"; shift 2 ;;
+            --token-var) token_var="$2"; shift 2 ;;
             --dry-run) dry_run="true"; shift ;;
             *) log.error "unknown option: $1"; return "$BRIK_EXIT_INVALID_INPUT" ;;
         esac
@@ -55,23 +55,23 @@ publish.nuget.run() {
         fi
     fi
 
-    if [[ -n "$api_key_var" ]]; then
-        _publish._require_secret_var "$api_key_var" "nuget api key" || return $?
+    if [[ -n "$token_var" ]]; then
+        _publish._require_secret_var "$token_var" "nuget api key" || return $?
         # Set API key via environment variable (not CLI arg)
-        export NUGET_API_KEY="${!api_key_var}"
+        export NUGET_API_KEY="${!token_var}"
     fi
 
     # Create temporary NuGet.Config for HTTP sources (NuGet requires HTTPS by default)
-    # Also supports basic auth for Nexus/Artifactory when api_key is in "user:password" format
+    # Also supports basic auth for Nexus/Artifactory when token is in "user:password" format
     local tmp_nuget_config=""
     local use_config_auth=""
     if [[ -n "$source" ]] && [[ "$source" == http://* ]]; then
         tmp_nuget_config="$(mktemp)"
         local nuget_username="" nuget_password=""
-        if [[ -n "$api_key_var" ]] && [[ "${!api_key_var}" == *:* ]]; then
+        if [[ -n "$token_var" ]] && [[ "${!token_var}" == *:* ]]; then
             # Basic auth format (user:password) for Nexus/Artifactory
-            nuget_username="${!api_key_var%%:*}"
-            nuget_password="${!api_key_var#*:}"
+            nuget_username="${!token_var%%:*}"
+            nuget_password="${!token_var#*:}"
             use_config_auth="true"
         fi
         # Build NuGet.Config with source and optional credentials
@@ -101,12 +101,12 @@ publish.nuget.run() {
         if [[ -n "$tmp_nuget_config" ]]; then
             cmd+=(--configfile "$tmp_nuget_config" --source "brik")
             # Skip --api-key when using config-based auth
-            [[ -z "$use_config_auth" ]] && [[ -n "$api_key_var" ]] && cmd+=(--api-key "$NUGET_API_KEY")
+            [[ -z "$use_config_auth" ]] && [[ -n "$token_var" ]] && cmd+=(--api-key "$NUGET_API_KEY")
         elif [[ -n "$source" ]]; then
             cmd+=(--source "$source")
-            [[ -n "$api_key_var" ]] && cmd+=(--api-key "$NUGET_API_KEY")
+            [[ -n "$token_var" ]] && cmd+=(--api-key "$NUGET_API_KEY")
         else
-            [[ -n "$api_key_var" ]] && cmd+=(--api-key "$NUGET_API_KEY")
+            [[ -n "$token_var" ]] && cmd+=(--api-key "$NUGET_API_KEY")
         fi
 
         if [[ "$dry_run" == "true" ]]; then
