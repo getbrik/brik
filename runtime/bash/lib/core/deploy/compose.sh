@@ -34,6 +34,19 @@ deploy.compose.run() {
 
     runtime.require_tool docker || return "$BRIK_EXIT_MISSING_DEP"
 
+    # Authenticate to container registry if credentials are provided
+    if [[ -n "${BRIK_REGISTRY_HOST:-}" && -n "${BRIK_REGISTRY_USER:-}" ]]; then
+        if [[ "$dry_run" == "true" ]]; then
+            log.info "[dry-run] docker login ${BRIK_REGISTRY_HOST}"
+        else
+            log.info "logging in to registry: ${BRIK_REGISTRY_HOST}"
+            printf '%s' "${BRIK_REGISTRY_PASSWORD:-}" | docker login "$BRIK_REGISTRY_HOST" \
+                -u "$BRIK_REGISTRY_USER" --password-stdin || {
+                log.warn "docker login failed for ${BRIK_REGISTRY_HOST} (continuing anyway)"
+            }
+        fi
+    fi
+
     # Determine compose file: --file or auto-detect (compose.yaml > docker-compose.yml)
     if [[ -z "$compose_file" ]]; then
         if [[ -f "compose.yaml" ]]; then

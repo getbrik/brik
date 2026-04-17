@@ -537,7 +537,7 @@ deploy.gitops.run() {
     fi
 
     # Step 2: Push manifests
-    local tag="${BRIK_DEPLOY_IMAGE_TAG:-${BRIK_APP_VERSION:-${BRIK_COMMIT_SHORT_SHA:-unknown}}}"
+    local tag="${BRIK_APP_VERSION:-${BRIK_COMMIT_SHORT_SHA:-unknown}}"
     local -a push_args=(
         --repo "$repo"
         --branch "$branch"
@@ -573,42 +573,6 @@ deploy.gitops.run() {
         log.info "argocd: repo updated; sync will be triggered by ArgoCD controller"
     elif [[ "$controller" == "fluxcd" ]]; then
         log.info "fluxcd: flux will auto-reconcile from the updated repo"
-    fi
-
-    # Step 4: Rollback test (E2E verification of rollback path)
-    if [[ "${BRIK_DEPLOY_ROLLBACK_TEST:-}" == "true" ]]; then
-        log.info "rollback test enabled - reverting last deployment"
-
-        if [[ "$controller" == "argocd" && -n "$app_name" ]]; then
-            # ArgoCD-native rollback (safer, uses ArgoCD's deployment history)
-            if [[ "$dry_run" == "true" ]]; then
-                log.info "[dry-run] would call: deploy.argocd.rollback --app ${app_name}"
-            else
-                deploy.argocd.rollback --app "$app_name" || {
-                    log.error "argocd rollback failed for app: ${app_name}"
-                    return "$BRIK_EXIT_EXTERNAL_FAIL"
-                }
-                deploy.argocd.wait_healthy --app "$app_name" || {
-                    log.error "argocd app not healthy after rollback: ${app_name}"
-                    return "$BRIK_EXIT_EXTERNAL_FAIL"
-                }
-            fi
-        else
-            # Git-based rollback
-            local -a rollback_args=(
-                --repo "$repo"
-                --branch "$branch"
-            )
-            [[ -n "$target_path" ]] && rollback_args+=(--path "$target_path")
-            [[ -n "$git_token_var" ]] && rollback_args+=(--git-token-var "$git_token_var")
-
-            deploy.gitops.rollback "${rollback_args[@]}" "${common_args[@]}" || {
-                log.error "rollback failed"
-                return "$BRIK_EXIT_EXTERNAL_FAIL"
-            }
-        fi
-
-        log.info "rollback test completed successfully"
     fi
 
     log.info "gitops deployment completed successfully"
