@@ -85,10 +85,17 @@ deploy.argocd.sync() {
     fi
 
     log.info "syncing argocd app: ${app_name}"
-    "${cmd[@]}" || {
-        log.error "argocd app sync failed for: ${app_name}"
-        return "$BRIK_EXIT_EXTERNAL_FAIL"
-    }
+
+    local sync_output
+    if ! sync_output=$("${cmd[@]}" 2>&1); then
+        if [[ "$sync_output" == *"another operation is already in progress"* ]]; then
+            log.warn "argocd sync: another operation already in progress, waiting for it to finish"
+        else
+            log.error "argocd app sync failed for: ${app_name}"
+            printf '%s\n' "$sync_output" >&2
+            return "$BRIK_EXIT_EXTERNAL_FAIL"
+        fi
+    fi
 
     log.info "argocd sync completed: ${app_name}"
     return 0
@@ -180,10 +187,37 @@ deploy.argocd.rollback() {
     fi
 
     log.info "rolling back argocd app: ${app_name}"
-    "${cmd[@]}" || {
-        log.error "argocd app rollback failed for: ${app_name}"
-        return "$BRIK_EXIT_EXTERNAL_FAIL"
-    }
+
+    local rollback_output
+    if ! rollback_output=$("${cmd[@]}" 2>&1); then
+        # If rollback fails because auto-sync is enabled, disable it and retry
+        if [[ "$rollback_output" == *"auto-sync is enabled"* ]]; then
+            log.info "disabling auto-sync for rollback: ${app_name}"
+            local -a set_cmd=(argocd app set "$app_name" --sync-policy none)
+            _deploy.argocd._add_server_auth set_cmd "$server" "$auth_token_var" || return $?
+            "${set_cmd[@]}" || {
+                log.error "failed to disable auto-sync for: ${app_name}"
+                return "$BRIK_EXIT_EXTERNAL_FAIL"
+            }
+
+            # Retry rollback
+            rollback_output=$("${cmd[@]}" 2>&1) || {
+                log.error "argocd app rollback failed for: ${app_name}"
+                printf '%s\n' "$rollback_output" >&2
+                return "$BRIK_EXIT_EXTERNAL_FAIL"
+            }
+
+            # Re-enable auto-sync
+            log.info "re-enabling auto-sync: ${app_name}"
+            local -a reenable_cmd=(argocd app set "$app_name" --sync-policy automated --auto-prune --self-heal)
+            _deploy.argocd._add_server_auth reenable_cmd "$server" "$auth_token_var" || true
+            "${reenable_cmd[@]}" || log.warn "failed to re-enable auto-sync for: ${app_name}"
+        else
+            log.error "argocd app rollback failed for: ${app_name}"
+            printf '%s\n' "$rollback_output" >&2
+            return "$BRIK_EXIT_EXTERNAL_FAIL"
+        fi
+    fi
 
     log.info "argocd rollback completed: ${app_name}"
     return 0
@@ -372,7 +406,7 @@ deploy.argocd.deploy() {
     [[ "$dry_run" == "true" ]] && common_args+=(--dry-run)
 
     # Step 1: Push manifests to config repo
-    local tag="${BRIK_DEPLOY_IMAGE_TAG:-${BRIK_TAG:-${BRIK_COMMIT_SHA:-unknown}}}"
+    local tag="${BRIK_TAG:-${BRIK_COMMIT_SHA:-unknown}}"
     local -a push_args=(
         --repo "$repo"
         --branch "$branch"

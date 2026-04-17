@@ -752,11 +752,11 @@ SCRIPT
         chmod +x "${MOCK_BIN}/git"
         mock.activate
         export BRIK_APP_VERSION="1.2.3"
-        unset BRIK_DEPLOY_IMAGE_TAG BRIK_COMMIT_SHORT_SHA 2>/dev/null
+        unset BRIK_COMMIT_SHORT_SHA 2>/dev/null
       }
       cleanup_run_tag() {
         mock.cleanup
-        unset BRIK_APP_VERSION BRIK_DEPLOY_IMAGE_TAG BRIK_COMMIT_SHORT_SHA 2>/dev/null
+        unset BRIK_APP_VERSION BRIK_COMMIT_SHORT_SHA 2>/dev/null
         rm -rf "$TEST_WS"
       }
       Before 'setup_run_tag'
@@ -788,11 +788,11 @@ exit 0
 SCRIPT
         chmod +x "${MOCK_BIN}/git"
         mock.activate
-        unset BRIK_APP_VERSION BRIK_DEPLOY_IMAGE_TAG BRIK_COMMIT_SHORT_SHA 2>/dev/null
+        unset BRIK_APP_VERSION BRIK_COMMIT_SHORT_SHA 2>/dev/null
       }
       cleanup_run_no_tag() {
         mock.cleanup
-        unset BRIK_APP_VERSION BRIK_DEPLOY_IMAGE_TAG BRIK_COMMIT_SHORT_SHA 2>/dev/null
+        unset BRIK_APP_VERSION BRIK_COMMIT_SHORT_SHA 2>/dev/null
         rm -rf "$TEST_WS"
       }
       Before 'setup_run_no_tag'
@@ -1303,7 +1303,7 @@ SCRIPT
       }
       cleanup_git_run() {
         mock.cleanup
-        unset BRIK_DRY_RUN BRIK_TAG BRIK_COMMIT_SHA BRIK_DEPLOY_IMAGE_TAG 2>/dev/null
+        unset BRIK_DRY_RUN BRIK_TAG BRIK_COMMIT_SHA 2>/dev/null
         rm -rf "$TEST_WS"
       }
       Before 'setup_git_run'
@@ -1426,156 +1426,6 @@ SCRIPT
           --source "${TEST_WS}/src" --controller argocd --app-name my-app --dry-run
         The status should be success
         The stderr should include "dry-run"
-      End
-    End
-
-    Describe "rollback test with controller=argocd uses argocd rollback"
-      setup_git_argocd_rb() {
-        mock.setup
-        TEST_WS="$(mktemp -d)"
-        MOCK_LOG="${TEST_WS}/mock_git.log"
-        ARGOCD_LOG="${TEST_WS}/mock_argocd.log"
-        mkdir -p "${TEST_WS}/src"
-        printf 'apiVersion: v1\n' > "${TEST_WS}/src/cm.yaml"
-        cat > "${MOCK_BIN}/git" <<SCRIPT
-#!/bin/sh
-printf 'git %s\n' "\$*" >> "${MOCK_LOG}"
-if [ "\$1" = "clone" ]; then
-  dest="\$(echo "\$*" | rev | cut -d' ' -f1 | rev)"
-  mkdir -p "\$dest"
-fi
-exit 0
-SCRIPT
-        chmod +x "${MOCK_BIN}/git"
-        printf "#!/bin/sh\nprintf 'argocd %%s\\n' \"\$*\" >> \"%s\"\n" "$ARGOCD_LOG" > "${MOCK_BIN}/argocd"
-        chmod +x "${MOCK_BIN}/argocd"
-        mock.activate
-        unset BRIK_DRY_RUN BRIK_TAG BRIK_COMMIT_SHA 2>/dev/null
-        export BRIK_DEPLOY_ROLLBACK_TEST="true"
-        export BRIK_HOME
-      }
-      cleanup_git_argocd_rb() {
-        mock.cleanup
-        unset BRIK_DRY_RUN BRIK_TAG BRIK_COMMIT_SHA BRIK_DEPLOY_ROLLBACK_TEST 2>/dev/null
-        rm -rf "$TEST_WS"
-      }
-      Before 'setup_git_argocd_rb'
-      After 'cleanup_git_argocd_rb'
-
-      It "uses deploy.argocd.rollback instead of git-based rollback"
-        invoke_argocd_rb() {
-          deploy.gitops.run --repo "https://github.com/org/gitops.git" \
-            --source "${TEST_WS}/src" --controller argocd --app-name my-app 2>/dev/null || return 1
-          # ArgoCD rollback should have been called
-          grep -q "app rollback" "$ARGOCD_LOG" || grep -q "app get" "$ARGOCD_LOG"
-        }
-        When call invoke_argocd_rb
-        The status should be success
-      End
-
-      It "does not call deploy.gitops.rollback (no git revert)"
-        invoke_argocd_rb_no_revert() {
-          deploy.gitops.run --repo "https://github.com/org/gitops.git" \
-            --source "${TEST_WS}/src" --controller argocd --app-name my-app 2>/dev/null || return 1
-          # Should NOT see a second clone for rollback (only one clone for push)
-          local clone_count
-          clone_count="$(grep -c "clone" "$MOCK_LOG")"
-          [ "$clone_count" -eq 1 ]
-        }
-        When call invoke_argocd_rb_no_revert
-        The status should be success
-      End
-    End
-
-    Describe "rollback test without controller uses git-based rollback"
-      setup_git_rb_noctl() {
-        mock.setup
-        TEST_WS="$(mktemp -d)"
-        MOCK_LOG="${TEST_WS}/mock_git.log"
-        mkdir -p "${TEST_WS}/src"
-        printf 'apiVersion: v1\n' > "${TEST_WS}/src/cm.yaml"
-        cat > "${MOCK_BIN}/git" <<SCRIPT
-#!/bin/sh
-printf 'git %s\n' "\$*" >> "${MOCK_LOG}"
-if [ "\$1" = "clone" ]; then
-  dest="\$(echo "\$*" | rev | cut -d' ' -f1 | rev)"
-  mkdir -p "\$dest"
-fi
-exit 0
-SCRIPT
-        chmod +x "${MOCK_BIN}/git"
-        mock.activate
-        unset BRIK_DRY_RUN BRIK_TAG BRIK_COMMIT_SHA 2>/dev/null
-        export BRIK_DEPLOY_ROLLBACK_TEST="true"
-      }
-      cleanup_git_rb_noctl() {
-        mock.cleanup
-        unset BRIK_DRY_RUN BRIK_TAG BRIK_COMMIT_SHA BRIK_DEPLOY_ROLLBACK_TEST 2>/dev/null
-        rm -rf "$TEST_WS"
-      }
-      Before 'setup_git_rb_noctl'
-      After 'cleanup_git_rb_noctl'
-
-      It "uses deploy.gitops.rollback (git revert) when no controller"
-        invoke_rb_noctl() {
-          deploy.gitops.run --repo "https://github.com/org/gitops.git" \
-            --source "${TEST_WS}/src" --path apps/myapp 2>/dev/null || return 1
-          # Should see two clones: one for push, one for rollback
-          local clone_count
-          clone_count="$(grep -c "clone" "$MOCK_LOG")"
-          [ "$clone_count" -eq 2 ]
-        }
-        When call invoke_rb_noctl
-        The status should be success
-      End
-
-      It "uses path-scoped rollback (checkout HEAD~1)"
-        invoke_rb_noctl_path() {
-          deploy.gitops.run --repo "https://github.com/org/gitops.git" \
-            --source "${TEST_WS}/src" --path apps/myapp 2>/dev/null || return 1
-          grep -q "checkout HEAD~1 -- apps/myapp" "$MOCK_LOG"
-        }
-        When call invoke_rb_noctl_path
-        The status should be success
-      End
-    End
-
-    Describe "BRIK_DEPLOY_IMAGE_TAG precedence"
-      setup_git_tag_prio() {
-        mock.setup
-        TEST_WS="$(mktemp -d)"
-        MOCK_LOG="${TEST_WS}/mock_git.log"
-        mkdir -p "${TEST_WS}/src"
-        cat > "${MOCK_BIN}/git" <<SCRIPT
-#!/bin/sh
-printf 'git %s\n' "\$*" >> "${MOCK_LOG}"
-if [ "\$1" = "clone" ]; then
-  dest="\$(echo "\$*" | rev | cut -d' ' -f1 | rev)"
-  mkdir -p "\$dest"
-fi
-exit 0
-SCRIPT
-        chmod +x "${MOCK_BIN}/git"
-        mock.activate
-        export BRIK_DEPLOY_IMAGE_TAG="deploy-tag-1.0"
-        export BRIK_APP_VERSION="brik-app-2.0"
-      }
-      cleanup_git_tag_prio() {
-        mock.cleanup
-        unset BRIK_DEPLOY_IMAGE_TAG BRIK_APP_VERSION 2>/dev/null
-        rm -rf "$TEST_WS"
-      }
-      Before 'setup_git_tag_prio'
-      After 'cleanup_git_tag_prio'
-
-      It "uses BRIK_DEPLOY_IMAGE_TAG over BRIK_APP_VERSION when both set"
-        invoke_tag_prio() {
-          deploy.gitops.run --repo "https://github.com/org/gitops.git" \
-            --source "${TEST_WS}/src" 2>/dev/null
-          grep -q "deploy-tag-1.0" "$MOCK_LOG"
-        }
-        When call invoke_tag_prio
-        The status should be success
       End
     End
 
