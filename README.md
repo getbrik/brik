@@ -314,6 +314,7 @@ deploy:
 - JSON Schema: [`schemas/config/v1/brik.schema.json`](schemas/config/v1/brik.schema.json)
 - Examples: [`examples/`](examples/) (minimal-node, java-maven, python-pytest, mono-dotnet)
 - Full parameter reference: [`docs/reference.md`](docs/reference.md)
+- Credentials and secrets configuration: [`docs/credentials.md`](docs/credentials.md)
 
 ## CLI Reference
 
