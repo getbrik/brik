@@ -78,7 +78,7 @@ Describe "publish/nuget.sh"
       It "passes api key"
         invoke_key() {
           export MY_NUGET_KEY="nuget-key-123"
-          publish.nuget.run --api-key-var "MY_NUGET_KEY" 2>/dev/null || return 1
+          publish.nuget.run --token-var "MY_NUGET_KEY" 2>/dev/null || return 1
           grep -q "\-\-api-key nuget-key-123" "$MOCK_LOG"
         }
         When call invoke_key
@@ -161,7 +161,7 @@ FAILEOF
       It "uses basic auth when api key contains colon"
         invoke_basic_auth() {
           export MY_HTTP_KEY="admin:secret123"
-          publish.nuget.run --source "http://nexus:8081/repository/nuget/" --api-key-var "MY_HTTP_KEY" 2>/dev/null || return 1
+          publish.nuget.run --source "http://nexus:8081/repository/nuget/" --token-var "MY_HTTP_KEY" 2>/dev/null || return 1
           # Should NOT have --api-key in log (config-based auth used instead)
           ! grep -q "\-\-api-key" "$MOCK_LOG"
         }
@@ -172,7 +172,7 @@ FAILEOF
       It "passes api-key for HTTP source without colon in key"
         invoke_http_key() {
           export MY_HTTP_KEY="plain-api-key"
-          publish.nuget.run --source "http://nexus:8081/repository/nuget/" --api-key-var "MY_HTTP_KEY" 2>/dev/null || return 1
+          publish.nuget.run --source "http://nexus:8081/repository/nuget/" --token-var "MY_HTTP_KEY" 2>/dev/null || return 1
           grep -q "\-\-api-key plain-api-key" "$MOCK_LOG"
         }
         When call invoke_http_key

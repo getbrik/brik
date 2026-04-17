@@ -56,7 +56,7 @@ stages.package() {
         "maven:BRIK_PUBLISH_MAVEN_REPOSITORY"
         "pypi:BRIK_PUBLISH_PYPI_TOKEN_VAR"
         "cargo:BRIK_PUBLISH_CARGO_TOKEN_VAR"
-        "nuget:BRIK_PUBLISH_NUGET_API_KEY_VAR"
+        "nuget:BRIK_PUBLISH_NUGET_TOKEN_VAR"
     )
 
     # Pre-scan: only load the publish module if at least one target is configured

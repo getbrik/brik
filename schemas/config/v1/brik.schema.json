@@ -594,8 +594,8 @@
               "type": "string",
               "format": "uri"
             },
-            "api_key_var": {
-              "description": "Name of the environment variable holding the NuGet API key.",
+            "token_var": {
+              "description": "Name of the environment variable holding the NuGet token or API key.",
               "type": "string",
               "minLength": 1
             }
