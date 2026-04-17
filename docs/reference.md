@@ -413,6 +413,7 @@ Scans container images using `grype` (primary) or `dockle` (fallback).
 
 Publish artifacts to package registries. Each subsection corresponds to a registry type.
 Credential values are never stored in `brik.yml` -- only environment variable **names** are referenced.
+For details on how credential indirection works and platform setup examples, see [credentials.md](credentials.md).
 
 #### `publish.npm`
 
