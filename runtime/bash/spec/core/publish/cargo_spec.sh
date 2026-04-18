@@ -99,6 +99,80 @@ Describe "publish/cargo.sh"
         The status should be success
         The stderr should include "cargo publish completed"
       End
+
+      It "shows registry name in log message"
+        When call publish.cargo.run --registry "my-registry"
+        The status should be success
+        The stderr should include "publishing to my-registry"
+      End
+
+      It "shows crates.io when no registry specified"
+        When call publish.cargo.run
+        The status should be success
+        The stderr should include "publishing to crates.io"
+      End
+    End
+
+    Describe "with index support"
+      setup_cargo_index() {
+        mock.setup
+        TEST_WS="$(mktemp -d)"
+        MOCK_LOG="${TEST_WS}/mock_cargo.log"
+        printf '[package]\nname = "test"\nversion = "1.0.0"\n' > "${TEST_WS}/Cargo.toml"
+        mock.create_logging "cargo" "$MOCK_LOG"
+        mock.activate
+        ORIG_DIR="$(pwd)"
+        cd "$TEST_WS" || return 1
+      }
+      cleanup_cargo_index() {
+        cd "$ORIG_DIR" || true
+        mock.cleanup
+        unset BRIK_PUBLISH_CARGO_INDEX 2>/dev/null
+        unset CARGO_REGISTRIES_MY_REGISTRY_INDEX 2>/dev/null
+        unset CARGO_REGISTRIES_BRIK_CARGO_INDEX 2>/dev/null
+        rm -rf "$TEST_WS"
+      }
+      Before 'setup_cargo_index'
+      After 'cleanup_cargo_index'
+
+      It "exports CARGO_REGISTRIES_<NAME>_INDEX when registry and index provided"
+        invoke_index() {
+          publish.cargo.run --registry "my-registry" --index "sparse+http://nexus:8081/repo/" 2>/dev/null || return 1
+          grep -q "\-\-registry my-registry" "$MOCK_LOG"
+        }
+        When call invoke_index
+        The status should be success
+      End
+
+      It "converts registry name to uppercase with underscores for env var"
+        invoke_index_convert() {
+          publish.cargo.run --registry "brik-cargo" --index "sparse+http://nexus:8081/repo/" 2>/dev/null || return 1
+          # After publish.cargo.run, the index env var should be cleaned up
+          [ -z "${CARGO_REGISTRIES_BRIK_CARGO_INDEX:-}" ]
+        }
+        When call invoke_index_convert
+        The status should be success
+      End
+
+      It "reads index from BRIK_PUBLISH_CARGO_INDEX env var"
+        invoke_env_index() {
+          export BRIK_PUBLISH_CARGO_INDEX="sparse+http://nexus:8081/repo/"
+          publish.cargo.run --registry "brik-cargo" 2>/dev/null || return 1
+          [ -z "${CARGO_REGISTRIES_BRIK_CARGO_INDEX:-}" ]
+        }
+        When call invoke_env_index
+        The status should be success
+      End
+
+      It "cleans up index env var after execution"
+        invoke_cleanup() {
+          export CARGO_REGISTRIES_BRIK_CARGO_INDEX=""
+          publish.cargo.run --registry "brik-cargo" --index "sparse+http://nexus:8081/repo/" 2>/dev/null || return 1
+          [ -z "${CARGO_REGISTRIES_BRIK_CARGO_INDEX:-}" ]
+        }
+        When call invoke_cleanup
+        The status should be success
+      End
     End
   End
 End

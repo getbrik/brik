@@ -569,7 +569,7 @@
           }
         },
         "cargo": {
-          "description": "Publish to crates.io or a compatible registry.",
+          "description": "Publish to crates.io or a compatible Cargo registry (e.g. Nexus).",
           "type": "object",
           "additionalProperties": false,
           "properties": {
@@ -577,8 +577,12 @@
               "description": "Cargo registry name. Default is crates-io.",
               "type": "string"
             },
+            "index": {
+              "description": "Sparse index URL for the registry (e.g. sparse+http://nexus:8081/repository/brik-cargo/). Required for private registries.",
+              "type": "string"
+            },
             "token_var": {
-              "description": "Name of the environment variable holding the crates.io API token.",
+              "description": "Name of the environment variable holding the registry API token.",
               "type": "string",
               "minLength": 1
             }

@@ -650,6 +650,9 @@ config.export_publish_vars() {
     val="$(config.get '.publish.cargo.registry' '')"
     [[ -n "$val" ]] && export BRIK_PUBLISH_CARGO_REGISTRY="$val"
 
+    val="$(config.get '.publish.cargo.index' '')"
+    [[ -n "$val" ]] && export BRIK_PUBLISH_CARGO_INDEX="$val"
+
     val="$(config.get '.publish.cargo.token_var' '')"
     [[ -n "$val" ]] && export BRIK_PUBLISH_CARGO_TOKEN_VAR="$val"
 
