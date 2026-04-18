@@ -470,6 +470,13 @@ Tracked automatically via [shellmetrics](https://github.com/shellspec/shellmetri
 - [brik-images](https://github.com/getbrik/brik-images) - official Docker images for Brik CI/CD runners
 - [briklab](https://github.com/getbrik/briklab) - local Docker infrastructure for testing Brik pipelines
 
+## Transparency Notice
+
+We use AI-assisted development ([Claude Code](https://claude.ai/code) + [Everything Claude Code](https://github.com/aspect-build/everything-claude-code)) to accelerate implementation:
+
+- Every contribution (human or AI-generated) follows the same quality gates: code review, test coverage, E2E testing, and CI checks.
+- AI-generated code is not perfect. Regular refactoring passes address its shortcomings, and the overall productivity gains are significant.
+
 ## License
 
 [MPL-2.0](LICENSE)
