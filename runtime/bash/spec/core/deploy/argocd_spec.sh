@@ -991,6 +991,568 @@ SCRIPT
   End
 
   # ---------------------------------------------------------------------------
+  # deploy.argocd.sync - "another operation in progress" warning
+  # ---------------------------------------------------------------------------
+  Describe "deploy.argocd.sync - another operation in progress"
+    setup_sync_in_progress() {
+      mock.setup
+      TEST_WS="$(mktemp -d)"
+      MOCK_LOG="${TEST_WS}/mock_argocd.log"
+      # argocd mock that fails with "another operation is already in progress"
+      local mock_script="${MOCK_BIN}/argocd"
+      cat > "$mock_script" <<'SCRIPT'
+#!/usr/bin/env bash
+echo "another operation is already in progress" >&2
+exit 1
+SCRIPT
+      chmod +x "$mock_script"
+      mock.activate
+      unset BRIK_DRY_RUN 2>/dev/null
+    }
+    cleanup_sync_in_progress() {
+      mock.cleanup
+      unset BRIK_DRY_RUN 2>/dev/null
+      rm -rf "$TEST_WS"
+    }
+    Before 'setup_sync_in_progress'
+    After 'cleanup_sync_in_progress'
+
+    It "warns and succeeds when another operation is already in progress"
+      When call deploy.argocd.sync --app my-app
+      The status should be success
+      The stderr should include "another operation already in progress"
+    End
+  End
+
+  # ---------------------------------------------------------------------------
+  # deploy.argocd.rollback - auto-sync retry logic
+  # ---------------------------------------------------------------------------
+  Describe "deploy.argocd.rollback - auto-sync retry"
+    setup_rollback_autosync() {
+      mock.setup
+      TEST_WS="$(mktemp -d)"
+      MOCK_LOG="${TEST_WS}/mock_argocd.log"
+      export MOCK_LOG
+      # First rollback fails with "auto-sync is enabled",
+      # then "app set" succeeds, retry rollback succeeds, re-enable succeeds
+      local mock_script="${MOCK_BIN}/argocd"
+      cat > "$mock_script" <<SCRIPT
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "${MOCK_LOG}"
+if [[ "\$*" == *"app rollback"* ]]; then
+  count_file="${TEST_WS}/rollback_count"
+  count=\$(cat "\$count_file" 2>/dev/null || echo 0)
+  count=\$((count + 1))
+  echo "\$count" > "\$count_file"
+  if [[ "\$count" -eq 1 ]]; then
+    echo "auto-sync is enabled" >&2
+    exit 1
+  fi
+  exit 0
+fi
+exit 0
+SCRIPT
+      chmod +x "$mock_script"
+      mock.activate
+      unset BRIK_DRY_RUN 2>/dev/null
+    }
+    cleanup_rollback_autosync() {
+      mock.cleanup
+      unset BRIK_DRY_RUN 2>/dev/null
+      rm -rf "$TEST_WS"
+    }
+    Before 'setup_rollback_autosync'
+    After 'cleanup_rollback_autosync'
+
+    It "disables auto-sync and retries rollback successfully"
+      invoke_autosync_retry() {
+        deploy.argocd.rollback --app my-app 2>/dev/null || return 1
+        grep -q "app set my-app --sync-policy none" "$MOCK_LOG" &&
+        grep -q "app set my-app --sync-policy automated" "$MOCK_LOG"
+      }
+      When call invoke_autosync_retry
+      The status should be success
+    End
+
+    It "logs disabling and re-enabling auto-sync"
+      When call deploy.argocd.rollback --app my-app
+      The status should be success
+      The stderr should include "disabling auto-sync"
+      The stderr should include "re-enabling auto-sync"
+    End
+  End
+
+  Describe "deploy.argocd.rollback - auto-sync retry fails on second rollback"
+    setup_rollback_autosync_fail() {
+      mock.setup
+      TEST_WS="$(mktemp -d)"
+      MOCK_LOG="${TEST_WS}/mock_argocd.log"
+      export MOCK_LOG
+      # rollback always fails with auto-sync, then retry also fails
+      local mock_script="${MOCK_BIN}/argocd"
+      cat > "$mock_script" <<SCRIPT
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "${MOCK_LOG}"
+if [[ "\$*" == *"app rollback"* ]]; then
+  count_file="${TEST_WS}/rollback_count"
+  count=\$(cat "\$count_file" 2>/dev/null || echo 0)
+  count=\$((count + 1))
+  echo "\$count" > "\$count_file"
+  if [[ "\$count" -eq 1 ]]; then
+    echo "auto-sync is enabled" >&2
+    exit 1
+  fi
+  echo "rollback still fails" >&2
+  exit 1
+fi
+exit 0
+SCRIPT
+      chmod +x "$mock_script"
+      mock.activate
+      unset BRIK_DRY_RUN 2>/dev/null
+    }
+    cleanup_rollback_autosync_fail() {
+      mock.cleanup
+      unset BRIK_DRY_RUN 2>/dev/null
+      rm -rf "$TEST_WS"
+    }
+    Before 'setup_rollback_autosync_fail'
+    After 'cleanup_rollback_autosync_fail'
+
+    It "returns 5 when retry rollback also fails"
+      When call deploy.argocd.rollback --app my-app
+      The status should equal 5
+      The stderr should include "argocd app rollback failed"
+    End
+  End
+
+  Describe "deploy.argocd.rollback - auto-sync disable fails"
+    setup_rollback_set_fail() {
+      mock.setup
+      TEST_WS="$(mktemp -d)"
+      MOCK_LOG="${TEST_WS}/mock_argocd.log"
+      export MOCK_LOG
+      local mock_script="${MOCK_BIN}/argocd"
+      cat > "$mock_script" <<SCRIPT
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "${MOCK_LOG}"
+if [[ "\$*" == *"app rollback"* ]]; then
+  echo "auto-sync is enabled" >&2
+  exit 1
+fi
+if [[ "\$*" == *"app set"*"--sync-policy none"* ]]; then
+  exit 1
+fi
+exit 0
+SCRIPT
+      chmod +x "$mock_script"
+      mock.activate
+      unset BRIK_DRY_RUN 2>/dev/null
+    }
+    cleanup_rollback_set_fail() {
+      mock.cleanup
+      unset BRIK_DRY_RUN 2>/dev/null
+      rm -rf "$TEST_WS"
+    }
+    Before 'setup_rollback_set_fail'
+    After 'cleanup_rollback_set_fail'
+
+    It "returns 5 when disabling auto-sync fails"
+      When call deploy.argocd.rollback --app my-app
+      The status should equal 5
+      The stderr should include "failed to disable auto-sync"
+    End
+  End
+
+  Describe "deploy.argocd.rollback - re-enable auto-sync fails gracefully"
+    setup_rollback_reenable_fail() {
+      mock.setup
+      TEST_WS="$(mktemp -d)"
+      MOCK_LOG="${TEST_WS}/mock_argocd.log"
+      export MOCK_LOG
+      local mock_script="${MOCK_BIN}/argocd"
+      cat > "$mock_script" <<SCRIPT
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "${MOCK_LOG}"
+if [[ "\$*" == *"app rollback"* ]]; then
+  count_file="${TEST_WS}/rollback_count"
+  count=\$(cat "\$count_file" 2>/dev/null || echo 0)
+  count=\$((count + 1))
+  echo "\$count" > "\$count_file"
+  if [[ "\$count" -eq 1 ]]; then
+    echo "auto-sync is enabled" >&2
+    exit 1
+  fi
+  exit 0
+fi
+if [[ "\$*" == *"--sync-policy automated"* ]]; then
+  exit 1
+fi
+exit 0
+SCRIPT
+      chmod +x "$mock_script"
+      mock.activate
+      unset BRIK_DRY_RUN 2>/dev/null
+    }
+    cleanup_rollback_reenable_fail() {
+      mock.cleanup
+      unset BRIK_DRY_RUN 2>/dev/null
+      rm -rf "$TEST_WS"
+    }
+    Before 'setup_rollback_reenable_fail'
+    After 'cleanup_rollback_reenable_fail'
+
+    It "succeeds but warns when re-enabling auto-sync fails"
+      When call deploy.argocd.rollback --app my-app
+      The status should be success
+      The stderr should include "failed to re-enable auto-sync"
+    End
+  End
+
+  # ---------------------------------------------------------------------------
+  # deploy.argocd.diff - --dry-run via explicit flag + --auth-token-var
+  # ---------------------------------------------------------------------------
+  Describe "deploy.argocd.diff - --dry-run flag"
+    setup_diff_dryrun_flag() {
+      mock.setup
+      TEST_WS="$(mktemp -d)"
+      mock.create_logging "argocd" "${TEST_WS}/mock.log"
+      mock.activate
+      unset BRIK_DRY_RUN 2>/dev/null
+    }
+    cleanup_diff_dryrun_flag() {
+      mock.cleanup
+      unset BRIK_DRY_RUN 2>/dev/null
+      rm -rf "$TEST_WS"
+    }
+    Before 'setup_diff_dryrun_flag'
+    After 'cleanup_diff_dryrun_flag'
+
+    It "logs dry-run message via --dry-run flag"
+      When call deploy.argocd.diff --app my-app --dry-run
+      The status should be success
+      The stderr should include "dry-run"
+    End
+  End
+
+  Describe "deploy.argocd.diff - --auth-token-var"
+    setup_diff_auth() {
+      mock.setup
+      TEST_WS="$(mktemp -d)"
+      MOCK_LOG="${TEST_WS}/mock_argocd.log"
+      mock.create_logging "argocd" "$MOCK_LOG"
+      mock.activate
+      unset BRIK_DRY_RUN 2>/dev/null
+    }
+    cleanup_diff_auth() {
+      mock.cleanup
+      unset BRIK_DRY_RUN 2>/dev/null
+      rm -rf "$TEST_WS"
+    }
+    Before 'setup_diff_auth'
+    After 'cleanup_diff_auth'
+
+    It "passes --auth-token-var to argocd diff"
+      invoke_diff_auth() {
+        export MY_TOKEN="diff-token"
+        deploy.argocd.diff --app my-app --auth-token-var MY_TOKEN 2>/dev/null || return 1
+        grep -q "\-\-auth-token diff-token" "$MOCK_LOG"
+        local rc=$?
+        unset MY_TOKEN
+        return $rc
+      }
+      When call invoke_diff_auth
+      The status should be success
+    End
+  End
+
+  # ---------------------------------------------------------------------------
+  # deploy.argocd.status - unknown option + --dry-run via flag
+  # ---------------------------------------------------------------------------
+  Describe "deploy.argocd.status - unknown option"
+    It "returns 2 for unknown option"
+      When call deploy.argocd.status --app my-app --badopt
+      The status should equal 2
+      The stderr should include "unknown option"
+    End
+  End
+
+  Describe "deploy.argocd.status - --dry-run via flag"
+    setup_status_dryrun_flag() {
+      mock.setup
+      mock.create_logging "argocd" "${MOCK_BIN}/mock.log"
+      mock.create_exit "jq" 0
+      mock.activate
+      unset BRIK_DRY_RUN 2>/dev/null
+    }
+    cleanup_status_dryrun_flag() {
+      mock.cleanup
+      unset BRIK_DRY_RUN 2>/dev/null
+    }
+    Before 'setup_status_dryrun_flag'
+    After 'cleanup_status_dryrun_flag'
+
+    It "logs dry-run message via --dry-run flag"
+      When call deploy.argocd.status --app my-app --dry-run
+      The status should be success
+      The stderr should include "dry-run"
+    End
+  End
+
+  # ---------------------------------------------------------------------------
+  # deploy.argocd.is_synced - with --server and --auth-token-var
+  # ---------------------------------------------------------------------------
+  Describe "deploy.argocd.is_synced - with server and auth"
+    setup_is_synced_auth() {
+      mock.setup
+      TEST_WS="$(mktemp -d)"
+      MOCK_LOG="${TEST_WS}/mock_argocd.log"
+      export MOCK_LOG
+      local mock_script="${MOCK_BIN}/argocd"
+      cat > "$mock_script" <<SCRIPT
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "${MOCK_LOG}"
+if [[ "\$*" == *"app get"* ]]; then
+  cat <<'JSON'
+{
+  "status": {
+    "health": {"status": "Healthy"},
+    "sync": {"status": "Synced", "revision": "xyz"},
+    "conditions": []
+  }
+}
+JSON
+fi
+SCRIPT
+      chmod +x "$mock_script"
+      mock.activate
+      unset BRIK_DRY_RUN 2>/dev/null
+    }
+    cleanup_is_synced_auth() {
+      mock.cleanup
+      unset BRIK_DRY_RUN 2>/dev/null
+      rm -rf "$TEST_WS"
+    }
+    Before 'setup_is_synced_auth'
+    After 'cleanup_is_synced_auth'
+
+    It "passes --server and --auth-token-var through to status"
+      invoke_synced_auth() {
+        export MY_TOKEN="synced-tok"
+        deploy.argocd.is_synced --app my-app --server https://argo.local --auth-token-var MY_TOKEN 2>/dev/null
+        local rc=$?
+        grep -q "\-\-server https://argo.local" "$MOCK_LOG" &&
+        grep -q "\-\-auth-token synced-tok" "$MOCK_LOG"
+        local grep_rc=$?
+        unset MY_TOKEN
+        [[ $rc -eq 0 && $grep_rc -eq 0 ]]
+      }
+      When call invoke_synced_auth
+      The status should be success
+    End
+
+    It "returns 2 for unknown option"
+      When call deploy.argocd.is_synced --app my-app --badopt
+      The status should equal 2
+      The stderr should include "unknown option"
+    End
+  End
+
+  # ---------------------------------------------------------------------------
+  # deploy.argocd.deploy - integration tests
+  # ---------------------------------------------------------------------------
+  Describe "deploy.argocd.deploy - dry-run integration"
+    Include "$BRIK_CORE_LIB/deploy/gitops.sh"
+
+    setup_deploy_dryrun() {
+      mock.setup
+      TEST_WS="$(mktemp -d)"
+      MOCK_LOG="${TEST_WS}/mock.log"
+      export MOCK_LOG
+      mock.create_logging "argocd" "$MOCK_LOG"
+      mock.create_logging "git" "$MOCK_LOG"
+      mock.activate
+      export BRIK_DRY_RUN="true"
+      brik.use() { :; }
+    }
+    cleanup_deploy_dryrun() {
+      mock.cleanup
+      unset BRIK_DRY_RUN 2>/dev/null
+      unset -f brik.use 2>/dev/null
+      rm -rf "$TEST_WS"
+    }
+    Before 'setup_deploy_dryrun'
+    After 'cleanup_deploy_dryrun'
+
+    It "runs all steps in dry-run mode"
+      When call deploy.argocd.deploy \
+        --app my-app \
+        --repo https://git.example.com/config.git \
+        --branch main \
+        --path apps/myapp \
+        --source /tmp/rendered \
+        --dry-run
+      The status should be success
+      The stderr should include "dry-run"
+    End
+  End
+
+  Describe "deploy.argocd.deploy - happy path with mocks"
+    Include "$BRIK_CORE_LIB/deploy/gitops.sh"
+
+    setup_deploy_happy() {
+      mock.setup
+      TEST_WS="$(mktemp -d)"
+      MOCK_LOG="${TEST_WS}/mock.log"
+      export MOCK_LOG
+      export TEST_WS
+      mkdir -p "${TEST_WS}/rendered"
+      echo "apiVersion: v1" > "${TEST_WS}/rendered/deploy.yaml"
+      mock.create_logging "argocd" "$MOCK_LOG"
+      local mock_git="${MOCK_BIN}/git"
+      cat > "$mock_git" <<SCRIPT
+#!/usr/bin/env bash
+printf 'git %s\n' "\$*" >> "${MOCK_LOG}"
+if [[ "\$1" == "clone" ]]; then
+  target="\${@: -1}"
+  mkdir -p "\$target"
+fi
+if [[ "\$1" == "rev-parse" ]]; then
+  echo "abc1234"
+fi
+SCRIPT
+      chmod +x "$mock_git"
+      mock.create_logging "rsync" "$MOCK_LOG"
+      mock.activate
+      unset BRIK_DRY_RUN 2>/dev/null
+      brik.use() { :; }
+    }
+    cleanup_deploy_happy() {
+      mock.cleanup
+      unset BRIK_DRY_RUN 2>/dev/null
+      unset -f brik.use 2>/dev/null
+      rm -rf "$TEST_WS"
+    }
+    Before 'setup_deploy_happy'
+    After 'cleanup_deploy_happy'
+
+    It "runs push_manifests + sync + wait_healthy"
+      invoke_deploy_happy() {
+        deploy.argocd.deploy \
+          --app my-app \
+          --repo https://git.example.com/config.git \
+          --branch main \
+          --path apps/myapp \
+          --source "${TEST_WS}/rendered" \
+          --server https://argocd.local \
+          --timeout 120 2>/dev/null || return $?
+        grep -q "app sync my-app" "$MOCK_LOG" &&
+        grep -q "app wait my-app" "$MOCK_LOG"
+      }
+      When call invoke_deploy_happy
+      The status should be success
+    End
+
+    It "logs deployment completed"
+      When call deploy.argocd.deploy \
+        --app my-app \
+        --repo https://git.example.com/config.git \
+        --branch main \
+        --path apps/myapp \
+        --source "${TEST_WS}/rendered"
+      The status should be success
+      The stderr should include "argocd deployment completed"
+    End
+
+    It "passes --git-token-var to push_manifests"
+      invoke_deploy_git_token() {
+        export GIT_TOK="my-git-token"
+        deploy.argocd.deploy \
+          --app my-app \
+          --repo https://git.example.com/config.git \
+          --branch main \
+          --path apps/myapp \
+          --source "${TEST_WS}/rendered" \
+          --git-token-var GIT_TOK 2>/dev/null
+        local rc=$?
+        unset GIT_TOK
+        return $rc
+      }
+      When call invoke_deploy_git_token
+      The status should be success
+    End
+
+    It "passes --auth-token-var to sync and wait_healthy"
+      invoke_deploy_auth() {
+        export ARGO_TOK="argo-secret"
+        deploy.argocd.deploy \
+          --app my-app \
+          --repo https://git.example.com/config.git \
+          --branch main \
+          --path apps/myapp \
+          --source "${TEST_WS}/rendered" \
+          --auth-token-var ARGO_TOK 2>/dev/null || return $?
+        grep -q "\-\-auth-token argo-secret" "$MOCK_LOG"
+        local rc=$?
+        unset ARGO_TOK
+        return $rc
+      }
+      When call invoke_deploy_auth
+      The status should be success
+    End
+  End
+
+  # ---------------------------------------------------------------------------
+  # deploy.argocd.wait_healthy - --dry-run via explicit flag
+  # ---------------------------------------------------------------------------
+  Describe "deploy.argocd.wait_healthy - --dry-run via flag"
+    setup_wait_dryrun_flag() {
+      mock.setup
+      TEST_WS="$(mktemp -d)"
+      mock.create_logging "argocd" "${TEST_WS}/mock.log"
+      mock.activate
+      unset BRIK_DRY_RUN 2>/dev/null
+    }
+    cleanup_wait_dryrun_flag() {
+      mock.cleanup
+      unset BRIK_DRY_RUN 2>/dev/null
+      rm -rf "$TEST_WS"
+    }
+    Before 'setup_wait_dryrun_flag'
+    After 'cleanup_wait_dryrun_flag'
+
+    It "logs dry-run message via --dry-run flag (not env var)"
+      When call deploy.argocd.wait_healthy --app my-app --dry-run
+      The status should be success
+      The stderr should include "dry-run"
+    End
+  End
+
+  # ---------------------------------------------------------------------------
+  # deploy.argocd.rollback - --dry-run via explicit flag
+  # ---------------------------------------------------------------------------
+  Describe "deploy.argocd.rollback - --dry-run via flag"
+    setup_rollback_dryrun_flag() {
+      mock.setup
+      mock.create_logging "argocd" "${MOCK_BIN}/mock.log"
+      mock.activate
+      unset BRIK_DRY_RUN 2>/dev/null
+    }
+    cleanup_rollback_dryrun_flag() {
+      mock.cleanup
+      unset BRIK_DRY_RUN 2>/dev/null
+    }
+    Before 'setup_rollback_dryrun_flag'
+    After 'cleanup_rollback_dryrun_flag'
+
+    It "logs dry-run via --dry-run flag"
+      When call deploy.argocd.rollback --app my-app --dry-run
+      The status should be success
+      The stderr should include "dry-run"
+    End
+  End
+
+  # ---------------------------------------------------------------------------
   # double-sourcing guard
   # ---------------------------------------------------------------------------
   Describe "double-sourcing guard"
