@@ -453,8 +453,9 @@ For details on how credential indirection works and platform setup examples, see
 
 | Key | Type | Required | Default | Description |
 |-----|------|----------|---------|-------------|
-| `publish.cargo.registry` | string | no | `crates-io` | Cargo registry name. |
-| `publish.cargo.token_var` | string | no | -- | Environment variable name holding the crates.io API token. |
+| `publish.cargo.registry` | string | no | `crates-io` | Cargo registry name (e.g. `brik-cargo` for a private Nexus registry). |
+| `publish.cargo.index` | string | no | -- | Sparse index URL for the registry (e.g. `sparse+http://nexus:8081/repository/brik-cargo/`). Required for private registries. |
+| `publish.cargo.token_var` | string | no | -- | Environment variable name holding the registry API token. |
 
 #### `publish.nuget`
 
