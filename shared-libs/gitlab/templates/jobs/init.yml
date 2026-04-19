@@ -26,8 +26,8 @@ brik-init:
       # Resolve runner image from stack + version
       BRIK_HOME="${BRIK_HOME:-/opt/brik}"
       RUNNER_IMAGE=""
-      if [ -f "${BRIK_HOME}/runtime/bash/lib/runtime/runner-images.sh" ]; then
-        . "${BRIK_HOME}/runtime/bash/lib/runtime/runner-images.sh"
+      if [ -f "${BRIK_HOME}/lib/runtime/runner-images.sh" ]; then
+        . "${BRIK_HOME}/lib/runtime/runner-images.sh"
         RUNNER_IMAGE="$(runner.resolve_image "$STACK" "$STACK_VERSION" 2>/dev/null)" || true
       fi
       [ -z "$RUNNER_IMAGE" ] && RUNNER_IMAGE="ghcr.io/getbrik/brik-runner-base:latest"

@@ -14,7 +14,7 @@
 # Detect the best available package manager.
 # Prints: apk | apt-get | yum | dnf | "" (empty if none)
 # NOTE: keep in sync with _setup._detect_system_pkg_manager() in
-#       runtime/bash/lib/runtime/setup.sh
+#       lib/runtime/setup.sh
 _bootstrap_detect_pkg_manager() {
     for _mgr in apk apt-get yum dnf; do
         if command -v "$_mgr" >/dev/null 2>&1; then

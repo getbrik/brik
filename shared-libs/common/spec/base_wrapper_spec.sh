@@ -21,8 +21,8 @@ Describe "base-wrapper.sh"
     Describe "with partial runtime"
       setup_partial() {
         _test_dir="$(mktemp -d)"
-        mkdir -p "${_test_dir}/runtime/bash/lib/core"
-        touch "${_test_dir}/runtime/bash/lib/core/_loader.sh"
+        mkdir -p "${_test_dir}/lib/core"
+        touch "${_test_dir}/lib/core/_loader.sh"
       }
       cleanup_partial() { rm -rf "$_test_dir"; }
       Before 'setup_partial'
@@ -38,9 +38,9 @@ Describe "base-wrapper.sh"
     Describe "with runtime but no loader"
       setup_no_loader() {
         _test_dir="$(mktemp -d)"
-        mkdir -p "${_test_dir}/runtime/bash/lib/runtime"
-        mkdir -p "${_test_dir}/runtime/bash/lib/core"
-        touch "${_test_dir}/runtime/bash/lib/runtime/stage.sh"
+        mkdir -p "${_test_dir}/lib/runtime"
+        mkdir -p "${_test_dir}/lib/core"
+        touch "${_test_dir}/lib/runtime/stage.sh"
       }
       cleanup_no_loader() { rm -rf "$_test_dir"; }
       Before 'setup_no_loader'
@@ -73,7 +73,7 @@ Describe "base-wrapper.sh"
         printf '%s' "$_BRIK_RUNTIME_DIR"
       }
       When call check_runtime_dir
-      The output should include "runtime/bash/lib/runtime"
+      The output should include "lib/runtime"
     End
 
     It "exports _BRIK_CORE_DIR after validation"
@@ -82,7 +82,7 @@ Describe "base-wrapper.sh"
         printf '%s' "$_BRIK_CORE_DIR"
       }
       When call check_core_dir
-      The output should include "runtime/bash/lib/core"
+      The output should include "lib/core"
     End
   End
 
@@ -136,7 +136,7 @@ Describe "base-wrapper.sh"
         printf '%s' "$BRIK_LIB"
       }
       When call check_lib
-      The output should include "runtime/bash/lib/core"
+      The output should include "lib/core"
     End
 
     It "preserves pre-set BRIK_LOG_DIR"

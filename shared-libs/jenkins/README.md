@@ -103,7 +103,7 @@ Jenkinsfile (2 lines)
   -> brikPipeline.groovy (orchestrator)
     -> brikStage.groovy (stage executor)
       -> jenkins-wrapper.sh (Jenkins -> BRIK_* normalization)
-        -> portable stages (runtime/bash/lib/stages/*.sh)
+        -> portable stages (lib/stages/*.sh)
 ```
 
 ### Variable Mapping

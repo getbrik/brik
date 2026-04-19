@@ -4,7 +4,7 @@ help: ## Show available targets
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F ':.*## ' '{printf "  %-14s %s\n", $$1, $$2}'
 
 lint: ## Run shellcheck on all Bash sources
-	shellcheck --severity=warning -x bin/brik $$(find runtime/bash/lib shared-libs -name '*.sh' -not -path '*/spec/*')
+	shellcheck --severity=warning -x bin/brik $$(find lib shared-libs -name '*.sh' -not -path '*/spec/*')
 
 SHELLSPEC_JOBS ?= $(shell nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 0)
 
@@ -41,7 +41,7 @@ uninstall: ## Remove brik symlink from /usr/local/bin
 	@echo "removed: /usr/local/bin/brik"
 
 metrics: ## Run shellmetrics on production scripts
-	@find runtime/bash/lib shared-libs -name '*.sh' -not -path '*/spec/*' | \
+	@find lib shared-libs -name '*.sh' -not -path '*/spec/*' | \
 		xargs shellmetrics
 
 clean: ## Remove generated files

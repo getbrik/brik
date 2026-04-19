@@ -22,8 +22,8 @@ Describe "jenkins-wrapper.sh"
       setup_no_runtime() {
         export _test_dir
         _test_dir="$(mktemp -d)"
-        mkdir -p "${_test_dir}/runtime/bash/lib/core"
-        touch "${_test_dir}/runtime/bash/lib/core/_loader.sh"
+        mkdir -p "${_test_dir}/lib/core"
+        touch "${_test_dir}/lib/core/_loader.sh"
       }
       cleanup_no_runtime() { rm -rf "$_test_dir"; }
       Before 'setup_no_runtime'
@@ -72,7 +72,7 @@ Describe "jenkins-wrapper.sh"
           printf '%s' "$BRIK_LIB"
         }
         When call setup_and_check
-        The output should include "runtime/bash/lib/core"
+        The output should include "lib/core"
       End
 
       It "makes stage.run available after setup"

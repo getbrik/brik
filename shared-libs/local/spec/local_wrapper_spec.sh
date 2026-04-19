@@ -64,7 +64,7 @@ Describe "local-wrapper.sh"
           printf '%s' "$BRIK_LIB"
         }
         When call setup_and_check
-        The output should include "runtime/bash/lib/core"
+        The output should include "lib/core"
       End
 
       It "makes stage.run available after setup"

@@ -590,5 +590,5 @@ Separately, **module loading** uses a three-level resolution for `.sh` files
 ```
 1. Project extensions: ${BRIK_PROJECT_DIR}/.brik/lib/core/
 2. Organization extensions: BRIK_LIB_EXTENSIONS (colon-separated paths)
-3. Standard library: ${BRIK_HOME}/runtime/bash/lib/core/
+3. Standard library: ${BRIK_HOME}/lib/core/
 ```
