@@ -8,7 +8,7 @@ coverage:
         target: 80%
 
 ignore:
-  - "runtime/bash/spec/**"
+  - "spec/**"
   - "shared-libs/*/spec/**"
   - "testdata/**"
   - "examples/**"

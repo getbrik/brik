@@ -38,16 +38,16 @@ fi
 readonly BRIK_HOME
 
 # Source runtime foundations (version, logging, exit codes, module loader)
-# shellcheck source=../runtime/bash/lib/runtime/version-info.sh
-. "${BRIK_HOME}/runtime/bash/lib/runtime/version-info.sh"
-# shellcheck source=../runtime/bash/lib/runtime/logging.sh
-. "${BRIK_HOME}/runtime/bash/lib/runtime/logging.sh"
-# shellcheck source=../runtime/bash/lib/runtime/error.sh
-. "${BRIK_HOME}/runtime/bash/lib/runtime/error.sh"
-# shellcheck source=../runtime/bash/lib/runtime/tools.sh
-. "${BRIK_HOME}/runtime/bash/lib/runtime/tools.sh"
-# shellcheck source=../runtime/bash/lib/core/_loader.sh
-. "${BRIK_HOME}/runtime/bash/lib/core/_loader.sh"
+# shellcheck source=../lib/runtime/version-info.sh
+. "${BRIK_HOME}/lib/runtime/version-info.sh"
+# shellcheck source=../lib/runtime/logging.sh
+. "${BRIK_HOME}/lib/runtime/logging.sh"
+# shellcheck source=../lib/runtime/error.sh
+. "${BRIK_HOME}/lib/runtime/error.sh"
+# shellcheck source=../lib/runtime/tools.sh
+. "${BRIK_HOME}/lib/runtime/tools.sh"
+# shellcheck source=../lib/core/_loader.sh
+. "${BRIK_HOME}/lib/core/_loader.sh"
 
 readonly DEFAULT_CONFIG="brik.yml"
 readonly DEFAULT_SCHEMA="${BRIK_HOME}/schemas/config/v1/brik.schema.json"

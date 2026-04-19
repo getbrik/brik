@@ -15,7 +15,7 @@
  * The fixed flow:
  *   Init -> Release -> Build -> Lint||SAST||Scan||Test -> Package -> Container Scan -> Deploy -> Notify
  *
- * All business logic lives in portable Bash stages (runtime/bash/lib/stages/).
+ * All business logic lives in portable Bash stages (lib/stages/).
  * This Groovy file is a thin orchestrator only.
  */
 def call(Map params = [:]) {
@@ -84,7 +84,7 @@ def call(Map params = [:]) {
                 if (useDocker) {
                     resolvedImage = sh(
                         script: """#!/bin/bash
-                            . "${brikHome}/runtime/bash/lib/runtime/runner-images.sh"
+                            . "${brikHome}/lib/runtime/runner-images.sh"
                             STACK=\$(yq '.project.stack // "auto"' brik.yml 2>/dev/null || echo "auto")
                             VERSION=\$(yq '.project.stack_version // ""' brik.yml 2>/dev/null || echo "")
                             runner.resolve_image "\$STACK" "\$VERSION" 2>/dev/null || echo ""

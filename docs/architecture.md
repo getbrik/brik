@@ -101,13 +101,13 @@ validation runs on briklab (a real GitLab instance).
 └─────────────────────────────────────────────────────────┘
 ```
 
-**Layer 0 -- Bash Runtime** (`runtime/bash/lib/runtime/`).
+**Layer 0 -- Bash Runtime** (`lib/runtime/`).
 The execution framework that wraps every stage. Provides `stage.run` (lifecycle
 engine), structured logging, execution context, pre/post hooks, error handling,
 and step summary generation. Knows nothing about CI/CD -- it only runs functions
 with observability.
 
-**Layer 1 -- brik-lib** (`runtime/bash/lib/core/`).
+**Layer 1 -- brik-lib** (`lib/core/`).
 Reusable CI/CD business functions organized by domain: `build.node.run`, `build.java.run`,
 `test.run`, `quality.lint.run`, `quality.format.run`, `security.run`, etc.
 Each function knows how to perform one CI/CD action for one stack or tool. Layer 1
@@ -166,7 +166,7 @@ On other platforms that support parallelism, the same pattern applies.
 ## Stage Lifecycle (`stage.run`)
 
 Every stage is executed through `stage.run`, which provides a consistent lifecycle.
-Source: `runtime/bash/lib/runtime/stage.sh`.
+Source: `lib/runtime/stage.sh`.
 
 ```
 stage.run("build", stages.build)
@@ -265,13 +265,13 @@ To add support for a new stack (e.g., `go`):
 1. **JSON Schema** -- add `go` to the `stack` enum in `schemas/config/v1/brik.schema.json`
    and define any stack-specific properties (e.g., `go_version`).
 
-2. **Build module** -- create `runtime/bash/lib/core/build/go.sh` implementing
+2. **Build module** -- create `lib/core/build/go.sh` implementing
    `build.go.run()` with the standard build logic for the stack.
 
-3. **Test module** -- create `runtime/bash/lib/core/test/go.sh` implementing
+3. **Test module** -- create `lib/core/test/go.sh` implementing
    `test.go.cmd()` (returns the test command) and `test.go.run_cmd()` (executes it).
 
-4. **Config module** -- create `runtime/bash/lib/core/config/go.sh` implementing
+4. **Config module** -- create `lib/core/config/go.sh` implementing
    `config.go.default()` (sensible defaults), `config.go.export_build_vars()` (export
    stack-specific build variables), and `config.go.validate_coherence()` (cross-field
    validation).
@@ -280,7 +280,7 @@ To add support for a new stack (e.g., `go`):
    and `core/test.sh` use `brik.use "build.${stack}"` to dynamically load the correct
    module at runtime. The new `build/go.sh` is picked up automatically.
 
-6. **Doctor** -- add Go-specific prerequisite checks to `runtime/bash/lib/core/doctor.sh`.
+6. **Doctor** -- add Go-specific prerequisite checks to `lib/core/doctor.sh`.
 
 7. **Example** -- create `examples/minimal-go/brik.yml` with a minimal config.
 
@@ -296,7 +296,7 @@ To add support for a new stack (e.g., `go`):
 
 To add a new stage to the fixed flow (rare -- the flow is intentionally fixed):
 
-1. **Stage entry point** -- create `runtime/bash/lib/stages/<stage>.sh` implementing
+1. **Stage entry point** -- create `lib/stages/<stage>.sh` implementing
    `stages.<stage>()` following the pattern of existing stages.
 
 2. **Shared library template** -- add the stage to `shared-libs/gitlab/templates/pipeline.yml`

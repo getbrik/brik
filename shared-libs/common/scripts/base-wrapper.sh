@@ -19,7 +19,7 @@ _BRIK_BASE_WRAPPER_LOADED=1
 # ---------------------------------------------------------------------------
 
 # Ensure BRIK_EXIT_* constants are available.
-# Uses fallback values identical to runtime/bash/lib/runtime/error.sh.
+# Uses fallback values identical to lib/runtime/error.sh.
 # After bootstrap(), error.sh is sourced and the canonical values take over.
 _brik_wrapper_ensure_exit_codes() {
     : "${BRIK_EXIT_OK:=0}"
@@ -61,8 +61,8 @@ brik.wrapper.validate_home() {
     export BRIK_HOME="$brik_home"
 
     # Verify runtime files exist
-    export _BRIK_RUNTIME_DIR="${BRIK_HOME}/runtime/bash/lib/runtime"
-    export _BRIK_CORE_DIR="${BRIK_HOME}/runtime/bash/lib/core"
+    export _BRIK_RUNTIME_DIR="${BRIK_HOME}/lib/runtime"
+    export _BRIK_CORE_DIR="${BRIK_HOME}/lib/core"
 
     if [[ ! -f "${_BRIK_RUNTIME_DIR}/stage.sh" ]]; then
         echo "error: stage.sh not found at ${_BRIK_RUNTIME_DIR}/stage.sh" >&2
@@ -107,7 +107,7 @@ brik.wrapper.bootstrap() {
     brik.use condition
 
     # Source portable stage logic
-    local stages_dir="${BRIK_HOME}/runtime/bash/lib/stages"
+    local stages_dir="${BRIK_HOME}/lib/stages"
     local stage_file
     for stage_file in "${stages_dir}"/*.sh; do
         if [[ -f "$stage_file" ]]; then

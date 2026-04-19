@@ -400,7 +400,7 @@ make test
 shellspec
 
 # A specific spec file
-shellspec runtime/bash/spec/cli/validate_spec.sh
+shellspec spec/cli/validate_spec.sh
 
 # With verbose output
 shellspec --format documentation
@@ -410,7 +410,7 @@ make coverage
 # Report in coverage/index.html
 ```
 
-Tests are in `runtime/bash/spec/` and `shared-libs/*/spec/` using [ShellSpec](https://shellspec.info). The `.shellspec` config at the project root sets the shell, spec path (`--default-path "**/spec"`), and helper.
+Tests are in `spec/` and `shared-libs/*/spec/` using [ShellSpec](https://shellspec.info). The `.shellspec` config at the project root sets the shell, spec path (`--default-path "**/spec"`), and helper.
 
 > **Note:** `ulimit -n 1024` is required on macOS when running kcov directly. The Makefile handles this automatically. See [kcov#293](https://github.com/SimonKagstrom/kcov/issues/293).
 
