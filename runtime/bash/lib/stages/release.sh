@@ -30,26 +30,100 @@ stages.release() {
     context.set "$context_file" "BRIK_APP_VERSION" "$current_version"
     pipeline.env.set "BRIK_APP_VERSION" "$current_version"
 
-    # If on a tag (release trigger), prepare and finalize if release module available
+    # If on a tag (release trigger), prepare and finalize
     if [[ -n "${BRIK_TAG:-}" ]]; then
-        brik.use release
-
-        local changelog_enabled="${BRIK_RELEASE_CHANGELOG_ENABLED:-true}"
-        local -a prepare_args=("$current_version")
-        if [[ "$changelog_enabled" == "true" ]]; then
-            prepare_args+=(--changelog)
-            [[ -n "${BRIK_RELEASE_CHANGELOG_FILE:-}" ]] && \
-                prepare_args+=(--changelog-file "$BRIK_RELEASE_CHANGELOG_FILE")
-        fi
-
         local rc=0
-        release.prepare "${prepare_args[@]}" || rc=$?
-        [[ $rc -ne 0 ]] && log.warn "release.prepare skipped or failed (rc=$rc)"
+        _stages.release._prepare "$current_version" || rc=$?
+        [[ $rc -ne 0 ]] && log.warn "release prepare skipped or failed (rc=$rc)"
 
         rc=0
-        release.finalize "$current_version" --tag-prefix "$tag_prefix" || rc=$?
-        [[ $rc -ne 0 ]] && log.warn "release.finalize skipped or failed (rc=$rc)"
+        _stages.release._finalize "$current_version" "$tag_prefix" || rc=$?
+        [[ $rc -ne 0 ]] && log.warn "release finalize skipped or failed (rc=$rc)"
     fi
 
+    return 0
+}
+
+# Prepare a release: generate changelog, patch package.json, create commit.
+_stages.release._prepare() {
+    local version="$1"
+    local changelog_enabled="${BRIK_RELEASE_CHANGELOG_ENABLED:-true}"
+    local changelog_file="${BRIK_RELEASE_CHANGELOG_FILE:-CHANGELOG.md}"
+    local dry_run="${BRIK_DRY_RUN:-}"
+
+    if [[ "$changelog_file" != /* ]]; then
+        changelog_file="${BRIK_WORKSPACE:-.}/${changelog_file}"
+    fi
+
+    runtime.require_tool git || return "$BRIK_EXIT_MISSING_DEP"
+
+    if [[ "$dry_run" == "true" ]]; then
+        [[ "$changelog_enabled" == "true" ]] && log.info "[dry-run] changelog.generate > $changelog_file"
+        log.info "[dry-run] patch package.json version to $version (if present)"
+        log.info "[dry-run] git add -A + commit 'release: $version'"
+        log.info "release prepared (dry-run): $version"
+        return 0
+    fi
+
+    if [[ "$changelog_enabled" == "true" ]]; then
+        brik.use changelog
+        log.info "generating changelog to $changelog_file"
+        local changelog_content
+        changelog_content="$(changelog.generate)" || return $?
+
+        if [[ -f "$changelog_file" ]]; then
+            local tmp
+            tmp="$(mktemp)" || return "$BRIK_EXIT_IO_FAILURE"
+            {
+                printf '# %s\n\n' "$version"
+                printf '%s\n\n' "$changelog_content"
+                cat "$changelog_file"
+            } > "$tmp"
+            mv "$tmp" "$changelog_file" || return "$BRIK_EXIT_IO_FAILURE"
+        else
+            {
+                printf '# %s\n\n' "$version"
+                printf '%s\n' "$changelog_content"
+            } > "$changelog_file" || return "$BRIK_EXIT_IO_FAILURE"
+        fi
+    fi
+
+    # Patch package.json version if present.
+    local pkg="${BRIK_WORKSPACE:-.}/package.json"
+    if [[ -f "$pkg" ]] && command -v jq >/dev/null 2>&1; then
+        local tmp
+        tmp="$(mktemp)" || return "$BRIK_EXIT_IO_FAILURE"
+        jq --arg v "$version" '.version = $v' "$pkg" > "$tmp" || {
+            rm -f "$tmp"
+            return "$BRIK_EXIT_IO_FAILURE"
+        }
+        mv "$tmp" "$pkg" || return "$BRIK_EXIT_IO_FAILURE"
+    fi
+
+    git add -A >/dev/null 2>&1 || {
+        log.error "git add failed"
+        return "$BRIK_EXIT_EXTERNAL_FAIL"
+    }
+    git commit -q -m "release: $version" || {
+        log.error "git commit failed"
+        return "$BRIK_EXIT_EXTERNAL_FAIL"
+    }
+
+    log.info "release prepared: $version"
+    return 0
+}
+
+# Finalize a release: create annotated tag via git.tag.
+_stages.release._finalize() {
+    local version="$1"
+    local tag_prefix="$2"
+
+    local tag_name="${tag_prefix}${version}"
+    local -a tag_args=("$tag_name" --message "Release $version")
+    [[ "${BRIK_DRY_RUN:-}" == "true" ]] && tag_args+=(--dry-run)
+
+    git.tag "${tag_args[@]}" || return $?
+
+    log.info "release finalized: $tag_name"
     return 0
 }

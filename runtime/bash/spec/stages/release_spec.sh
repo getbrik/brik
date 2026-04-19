@@ -123,7 +123,7 @@ YAML
     Before 'setup_tag'
     After 'cleanup_tag'
 
-    It "calls release.prepare and release.finalize"
+    It "handles release trigger with BRIK_TAG"
       run_release_tag() {
         local ctx
         ctx="$(context.create "release")" 2>/dev/null || ctx="$(mktemp)"

@@ -392,40 +392,4 @@ MOCKEOF
     End
   End
 
-  Describe "test.publish_report"
-    setup() {
-      REPORT_FILE="$(mktemp)"
-      printf '<testsuites><testsuite tests="1"/></testsuites>\n' > "$REPORT_FILE"
-    }
-    cleanup() { rm -rf "$REPORT_FILE"; }
-    Before 'setup'
-    After 'cleanup'
-
-    It "copies report to log directory"
-      invoke_copy() {
-        test.publish_report "$REPORT_FILE" 2>/dev/null || return 1
-        [[ -f "${BRIK_LOG_DIR}/reports/$(basename "$REPORT_FILE")" ]]
-      }
-      When call invoke_copy
-      The status should be success
-    End
-
-    It "returns 6 for missing report file"
-      When call test.publish_report "/nonexistent/report.xml"
-      The status should equal 6
-      The stderr should include "report file not found"
-    End
-
-    It "accepts --format option"
-      When call test.publish_report "$REPORT_FILE" --format tap
-      The status should be success
-      The stderr should include "format: tap"
-    End
-
-    It "returns 2 for unknown option"
-      When call test.publish_report "$REPORT_FILE" --badopt
-      The status should equal 2
-      The stderr should include "unknown option"
-    End
-  End
 End

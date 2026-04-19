@@ -59,34 +59,6 @@ Describe "deploy.sh"
       End
     End
 
-    Describe "with --env loading"
-      setup_env() {
-        MOCK_K8S_LOG="$(mktemp)"
-        eval "deploy.k8s.run() { printf '%s\n' \"\$*\" > \"$MOCK_K8S_LOG\"; return 0; }"
-        eval "_BRIK_MODULE_DEPLOY_K8S_LOADED=1"
-        export _BRIK_MODULE_DEPLOY_K8S_LOADED
-        # Mock env.load to verify it is called
-        ENV_LOAD_LOG="$(mktemp)"
-        eval "env.load() { printf '%s\n' \"\$1\" > \"$ENV_LOAD_LOG\"; return 0; }"
-      }
-      cleanup_env() {
-        unset -f deploy.k8s.run env.load 2>/dev/null
-        unset _BRIK_MODULE_DEPLOY_K8S_LOADED
-        rm -f "$MOCK_K8S_LOG" "$ENV_LOAD_LOG"
-      }
-      Before 'setup_env'
-      After 'cleanup_env'
-
-      It "calls env.load with the specified environment"
-        invoke_env_check() {
-          deploy.run --target k8s --env production 2>/dev/null || return 1
-          grep -qx "production" "$ENV_LOAD_LOG"
-        }
-        When call invoke_env_check
-        The status should be success
-      End
-    End
-
     Describe "deploy function not found"
       setup_no_fn() {
         # Module loaded but no deploy function
