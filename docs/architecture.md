@@ -238,12 +238,8 @@ brik/
 │  │  │  ├─ notify.sh              #   Notification dispatcher (slack, email, webhook)
 │  │  │  ├─ doctor.sh              #   Prerequisite checks per stack
 │  │  │  ├─ validate.sh            #   Config validation against JSON Schema
-│  │  │  ├─ release.sh             #   Release version computation
 │  │  │  ├─ changelog.sh           #   Changelog generation
-│  │  │  ├─ artifact.sh            #   Artifact management
-│  │  │  ├─ cache.sh               #   Build cache management
 │  │  │  ├─ condition.sh           #   Deploy condition evaluation
-│  │  │  ├─ env.sh                 #   Environment variable helpers
 │  │  │  ├─ git.sh                 #   Git operations
 │  │  │  ├─ version.sh             #   Version parsing
 │  │  │  ├─ _loader.sh             #   Module loading (3-level resolution)

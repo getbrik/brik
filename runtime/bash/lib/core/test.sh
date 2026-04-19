@@ -97,36 +97,3 @@ test.run() {
     log.info "tests passed"
     return 0
 }
-
-# Publish a test report to the log directory.
-# Usage: test.publish_report <report_path> [--format <junit|tap>]
-test.publish_report() {
-    local report_path="$1"
-    shift
-    local format="junit"
-
-    while [[ $# -gt 0 ]]; do
-        case "$1" in
-            --format) format="$2"; shift 2 ;;
-            *) log.error "unknown option: $1"; return "$BRIK_EXIT_INVALID_INPUT" ;;
-        esac
-    done
-
-    if [[ ! -f "$report_path" ]]; then
-        log.error "report file not found: $report_path"
-        return "$BRIK_EXIT_IO_FAILURE"
-    fi
-
-    local reports_dir="${BRIK_LOG_DIR:-${BRIK_DEFAULT_LOG_DIR:-/tmp/brik/logs}}/reports"
-    mkdir -p "$reports_dir" || return "$BRIK_EXIT_IO_FAILURE"
-
-    local dest
-    dest="${reports_dir}/$(basename "$report_path")"
-    cp "$report_path" "$dest" || {
-        log.error "cannot copy report to: $dest"
-        return "$BRIK_EXIT_IO_FAILURE"
-    }
-
-    log.info "test report published: $dest (format: $format)"
-    return 0
-}

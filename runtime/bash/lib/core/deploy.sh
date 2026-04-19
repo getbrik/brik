@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 # @module deploy
-# @uses env
 # @description Deploy dispatcher for brik-lib.
 
 # Guard against double-sourcing
@@ -11,13 +10,13 @@ _BRIK_CORE_DEPLOY_LOADED=1
 # Usage: deploy.run --target <k8s|compose|ssh|helm|gitops> --env <environment>
 #        [--dry-run]
 deploy.run() {
-    local target="" environment="" dry_run="${BRIK_DRY_RUN:-}"
+    local target="" dry_run="${BRIK_DRY_RUN:-}"
     local -a passthrough_args=()
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --target) target="$2"; shift 2 ;;
-            --env) environment="$2"; shift 2 ;;
+            --env) shift 2 ;;
             --dry-run) dry_run="true"; passthrough_args+=(--dry-run); shift ;;
             *) passthrough_args+=("$1"); shift ;;
         esac
@@ -26,13 +25,6 @@ deploy.run() {
     if [[ -z "$target" ]]; then
         log.error "deploy target is required (--target)"
         return "$BRIK_EXIT_INVALID_INPUT"
-    fi
-
-    # Load environment if specified
-    if [[ -n "$environment" ]]; then
-        if declare -f env.load >/dev/null 2>&1; then
-            env.load "$environment" || return $?
-        fi
     fi
 
     log.info "deploying with target: $target"
