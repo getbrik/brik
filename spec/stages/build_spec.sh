@@ -138,6 +138,104 @@ YAML
     The output should equal "7"
   End
 
+  It "returns IO_FAILURE when BRIK_WORKSPACE does not exist"
+    run_build_no_workspace() {
+      brik.use() { :; }
+      local ctx
+      ctx="$(context.create "build")" 2>/dev/null || ctx="$(mktemp)"
+      export BRIK_WORKSPACE="/nonexistent/brik-workspace-$$"
+      stages.build "$ctx" 2>/dev/null
+      local rc=$?
+      printf '%s\n%s' "$rc" "$(grep "^BRIK_BUILD_STATUS=" "$ctx" | cut -d= -f2)"
+    }
+    When call run_build_no_workspace
+    The line 1 of output should equal "6"
+    The line 2 of output should equal "failed"
+  End
+
+  It "returns CONFIG_ERROR when auto-detect finds no stack"
+    run_build_auto_fail() {
+      cat > "$BRIK_CONFIG_FILE" <<'YAML'
+version: 1
+project:
+  name: test
+YAML
+      config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
+      brik.use() { :; }
+      stacks.detect() { return 1; }
+      local ctx
+      ctx="$(context.create "build")" 2>/dev/null || ctx="$(mktemp)"
+      stages.build "$ctx" 2>/dev/null
+      printf '%s' "$?"
+    }
+    When call run_build_auto_fail
+    The output should equal "7"
+  End
+
+  It "returns CONFIG_ERROR when stack module cannot be loaded"
+    run_build_unsupported() {
+      brik.use() {
+        case "$1" in
+          stacks.cobol) return 1 ;;
+          *) return 0 ;;
+        esac
+      }
+      export BRIK_BUILD_STACK="cobol"
+      local ctx
+      ctx="$(context.create "build")" 2>/dev/null || ctx="$(mktemp)"
+      stages.build "$ctx" 2>/dev/null
+      printf '%s' "$?"
+    }
+    When call run_build_unsupported
+    The output should equal "7"
+  End
+
+  It "forwards --tool to the stack build fn when build.tool is set"
+    run_build_tool() {
+      cat > "$BRIK_CONFIG_FILE" <<'YAML'
+version: 1
+project:
+  name: test
+  stack: node
+build:
+  tool: yarn
+YAML
+      config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
+      brik.use() { :; }
+      local ARGS_LOG=""
+      stacks.node.build() { ARGS_LOG="$*"; return 0; }
+      local ctx
+      ctx="$(context.create "build")" 2>/dev/null || ctx="$(mktemp)"
+      stages.build "$ctx" >/dev/null 2>&1
+      printf '%s' "$ARGS_LOG"
+    }
+    When call run_build_tool
+    The output should include "--tool yarn"
+  End
+
+  It "omits --tool when build.tool is auto"
+    run_build_tool_auto() {
+      cat > "$BRIK_CONFIG_FILE" <<'YAML'
+version: 1
+project:
+  name: test
+  stack: node
+build:
+  tool: auto
+YAML
+      config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
+      brik.use() { :; }
+      local ARGS_LOG=""
+      stacks.node.build() { ARGS_LOG="$*"; return 0; }
+      local ctx
+      ctx="$(context.create "build")" 2>/dev/null || ctx="$(mktemp)"
+      stages.build "$ctx" >/dev/null 2>&1
+      printf '%s' "$ARGS_LOG"
+    }
+    When call run_build_tool_auto
+    The output should not include "--tool"
+  End
+
   Describe "with java stack"
     setup_java() {
       cat > "$BRIK_CONFIG_FILE" <<'YAML'
