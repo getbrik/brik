@@ -4,9 +4,10 @@
 # @description Module loader for brik-lib. Provides brik.use for lazy loading.
 #
 # Resolution order:
-#   1. Project extensions: ${BRIK_PROJECT_DIR}/.brik/lib/core/
-#   2. Organization extensions: BRIK_LIB_EXTENSIONS (colon-separated paths)
-#   3. Standard library: ${BRIK_LIB}
+#   1. Project extensions: ${BRIK_PROJECT_DIR}/.brik/lib/
+#   2. BRIK_LIB (optional legacy override; skipped when unset)
+#   3. BRIK_LIB_EXTENSIONS (colon-separated notion paths: pipeline, transverse,
+#      stages, stacks, rollout, deployments, package-managers, cli)
 #
 # Double-load prevention via guard variables.
 
@@ -49,18 +50,15 @@ brik.use() {
 
     # 1. Project extensions
     local project_dir="${BRIK_PROJECT_DIR:-$(pwd)}"
-    local project_path="${project_dir}/.brik/lib/core/${relative_path}"
+    local project_path="${project_dir}/.brik/lib/${relative_path}"
     if [[ -f "$project_path" ]]; then
         resolved="$project_path"
     fi
 
-    # 2. Standard library (BRIK_LIB = lib/core) - checked before extensions
-    # so that shared names (build, test, deploy, publish, quality, security)
-    # resolve to core dispatchers, not to same-named files under extension dirs
-    # (e.g. lib/stages/build.sh is a stage, not the build dispatcher).
-    if [[ -z "$resolved" ]]; then
-        local std_lib="${BRIK_LIB:-${BRIK_HOME}/lib/core}"
-        local std_path="${std_lib}/${relative_path}"
+    # 2. BRIK_LIB override (legacy; skipped when unset/empty). Kept as an
+    # escape hatch for users who set BRIK_LIB to a custom directory.
+    if [[ -z "$resolved" && -n "${BRIK_LIB:-}" ]]; then
+        local std_path="${BRIK_LIB}/${relative_path}"
         if [[ -f "$std_path" ]]; then
             resolved="$std_path"
         fi

@@ -26,9 +26,8 @@ spec_helper_loaded() {
   export FIXTURES="${BRIK_HOME}/testdata/fixtures"
   export EXAMPLES="${BRIK_HOME}/examples"
 
-  # Runtime and core library paths
+  # Runtime library paths (notion dirs, domain-driven layout).
   export BRIK_PIPELINE_LIB="${BRIK_HOME}/lib/pipeline"
-  export BRIK_CORE_LIB="${BRIK_HOME}/lib/core"
   export BRIK_TRANSVERSE_LIB="${BRIK_HOME}/lib/transverse"
   export BRIK_STACKS_LIB="${BRIK_HOME}/lib/stacks"
   export BRIK_ROLLOUT_LIB="${BRIK_HOME}/lib/rollout"
@@ -36,9 +35,10 @@ spec_helper_loaded() {
   export BRIK_PACKAGE_MANAGERS_LIB="${BRIK_HOME}/lib/package-managers"
   export BRIK_STAGES_LIB="${BRIK_HOME}/lib/stages"
   export BRIK_CLI_LIB="${BRIK_HOME}/lib/cli"
-  # Notion dirs as loader extensions (non-existent entries are harmless).
-  export BRIK_LIB="${BRIK_CORE_LIB}"
-  export BRIK_LIB_EXTENSIONS="${BRIK_TRANSVERSE_LIB}:${BRIK_STACKS_LIB}:${BRIK_ROLLOUT_LIB}:${BRIK_DEPLOYMENTS_LIB}:${BRIK_PACKAGE_MANAGERS_LIB}:${BRIK_STAGES_LIB}:${BRIK_CLI_LIB}:${BRIK_HOME}/lib"
+  # BRIK_LIB is an optional escape hatch (empty by default now that lib/core/
+  # has been absorbed). Loader resolves via BRIK_LIB_EXTENSIONS.
+  export BRIK_LIB=""
+  export BRIK_LIB_EXTENSIONS="${BRIK_PIPELINE_LIB}:${BRIK_TRANSVERSE_LIB}:${BRIK_STACKS_LIB}:${BRIK_ROLLOUT_LIB}:${BRIK_DEPLOYMENTS_LIB}:${BRIK_PACKAGE_MANAGERS_LIB}:${BRIK_STAGES_LIB}:${BRIK_CLI_LIB}:${BRIK_HOME}/lib"
   export WORKSPACES="${FIXTURES}/workspaces"
 }
 

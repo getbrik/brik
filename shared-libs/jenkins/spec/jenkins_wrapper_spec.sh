@@ -66,13 +66,14 @@ Describe "jenkins-wrapper.sh"
         The output should equal "jenkins"
       End
 
-      It "sets BRIK_LIB to core library path"
+      It "leaves BRIK_LIB empty by default (legacy escape hatch)"
         setup_and_check() {
+          unset BRIK_LIB
           brik.jenkins.setup "$BRIK_HOME" >/dev/null 2>&1
-          printf '%s' "$BRIK_LIB"
+          printf '%s' "${BRIK_LIB:-UNSET}"
         }
         When call setup_and_check
-        The output should include "lib/core"
+        The output should equal "UNSET"
       End
 
       It "makes stage.run available after setup"

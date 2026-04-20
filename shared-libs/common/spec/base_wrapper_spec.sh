@@ -75,14 +75,6 @@ Describe "base-wrapper.sh"
       The output should include "lib/pipeline"
     End
 
-    It "exports _BRIK_CORE_DIR after validation"
-      check_core_dir() {
-        brik.wrapper.validate_home "$BRIK_HOME" 2>/dev/null
-        printf '%s' "$_BRIK_CORE_DIR"
-      }
-      When call check_core_dir
-      The output should include "lib/core"
-    End
   End
 
   # =========================================================================
@@ -129,13 +121,14 @@ Describe "base-wrapper.sh"
       The output should include "/tmp/brik/logs"
     End
 
-    It "sets BRIK_LIB to core dir"
+    It "leaves BRIK_LIB empty by default (legacy escape hatch)"
       check_lib() {
+        unset BRIK_LIB
         brik.wrapper.set_standard_env
-        printf '%s' "$BRIK_LIB"
+        printf '%s' "${BRIK_LIB:-UNSET}"
       }
       When call check_lib
-      The output should include "lib/core"
+      The output should equal "UNSET"
     End
 
     It "preserves pre-set BRIK_LOG_DIR"

@@ -51,13 +51,14 @@ Describe "gitlab-wrapper.sh"
         The output should equal "gitlab"
       End
 
-      It "sets BRIK_LIB to core library path"
+      It "leaves BRIK_LIB empty by default (legacy escape hatch)"
         setup_and_check() {
+          unset BRIK_LIB
           brik.gitlab.setup "$BRIK_HOME" >/dev/null 2>&1
-          printf '%s' "$BRIK_LIB"
+          printf '%s' "${BRIK_LIB:-UNSET}"
         }
         When call setup_and_check
-        The output should include "lib/core"
+        The output should equal "UNSET"
       End
 
       It "makes stage.run available after setup"
