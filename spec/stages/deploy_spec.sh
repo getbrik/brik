@@ -53,7 +53,7 @@ project:
 deploy:
   environments:
     staging:
-      target: kubernetes
+      target: k8s
       namespace: staging-ns
 YAML
       config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
@@ -63,7 +63,7 @@ YAML
     It "returns 0 when deploy.run succeeds"
       run_deploy_success() {
         brik.use() { :; }
-        deploy.run() { return 0; }
+        deploy.k8s.run() { return 0; }
 
         local ctx
         ctx="$(context.create "deploy")" 2>/dev/null || ctx="$(mktemp)"
@@ -76,7 +76,7 @@ YAML
     It "sets BRIK_DEPLOY_STATUS to success"
       run_deploy_ctx() {
         brik.use() { :; }
-        deploy.run() { return 0; }
+        deploy.k8s.run() { return 0; }
 
         local ctx
         ctx="$(context.create "deploy")" 2>/dev/null || ctx="$(mktemp)"
@@ -90,7 +90,7 @@ YAML
     It "sets BRIK_DEPLOY_STATUS to failed when deploy.run fails"
       run_deploy_fail() {
         brik.use() { :; }
-        deploy.run() { return 1; }
+        deploy.k8s.run() { return 1; }
 
         local ctx
         ctx="$(context.create "deploy")" 2>/dev/null || ctx="$(mktemp)"
@@ -104,14 +104,14 @@ YAML
     It "passes target and namespace to deploy.run"
       run_deploy_args() {
         brik.use() { :; }
-        deploy.run() { printf '%s ' "$@"; printf '\n'; return 0; }
+        deploy.k8s.run() { printf '%s ' "$@"; printf '\n'; return 0; }
 
         local ctx
         ctx="$(context.create "deploy")" 2>/dev/null || ctx="$(mktemp)"
         stages.deploy "$ctx" 2>/dev/null
       }
       When call run_deploy_args
-      The output should include "--target kubernetes"
+      The output should include "--target k8s"
       The output should include "--env staging"
       The output should include "--namespace staging-ns"
     End
@@ -119,7 +119,7 @@ YAML
     It "logs environment name"
       run_deploy_log() {
         brik.use() { :; }
-        deploy.run() { return 0; }
+        deploy.k8s.run() { return 0; }
         local ctx
         ctx="$(context.create "deploy")" 2>/dev/null || ctx="$(mktemp)"
         stages.deploy "$ctx"
@@ -139,7 +139,7 @@ project:
 deploy:
   environments:
     staging:
-      target: kubernetes
+      target: k8s
       when: "branch == 'main'"
 YAML
       config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
@@ -150,7 +150,7 @@ YAML
       run_deploy_cond_skip() {
         export BRIK_BRANCH="develop"
         brik.use() { :; }
-        deploy.run() { printf 'DEPLOYED\n'; return 0; }
+        deploy.k8s.run() { printf 'DEPLOYED\n'; return 0; }
         local ctx
         ctx="$(context.create "deploy")" 2>/dev/null || ctx="$(mktemp)"
         stages.deploy "$ctx" 2>/dev/null
@@ -163,7 +163,7 @@ YAML
       run_deploy_cond_match() {
         export BRIK_BRANCH="main"
         brik.use() { :; }
-        deploy.run() { printf 'DEPLOYED\n'; return 0; }
+        deploy.k8s.run() { printf 'DEPLOYED\n'; return 0; }
         local ctx
         ctx="$(context.create "deploy")" 2>/dev/null || ctx="$(mktemp)"
         stages.deploy "$ctx" 2>/dev/null
@@ -182,13 +182,13 @@ project:
 deploy:
   environments:
     production:
-      target: kubernetes
+      target: k8s
       when: "tag =~ 'v*'"
 YAML
         config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
         export BRIK_TAG=""
         brik.use() { :; }
-        deploy.run() { printf 'DEPLOYED\n'; return 0; }
+        deploy.k8s.run() { printf 'DEPLOYED\n'; return 0; }
         local ctx
         ctx="$(context.create "deploy")" 2>/dev/null || ctx="$(mktemp)"
         stages.deploy "$ctx" 2>/dev/null

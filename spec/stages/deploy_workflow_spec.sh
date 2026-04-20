@@ -29,6 +29,17 @@ Describe "stages.deploy - workflow and new target fields"
   Before 'setup_env'
   After 'cleanup_env'
 
+  # Shared stub: define a success impl for every deploy target so that
+  # stages.deploy's inline dispatch (brik.use deployments.<target> + call
+  # deploy.<target>.run) finds the fn regardless of which target the test uses.
+  _stub_all_deploys() {
+    deploy.k8s.run() { printf '%s ' "$@"; printf '\n'; return 0; }
+    deploy.compose.run() { printf '%s ' "$@"; printf '\n'; return 0; }
+    deploy.ssh.run() { printf '%s ' "$@"; printf '\n'; return 0; }
+    deploy.helm.run() { printf '%s ' "$@"; printf '\n'; return 0; }
+    deploy.gitops.run() { printf '%s ' "$@"; printf '\n'; return 0; }
+  }
+
   # =========================================================================
   # New field passthrough: chart, release_name, values
   # =========================================================================
@@ -55,7 +66,7 @@ YAML
     It "passes --chart to deploy.run"
       run_deploy_chart() {
         brik.use() { :; }
-        deploy.run() { printf '%s ' "$@"; printf '\n'; return 0; }
+        _stub_all_deploys
         local ctx
         ctx="$(context.create "deploy")" 2>/dev/null || ctx="$(mktemp)"
         stages.deploy "$ctx" 2>/dev/null
@@ -67,7 +78,7 @@ YAML
     It "passes --release to deploy.run"
       run_deploy_release() {
         brik.use() { :; }
-        deploy.run() { printf '%s ' "$@"; printf '\n'; return 0; }
+        _stub_all_deploys
         local ctx
         ctx="$(context.create "deploy")" 2>/dev/null || ctx="$(mktemp)"
         stages.deploy "$ctx" 2>/dev/null
@@ -79,7 +90,7 @@ YAML
     It "passes --values to deploy.run"
       run_deploy_values() {
         brik.use() { :; }
-        deploy.run() { printf '%s ' "$@"; printf '\n'; return 0; }
+        _stub_all_deploys
         local ctx
         ctx="$(context.create "deploy")" 2>/dev/null || ctx="$(mktemp)"
         stages.deploy "$ctx" 2>/dev/null
@@ -114,7 +125,7 @@ YAML
     It "passes --host to deploy.run"
       run_deploy_host() {
         brik.use() { :; }
-        deploy.run() { printf '%s ' "$@"; printf '\n'; return 0; }
+        _stub_all_deploys
         local ctx
         ctx="$(context.create "deploy")" 2>/dev/null || ctx="$(mktemp)"
         stages.deploy "$ctx" 2>/dev/null
@@ -126,7 +137,7 @@ YAML
     It "passes --path to deploy.run"
       run_deploy_remote_path() {
         brik.use() { :; }
-        deploy.run() { printf '%s ' "$@"; printf '\n'; return 0; }
+        _stub_all_deploys
         local ctx
         ctx="$(context.create "deploy")" 2>/dev/null || ctx="$(mktemp)"
         stages.deploy "$ctx" 2>/dev/null
@@ -138,7 +149,7 @@ YAML
     It "passes --restart-cmd to deploy.run"
       run_deploy_restart() {
         brik.use() { :; }
-        deploy.run() { printf '%s ' "$@"; printf '\n'; return 0; }
+        _stub_all_deploys
         local ctx
         ctx="$(context.create "deploy")" 2>/dev/null || ctx="$(mktemp)"
         stages.deploy "$ctx" 2>/dev/null
@@ -171,7 +182,7 @@ YAML
     It "passes --file to deploy.run"
       run_deploy_compose() {
         brik.use() { :; }
-        deploy.run() { printf '%s ' "$@"; printf '\n'; return 0; }
+        _stub_all_deploys
         local ctx
         ctx="$(context.create "deploy")" 2>/dev/null || ctx="$(mktemp)"
         stages.deploy "$ctx" 2>/dev/null
@@ -194,7 +205,7 @@ project:
 deploy:
   environments:
     staging:
-      target: kubernetes
+      target: k8s
       namespace: staging-ns
       manifest: k8s/staging.yml
       repo: org/infra-repo
@@ -209,19 +220,19 @@ YAML
     It "still passes --target to deploy.run"
       run_deploy_target() {
         brik.use() { :; }
-        deploy.run() { printf '%s ' "$@"; printf '\n'; return 0; }
+        _stub_all_deploys
         local ctx
         ctx="$(context.create "deploy")" 2>/dev/null || ctx="$(mktemp)"
         stages.deploy "$ctx" 2>/dev/null
       }
       When call run_deploy_target
-      The output should include "--target kubernetes"
+      The output should include "--target k8s"
     End
 
     It "still passes --env to deploy.run"
       run_deploy_env() {
         brik.use() { :; }
-        deploy.run() { printf '%s ' "$@"; printf '\n'; return 0; }
+        _stub_all_deploys
         local ctx
         ctx="$(context.create "deploy")" 2>/dev/null || ctx="$(mktemp)"
         stages.deploy "$ctx" 2>/dev/null
@@ -233,7 +244,7 @@ YAML
     It "still passes --namespace to deploy.run"
       run_deploy_ns() {
         brik.use() { :; }
-        deploy.run() { printf '%s ' "$@"; printf '\n'; return 0; }
+        _stub_all_deploys
         local ctx
         ctx="$(context.create "deploy")" 2>/dev/null || ctx="$(mktemp)"
         stages.deploy "$ctx" 2>/dev/null
@@ -245,7 +256,7 @@ YAML
     It "still passes --manifest to deploy.run"
       run_deploy_manifest() {
         brik.use() { :; }
-        deploy.run() { printf '%s ' "$@"; printf '\n'; return 0; }
+        _stub_all_deploys
         local ctx
         ctx="$(context.create "deploy")" 2>/dev/null || ctx="$(mktemp)"
         stages.deploy "$ctx" 2>/dev/null
@@ -257,7 +268,7 @@ YAML
     It "still passes --repo to deploy.run"
       run_deploy_repo() {
         brik.use() { :; }
-        deploy.run() { printf '%s ' "$@"; printf '\n'; return 0; }
+        _stub_all_deploys
         local ctx
         ctx="$(context.create "deploy")" 2>/dev/null || ctx="$(mktemp)"
         stages.deploy "$ctx" 2>/dev/null
@@ -269,7 +280,7 @@ YAML
     It "still passes --path to deploy.run"
       run_deploy_path() {
         brik.use() { :; }
-        deploy.run() { printf '%s ' "$@"; printf '\n'; return 0; }
+        _stub_all_deploys
         local ctx
         ctx="$(context.create "deploy")" 2>/dev/null || ctx="$(mktemp)"
         stages.deploy "$ctx" 2>/dev/null
@@ -281,7 +292,7 @@ YAML
     It "still passes --controller to deploy.run"
       run_deploy_controller() {
         brik.use() { :; }
-        deploy.run() { printf '%s ' "$@"; printf '\n'; return 0; }
+        _stub_all_deploys
         local ctx
         ctx="$(context.create "deploy")" 2>/dev/null || ctx="$(mktemp)"
         stages.deploy "$ctx" 2>/dev/null
@@ -293,7 +304,7 @@ YAML
     It "still passes --app-name to deploy.run"
       run_deploy_appname() {
         brik.use() { :; }
-        deploy.run() { printf '%s ' "$@"; printf '\n'; return 0; }
+        _stub_all_deploys
         local ctx
         ctx="$(context.create "deploy")" 2>/dev/null || ctx="$(mktemp)"
         stages.deploy "$ctx" 2>/dev/null

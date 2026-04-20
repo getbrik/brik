@@ -9,7 +9,6 @@ stages.deploy() {
 
     config.export_deploy_vars
 
-    brik.use deploy
     brik.use conditions
     brik.use transverse.env
 
@@ -90,7 +89,20 @@ stages.deploy() {
         _v="$(transverse.env.resolve_indirect "$source_var")";       [[ -n "$_v" ]] && deploy_args+=(--source "$_v")
         _v="$(transverse.env.resolve_indirect "$restart_cmd_var")";  [[ -n "$_v" ]] && deploy_args+=(--restart-cmd "$_v")
 
-        deploy.run "${deploy_args[@]}" || ((deploy_failed++))
+        # Inline deploy dispatch: load deployments.<target> + call deploy.<target>.run.
+        if ! brik.use "deployments.${target}"; then
+            log.error "unsupported deploy target: $target"
+            ((deploy_failed++))
+            continue
+        fi
+        local _deploy_fn="deploy.${target}.run"
+        if ! declare -f "$_deploy_fn" >/dev/null 2>&1; then
+            log.error "deploy function not found: $_deploy_fn"
+            ((deploy_failed++))
+            continue
+        fi
+        log.info "deploying with target: $target"
+        "$_deploy_fn" "${deploy_args[@]}" || ((deploy_failed++))
     done <<< "$BRIK_DEPLOY_ENVIRONMENTS"
 
     if [[ $deploy_failed -gt 0 ]]; then
