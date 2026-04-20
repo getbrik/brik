@@ -89,7 +89,7 @@ brik.wrapper.set_standard_env() {
     export BRIK_LIB="${_BRIK_CORE_DIR}"
     # Notion dirs (Phase 3 domain-driven layout) - populated progressively.
     # Non-existent entries are harmless (loader tests existence before use).
-    export BRIK_LIB_EXTENSIONS="${BRIK_LIB_EXTENSIONS:-${BRIK_HOME}/lib/transverse:${BRIK_HOME}/lib/stacks:${BRIK_HOME}/lib/rollout:${BRIK_HOME}/lib/deployments:${BRIK_HOME}/lib/package-managers:${BRIK_HOME}/lib/stages:${BRIK_HOME}/lib}"
+    export BRIK_LIB_EXTENSIONS="${BRIK_LIB_EXTENSIONS:-${BRIK_HOME}/lib/transverse:${BRIK_HOME}/lib/stacks:${BRIK_HOME}/lib/rollout:${BRIK_HOME}/lib/deployments:${BRIK_HOME}/lib/package-managers:${BRIK_HOME}/lib/stages:${BRIK_HOME}/lib/cli:${BRIK_HOME}/lib}"
 }
 
 # ---------------------------------------------------------------------------
