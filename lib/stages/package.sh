@@ -72,16 +72,25 @@ stages.package() {
     done
 
     if [[ "$_has_publish" == "true" ]]; then
-        brik.use publish
-
         for _entry in "${_publish_targets[@]}"; do
             _target="${_entry%%:*}"
             _detect_var="${_entry#*:}"
             _detect_val="$(transverse.env.resolve_indirect "$_detect_var")"
             if [[ -n "$_detect_val" ]]; then
                 log.info "publishing ${_target}"
+                if ! brik.use "package-managers.${_target}"; then
+                    log.error "unsupported publish target: ${_target}"
+                    context.set "$context_file" "BRIK_PACKAGE_STATUS" "failed"
+                    return "$BRIK_EXIT_CONFIG_ERROR"
+                fi
+                local _publish_fn="pkg.${_target}.publish"
+                if ! declare -f "$_publish_fn" >/dev/null 2>&1; then
+                    log.error "publish function not found: $_publish_fn"
+                    context.set "$context_file" "BRIK_PACKAGE_STATUS" "failed"
+                    return "$BRIK_EXIT_CONFIG_ERROR"
+                fi
                 rc=0
-                publish.run --target "$_target" || rc=$?
+                "$_publish_fn" || rc=$?
                 if [[ $rc -ne 0 ]]; then
                     context.set "$context_file" "BRIK_PACKAGE_STATUS" "failed"
                     return "$rc"

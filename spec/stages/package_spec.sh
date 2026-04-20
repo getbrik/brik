@@ -147,22 +147,22 @@ YAML
       run_publish_docker() {
         brik.use() { :; }
         stacks.docker.build() { return 0; }
-        local PUBLISH_CALLED=""
-        publish.run() { PUBLISH_CALLED="$*"; return 0; }
+        local PUBLISH_CALLS=""
+        pkg.docker.publish() { PUBLISH_CALLS="${PUBLISH_CALLS}docker "; return 0; }
         local ctx
         ctx="$(context.create "package")" 2>/dev/null || ctx="$(mktemp)"
         stages.package "$ctx" 2>/dev/null
-        printf '%s' "$PUBLISH_CALLED"
+        printf '%s' "$PUBLISH_CALLS"
       }
       When call run_publish_docker
-      The output should include "--target docker"
+      The output should include "docker"
     End
 
     It "sets failed when docker publish fails"
       run_publish_docker_fail() {
         brik.use() { :; }
         stacks.docker.build() { return 0; }
-        publish.run() { return 1; }
+        pkg.docker.publish() { return 1; }
         local ctx
         ctx="$(context.create "package")" 2>/dev/null || ctx="$(mktemp)"
         stages.package "$ctx" 2>/dev/null || true
@@ -196,26 +196,21 @@ YAML
         brik.use() { :; }
         stacks.docker.build() { return 0; }
         local PUBLISH_CALLS=""
-        publish.run() { PUBLISH_CALLS="${PUBLISH_CALLS}$* "; return 0; }
+        pkg.npm.publish() { PUBLISH_CALLS="${PUBLISH_CALLS}npm "; return 0; }
         local ctx
         ctx="$(context.create "package")" 2>/dev/null || ctx="$(mktemp)"
         stages.package "$ctx" 2>/dev/null
         printf '%s' "$PUBLISH_CALLS"
       }
       When call run_publish_npm
-      The output should include "--target npm"
+      The output should include "npm"
     End
 
     It "sets failed when npm publish fails"
       run_publish_npm_fail() {
         brik.use() { :; }
         stacks.docker.build() { return 0; }
-        publish.run() {
-          case "$*" in
-            *docker*) return 0 ;;
-            *npm*) return 1 ;;
-          esac
-        }
+        pkg.npm.publish() { return 1; }
         local ctx
         ctx="$(context.create "package")" 2>/dev/null || ctx="$(mktemp)"
         stages.package "$ctx" 2>/dev/null || true
@@ -251,26 +246,21 @@ YAML
         brik.use() { :; }
         stacks.docker.build() { return 0; }
         local PUBLISH_CALLS=""
-        publish.run() { PUBLISH_CALLS="${PUBLISH_CALLS}$* "; return 0; }
+        pkg.maven.publish() { PUBLISH_CALLS="${PUBLISH_CALLS}maven "; return 0; }
         local ctx
         ctx="$(context.create "package")" 2>/dev/null || ctx="$(mktemp)"
         stages.package "$ctx" 2>/dev/null
         printf '%s' "$PUBLISH_CALLS"
       }
       When call run_publish_maven
-      The output should include "--target maven"
+      The output should include "maven"
     End
 
     It "sets failed when maven publish fails"
       run_publish_maven_fail() {
         brik.use() { :; }
         stacks.docker.build() { return 0; }
-        publish.run() {
-          case "$*" in
-            *docker*) return 0 ;;
-            *maven*) return 1 ;;
-          esac
-        }
+        pkg.maven.publish() { return 1; }
         local ctx
         ctx="$(context.create "package")" 2>/dev/null || ctx="$(mktemp)"
         stages.package "$ctx" 2>/dev/null || true
@@ -305,26 +295,21 @@ YAML
         brik.use() { :; }
         stacks.docker.build() { return 0; }
         local PUBLISH_CALLS=""
-        publish.run() { PUBLISH_CALLS="${PUBLISH_CALLS}$* "; return 0; }
+        pkg.pypi.publish() { PUBLISH_CALLS="${PUBLISH_CALLS}pypi "; return 0; }
         local ctx
         ctx="$(context.create "package")" 2>/dev/null || ctx="$(mktemp)"
         stages.package "$ctx" 2>/dev/null
         printf '%s' "$PUBLISH_CALLS"
       }
       When call run_publish_pypi
-      The output should include "--target pypi"
+      The output should include "pypi"
     End
 
     It "sets failed when pypi publish fails"
       run_publish_pypi_fail() {
         brik.use() { :; }
         stacks.docker.build() { return 0; }
-        publish.run() {
-          case "$*" in
-            *docker*) return 0 ;;
-            *pypi*) return 1 ;;
-          esac
-        }
+        pkg.pypi.publish() { return 1; }
         local ctx
         ctx="$(context.create "package")" 2>/dev/null || ctx="$(mktemp)"
         stages.package "$ctx" 2>/dev/null || true
@@ -358,26 +343,21 @@ YAML
         brik.use() { :; }
         stacks.docker.build() { return 0; }
         local PUBLISH_CALLS=""
-        publish.run() { PUBLISH_CALLS="${PUBLISH_CALLS}$* "; return 0; }
+        pkg.cargo.publish() { PUBLISH_CALLS="${PUBLISH_CALLS}cargo "; return 0; }
         local ctx
         ctx="$(context.create "package")" 2>/dev/null || ctx="$(mktemp)"
         stages.package "$ctx" 2>/dev/null
         printf '%s' "$PUBLISH_CALLS"
       }
       When call run_publish_cargo
-      The output should include "--target cargo"
+      The output should include "cargo"
     End
 
     It "sets failed when cargo publish fails"
       run_publish_cargo_fail() {
         brik.use() { :; }
         stacks.docker.build() { return 0; }
-        publish.run() {
-          case "$*" in
-            *docker*) return 0 ;;
-            *cargo*) return 1 ;;
-          esac
-        }
+        pkg.cargo.publish() { return 1; }
         local ctx
         ctx="$(context.create "package")" 2>/dev/null || ctx="$(mktemp)"
         stages.package "$ctx" 2>/dev/null || true
@@ -412,26 +392,21 @@ YAML
         brik.use() { :; }
         stacks.docker.build() { return 0; }
         local PUBLISH_CALLS=""
-        publish.run() { PUBLISH_CALLS="${PUBLISH_CALLS}$* "; return 0; }
+        pkg.nuget.publish() { PUBLISH_CALLS="${PUBLISH_CALLS}nuget "; return 0; }
         local ctx
         ctx="$(context.create "package")" 2>/dev/null || ctx="$(mktemp)"
         stages.package "$ctx" 2>/dev/null
         printf '%s' "$PUBLISH_CALLS"
       }
       When call run_publish_nuget
-      The output should include "--target nuget"
+      The output should include "nuget"
     End
 
     It "sets failed when nuget publish fails"
       run_publish_nuget_fail() {
         brik.use() { :; }
         stacks.docker.build() { return 0; }
-        publish.run() {
-          case "$*" in
-            *docker*) return 0 ;;
-            *nuget*) return 1 ;;
-          esac
-        }
+        pkg.nuget.publish() { return 1; }
         local ctx
         ctx="$(context.create "package")" 2>/dev/null || ctx="$(mktemp)"
         stages.package "$ctx" 2>/dev/null || true
@@ -467,15 +442,16 @@ YAML
         brik.use() { :; }
         stacks.docker.build() { return 0; }
         local PUBLISH_CALLS=""
-        publish.run() { PUBLISH_CALLS="${PUBLISH_CALLS}$* "; return 0; }
+        pkg.docker.publish() { PUBLISH_CALLS="${PUBLISH_CALLS}docker "; return 0; }
+        pkg.npm.publish() { PUBLISH_CALLS="${PUBLISH_CALLS}npm "; return 0; }
         local ctx
         ctx="$(context.create "package")" 2>/dev/null || ctx="$(mktemp)"
         stages.package "$ctx" 2>/dev/null
         printf '%s' "$PUBLISH_CALLS"
       }
       When call run_publish_multi
-      The output should include "--target docker"
-      The output should include "--target npm"
+      The output should include "docker"
+      The output should include "npm"
     End
 
     It "stops on first publish failure (fail-fast)"
@@ -483,21 +459,16 @@ YAML
         brik.use() { :; }
         stacks.docker.build() { return 0; }
         local PUBLISH_CALLS=""
-        publish.run() {
-          PUBLISH_CALLS="${PUBLISH_CALLS}$* "
-          case "$*" in
-            *docker*) return 1 ;;
-            *) return 0 ;;
-          esac
-        }
+        pkg.docker.publish() { PUBLISH_CALLS="${PUBLISH_CALLS}docker "; return 1; }
+        pkg.npm.publish() { PUBLISH_CALLS="${PUBLISH_CALLS}npm "; return 0; }
         local ctx
         ctx="$(context.create "package")" 2>/dev/null || ctx="$(mktemp)"
         stages.package "$ctx" 2>/dev/null || true
         printf '%s' "$PUBLISH_CALLS"
       }
       When call run_publish_failfast
-      The output should include "--target docker"
-      The output should not include "--target npm"
+      The output should include "docker"
+      The output should not include "npm"
     End
   End
 End
