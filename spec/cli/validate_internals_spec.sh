@@ -1,8 +1,8 @@
-Describe "validate.sh"
+Describe "cli/validate.sh - validate.run internals"
   Include "$BRIK_PIPELINE_LIB/logging.sh"
   Include "$BRIK_PIPELINE_LIB/tools.sh"
   Include "$BRIK_PIPELINE_LIB/loader.sh"
-  Include "$BRIK_CORE_LIB/validate.sh"
+  Include "$BRIK_CLI_LIB/validate.sh"
 
   Describe "validate.run"
     It "validates a correct brik.yml"
