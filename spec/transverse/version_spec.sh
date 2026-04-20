@@ -1,7 +1,12 @@
 Describe "version.sh"
   Include "$BRIK_PIPELINE_LIB/logging.sh"
   Include "$BRIK_PIPELINE_LIB/tools.sh"
+  Include "$BRIK_TRANSVERSE_LIB/git.sh"
   Include "$BRIK_TRANSVERSE_LIB/version.sh"
+
+  # Stub brik.use: transverse.git is already Included above, so the runtime
+  # loader call from version.current becomes a no-op (function is in scope).
+  brik.use() { :; }
 
   Describe "version.validate"
     It "accepts a valid semver (1.2.3)"

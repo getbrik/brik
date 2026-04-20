@@ -48,7 +48,8 @@ changelog.generate() {
 
     # Auto-detect from ref (latest tag)
     if [[ -z "$from_ref" ]]; then
-        from_ref="$(git describe --tags --abbrev=0 2>/dev/null)" || {
+        brik.use transverse.git
+        from_ref="$(transverse.git.latest_tag)" || {
             # No tags, use initial commit
             from_ref="$(git rev-list --max-parents=0 HEAD 2>/dev/null)" || {
                 log.error "cannot determine changelog starting point"

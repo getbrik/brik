@@ -205,8 +205,8 @@ deploy.gitops.push_manifests() {
     tmpdir="$(mktemp -d)"
 
     log.info "cloning config repo: $safe_url (branch: $branch)"
-    if ! GIT_TERMINAL_PROMPT=0 git clone --depth 1 --branch "$branch" "$clone_url" "$tmpdir"; then
-        log.error "git clone failed"
+    brik.use transverse.git
+    if ! transverse.git.clone_shallow "$clone_url" "$tmpdir" --branch "$branch"; then
         rm -rf "$tmpdir"
         return "$BRIK_EXIT_EXTERNAL_FAIL"
     fi
@@ -376,8 +376,8 @@ deploy.gitops.diff() {
     local tmpdir
     tmpdir="$(mktemp -d)"
 
-    if ! GIT_TERMINAL_PROMPT=0 git clone --depth 1 --branch "$branch" "$clone_url" "$tmpdir" 2>/dev/null; then
-        log.error "git clone failed"
+    brik.use transverse.git
+    if ! transverse.git.clone_shallow "$clone_url" "$tmpdir" --branch "$branch"; then
         rm -rf "$tmpdir"
         return "$BRIK_EXIT_EXTERNAL_FAIL"
     fi
@@ -437,8 +437,8 @@ deploy.gitops.rollback() {
     local tmpdir
     tmpdir="$(mktemp -d)"
 
-    if ! GIT_TERMINAL_PROMPT=0 git clone --depth 10 --branch "$branch" "$clone_url" "$tmpdir"; then
-        log.error "git clone failed"
+    brik.use transverse.git
+    if ! transverse.git.clone_shallow "$clone_url" "$tmpdir" --branch "$branch" --depth 10; then
         rm -rf "$tmpdir"
         return "$BRIK_EXIT_EXTERNAL_FAIL"
     fi

@@ -1398,6 +1398,7 @@ SCRIPT
   End
 
   Describe "deploy.argocd.deploy - happy path with mocks"
+    Include "$BRIK_TRANSVERSE_LIB/git.sh"
     Include "$BRIK_DEPLOYMENTS_LIB/gitops.sh"
 
     setup_deploy_happy() {
