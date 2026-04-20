@@ -125,6 +125,129 @@ YAML
     The output should include "override-ran"
   End
 
+  It "returns IO_FAILURE when BRIK_WORKSPACE does not exist"
+    run_test_no_workspace() {
+      _stub_leaf_success
+      export BRIK_WORKSPACE="/nonexistent/brik-ws-$$"
+      local ctx
+      ctx="$(context.create "test")" 2>/dev/null || ctx="$(mktemp)"
+      stages.test "$ctx" 2>/dev/null
+      local rc=$?
+      printf '%s\n%s' "$rc" "$(grep "^BRIK_TEST_STATUS=" "$ctx" | cut -d= -f2)"
+    }
+    When call run_test_no_workspace
+    The line 1 of output should equal "6"
+    The line 2 of output should equal "failed"
+  End
+
+  It "runs BRIK_TEST_COMMAND override and reports success"
+    run_test_cmd_success() {
+      cat > "$BRIK_CONFIG_FILE" <<'YAML'
+version: 1
+project:
+  name: test
+  stack: node
+test:
+  command: "true"
+YAML
+      config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
+      _stub_leaf_success
+      local ctx
+      ctx="$(context.create "test")" 2>/dev/null || ctx="$(mktemp)"
+      stages.test "$ctx" 2>/dev/null
+      local rc=$?
+      printf '%s\n%s' "$rc" "$(grep "^BRIK_TEST_STATUS=" "$ctx" | cut -d= -f2)"
+    }
+    When call run_test_cmd_success
+    The line 1 of output should equal "0"
+    The line 2 of output should equal "success"
+  End
+
+  It "returns CHECK_FAILED when BRIK_TEST_COMMAND override fails"
+    run_test_cmd_failure() {
+      cat > "$BRIK_CONFIG_FILE" <<'YAML'
+version: 1
+project:
+  name: test
+  stack: node
+test:
+  command: "false"
+YAML
+      config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
+      _stub_leaf_success
+      local ctx
+      ctx="$(context.create "test")" 2>/dev/null || ctx="$(mktemp)"
+      stages.test "$ctx" 2>/dev/null
+      local rc=$?
+      printf '%s\n%s' "$rc" "$(grep "^BRIK_TEST_STATUS=" "$ctx" | cut -d= -f2)"
+    }
+    When call run_test_cmd_failure
+    The line 1 of output should equal "10"
+    The line 2 of output should equal "failed"
+  End
+
+  It "returns CONFIG_ERROR when test framework is unsupported"
+    run_test_bad_framework() {
+      cat > "$BRIK_CONFIG_FILE" <<'YAML'
+version: 1
+project:
+  name: test
+  stack: node
+test:
+  framework: cobol-test
+YAML
+      config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
+      brik.use() { :; }
+      stacks.detect_from_framework() { return 1; }
+      stacks.install_deps() { :; }
+      local ctx
+      ctx="$(context.create "test")" 2>/dev/null || ctx="$(mktemp)"
+      stages.test "$ctx" 2>/dev/null
+      printf '%s' "$?"
+    }
+    When call run_test_bad_framework
+    The output should equal "7"
+  End
+
+  It "returns MISSING_DEP when stack cannot be auto-detected"
+    run_test_auto_fail() {
+      cat > "$BRIK_CONFIG_FILE" <<'YAML'
+version: 1
+project:
+  name: test
+YAML
+      config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
+      brik.use() { :; }
+      stacks.detect() { return 1; }
+      stacks.install_deps() { :; }
+      local ctx
+      ctx="$(context.create "test")" 2>/dev/null || ctx="$(mktemp)"
+      stages.test "$ctx" 2>/dev/null
+      printf '%s' "$?"
+    }
+    When call run_test_auto_fail
+    The output should equal "3"
+  End
+
+  It "returns CONFIG_ERROR when stack module cannot be loaded"
+    run_test_unsupported_stack() {
+      brik.use() {
+        case "$1" in
+          stacks.node) return 1 ;;
+          *) return 0 ;;
+        esac
+      }
+      stacks.detect() { printf 'node'; return 0; }
+      stacks.install_deps() { :; }
+      local ctx
+      ctx="$(context.create "test")" 2>/dev/null || ctx="$(mktemp)"
+      stages.test "$ctx" 2>/dev/null
+      printf '%s' "$?"
+    }
+    When call run_test_unsupported_stack
+    The output should equal "7"
+  End
+
   Describe "with test commands configured"
     setup_test_cmds() {
       cat > "$BRIK_CONFIG_FILE" <<'YAML'
