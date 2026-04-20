@@ -1,8 +1,8 @@
-Describe "doctor.sh"
+Describe "cli/doctor.sh - doctor.run internals"
   Include "$BRIK_PIPELINE_LIB/logging.sh"
   Include "$BRIK_PIPELINE_LIB/tools.sh"
   Include "$BRIK_PIPELINE_LIB/loader.sh"
-  Include "$BRIK_CORE_LIB/doctor.sh"
+  Include "$BRIK_CLI_LIB/doctor.sh"
 
   Describe "doctor.run"
     It "succeeds when core tools are present"
