@@ -2,6 +2,21 @@
 # @module stages/container_scan
 # @description Container scan stage - post-package container image scanning.
 # Runs in the scanner image after the package stage produces an image.
+#
+# Design note (Decision X7, Phase 4.5 Lot 7):
+# stages.container_scan delegates to verify.scan.run --scans container rather
+# than inlining grype/dockle invocations. Rationale:
+#   1. "One scanner per stage" (final-plan §6.12) is already satisfied because
+#      stages.container_scan invokes verify.scan.container.run for exactly one
+#      scanner category.
+#   2. verify.scan.run centralises scanner resolution (tier 1 command override,
+#      tier 2 explicit tool, tier 3 registry priority); sharing that path
+#      avoids duplicating the 3-tier logic between the stage and the scanner.
+#   3. Inlining grype/dockle here would duplicate the scanner implementation
+#      in lib/stages/verify/scan/container.sh without behaviour gain, and
+#      would widen the test surface.
+# The thin delegation pattern is the chosen steady state, not a step toward
+# inlining.
 
 # Container scan stage: scan a built container image for vulnerabilities.
 # Usage: stages.container_scan <context_file>
