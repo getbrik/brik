@@ -2,6 +2,7 @@ Describe "stages.lint"
   Include "$BRIK_HOME/lib/pipeline/stage.sh"
   Include "$BRIK_HOME/lib/pipeline/loader.sh"
   Include "$BRIK_HOME/lib/transverse/config.sh"
+  Include "$BRIK_HOME/lib/transverse/csv.sh"
   Include "$BRIK_HOME/lib/stages/verify/verify.sh"
   Include "$BRIK_HOME/lib/stages/lint.sh"
 

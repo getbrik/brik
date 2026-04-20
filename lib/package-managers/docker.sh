@@ -69,7 +69,10 @@ pkg.docker.publish() {
         fi
     fi
 
-    # Tag and push for each tag
+    # Tag and push for each tag.
+    # Kept inline (not transverse.csv.foreach) because docker push uses
+    # fail-fast semantics with early return; transverse.csv.foreach continues
+    # on failure which would push to every tag even after auth breaks.
     local old_ifs="${IFS}"
     IFS=','
     local tag

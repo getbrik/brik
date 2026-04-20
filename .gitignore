@@ -22,6 +22,7 @@ tmp/
 
 # ShellSpec
 report/
+.brik-logs/
 
 # Claude Code workspace (local state, plans, checkpoints)
 .claude/
