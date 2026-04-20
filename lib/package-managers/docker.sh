@@ -51,6 +51,7 @@ pkg.docker.publish() {
         export DOCKER_CONFIG="$_docker_config_dir"
 
         brik.use transverse.secrets
+        brik.use transverse.env
         transverse.secrets.require_var "$username_var" "docker username" || return $?
         transverse.secrets.require_var "$password_var" "docker password" || return $?
 
@@ -60,8 +61,11 @@ pkg.docker.publish() {
             log.info "[dry-run] docker login ${login_registry:+"$login_registry"}"
         else
             log.info "logging in to registry${registry:+: $registry}"
-            printf '%s' "${!password_var}" | docker login ${login_registry:+"$login_registry"} \
-                --username "${!username_var}" --password-stdin || {
+            local docker_username docker_password
+            docker_username="$(transverse.env.resolve_indirect "$username_var")"
+            docker_password="$(transverse.env.resolve_indirect "$password_var")"
+            printf '%s' "$docker_password" | docker login ${login_registry:+"$login_registry"} \
+                --username "$docker_username" --password-stdin || {
                 log.error "docker login failed"
                 rm -rf "$_docker_config_dir"
                 unset DOCKER_CONFIG

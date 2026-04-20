@@ -39,6 +39,13 @@ stages.init() {
     export BRIK_BUILD_STACK="$stack"
     config.validate_coherence || return $?
 
+    # Load project-level env file (brik.yml .project.env or auto-detect brik.env).
+    # Exports variables that subsequent stages can reference. Existing
+    # environment values (CI secrets etc.) take precedence over file entries.
+    # Fails the init stage when .project.env is declared but the file is missing.
+    brik.use transverse.env
+    transverse.env.load_project || return "$BRIK_EXIT_CONFIG_ERROR"
+
     # Log project info
     local project_name
     project_name="$(config.get '.project.name' 'unnamed')"

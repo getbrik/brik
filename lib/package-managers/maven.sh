@@ -60,6 +60,10 @@ pkg.maven.publish() {
 
         # Write temporary settings.xml with credentials (never pass via CLI args)
         if [[ -n "$username_var" && -n "$password_var" ]]; then
+            brik.use transverse.env
+            local maven_username maven_password
+            maven_username="$(transverse.env.resolve_indirect "$username_var")"
+            maven_password="$(transverse.env.resolve_indirect "$password_var")"
             tmp_settings="$(mktemp)"
             chmod 600 "$tmp_settings"
             cat > "$tmp_settings" <<SETTINGS_XML
@@ -67,8 +71,8 @@ pkg.maven.publish() {
   <servers>
     <server>
       <id>brik</id>
-      <username>${!username_var}</username>
-      <password>${!password_var}</password>
+      <username>${maven_username}</username>
+      <password>${maven_password}</password>
     </server>
   </servers>
 </settings>

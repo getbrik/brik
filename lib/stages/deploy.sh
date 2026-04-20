@@ -11,6 +11,7 @@ stages.deploy() {
 
     brik.use deploy
     brik.use conditions
+    brik.use transverse.env
 
     log.info "deploy stage"
 
@@ -44,8 +45,17 @@ stages.deploy() {
         local source_var="BRIK_DEPLOY_${upper_env}_SOURCE"
         local restart_cmd_var="BRIK_DEPLOY_${upper_env}_RESTART_CMD"
 
-        local target="${!target_var:-}"
-        local when_cond="${!when_var:-}"
+        # Load per-env env_file (brik.yml .deploy.environments.<env>.env_file) if set.
+        # Existing env vars take precedence over file entries (CI precedence).
+        transverse.env.load_deploy_env "$env_name" || {
+            log.error "failed to load env_file for '$env_name'"
+            ((deploy_failed++))
+            continue
+        }
+
+        local target when_cond
+        target="$(transverse.env.resolve_indirect "$target_var")"
+        when_cond="$(transverse.env.resolve_indirect "$when_var")"
 
         if [[ -z "$target" ]]; then
             log.error "environment '$env_name' has no target configured in brik.yml"
@@ -64,20 +74,21 @@ stages.deploy() {
         log.info "deploying to $env_name (target=$target)"
 
         local deploy_args=(--target "$target" --env "$env_name")
-        [[ -n "${!namespace_var:-}" ]] && deploy_args+=(--namespace "${!namespace_var}")
-        [[ -n "${!manifest_var:-}" ]] && deploy_args+=(--manifest "${!manifest_var}")
-        [[ -n "${!repo_var:-}" ]] && deploy_args+=(--repo "${!repo_var}")
-        [[ -n "${!path_var:-}" ]] && deploy_args+=(--path "${!path_var}")
-        [[ -n "${!controller_var:-}" ]] && deploy_args+=(--controller "${!controller_var}")
-        [[ -n "${!app_name_var:-}" ]] && deploy_args+=(--app-name "${!app_name_var}")
-        [[ -n "${!chart_var:-}" ]] && deploy_args+=(--chart "${!chart_var}")
-        [[ -n "${!release_name_var:-}" ]] && deploy_args+=(--release "${!release_name_var}")
-        [[ -n "${!values_var:-}" ]] && deploy_args+=(--values "${!values_var}")
-        [[ -n "${!host_var:-}" ]] && deploy_args+=(--host "${!host_var}")
-        [[ -n "${!compose_file_var:-}" ]] && deploy_args+=(--file "${!compose_file_var}")
-        [[ -n "${!remote_path_var:-}" ]] && deploy_args+=(--path "${!remote_path_var}")
-        [[ -n "${!source_var:-}" ]] && deploy_args+=(--source "${!source_var}")
-        [[ -n "${!restart_cmd_var:-}" ]] && deploy_args+=(--restart-cmd "${!restart_cmd_var}")
+        local _v
+        _v="$(transverse.env.resolve_indirect "$namespace_var")";    [[ -n "$_v" ]] && deploy_args+=(--namespace "$_v")
+        _v="$(transverse.env.resolve_indirect "$manifest_var")";     [[ -n "$_v" ]] && deploy_args+=(--manifest "$_v")
+        _v="$(transverse.env.resolve_indirect "$repo_var")";         [[ -n "$_v" ]] && deploy_args+=(--repo "$_v")
+        _v="$(transverse.env.resolve_indirect "$path_var")";         [[ -n "$_v" ]] && deploy_args+=(--path "$_v")
+        _v="$(transverse.env.resolve_indirect "$controller_var")";   [[ -n "$_v" ]] && deploy_args+=(--controller "$_v")
+        _v="$(transverse.env.resolve_indirect "$app_name_var")";     [[ -n "$_v" ]] && deploy_args+=(--app-name "$_v")
+        _v="$(transverse.env.resolve_indirect "$chart_var")";        [[ -n "$_v" ]] && deploy_args+=(--chart "$_v")
+        _v="$(transverse.env.resolve_indirect "$release_name_var")"; [[ -n "$_v" ]] && deploy_args+=(--release "$_v")
+        _v="$(transverse.env.resolve_indirect "$values_var")";       [[ -n "$_v" ]] && deploy_args+=(--values "$_v")
+        _v="$(transverse.env.resolve_indirect "$host_var")";         [[ -n "$_v" ]] && deploy_args+=(--host "$_v")
+        _v="$(transverse.env.resolve_indirect "$compose_file_var")"; [[ -n "$_v" ]] && deploy_args+=(--file "$_v")
+        _v="$(transverse.env.resolve_indirect "$remote_path_var")";  [[ -n "$_v" ]] && deploy_args+=(--path "$_v")
+        _v="$(transverse.env.resolve_indirect "$source_var")";       [[ -n "$_v" ]] && deploy_args+=(--source "$_v")
+        _v="$(transverse.env.resolve_indirect "$restart_cmd_var")";  [[ -n "$_v" ]] && deploy_args+=(--restart-cmd "$_v")
 
         deploy.run "${deploy_args[@]}" || ((deploy_failed++))
     done <<< "$BRIK_DEPLOY_ENVIRONMENTS"

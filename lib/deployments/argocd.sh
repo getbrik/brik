@@ -35,7 +35,9 @@ _deploy.argocd._add_server_auth() {
         _cmd+=(--server "$server" --insecure)
     fi
     if [[ -n "$auth_token_var" ]]; then
-        local token="${!auth_token_var:-}"
+        brik.use transverse.env
+        local token
+        token="$(transverse.env.resolve_indirect "$auth_token_var")"
         if [[ -z "$token" ]]; then
             log.error "auth token variable is empty or unset: $auth_token_var"
             return "$BRIK_EXIT_INVALID_ENV"

@@ -60,10 +60,12 @@ stages.package() {
     )
 
     # Pre-scan: only load the publish module if at least one target is configured
-    local _has_publish=false _entry _target _detect_var
+    brik.use transverse.env
+    local _has_publish=false _entry _target _detect_var _detect_val
     for _entry in "${_publish_targets[@]}"; do
         _detect_var="${_entry#*:}"
-        if [[ -n "${!_detect_var}" ]]; then
+        _detect_val="$(transverse.env.resolve_indirect "$_detect_var")"
+        if [[ -n "$_detect_val" ]]; then
             _has_publish=true
             break
         fi
@@ -75,7 +77,8 @@ stages.package() {
         for _entry in "${_publish_targets[@]}"; do
             _target="${_entry%%:*}"
             _detect_var="${_entry#*:}"
-            if [[ -n "${!_detect_var}" ]]; then
+            _detect_val="$(transverse.env.resolve_indirect "$_detect_var")"
+            if [[ -n "$_detect_val" ]]; then
                 log.info "publishing ${_target}"
                 rc=0
                 publish.run --target "$_target" || rc=$?

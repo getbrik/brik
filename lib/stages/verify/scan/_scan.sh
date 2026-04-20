@@ -28,7 +28,9 @@ _verify._scan._run() {
     local label="$5"
 
     # Tier 1: command override
-    local command_override="${!command_var:-}"
+    brik.use transverse.env
+    local command_override
+    command_override="$(transverse.env.resolve_indirect "$command_var")"
     if [[ -n "$command_override" ]]; then
         log.info "$label (command override): $command_override"
         (cd "$workspace" && eval "$command_override") || {
@@ -40,7 +42,8 @@ _verify._scan._run() {
     fi
 
     # Tier 2+3: resolve via tool registry
-    local tool="${!tool_var:-}"
+    local tool
+    tool="$(transverse.env.resolve_indirect "$tool_var")"
     local resolve_args=("$category")
     [[ -n "$tool" ]] && resolve_args+=(--tool "$tool")
 

@@ -2,6 +2,7 @@ Describe "deploy/gitops.sh"
   Include "$BRIK_PIPELINE_LIB/logging.sh"
   Include "$BRIK_PIPELINE_LIB/tools.sh"
   Include "$BRIK_PIPELINE_LIB/loader.sh"
+  Include "$BRIK_TRANSVERSE_LIB/env.sh"
   Include "$BRIK_DEPLOYMENTS_LIB/gitops.sh"
   Include "$BRIK_HOME/spec/support/mock_helper.sh"
 

@@ -24,7 +24,9 @@ _deploy.gitops._inject_token() {
         printf '%s' "$repo"
         return 0
     fi
-    local token="${!token_var:-}"
+    brik.use transverse.env
+    local token
+    token="$(transverse.env.resolve_indirect "$token_var")"
     if [[ -z "$token" ]]; then
         log.error "token variable is empty: ${token_var}"
         return "$BRIK_EXIT_INVALID_ENV"

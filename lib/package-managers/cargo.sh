@@ -38,13 +38,16 @@ pkg.cargo.publish() {
     local token_env_var="CARGO_REGISTRY_TOKEN"
     if [[ -n "$token_var" ]]; then
         brik.use transverse.secrets
+        brik.use transverse.env
         transverse.secrets.require_var "$token_var" "cargo token" || return $?
         if [[ -n "$registry" ]]; then
             local upper_name
             upper_name=$(printf '%s' "$registry" | tr '[:lower:]-' '[:upper:]_')
             token_env_var="CARGO_REGISTRIES_${upper_name}_TOKEN"
         fi
-        export "$token_env_var"="${!token_var}"
+        local cargo_token_value
+        cargo_token_value="$(transverse.env.resolve_indirect "$token_var")"
+        export "$token_env_var=$cargo_token_value"
     fi
 
     # When registry + index are provided, tell cargo where the index lives

@@ -53,6 +53,7 @@ pkg.pypi.publish() {
     # Validate token if provided
     if [[ -n "$token_var" ]]; then
         brik.use transverse.secrets
+        brik.use transverse.env
         transverse.secrets.require_var "$token_var" "pypi token" || return $?
     fi
 
@@ -61,13 +62,19 @@ pkg.pypi.publish() {
         poetry)
             cmd=(poetry publish --build)
             [[ -n "$repository" ]] && cmd+=(--repository "$repository")
-            [[ -n "$token_var" ]] && export POETRY_PYPI_TOKEN_PYPI="${!token_var}"
+            if [[ -n "$token_var" ]]; then
+                POETRY_PYPI_TOKEN_PYPI="$(transverse.env.resolve_indirect "$token_var")"
+                export POETRY_PYPI_TOKEN_PYPI
+            fi
             ;;
         uv)
             cmd=(uv publish)
             [[ -n "$repository" ]] && cmd+=(--publish-url "$repository")
             # Auth via environment variable (not CLI arg)
-            [[ -n "$token_var" ]] && export UV_PUBLISH_TOKEN="${!token_var}"
+            if [[ -n "$token_var" ]]; then
+                UV_PUBLISH_TOKEN="$(transverse.env.resolve_indirect "$token_var")"
+                export UV_PUBLISH_TOKEN
+            fi
             ;;
         twine)
             # Build distribution if dist/ is empty
@@ -89,7 +96,8 @@ pkg.pypi.publish() {
             # Auth via environment variables (not CLI args)
             # Support both token auth (PyPI.org) and basic auth (Nexus/Artifactory)
             if [[ -n "$token_var" ]]; then
-                local token_value="${!token_var}"
+                local token_value
+                token_value="$(transverse.env.resolve_indirect "$token_var")"
                 if [[ "$token_value" == *:* ]]; then
                     # Format user:password - basic auth (Nexus, Artifactory)
                     export TWINE_USERNAME="${token_value%%:*}"
