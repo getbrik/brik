@@ -1,6 +1,7 @@
 Describe "deploy/argocd.sh"
   Include "$BRIK_PIPELINE_LIB/logging.sh"
   Include "$BRIK_PIPELINE_LIB/tools.sh"
+  Include "$BRIK_TRANSVERSE_LIB/env.sh"
   Include "$BRIK_DEPLOYMENTS_LIB/argocd.sh"
   Include "$BRIK_HOME/spec/support/mock_helper.sh"
 

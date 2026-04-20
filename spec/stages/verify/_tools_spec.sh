@@ -1,7 +1,10 @@
 Describe "quality/_tools.sh"
   Include "$BRIK_PIPELINE_LIB/logging.sh"
+  Include "$BRIK_TRANSVERSE_LIB/env.sh"
   Include "$BRIK_HOME/lib/stages/verify/_tools.sh"
   Include "$BRIK_HOME/spec/support/mock_helper.sh"
+
+  brik.use() { :; }
 
   Describe "verify.tool.register + verify.tool.resolve"
     setup_tools() {

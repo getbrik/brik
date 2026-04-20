@@ -34,21 +34,23 @@ _brik_tool_parse_entry() {
 # Tier 1: check BRIK_QUALITY_<CAT>_COMMAND or BRIK_SECURITY_<CAT>_COMMAND.
 # Returns 0 and echoes "__command__" if found, 1 otherwise.
 _brik_tool_resolve_tier1() {
+    brik.use transverse.env
     local category_upper="${1^^}"
     local cmd_var="BRIK_QUALITY_${category_upper}_COMMAND"
-    if [[ -n "${!cmd_var:-}" ]]; then echo "__command__"; return 0; fi
+    if [[ -n "$(transverse.env.resolve_indirect "$cmd_var")" ]]; then echo "__command__"; return 0; fi
     cmd_var="BRIK_SECURITY_${category_upper}_COMMAND"
-    if [[ -n "${!cmd_var:-}" ]]; then echo "__command__"; return 0; fi
+    if [[ -n "$(transverse.env.resolve_indirect "$cmd_var")" ]]; then echo "__command__"; return 0; fi
     return "$BRIK_EXIT_FAILURE"
 }
 
 # Tier 2: resolve an explicitly requested tool name from registry.
 # Returns 0+tool name, 3 if binary missing, 7 if tool not registered.
 _brik_tool_resolve_tier2() {
+    brik.use transverse.env
     local category="$1" requested="$2"
     local var_name var_val _t_priority _t_tool _t_binary _t_template
     for var_name in $(compgen -v _BRIK_TOOL_"${category}"_ 2>/dev/null); do
-        var_val="${!var_name}"
+        var_val="$(transverse.env.resolve_indirect "$var_name")"
         _brik_tool_parse_entry "$var_val"
         if [[ "$_t_tool" == "$requested" ]]; then
             if command -v "$_t_binary" >/dev/null 2>&1; then
@@ -65,11 +67,12 @@ _brik_tool_resolve_tier2() {
 # Tier 3: auto-detect best available tool by priority.
 # Returns 0+tool name, 1 if none available.
 _brik_tool_resolve_tier3() {
+    brik.use transverse.env
     local category="$1"
     local best_tool="" best_priority=999999
     local var_name var_val _t_priority _t_tool _t_binary _t_template
     for var_name in $(compgen -v _BRIK_TOOL_"${category}"_ 2>/dev/null); do
-        var_val="${!var_name}"
+        var_val="$(transverse.env.resolve_indirect "$var_name")"
         _brik_tool_parse_entry "$var_val"
         if command -v "$_t_binary" >/dev/null 2>&1; then
             if (( _t_priority < best_priority )); then
@@ -103,9 +106,13 @@ verify.tool.resolve() {
     _brik_tool_resolve_tier1 "$category" && return 0
 
     # Tier 2: explicit tool selection
+    brik.use transverse.env
     local tool_var="BRIK_QUALITY_${category^^}_TOOL"
     local sec_tool_var="BRIK_SECURITY_${category^^}_TOOL"
-    local requested="${explicit_tool:-${!tool_var:-${!sec_tool_var:-}}}"
+    local _tool_val _sec_tool_val requested
+    _tool_val="$(transverse.env.resolve_indirect "$tool_var")"
+    _sec_tool_val="$(transverse.env.resolve_indirect "$sec_tool_var")"
+    requested="${explicit_tool:-${_tool_val:-${_sec_tool_val}}}"
     if [[ -n "$requested" ]]; then
         _brik_tool_resolve_tier2 "$category" "$requested"
         return $?
@@ -123,18 +130,24 @@ verify.tool.exec() {
 
     # Tier 1: command override - execute directly
     if [[ "$resolved" == "__command__" ]]; then
+        brik.use transverse.env
         local cmd_var="BRIK_QUALITY_${category^^}_COMMAND"
-        local cmd="${!cmd_var:-}"
-        [[ -z "$cmd" ]] && cmd_var="BRIK_SECURITY_${category^^}_COMMAND" && cmd="${!cmd_var:-}"
+        local cmd
+        cmd="$(transverse.env.resolve_indirect "$cmd_var")"
+        if [[ -z "$cmd" ]]; then
+            cmd_var="BRIK_SECURITY_${category^^}_COMMAND"
+            cmd="$(transverse.env.resolve_indirect "$cmd_var")"
+        fi
         eval "$cmd"
         return
     fi
 
     # Find template for resolved tool (last match wins, supports re-registration)
+    brik.use transverse.env
     local template=""
     local var_name var_val _t_priority _t_tool _t_binary _t_template
     for var_name in $(compgen -v _BRIK_TOOL_"${category}"_ 2>/dev/null); do
-        var_val="${!var_name}"
+        var_val="$(transverse.env.resolve_indirect "$var_name")"
         _brik_tool_parse_entry "$var_val"
         if [[ "$_t_tool" == "$resolved" ]]; then
             template="$_t_template"

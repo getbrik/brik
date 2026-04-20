@@ -2,6 +2,7 @@ Describe "stages.package"
   Include "$BRIK_HOME/lib/pipeline/stage.sh"
   Include "$BRIK_HOME/lib/pipeline/loader.sh"
   Include "$BRIK_HOME/lib/transverse/config.sh"
+  Include "$BRIK_HOME/lib/transverse/env.sh"
   Include "$BRIK_HOME/lib/stages/package.sh"
 
   setup_env() {

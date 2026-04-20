@@ -3,6 +3,7 @@ Describe "publish/nuget.sh"
   Include "$BRIK_PIPELINE_LIB/tools.sh"
   Include "$BRIK_CORE_LIB/publish.sh"
   Include "$BRIK_TRANSVERSE_LIB/secrets.sh"
+  Include "$BRIK_TRANSVERSE_LIB/env.sh"
   Include "$BRIK_PACKAGE_MANAGERS_LIB/nuget.sh"
   Include "$BRIK_HOME/spec/support/mock_helper.sh"
 

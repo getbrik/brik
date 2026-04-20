@@ -41,8 +41,10 @@ pkg.npm.publish() {
     # Set auth token if configured
     if [[ -n "$token_var" ]]; then
         brik.use transverse.secrets
+        brik.use transverse.env
         transverse.secrets.require_var "$token_var" "npm token" || return $?
-        export NPM_TOKEN="${!token_var}"
+        NPM_TOKEN="$(transverse.env.resolve_indirect "$token_var")"
+        export NPM_TOKEN
 
         # Generate .npmrc for registry auth
         # Write to both project .npmrc and user ~/.npmrc for maximum compatibility

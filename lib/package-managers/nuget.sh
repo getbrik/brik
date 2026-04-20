@@ -57,9 +57,11 @@ pkg.nuget.publish() {
 
     if [[ -n "$token_var" ]]; then
         brik.use transverse.secrets
+        brik.use transverse.env
         transverse.secrets.require_var "$token_var" "nuget api key" || return $?
         # Set API key via environment variable (not CLI arg)
-        export NUGET_API_KEY="${!token_var}"
+        NUGET_API_KEY="$(transverse.env.resolve_indirect "$token_var")"
+        export NUGET_API_KEY
     fi
 
     # Create temporary NuGet.Config for HTTP sources (NuGet requires HTTPS by default)
@@ -69,11 +71,16 @@ pkg.nuget.publish() {
     if [[ -n "$source" ]] && [[ "$source" == http://* ]]; then
         tmp_nuget_config="$(mktemp)"
         local nuget_username="" nuget_password=""
-        if [[ -n "$token_var" ]] && [[ "${!token_var}" == *:* ]]; then
-            # Basic auth format (user:password) for Nexus/Artifactory
-            nuget_username="${!token_var%%:*}"
-            nuget_password="${!token_var#*:}"
-            use_config_auth="true"
+        if [[ -n "$token_var" ]]; then
+            brik.use transverse.env
+            local nuget_token_value
+            nuget_token_value="$(transverse.env.resolve_indirect "$token_var")"
+            if [[ "$nuget_token_value" == *:* ]]; then
+                # Basic auth format (user:password) for Nexus/Artifactory
+                nuget_username="${nuget_token_value%%:*}"
+                nuget_password="${nuget_token_value#*:}"
+                use_config_auth="true"
+            fi
         fi
         # Build NuGet.Config with source and optional credentials
         {

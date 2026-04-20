@@ -35,6 +35,11 @@
         "root": {
           "description": "Relative path to the service root directory. Used in monorepos where each service has its own brik.yml.",
           "type": "string"
+        },
+        "env": {
+          "description": "Path to the project-level env file (KEY=VALUE format), relative to the project root. Optional. When omitted, Brik auto-detects 'brik.env' at the repo root. Existing environment variables (CI secrets, etc.) take precedence over file entries.",
+          "type": "string",
+          "minLength": 1
         }
       }
     },
@@ -630,6 +635,11 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "env_file": {
+          "description": "Path to the env file (KEY=VALUE format) sourced when deploying this environment, relative to the project root. Optional. Existing environment variables take precedence over file entries. Brik returns an error if env_file is declared but the file is missing on disk.",
+          "type": "string",
+          "minLength": 1
+        },
         "when": {
           "description": "Condition expression evaluated by the shared library to decide whether this environment is deployed. Supports branch equality (branch == 'main'), glob matching (tag =~ 'v*'), and native CI variables ($CI_PIPELINE_SOURCE == 'merge_request_event').",
           "type": "string",

@@ -43,7 +43,8 @@ deploy.helm.run() {
         local upper_env
         upper_env="$(printf '%s' "$environment" | tr '[:lower:]' '[:upper:]')"
         local env_release_var="BRIK_DEPLOY_${upper_env}_RELEASE_NAME"
-        release_name="${!env_release_var:-}"
+        brik.use transverse.env
+        release_name="$(transverse.env.resolve_indirect "$env_release_var")"
     fi
     if [[ -z "$release_name" ]]; then
         release_name="$(basename "$chart")"

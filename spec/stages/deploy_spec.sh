@@ -3,6 +3,7 @@ Describe "stages.deploy"
   Include "$BRIK_HOME/lib/pipeline/loader.sh"
   Include "$BRIK_HOME/lib/transverse/config.sh"
   Include "$BRIK_HOME/lib/transverse/conditions.sh"
+  Include "$BRIK_HOME/lib/transverse/env.sh"
   Include "$BRIK_HOME/lib/stages/deploy.sh"
 
   setup_env() {
