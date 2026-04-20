@@ -63,10 +63,9 @@ deploy.compose.run() {
     export IMAGE_TAG="${BRIK_APP_VERSION:-${BRIK_COMMIT_SHORT_SHA:-latest}}"
 
     if [[ -n "$host" ]]; then
-        # Reuse SSH agent setup from ssh module
-        if declare -f _deploy.ssh.setup_agent >/dev/null 2>&1; then
-            _deploy.ssh.setup_agent
-        fi
+        # Reuse SSH agent setup from transverse helper
+        brik.use transverse.ssh
+        transverse.ssh.setup_agent
         local strict_host="${BRIK_SSH_STRICT_HOST_KEY:-yes}"
         local -a ssh_opts=(-o BatchMode=yes -o "StrictHostKeyChecking=${strict_host}")
         # Remote deploy via SSH
