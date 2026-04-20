@@ -17,19 +17,7 @@ _stacks._load() {
     }
 }
 
-# Map a framework name to its stack.
-# Prints the stack name on stdout.
-# Returns 1 for unknown frameworks.
-stacks.detect_from_framework() {
-    case "$1" in
-        jest|npm|vitest|mocha)      printf 'node' ;;
-        junit|maven|gradle)         printf 'java' ;;
-        pytest|unittest|tox)        printf 'python' ;;
-        cargo)                      printf 'rust' ;;
-        dotnet|xunit|nunit)         printf 'dotnet' ;;
-        *)                          return "$BRIK_EXIT_FAILURE" ;;
-    esac
-}
+# Note: stacks.detect_from_framework moved to lib/stacks/_detect.sh.
 
 # Run tests in a workspace.
 # Usage: test.run <workspace> [--suite <unit|integration|e2e>] [--report-dir <path>]
@@ -64,6 +52,7 @@ test.run() {
     fi
 
     local test_cmd=""
+    brik.use stacks._detect
     if [[ -n "$framework" ]]; then
         local stack
         stack="$(stacks.detect_from_framework "$framework")" || {
@@ -74,7 +63,6 @@ test.run() {
         test_cmd="$(stacks."${stack}".test_cmd "$framework" "$workspace" "$report_dir")" || return $?
     else
         local stack
-        brik.use build
         stack="$(stacks.detect "$workspace")" || return "$BRIK_EXIT_MISSING_DEP"
         _stacks._load "$stack"
         test_cmd="$(stacks."${stack}".test "$workspace" "$report_dir")" || return $?

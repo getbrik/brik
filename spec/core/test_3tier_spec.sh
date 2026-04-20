@@ -24,35 +24,5 @@ Describe "test.sh - 3-tier resolution"
     End
   End
 
-  Describe "extended framework mappings"
-    It "maps vitest to node"
-      When call stacks.detect_from_framework "vitest"
-      The output should equal "node"
-    End
-
-    It "maps mocha to node"
-      When call stacks.detect_from_framework "mocha"
-      The output should equal "node"
-    End
-
-    It "maps unittest to python"
-      When call stacks.detect_from_framework "unittest"
-      The output should equal "python"
-    End
-
-    It "maps tox to python"
-      When call stacks.detect_from_framework "tox"
-      The output should equal "python"
-    End
-
-    It "maps xunit to dotnet"
-      When call stacks.detect_from_framework "xunit"
-      The output should equal "dotnet"
-    End
-
-    It "maps nunit to dotnet"
-      When call stacks.detect_from_framework "nunit"
-      The output should equal "dotnet"
-    End
-  End
+  # Note: stacks.detect_from_framework tests moved to spec/stacks/_detect_spec.sh.
 End

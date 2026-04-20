@@ -5,38 +5,7 @@ Describe "build.sh"
   Include "$BRIK_CORE_LIB/build.sh"
   Include "$BRIK_HOME/spec/support/mock_helper.sh"
 
-  Describe "stacks.detect"
-    It "detects node from package.json"
-      When call stacks.detect "$WORKSPACES/node-simple"
-      The output should equal "node"
-    End
-
-    It "detects java from pom.xml"
-      When call stacks.detect "$WORKSPACES/java-maven"
-      The output should equal "java"
-    End
-
-    It "detects python from pyproject.toml"
-      When call stacks.detect "$WORKSPACES/python-simple"
-      The output should equal "python"
-    End
-
-    It "detects rust from Cargo.toml"
-      When call stacks.detect "$WORKSPACES/rust-simple"
-      The output should equal "rust"
-    End
-
-    It "detects dotnet from .csproj file"
-      When call stacks.detect "$WORKSPACES/dotnet-simple"
-      The output should equal "dotnet"
-    End
-
-    It "returns 1 for unknown workspace"
-      When call stacks.detect "$WORKSPACES/unknown"
-      The status should equal 1
-      The stderr should include "cannot detect stack"
-    End
-  End
+  # Note: stacks.detect tests moved to spec/stacks/_detect_spec.sh.
 
   Describe "build.run"
     It "returns 6 for nonexistent workspace"

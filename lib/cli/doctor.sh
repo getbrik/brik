@@ -101,7 +101,7 @@ doctor.run() {
 
     printf '\n'
 
-    brik.use build
+    brik.use stacks._detect
     stack="$(stacks.detect "$workspace" 2>/dev/null)" || true
 
     if [[ -n "$stack" ]]; then
