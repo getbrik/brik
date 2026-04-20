@@ -100,29 +100,4 @@ Describe "publish.sh"
     End
   End
 
-  Describe "_pkg._require_secret_var"
-    It "returns 7 when variable name is empty"
-      When call _pkg._require_secret_var "" "test token"
-      The status should equal 7
-      The stderr should include "variable name is not configured"
-    End
-
-    It "returns 7 when referenced variable is not set"
-      When call _pkg._require_secret_var "NONEXISTENT_VAR_12345" "test token"
-      The status should equal 7
-      The stderr should include "is not set or empty"
-    End
-
-    Describe "with valid variable"
-      setup_var() { export MY_SECRET_TOKEN="abc123"; }
-      cleanup_var() { unset MY_SECRET_TOKEN; }
-      Before 'setup_var'
-      After 'cleanup_var'
-
-      It "returns 0 when referenced variable is set"
-        When call _pkg._require_secret_var "MY_SECRET_TOKEN" "test token"
-        The status should be success
-      End
-    End
-  End
 End

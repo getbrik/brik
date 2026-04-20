@@ -37,7 +37,8 @@ pkg.cargo.publish() {
     # instead of the global CARGO_REGISTRY_TOKEN.
     local token_env_var="CARGO_REGISTRY_TOKEN"
     if [[ -n "$token_var" ]]; then
-        _pkg._require_secret_var "$token_var" "cargo token" || return $?
+        brik.use transverse.secrets
+        transverse.secrets.require_var "$token_var" "cargo token" || return $?
         if [[ -n "$registry" ]]; then
             local upper_name
             upper_name=$(printf '%s' "$registry" | tr '[:lower:]-' '[:upper:]_')

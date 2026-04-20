@@ -43,10 +43,12 @@ pkg.maven.publish() {
 
     # Validate credentials if provided
     if [[ -n "$username_var" ]]; then
-        _pkg._require_secret_var "$username_var" "maven username" || return $?
+        brik.use transverse.secrets
+        transverse.secrets.require_var "$username_var" "maven username" || return $?
     fi
     if [[ -n "$password_var" ]]; then
-        _pkg._require_secret_var "$password_var" "maven password" || return $?
+        brik.use transverse.secrets
+        transverse.secrets.require_var "$password_var" "maven password" || return $?
     fi
 
     local -a cmd

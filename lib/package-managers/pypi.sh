@@ -52,7 +52,8 @@ pkg.pypi.publish() {
 
     # Validate token if provided
     if [[ -n "$token_var" ]]; then
-        _pkg._require_secret_var "$token_var" "pypi token" || return $?
+        brik.use transverse.secrets
+        transverse.secrets.require_var "$token_var" "pypi token" || return $?
     fi
 
     local -a cmd

@@ -50,8 +50,9 @@ pkg.docker.publish() {
         _docker_config_dir="$(mktemp -d)"
         export DOCKER_CONFIG="$_docker_config_dir"
 
-        _pkg._require_secret_var "$username_var" "docker username" || return $?
-        _pkg._require_secret_var "$password_var" "docker password" || return $?
+        brik.use transverse.secrets
+        transverse.secrets.require_var "$username_var" "docker username" || return $?
+        transverse.secrets.require_var "$password_var" "docker password" || return $?
 
         local login_registry="${registry:-}"
 

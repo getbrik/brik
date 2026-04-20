@@ -2,8 +2,11 @@ Describe "publish/pypi.sh"
   Include "$BRIK_PIPELINE_LIB/logging.sh"
   Include "$BRIK_PIPELINE_LIB/tools.sh"
   Include "$BRIK_CORE_LIB/publish.sh"
+  Include "$BRIK_TRANSVERSE_LIB/secrets.sh"
   Include "$BRIK_PACKAGE_MANAGERS_LIB/pypi.sh"
   Include "$BRIK_HOME/spec/support/mock_helper.sh"
+
+  brik.use() { :; }
 
   Describe "pkg.pypi.publish"
     It "returns 2 for unknown option"
