@@ -6,31 +6,6 @@
 [[ -n "${_BRIK_CORE_PUBLISH_LOADED:-}" ]] && return 0
 _BRIK_CORE_PUBLISH_LOADED=1
 
-# Validate that a secret variable name is set and the referenced variable has a value.
-# Usage: _pkg._require_secret_var <var_name> <label>
-# Returns 7 if the variable name is empty or the referenced variable is unset.
-_pkg._require_secret_var() {
-    local var_name="$1"
-    local label="$2"
-
-    if [[ -z "$var_name" ]]; then
-        log.error "$label variable name is not configured"
-        return "$BRIK_EXIT_CONFIG_ERROR"
-    fi
-
-    if [[ ! "$var_name" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
-        log.error "$label variable name '$var_name' is not a valid identifier"
-        return "$BRIK_EXIT_CONFIG_ERROR"
-    fi
-
-    if [[ -z "${!var_name:-}" ]]; then
-        log.error "$label variable '$var_name' is not set or empty"
-        return "$BRIK_EXIT_CONFIG_ERROR"
-    fi
-
-    return 0
-}
-
 # Publish artefacts to a registry.
 # Usage: publish.run --target <npm|docker|maven|pypi|cargo|nuget> [--dry-run]
 publish.run() {

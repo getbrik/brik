@@ -40,7 +40,8 @@ pkg.npm.publish() {
 
     # Set auth token if configured
     if [[ -n "$token_var" ]]; then
-        _pkg._require_secret_var "$token_var" "npm token" || return $?
+        brik.use transverse.secrets
+        transverse.secrets.require_var "$token_var" "npm token" || return $?
         export NPM_TOKEN="${!token_var}"
 
         # Generate .npmrc for registry auth

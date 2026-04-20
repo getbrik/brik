@@ -56,7 +56,8 @@ pkg.nuget.publish() {
     fi
 
     if [[ -n "$token_var" ]]; then
-        _pkg._require_secret_var "$token_var" "nuget api key" || return $?
+        brik.use transverse.secrets
+        transverse.secrets.require_var "$token_var" "nuget api key" || return $?
         # Set API key via environment variable (not CLI arg)
         export NUGET_API_KEY="${!token_var}"
     fi
