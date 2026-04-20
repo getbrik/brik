@@ -1,4 +1,6 @@
 Describe "stages.test"
+  Include "$BRIK_PIPELINE_LIB/logging.sh"
+  Include "$BRIK_PIPELINE_LIB/tools.sh"
   Include "$BRIK_HOME/lib/pipeline/stage.sh"
   Include "$BRIK_HOME/lib/pipeline/loader.sh"
   Include "$BRIK_HOME/lib/transverse/config.sh"
@@ -27,10 +29,27 @@ Describe "stages.test"
     The status should be success
   End
 
-  It "returns 0 when test.run succeeds"
+  _stub_leaf_success() {
+    brik.use() { :; }
+    stacks.detect_from_framework() { printf 'node'; return 0; }
+    stacks.detect() { printf 'node'; return 0; }
+    stacks.node.test_cmd() { printf 'true'; return 0; }
+    stacks.node.test() { printf 'true'; return 0; }
+    stacks.install_deps() { :; }
+  }
+
+  _stub_leaf_failure() {
+    brik.use() { :; }
+    stacks.detect_from_framework() { printf 'node'; return 0; }
+    stacks.detect() { printf 'node'; return 0; }
+    stacks.node.test_cmd() { printf 'false'; return 0; }
+    stacks.node.test() { printf 'false'; return 0; }
+    stacks.install_deps() { :; }
+  }
+
+  It "returns 0 when the stack test cmd succeeds"
     run_test_success() {
-      brik.use() { :; }
-      test.run() { return 0; }
+      _stub_leaf_success
       local ctx
       ctx="$(context.create "test")" 2>/dev/null || ctx="$(mktemp)"
       stages.test "$ctx" >/dev/null 2>&1
@@ -41,8 +60,7 @@ Describe "stages.test"
 
   It "sets BRIK_TEST_STATUS to success on success"
     run_test_ctx_success() {
-      brik.use() { :; }
-      test.run() { return 0; }
+      _stub_leaf_success
       local ctx
       ctx="$(context.create "test")" 2>/dev/null || ctx="$(mktemp)"
       stages.test "$ctx" >/dev/null 2>&1
@@ -52,10 +70,9 @@ Describe "stages.test"
     The output should equal "success"
   End
 
-  It "returns non-zero when test.run fails"
+  It "returns non-zero when the stack test cmd fails"
     run_test_failure() {
-      brik.use() { :; }
-      test.run() { return 1; }
+      _stub_leaf_failure
       local ctx
       ctx="$(context.create "test")" 2>/dev/null || ctx="$(mktemp)"
       stages.test "$ctx" >/dev/null 2>&1
@@ -66,8 +83,7 @@ Describe "stages.test"
 
   It "sets BRIK_TEST_STATUS to failed on failure"
     run_test_ctx_failure() {
-      brik.use() { :; }
-      test.run() { return 1; }
+      _stub_leaf_failure
       local ctx
       ctx="$(context.create "test")" 2>/dev/null || ctx="$(mktemp)"
       stages.test "$ctx" >/dev/null 2>&1 || true
@@ -79,8 +95,7 @@ Describe "stages.test"
 
   It "exports BRIK_TEST_FRAMEWORK from config"
     run_test_framework() {
-      brik.use() { :; }
-      test.run() { return 0; }
+      _stub_leaf_success
       local ctx
       ctx="$(context.create "test")" 2>/dev/null || ctx="$(mktemp)"
       stages.test "$ctx" >/dev/null 2>&1
@@ -88,6 +103,26 @@ Describe "stages.test"
     }
     When call run_test_framework
     The output should equal "jest"
+  End
+
+  It "runs BRIK_TEST_COMMAND override when set"
+    run_test_override() {
+      cat > "$BRIK_CONFIG_FILE" <<'YAML'
+version: 1
+project:
+  name: test
+  stack: node
+test:
+  command: "printf 'override-ran'"
+YAML
+      config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
+      _stub_leaf_success
+      local ctx
+      ctx="$(context.create "test")" 2>/dev/null || ctx="$(mktemp)"
+      stages.test "$ctx" 2>/dev/null
+    }
+    When call run_test_override
+    The output should include "override-ran"
   End
 
   Describe "with test commands configured"
@@ -109,8 +144,7 @@ YAML
 
     It "logs unit test command"
       run_test_log_unit() {
-        brik.use() { :; }
-        test.run() { return 0; }
+        _stub_leaf_success
         local ctx
         ctx="$(context.create "test")" 2>/dev/null || ctx="$(mktemp)"
         stages.test "$ctx"
