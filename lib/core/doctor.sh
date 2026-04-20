@@ -54,7 +54,7 @@ doctor.run() {
     local tool_version=""
     local stack=""
 
-    runtime.require_dir "$workspace" || return "$?"
+    pipeline.require_dir "$workspace" || return "$?"
 
     printf '%s\n' "brik doctor - checking prerequisites"
     printf '%s\n' "======================================"
@@ -104,7 +104,7 @@ doctor.run() {
     printf '\n'
 
     brik.use build
-    stack="$(build.detect_stack "$workspace" 2>/dev/null)" || true
+    stack="$(stacks.detect "$workspace" 2>/dev/null)" || true
 
     if [[ -n "$stack" ]]; then
         printf '  Detected stack: %s (from %s)\n' "$stack" "$workspace"

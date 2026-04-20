@@ -1,7 +1,7 @@
 Describe "stages.test"
-  Include "$BRIK_HOME/lib/runtime/stage.sh"
-  Include "$BRIK_HOME/lib/core/_loader.sh"
-  Include "$BRIK_HOME/lib/core/config.sh"
+  Include "$BRIK_HOME/lib/pipeline/stage.sh"
+  Include "$BRIK_HOME/lib/pipeline/loader.sh"
+  Include "$BRIK_HOME/lib/transverse/config.sh"
   Include "$BRIK_HOME/lib/stages/test.sh"
 
   setup_env() {
@@ -121,9 +121,9 @@ YAML
   End
 End
 
-Describe "_brik.install_deps (test mode)"
-  Include "$BRIK_HOME/lib/runtime/stage.sh"
-  Include "$BRIK_HOME/lib/core/_loader.sh"
+Describe "stacks.install_deps (test mode)"
+  Include "$BRIK_HOME/lib/pipeline/stage.sh"
+  Include "$BRIK_HOME/lib/pipeline/loader.sh"
   Include "$BRIK_HOME/lib/stages/test.sh"
   Include "$BRIK_HOME/spec/support/mock_helper.sh"
 
@@ -146,7 +146,7 @@ Describe "_brik.install_deps (test mode)"
         export BRIK_BUILD_STACK="node"
         mock.create_logging "npm" "$MOCK_LOG"
         mock.activate
-        _brik.install_deps "$DEPS_WS" test 2>/dev/null
+        stacks.install_deps "$DEPS_WS" test 2>/dev/null
         grep -q "npm ci" "$MOCK_LOG"
       }
       When call run_node_install
@@ -159,7 +159,7 @@ Describe "_brik.install_deps (test mode)"
         mkdir -p "${DEPS_WS}/node_modules"
         mock.create_exit "npm" 1
         mock.activate
-        _brik.install_deps "$DEPS_WS" test 2>/dev/null
+        stacks.install_deps "$DEPS_WS" test 2>/dev/null
       }
       When call run_node_skip
       The status should be success
@@ -173,7 +173,7 @@ Describe "_brik.install_deps (test mode)"
         printf '[project]\nname = "test"\n' > "${DEPS_WS}/pyproject.toml"
         mock.create_logging "pip" "$MOCK_LOG"
         mock.activate
-        _brik.install_deps "$DEPS_WS" test 2>/dev/null
+        stacks.install_deps "$DEPS_WS" test 2>/dev/null
         grep -q 'pip install -e' "$MOCK_LOG"
       }
       When call run_python_pyproject
@@ -187,7 +187,7 @@ Describe "_brik.install_deps (test mode)"
         printf 'pytest\n' > "${DEPS_WS}/requirements.txt"
         mock.create_logging "pip" "$MOCK_LOG"
         mock.activate
-        _brik.install_deps "$DEPS_WS" test 2>/dev/null
+        stacks.install_deps "$DEPS_WS" test 2>/dev/null
         grep -q 'pip install -r requirements.txt' "$MOCK_LOG"
       }
       When call run_python_req
@@ -199,7 +199,7 @@ Describe "_brik.install_deps (test mode)"
         export BRIK_BUILD_STACK="python"
         rm -f "${DEPS_WS}/pyproject.toml" "${DEPS_WS}/requirements.txt"
         rm -f "$MOCK_LOG"
-        _brik.install_deps "$DEPS_WS" test 2>/dev/null
+        stacks.install_deps "$DEPS_WS" test 2>/dev/null
         [[ ! -f "$MOCK_LOG" ]]
       }
       When call run_python_noop
@@ -212,7 +212,7 @@ Describe "_brik.install_deps (test mode)"
       run_java_noop() {
         export BRIK_BUILD_STACK="java"
         rm -f "$MOCK_LOG"
-        _brik.install_deps "$DEPS_WS" test 2>/dev/null
+        stacks.install_deps "$DEPS_WS" test 2>/dev/null
         [[ ! -f "$MOCK_LOG" ]]
       }
       When call run_java_noop
@@ -225,7 +225,7 @@ Describe "_brik.install_deps (test mode)"
       run_rust_noop() {
         export BRIK_BUILD_STACK="rust"
         rm -f "$MOCK_LOG"
-        _brik.install_deps "$DEPS_WS" test 2>/dev/null
+        stacks.install_deps "$DEPS_WS" test 2>/dev/null
         [[ ! -f "$MOCK_LOG" ]]
       }
       When call run_rust_noop
@@ -239,7 +239,7 @@ Describe "_brik.install_deps (test mode)"
         export BRIK_BUILD_STACK="dotnet"
         mock.create_logging "dotnet" "$MOCK_LOG"
         mock.activate
-        _brik.install_deps "$DEPS_WS" test 2>/dev/null
+        stacks.install_deps "$DEPS_WS" test 2>/dev/null
         grep -q "dotnet restore" "$MOCK_LOG"
       }
       When call run_dotnet_restore
@@ -252,7 +252,7 @@ Describe "_brik.install_deps (test mode)"
       run_unknown_stack() {
         export BRIK_BUILD_STACK="go"
         rm -f "$MOCK_LOG"
-        _brik.install_deps "$DEPS_WS" test 2>/dev/null
+        stacks.install_deps "$DEPS_WS" test 2>/dev/null
         [[ ! -f "$MOCK_LOG" ]]
       }
       When call run_unknown_stack
@@ -263,7 +263,7 @@ Describe "_brik.install_deps (test mode)"
       run_empty_stack() {
         unset BRIK_BUILD_STACK
         rm -f "$MOCK_LOG"
-        _brik.install_deps "$DEPS_WS" test 2>/dev/null
+        stacks.install_deps "$DEPS_WS" test 2>/dev/null
         [[ ! -f "$MOCK_LOG" ]]
       }
       When call run_empty_stack

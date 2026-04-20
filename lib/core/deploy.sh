@@ -30,7 +30,7 @@ deploy.run() {
     log.info "deploying with target: $target"
 
     # Load and delegate to target-specific module
-    brik.use "deploy.${target}" || {
+    brik.use "deployments.${target}" || {
         log.error "unsupported deploy target: $target"
         return "$BRIK_EXIT_CONFIG_ERROR"
     }

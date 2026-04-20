@@ -1,6 +1,6 @@
 Describe "notify.sh"
-  Include "$BRIK_RUNTIME_LIB/logging.sh"
-  Include "$BRIK_RUNTIME_LIB/tools.sh"
+  Include "$BRIK_PIPELINE_LIB/logging.sh"
+  Include "$BRIK_PIPELINE_LIB/tools.sh"
   Include "$BRIK_CORE_LIB/notify.sh"
   Include "$BRIK_HOME/spec/support/mock_helper.sh"
 

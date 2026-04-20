@@ -13,7 +13,7 @@ stages.test() {
 
     brik.use test
 
-    _brik.install_deps "${BRIK_WORKSPACE}" test
+    stacks.install_deps "${BRIK_WORKSPACE}" test
 
     log.info "running tests"
 

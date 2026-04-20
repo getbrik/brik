@@ -1,8 +1,8 @@
 Describe "stages.sast"
-  Include "$BRIK_HOME/lib/runtime/stage.sh"
-  Include "$BRIK_HOME/lib/core/_loader.sh"
-  Include "$BRIK_HOME/lib/core/config.sh"
-  Include "$BRIK_HOME/lib/core/security.sh"
+  Include "$BRIK_HOME/lib/pipeline/stage.sh"
+  Include "$BRIK_HOME/lib/pipeline/loader.sh"
+  Include "$BRIK_HOME/lib/transverse/config.sh"
+  Include "$BRIK_HOME/lib/stages/verify/scan/scan.sh"
   Include "$BRIK_HOME/lib/stages/sast.sh"
 
   setup_env() {
@@ -47,7 +47,7 @@ YAML
 
     It "defaults to semgrep and returns success"
       run_sast_defaults() {
-        security.sast.run() { return 0; }
+        verify.scan.sast.run() { return 0; }
         local ctx
         ctx="$(context.create "sast")" 2>/dev/null || ctx="$(mktemp)"
         stages.sast "$ctx" >/dev/null 2>&1
@@ -77,7 +77,7 @@ YAML
     It "runs SAST scan and sets status to success"
       run_sast() {
         brik.use() { :; }
-        security.sast.run() { return 0; }
+        verify.scan.sast.run() { return 0; }
         local ctx
         ctx="$(context.create "sast")" 2>/dev/null || ctx="$(mktemp)"
         stages.sast "$ctx" >/dev/null 2>&1
@@ -90,7 +90,7 @@ YAML
     It "sets status to failed when SAST fails"
       run_sast_fail() {
         brik.use() { :; }
-        security.sast.run() { return 1; }
+        verify.scan.sast.run() { return 1; }
         local ctx
         ctx="$(context.create "sast")" 2>/dev/null || ctx="$(mktemp)"
         stages.sast "$ctx" >/dev/null 2>&1 || true
@@ -119,8 +119,8 @@ YAML
     It "runs license scan and sets status to success"
       run_license() {
         brik.use() { :; }
-        security.sast.run() { return 0; }
-        security.license.run() { return 0; }
+        verify.scan.sast.run() { return 0; }
+        verify.scan.license.run() { return 0; }
         local ctx
         ctx="$(context.create "sast")" 2>/dev/null || ctx="$(mktemp)"
         stages.sast "$ctx" >/dev/null 2>&1
@@ -149,8 +149,8 @@ YAML
     It "runs IaC scan and sets status to success"
       run_iac() {
         brik.use() { :; }
-        security.sast.run() { return 0; }
-        security.iac.run() { return 0; }
+        verify.scan.sast.run() { return 0; }
+        verify.scan.iac.run() { return 0; }
         local ctx
         ctx="$(context.create "sast")" 2>/dev/null || ctx="$(mktemp)"
         stages.sast "$ctx" >/dev/null 2>&1
@@ -181,8 +181,8 @@ YAML
     It "runs all configured scans"
       run_multi() {
         brik.use() { :; }
-        security.sast.run() { return 0; }
-        security.license.run() { return 0; }
+        verify.scan.sast.run() { return 0; }
+        verify.scan.license.run() { return 0; }
         local ctx
         ctx="$(context.create "sast")" 2>/dev/null || ctx="$(mktemp)"
         stages.sast "$ctx" >/dev/null 2>&1
@@ -195,8 +195,8 @@ YAML
     It "fails if any scan fails"
       run_multi_fail() {
         brik.use() { :; }
-        security.sast.run() { return 0; }
-        security.license.run() { return 1; }
+        verify.scan.sast.run() { return 0; }
+        verify.scan.license.run() { return 1; }
         local ctx
         ctx="$(context.create "sast")" 2>/dev/null || ctx="$(mktemp)"
         stages.sast "$ctx" >/dev/null 2>&1 || true

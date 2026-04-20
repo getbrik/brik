@@ -7,9 +7,9 @@
 _BRIK_CORE_PUBLISH_LOADED=1
 
 # Validate that a secret variable name is set and the referenced variable has a value.
-# Usage: _publish._require_secret_var <var_name> <label>
+# Usage: _pkg._require_secret_var <var_name> <label>
 # Returns 7 if the variable name is empty or the referenced variable is unset.
-_publish._require_secret_var() {
+_pkg._require_secret_var() {
     local var_name="$1"
     local label="$2"
 
@@ -53,12 +53,12 @@ publish.run() {
     log.info "publishing with target: $target"
 
     # Load and delegate to target-specific module
-    brik.use "publish.${target}" || {
+    brik.use "package-managers.${target}" || {
         log.error "unsupported publish target: $target"
         return "$BRIK_EXIT_CONFIG_ERROR"
     }
 
-    local publish_fn="publish.${target}.run"
+    local publish_fn="pkg.${target}.publish"
     if ! declare -f "$publish_fn" >/dev/null 2>&1; then
         log.error "publish function not found: $publish_fn"
         return "$BRIK_EXIT_CONFIG_ERROR"

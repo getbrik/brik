@@ -1,7 +1,7 @@
 Describe "deploy.sh"
-  Include "$BRIK_RUNTIME_LIB/logging.sh"
-  Include "$BRIK_RUNTIME_LIB/tools.sh"
-  Include "$BRIK_CORE_LIB/_loader.sh"
+  Include "$BRIK_PIPELINE_LIB/logging.sh"
+  Include "$BRIK_PIPELINE_LIB/tools.sh"
+  Include "$BRIK_PIPELINE_LIB/loader.sh"
   Include "$BRIK_CORE_LIB/deploy.sh"
 
   Describe "deploy.run"
@@ -23,12 +23,12 @@ Describe "deploy.sh"
       setup_mock() {
         MOCK_K8S_LOG="$(mktemp)"
         eval "deploy.k8s.run() { printf '%s\n' \"\$*\" > \"$MOCK_K8S_LOG\"; return 0; }"
-        eval "_BRIK_MODULE_DEPLOY_K8S_LOADED=1"
-        export _BRIK_MODULE_DEPLOY_K8S_LOADED
+        eval "_BRIK_MODULE_DEPLOYMENTS_K8S_LOADED=1"
+        export _BRIK_MODULE_DEPLOYMENTS_K8S_LOADED
       }
       cleanup_mock() {
         unset -f deploy.k8s.run 2>/dev/null
-        unset _BRIK_MODULE_DEPLOY_K8S_LOADED
+        unset _BRIK_MODULE_DEPLOYMENTS_K8S_LOADED
         rm -f "$MOCK_K8S_LOG"
       }
       Before 'setup_mock'
@@ -62,11 +62,11 @@ Describe "deploy.sh"
     Describe "deploy function not found"
       setup_no_fn() {
         # Module loaded but no deploy function
-        eval "_BRIK_MODULE_DEPLOY_NOOP_LOADED=1"
-        export _BRIK_MODULE_DEPLOY_NOOP_LOADED
+        eval "_BRIK_MODULE_DEPLOYMENTS_NOOP_LOADED=1"
+        export _BRIK_MODULE_DEPLOYMENTS_NOOP_LOADED
       }
       cleanup_no_fn() {
-        unset _BRIK_MODULE_DEPLOY_NOOP_LOADED
+        unset _BRIK_MODULE_DEPLOYMENTS_NOOP_LOADED
       }
       Before 'setup_no_fn'
       After 'cleanup_no_fn'

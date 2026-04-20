@@ -18,7 +18,7 @@ jobs:
       - name: Run shellcheck
         run: |
           shellcheck --severity=warning bin/brik
-          shellcheck --severity=warning -x lib/runtime/*.sh
+          shellcheck --severity=warning -x lib/pipeline/*.sh
           shellcheck --severity=warning -x lib/core/*.sh lib/core/**/*.sh
           shellcheck --severity=warning -x shared-libs/jenkins/scripts/*.sh
           shellcheck --severity=warning -x shared-libs/gitlab/scripts/*.sh

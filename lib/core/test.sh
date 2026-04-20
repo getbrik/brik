@@ -9,9 +9,9 @@ _BRIK_CORE_TEST_LOADED=1
 
 # Load a stack-specific test module via brik.use.
 # Returns 7 if module not found.
-_test._load_stack() {
+_stacks._load() {
     local stack="$1"
-    brik.use "test.${stack}" || {
+    brik.use "stacks.${stack}" || {
         log.error "no test module: $stack"
         return "$BRIK_EXIT_CONFIG_ERROR"
     }
@@ -20,7 +20,7 @@ _test._load_stack() {
 # Map a framework name to its stack.
 # Prints the stack name on stdout.
 # Returns 1 for unknown frameworks.
-_test._stack_for_framework() {
+stacks.detect_from_framework() {
     case "$1" in
         jest|npm|vitest|mocha)      printf 'node' ;;
         junit|maven|gradle)         printf 'java' ;;
@@ -48,7 +48,7 @@ test.run() {
         esac
     done
 
-    runtime.require_dir "$workspace" || return "$BRIK_EXIT_IO_FAILURE"
+    pipeline.require_dir "$workspace" || return "$BRIK_EXIT_IO_FAILURE"
 
     # Tier 1: explicit command override
     if [[ -n "${BRIK_TEST_COMMAND:-}" ]]; then
@@ -66,18 +66,18 @@ test.run() {
     local test_cmd=""
     if [[ -n "$framework" ]]; then
         local stack
-        stack="$(_test._stack_for_framework "$framework")" || {
+        stack="$(stacks.detect_from_framework "$framework")" || {
             log.error "unsupported test framework: $framework"
             return "$BRIK_EXIT_CONFIG_ERROR"
         }
-        _test._load_stack "$stack"
-        test_cmd="$(test."${stack}".cmd "$framework" "$workspace" "$report_dir")" || return $?
+        _stacks._load "$stack"
+        test_cmd="$(stacks."${stack}".test_cmd "$framework" "$workspace" "$report_dir")" || return $?
     else
         local stack
         brik.use build
-        stack="$(build.detect_stack "$workspace")" || return "$BRIK_EXIT_MISSING_DEP"
-        _test._load_stack "$stack"
-        test_cmd="$(test."${stack}".run_cmd "$workspace" "$report_dir")" || return $?
+        stack="$(stacks.detect "$workspace")" || return "$BRIK_EXIT_MISSING_DEP"
+        _stacks._load "$stack"
+        test_cmd="$(stacks."${stack}".test "$workspace" "$report_dir")" || return $?
     fi
 
     log.info "running $suite tests: $test_cmd"

@@ -22,8 +22,8 @@ Describe "jenkins-wrapper.sh"
       setup_no_runtime() {
         export _test_dir
         _test_dir="$(mktemp -d)"
-        mkdir -p "${_test_dir}/lib/core"
-        touch "${_test_dir}/lib/core/_loader.sh"
+        mkdir -p "${_test_dir}/lib/pipeline"
+        touch "${_test_dir}/lib/pipeline/loader.sh"
       }
       cleanup_no_runtime() { rm -rf "$_test_dir"; }
       Before 'setup_no_runtime'
@@ -124,7 +124,7 @@ Describe "jenkins-wrapper.sh"
         The output should equal "exists"
       End
 
-      It "calls setup.prepare_env during setup"
+      It "calls bootstrap.prepare_env during setup"
         When call brik.jenkins.setup "$BRIK_HOME"
         The status should be success
         The error should include "preparing runtime environment"

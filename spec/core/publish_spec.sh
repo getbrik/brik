@@ -1,7 +1,7 @@
 Describe "publish.sh"
-  Include "$BRIK_RUNTIME_LIB/logging.sh"
-  Include "$BRIK_RUNTIME_LIB/tools.sh"
-  Include "$BRIK_CORE_LIB/_loader.sh"
+  Include "$BRIK_PIPELINE_LIB/logging.sh"
+  Include "$BRIK_PIPELINE_LIB/tools.sh"
+  Include "$BRIK_PIPELINE_LIB/loader.sh"
   Include "$BRIK_CORE_LIB/publish.sh"
 
   Describe "publish.run"
@@ -22,13 +22,13 @@ Describe "publish.sh"
     Describe "with mock npm module"
       setup_mock() {
         MOCK_NPM_LOG="$(mktemp)"
-        eval "publish.npm.run() { printf '%s\n' \"\$*\" > \"$MOCK_NPM_LOG\"; return 0; }"
-        eval "_BRIK_MODULE_PUBLISH_NPM_LOADED=1"
-        export _BRIK_MODULE_PUBLISH_NPM_LOADED
+        eval "pkg.npm.publish() { printf '%s\n' \"\$*\" > \"$MOCK_NPM_LOG\"; return 0; }"
+        eval "_BRIK_MODULE_PACKAGE_MANAGERS_NPM_LOADED=1"
+        export _BRIK_MODULE_PACKAGE_MANAGERS_NPM_LOADED
       }
       cleanup_mock() {
-        unset -f publish.npm.run 2>/dev/null
-        unset _BRIK_MODULE_PUBLISH_NPM_LOADED
+        unset -f pkg.npm.publish 2>/dev/null
+        unset _BRIK_MODULE_PACKAGE_MANAGERS_NPM_LOADED
         rm -f "$MOCK_NPM_LOG"
       }
       Before 'setup_mock'
@@ -62,13 +62,13 @@ Describe "publish.sh"
     Describe "with mock docker module"
       setup_docker_mock() {
         MOCK_DOCKER_LOG="$(mktemp)"
-        eval "publish.docker.run() { printf '%s\n' \"\$*\" > \"$MOCK_DOCKER_LOG\"; return 0; }"
-        eval "_BRIK_MODULE_PUBLISH_DOCKER_LOADED=1"
-        export _BRIK_MODULE_PUBLISH_DOCKER_LOADED
+        eval "pkg.docker.publish() { printf '%s\n' \"\$*\" > \"$MOCK_DOCKER_LOG\"; return 0; }"
+        eval "_BRIK_MODULE_PACKAGE_MANAGERS_DOCKER_LOADED=1"
+        export _BRIK_MODULE_PACKAGE_MANAGERS_DOCKER_LOADED
       }
       cleanup_docker_mock() {
-        unset -f publish.docker.run 2>/dev/null
-        unset _BRIK_MODULE_PUBLISH_DOCKER_LOADED
+        unset -f pkg.docker.publish 2>/dev/null
+        unset _BRIK_MODULE_PACKAGE_MANAGERS_DOCKER_LOADED
         rm -f "$MOCK_DOCKER_LOG"
       }
       Before 'setup_docker_mock'
@@ -83,11 +83,11 @@ Describe "publish.sh"
 
     Describe "publish function not found"
       setup_no_fn() {
-        eval "_BRIK_MODULE_PUBLISH_NOOP_LOADED=1"
-        export _BRIK_MODULE_PUBLISH_NOOP_LOADED
+        eval "_BRIK_MODULE_PACKAGE_MANAGERS_NOOP_LOADED=1"
+        export _BRIK_MODULE_PACKAGE_MANAGERS_NOOP_LOADED
       }
       cleanup_no_fn() {
-        unset _BRIK_MODULE_PUBLISH_NOOP_LOADED
+        unset _BRIK_MODULE_PACKAGE_MANAGERS_NOOP_LOADED
       }
       Before 'setup_no_fn'
       After 'cleanup_no_fn'
@@ -100,15 +100,15 @@ Describe "publish.sh"
     End
   End
 
-  Describe "_publish._require_secret_var"
+  Describe "_pkg._require_secret_var"
     It "returns 7 when variable name is empty"
-      When call _publish._require_secret_var "" "test token"
+      When call _pkg._require_secret_var "" "test token"
       The status should equal 7
       The stderr should include "variable name is not configured"
     End
 
     It "returns 7 when referenced variable is not set"
-      When call _publish._require_secret_var "NONEXISTENT_VAR_12345" "test token"
+      When call _pkg._require_secret_var "NONEXISTENT_VAR_12345" "test token"
       The status should equal 7
       The stderr should include "is not set or empty"
     End
@@ -120,7 +120,7 @@ Describe "publish.sh"
       After 'cleanup_var'
 
       It "returns 0 when referenced variable is set"
-        When call _publish._require_secret_var "MY_SECRET_TOKEN" "test token"
+        When call _pkg._require_secret_var "MY_SECRET_TOKEN" "test token"
         The status should be success
       End
     End

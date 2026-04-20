@@ -10,7 +10,7 @@ stages.package() {
 
     config.export_package_vars
 
-    brik.use build.docker
+    brik.use stacks.docker
 
     log.info "package stage - container build"
 
@@ -39,7 +39,7 @@ stages.package() {
 
     log.info "building image: ${BRIK_PACKAGE_DOCKER_IMAGE}:${_app_tag}"
 
-    build.docker.run "${docker_args[@]}"
+    stacks.docker.build "${docker_args[@]}"
     result=$?
 
     if [[ $result -ne 0 ]]; then

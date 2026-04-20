@@ -116,7 +116,7 @@ Describe "local-wrapper.sh"
         The output should equal "exists"
       End
 
-      It "calls setup.prepare_env during setup"
+      It "calls bootstrap.prepare_env during setup"
         When call brik.local.setup
         The status should be success
         The error should include "preparing runtime environment"

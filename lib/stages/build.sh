@@ -15,11 +15,11 @@ stages.build() {
 
     # Load stack-specific module
     case "$stack" in
-        node)   brik.use build.node ;;
-        java)   brik.use build.java ;;
-        python) brik.use build.python ;;
-        dotnet) brik.use build.dotnet ;;
-        rust)   brik.use build.rust ;;
+        node)   brik.use stacks.node ;;
+        java)   brik.use stacks.java ;;
+        python) brik.use stacks.python ;;
+        dotnet) brik.use stacks.dotnet ;;
+        rust)   brik.use stacks.rust ;;
     esac
 
     log.info "running build (stack=$stack)"

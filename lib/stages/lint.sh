@@ -18,10 +18,10 @@ stages.lint() {
         return 0
     fi
 
-    brik.use quality
+    brik.use verify.verify
 
     # Ensure project dependencies are available (quality tools may be dev deps).
-    _brik.install_deps "${BRIK_WORKSPACE}" dev
+    stacks.install_deps "${BRIK_WORKSPACE}" dev
 
     log.info "lint stage - running checks"
 
@@ -41,7 +41,7 @@ stages.lint() {
     checks_csv="$(IFS=','; printf '%s' "${checks[*]}")"
 
     local result=0
-    quality.run "${BRIK_WORKSPACE}" --checks "$checks_csv" || result=$?
+    verify.run "${BRIK_WORKSPACE}" --checks "$checks_csv" || result=$?
 
     context.set_result "$context_file" "BRIK_LINT_STATUS" "$result"
 

@@ -19,7 +19,7 @@ _BRIK_BASE_WRAPPER_LOADED=1
 # ---------------------------------------------------------------------------
 
 # Ensure BRIK_EXIT_* constants are available.
-# Uses fallback values identical to lib/runtime/error.sh.
+# Uses fallback values identical to lib/pipeline/error.sh.
 # After bootstrap(), error.sh is sourced and the canonical values take over.
 _brik_wrapper_ensure_exit_codes() {
     : "${BRIK_EXIT_OK:=0}"
@@ -42,7 +42,7 @@ _brik_wrapper_ensure_exit_codes
 
 # Validates BRIK_HOME path and verifies runtime files exist.
 # Arguments: $1 = brik_home path
-# Exports: BRIK_HOME, _BRIK_RUNTIME_DIR, _BRIK_CORE_DIR
+# Exports: BRIK_HOME, _BRIK_PIPELINE_DIR, _BRIK_CORE_DIR
 # Returns: 0 on success, $BRIK_EXIT_INVALID_ENV on failure
 brik.wrapper.validate_home() {
     local brik_home="$1"
@@ -61,16 +61,16 @@ brik.wrapper.validate_home() {
     export BRIK_HOME="$brik_home"
 
     # Verify runtime files exist
-    export _BRIK_RUNTIME_DIR="${BRIK_HOME}/lib/runtime"
+    export _BRIK_PIPELINE_DIR="${BRIK_HOME}/lib/pipeline"
     export _BRIK_CORE_DIR="${BRIK_HOME}/lib/core"
 
-    if [[ ! -f "${_BRIK_RUNTIME_DIR}/stage.sh" ]]; then
-        echo "error: stage.sh not found at ${_BRIK_RUNTIME_DIR}/stage.sh" >&2
+    if [[ ! -f "${_BRIK_PIPELINE_DIR}/stage.sh" ]]; then
+        echo "error: stage.sh not found at ${_BRIK_PIPELINE_DIR}/stage.sh" >&2
         return "$BRIK_EXIT_INVALID_ENV"
     fi
 
-    if [[ ! -f "${_BRIK_CORE_DIR}/_loader.sh" ]]; then
-        echo "error: _loader.sh not found at ${_BRIK_CORE_DIR}/_loader.sh" >&2
+    if [[ ! -f "${_BRIK_PIPELINE_DIR}/loader.sh" ]]; then
+        echo "error: loader.sh not found at ${_BRIK_PIPELINE_DIR}/loader.sh" >&2
         return "$BRIK_EXIT_INVALID_ENV"
     fi
 }
@@ -87,24 +87,27 @@ brik.wrapper.set_standard_env() {
     export BRIK_CONFIG_FILE="${BRIK_CONFIG_FILE:-${BRIK_PROJECT_DIR}/brik.yml}"
     export BRIK_LOG_DIR="${BRIK_LOG_DIR:-${BRIK_DEFAULT_LOG_DIR:-/tmp/brik/logs/run-$(date +%s)-$$}}"
     export BRIK_LIB="${_BRIK_CORE_DIR}"
+    # Notion dirs (Phase 3 domain-driven layout) - populated progressively.
+    # Non-existent entries are harmless (loader tests existence before use).
+    export BRIK_LIB_EXTENSIONS="${BRIK_LIB_EXTENSIONS:-${BRIK_HOME}/lib/transverse:${BRIK_HOME}/lib/stacks:${BRIK_HOME}/lib/rollout:${BRIK_HOME}/lib/deployments:${BRIK_HOME}/lib/package-managers:${BRIK_HOME}/lib/stages:${BRIK_HOME}/lib}"
 }
 
 # ---------------------------------------------------------------------------
 # brik.wrapper.bootstrap -- source runtime, loader, config, stages
 # ---------------------------------------------------------------------------
 
-# Sources the runtime (stage.sh, _loader.sh), loads config and condition
+# Sources the pipeline runtime (stage.sh, loader.sh), loads config and condition
 # modules, and sources all portable stage files.
 # Precondition: BRIK_HOME set and validated via validate_home().
 brik.wrapper.bootstrap() {
     # shellcheck source=/dev/null
-    . "${_BRIK_RUNTIME_DIR}/stage.sh" || return "$BRIK_EXIT_IO_FAILURE"
+    . "${_BRIK_PIPELINE_DIR}/stage.sh" || return "$BRIK_EXIT_IO_FAILURE"
     # shellcheck source=/dev/null
-    . "${_BRIK_CORE_DIR}/_loader.sh" || return "$BRIK_EXIT_IO_FAILURE"
+    . "${_BRIK_PIPELINE_DIR}/loader.sh" || return "$BRIK_EXIT_IO_FAILURE"
 
     # Load portable config and condition modules
     brik.use config
-    brik.use condition
+    brik.use conditions
 
     # Source portable stage logic
     local stages_dir="${BRIK_HOME}/lib/stages"
@@ -139,7 +142,7 @@ brik.wrapper.load_config() {
         log.warn "some config exports failed, continuing with defaults"
     }
 
-    setup.prepare_env "${BRIK_BUILD_STACK:-}" || {
+    bootstrap.prepare_env "${BRIK_BUILD_STACK:-}" || {
         log.warn "runtime preparation failed, some stages may fail"
     }
 }

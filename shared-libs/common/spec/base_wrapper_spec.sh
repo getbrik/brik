@@ -21,8 +21,8 @@ Describe "base-wrapper.sh"
     Describe "with partial runtime"
       setup_partial() {
         _test_dir="$(mktemp -d)"
-        mkdir -p "${_test_dir}/lib/core"
-        touch "${_test_dir}/lib/core/_loader.sh"
+        mkdir -p "${_test_dir}/lib/pipeline"
+        touch "${_test_dir}/lib/pipeline/loader.sh"
       }
       cleanup_partial() { rm -rf "$_test_dir"; }
       Before 'setup_partial'
@@ -38,18 +38,17 @@ Describe "base-wrapper.sh"
     Describe "with runtime but no loader"
       setup_no_loader() {
         _test_dir="$(mktemp -d)"
-        mkdir -p "${_test_dir}/lib/runtime"
-        mkdir -p "${_test_dir}/lib/core"
-        touch "${_test_dir}/lib/runtime/stage.sh"
+        mkdir -p "${_test_dir}/lib/pipeline"
+        touch "${_test_dir}/lib/pipeline/stage.sh"
       }
       cleanup_no_loader() { rm -rf "$_test_dir"; }
       Before 'setup_no_loader'
       After 'cleanup_no_loader'
 
-      It "returns BRIK_EXIT_INVALID_ENV when _loader.sh is missing"
+      It "returns BRIK_EXIT_INVALID_ENV when loader.sh is missing"
         When call brik.wrapper.validate_home "$_test_dir"
         The status should equal 4
-        The error should include "_loader.sh not found"
+        The error should include "loader.sh not found"
       End
     End
 
@@ -67,13 +66,13 @@ Describe "base-wrapper.sh"
       The output should be present
     End
 
-    It "exports _BRIK_RUNTIME_DIR after validation"
-      check_runtime_dir() {
+    It "exports _BRIK_PIPELINE_DIR after validation"
+      check_pipeline_dir() {
         brik.wrapper.validate_home "$BRIK_HOME" 2>/dev/null
-        printf '%s' "$_BRIK_RUNTIME_DIR"
+        printf '%s' "$_BRIK_PIPELINE_DIR"
       }
-      When call check_runtime_dir
-      The output should include "lib/runtime"
+      When call check_pipeline_dir
+      The output should include "lib/pipeline"
     End
 
     It "exports _BRIK_CORE_DIR after validation"

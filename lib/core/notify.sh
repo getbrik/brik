@@ -112,7 +112,7 @@ notify.slack() {
         return 0
     fi
 
-    runtime.require_tool curl || return "$BRIK_EXIT_MISSING_DEP"
+    pipeline.require_tool curl || return "$BRIK_EXIT_MISSING_DEP"
 
     curl --silent --max-time 10 --connect-timeout 5 \
         -H "Content-Type: application/json" \
@@ -221,7 +221,7 @@ notify.webhook() {
         return 0
     fi
 
-    runtime.require_tool curl || return "$BRIK_EXIT_MISSING_DEP"
+    pipeline.require_tool curl || return "$BRIK_EXIT_MISSING_DEP"
 
     curl --silent --max-time 10 --connect-timeout 5 \
         -H "Content-Type: application/json" \
