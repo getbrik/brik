@@ -1,8 +1,11 @@
-Describe "notify.sh"
+Describe "stages/notify.sh - internals"
   Include "$BRIK_PIPELINE_LIB/logging.sh"
   Include "$BRIK_PIPELINE_LIB/tools.sh"
-  Include "$BRIK_CORE_LIB/notify.sh"
+  Include "$BRIK_TRANSVERSE_LIB/env.sh"
+  Include "$BRIK_STAGES_LIB/notify.sh"
   Include "$BRIK_HOME/spec/support/mock_helper.sh"
+
+  brik.use() { :; }
 
   Describe "notify.send"
     It "returns 2 when no channel specified"

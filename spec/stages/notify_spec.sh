@@ -2,7 +2,6 @@ Describe "stages.notify"
   Include "$BRIK_HOME/lib/pipeline/stage.sh"
   Include "$BRIK_HOME/lib/pipeline/loader.sh"
   Include "$BRIK_HOME/lib/transverse/config.sh"
-  Include "$BRIK_HOME/lib/core/notify.sh"
   Include "$BRIK_HOME/lib/stages/notify.sh"
 
   setup_env() {
