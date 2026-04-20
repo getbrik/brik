@@ -1,41 +1,12 @@
 #!/usr/bin/env bash
 # @module build
-# @description Build dispatcher for brik-lib. Detects stack and delegates.
+# @description Build dispatcher for brik-lib. Delegates to stack-specific modules.
+#
+# Note: stacks.detect moved to lib/stacks/_detect.sh (brik.use stacks._detect).
 
 # Guard against double-sourcing
 [[ -n "${_BRIK_CORE_BUILD_LOADED:-}" ]] && return 0
 _BRIK_CORE_BUILD_LOADED=1
-
-# Detect the project stack based on marker files.
-# Prints the stack name on stdout. Returns 1 if not detected.
-stacks.detect() {
-    local workspace="$1"
-
-    if [[ -f "${workspace}/package.json" ]]; then
-        printf 'node'
-        return 0
-    fi
-    if [[ -f "${workspace}/pom.xml" || -f "${workspace}/build.gradle" || -f "${workspace}/build.gradle.kts" ]]; then
-        printf 'java'
-        return 0
-    fi
-    if [[ -f "${workspace}/requirements.txt" || -f "${workspace}/setup.py" || -f "${workspace}/pyproject.toml" ]]; then
-        printf 'python'
-        return 0
-    fi
-    if [[ -f "${workspace}/Cargo.toml" ]]; then
-        printf 'rust'
-        return 0
-    fi
-    # Check for .csproj or .sln files
-    if compgen -G "${workspace}/*.csproj" >/dev/null 2>&1 || compgen -G "${workspace}/*.sln" >/dev/null 2>&1; then
-        printf 'dotnet'
-        return 0
-    fi
-
-    log.error "cannot detect stack in workspace: $workspace"
-    return "$BRIK_EXIT_FAILURE"
-}
 
 # Run a build for the detected or specified stack.
 # Usage: build.run <workspace> [--stack <name>] [--config <path>]
@@ -56,6 +27,7 @@ build.run() {
 
     # Auto-detect stack if not specified
     if [[ -z "$stack" ]]; then
+        brik.use stacks._detect
         stack="$(stacks.detect "$workspace")" || return "$BRIK_EXIT_CONFIG_ERROR"
     fi
 

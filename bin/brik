@@ -247,7 +247,7 @@ cmd_init() {
     fi
 
     if [[ -z "${stack}" ]]; then
-        brik.use build
+        brik.use stacks._detect
         if ! stack="$(stacks.detect "${target_dir}" 2>/dev/null)"; then
             if [[ "${non_interactive}" == true ]]; then
                 brik_error "could not detect stack and --stack was not specified"
