@@ -100,14 +100,12 @@ _stages.release._prepare() {
         mv "$tmp" "$pkg" || return "$BRIK_EXIT_IO_FAILURE"
     fi
 
-    git add -A >/dev/null 2>&1 || {
-        log.error "git add failed"
-        return "$BRIK_EXIT_EXTERNAL_FAIL"
-    }
-    git commit -q -m "release: $version" || {
-        log.error "git commit failed"
-        return "$BRIK_EXIT_EXTERNAL_FAIL"
-    }
+    brik.use transverse.git
+    # --fail-if-empty preserves the pre-migration hard-fail semantics: a clean
+    # working tree at this point indicates a bug in the release prepare flow
+    # (changelog + version patch should have produced a diff), not an
+    # idempotent re-run.
+    transverse.git.commit_all "release: $version" --fail-if-empty || return "$BRIK_EXIT_EXTERNAL_FAIL"
 
     log.info "release prepared: $version"
     return 0

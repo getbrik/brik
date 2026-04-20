@@ -1,7 +1,12 @@
 Describe "changelog.sh"
   Include "$BRIK_PIPELINE_LIB/logging.sh"
   Include "$BRIK_PIPELINE_LIB/tools.sh"
+  Include "$BRIK_TRANSVERSE_LIB/git.sh"
   Include "$BRIK_TRANSVERSE_LIB/changelog.sh"
+
+  # Stub brik.use: transverse.git is already Included above, so the runtime
+  # loader call from changelog.generate becomes a no-op.
+  brik.use() { :; }
 
   Describe "changelog.generate"
     It "returns 2 for unknown option"

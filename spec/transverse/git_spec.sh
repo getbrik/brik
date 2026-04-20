@@ -3,6 +3,21 @@ Describe "git.sh"
   Include "$BRIK_PIPELINE_LIB/tools.sh"
   Include "$BRIK_TRANSVERSE_LIB/git.sh"
 
+  # Shared repo fixture for the enrich suite (commit_all / clone_shallow /
+  # push_branch / latest_tag / current_branch / short_sha).
+  setup_enrich_repo() {
+    GIT_DIR="$(mktemp -d)"
+    cd "$GIT_DIR" || return 1
+    git init -q -b main
+    git config user.name "test"
+    git config user.email "test@test.com"
+    printf 'hello\n' > file.txt
+    git add file.txt
+    git commit -q -m "initial commit"
+    unset BRIK_DRY_RUN
+  }
+  cleanup_enrich_repo() { rm -rf "$GIT_DIR"; cd /tmp || true; }
+
   Describe "git.tag"
     It "logs but does not execute in dry-run mode"
       When call git.tag "v1.0.0" --dry-run --message "release"
@@ -64,6 +79,248 @@ Describe "git.sh"
         The status should be success
         The stderr should include "tag created: v4.0.0"
       End
+    End
+  End
+
+  Describe "transverse.git.commit_all"
+    Before 'setup_enrich_repo'
+    After 'cleanup_enrich_repo'
+
+    It "stages all changes and commits with the given message"
+      run_commit() {
+        printf 'new\n' > added.txt
+        transverse.git.commit_all "add new file" 2>/dev/null
+        git log --oneline -1
+      }
+      When call run_commit
+      The status should be success
+      The output should include "add new file"
+    End
+
+    It "returns 0 and logs skip when there is nothing to commit"
+      run_commit_empty() {
+        transverse.git.commit_all "noop"
+      }
+      When call run_commit_empty
+      The status should be success
+      The stderr should include "no changes"
+    End
+
+    It "accepts -C <dir> to commit in a different directory"
+      run_commit_dir() {
+        local subrepo="$(mktemp -d)"
+        git -C "$subrepo" init -q -b main
+        git -C "$subrepo" config user.email "ci@brik.local"
+        git -C "$subrepo" config user.name "brik ci"
+        printf 'x\n' > "$subrepo/x.txt"
+        transverse.git.commit_all "x added" -C "$subrepo" 2>/dev/null
+        git -C "$subrepo" log --oneline -1
+        rm -rf "$subrepo"
+      }
+      When call run_commit_dir
+      The status should be success
+      The output should include "x added"
+    End
+
+    It "accepts --email and --name for committer identity"
+      run_commit_identity() {
+        local subrepo="$(mktemp -d)"
+        git -C "$subrepo" init -q -b main
+        printf 'y\n' > "$subrepo/y.txt"
+        transverse.git.commit_all "id-test" -C "$subrepo" \
+          --email "ci@noreply" --name "CI Bot" 2>/dev/null
+        git -C "$subrepo" log -1 --format='%an <%ae>'
+        rm -rf "$subrepo"
+      }
+      When call run_commit_identity
+      The status should be success
+      The output should include "CI Bot <ci@noreply>"
+    End
+  End
+
+  Describe "transverse.git.clone_shallow"
+    It "clones with depth 1 by default"
+      run_clone_default() {
+        local origin="$(mktemp -d)"
+        git -C "$origin" init -q -b main
+        git -C "$origin" config user.email ci@brik.local
+        git -C "$origin" config user.name ci
+        printf 'x\n' > "$origin/a.txt"
+        git -C "$origin" add a.txt
+        git -C "$origin" commit -q -m "a"
+        printf 'y\n' > "$origin/a.txt"
+        git -C "$origin" add a.txt
+        git -C "$origin" commit -q -m "b"
+        local dest="$(mktemp -d)"
+        rm -rf "$dest"
+        transverse.git.clone_shallow "file://$origin" "$dest" --branch main 2>/dev/null
+        git -C "$dest" log --oneline | wc -l | tr -d '[:space:]'
+        rm -rf "$origin" "$dest"
+      }
+      When call run_clone_default
+      The status should be success
+      The output should equal "1"
+    End
+
+    It "clones with --depth N when specified"
+      run_clone_depth() {
+        local origin="$(mktemp -d)"
+        git -C "$origin" init -q -b main
+        git -C "$origin" config user.email ci@brik.local
+        git -C "$origin" config user.name ci
+        for i in 1 2 3; do
+          printf '%s\n' "$i" > "$origin/a.txt"
+          git -C "$origin" add a.txt
+          git -C "$origin" commit -q -m "c$i"
+        done
+        local dest="$(mktemp -d)"
+        rm -rf "$dest"
+        transverse.git.clone_shallow "file://$origin" "$dest" --branch main --depth 2 2>/dev/null
+        git -C "$dest" log --oneline | wc -l | tr -d '[:space:]'
+        rm -rf "$origin" "$dest"
+      }
+      When call run_clone_depth
+      The status should be success
+      The output should equal "2"
+    End
+
+    It "returns non-zero on clone failure"
+      When call transverse.git.clone_shallow "/nonexistent/path" "/tmp/brik-csh-$$" --branch main
+      The status should not be success
+      The stderr should include "git clone failed"
+    End
+  End
+
+  Describe "transverse.git.push_branch"
+    setup_push_repo() {
+      REMOTE_DIR="$(mktemp -d)"
+      git -C "$REMOTE_DIR" init -q --bare -b main
+      setup_enrich_repo
+      git remote add origin "$REMOTE_DIR"
+      git push -q -u origin main
+    }
+    cleanup_push_repo() { rm -rf "$REMOTE_DIR"; cleanup_enrich_repo; }
+    Before 'setup_push_repo'
+    After 'cleanup_push_repo'
+
+    It "pushes current branch to origin"
+      run_push() {
+        printf 'more\n' >> file.txt
+        git add file.txt
+        git commit -q -m "more"
+        transverse.git.push_branch 2>/dev/null
+        git -C "$REMOTE_DIR" log --oneline -1
+      }
+      When call run_push
+      The status should be success
+      The output should include "more"
+    End
+
+    It "accepts -C <dir> to push from another directory"
+      run_push_dir() {
+        printf 'z\n' >> file.txt
+        git add file.txt
+        git commit -q -m "z added"
+        ( cd /tmp && transverse.git.push_branch -C "$GIT_DIR" 2>/dev/null )
+        git -C "$REMOTE_DIR" log --oneline -1
+      }
+      When call run_push_dir
+      The status should be success
+      The output should include "z added"
+    End
+
+    It "logs and does not push in --dry-run mode"
+      When call transverse.git.push_branch --dry-run
+      The status should be success
+      The stderr should include "[dry-run]"
+    End
+  End
+
+  Describe "transverse.git.latest_tag"
+    Before 'setup_enrich_repo'
+    After 'cleanup_enrich_repo'
+
+    It "returns the most recent annotated tag"
+      run_latest() {
+        git tag -a v1.0.0 -m "r1"
+        printf 'a\n' >> file.txt
+        git add file.txt
+        git commit -q -m "b"
+        git tag -a v2.0.0 -m "r2"
+        transverse.git.latest_tag
+      }
+      When call run_latest
+      The status should be success
+      The output should equal "v2.0.0"
+    End
+
+    It "returns the most recent tag matching --pattern"
+      run_latest_pattern() {
+        git tag v1.0.0
+        printf 'a\n' >> file.txt
+        git add file.txt
+        git commit -q -m "b"
+        git tag rc-5
+        printf 'b\n' >> file.txt
+        git add file.txt
+        git commit -q -m "c"
+        git tag v1.1.0
+        transverse.git.latest_tag --pattern "v*"
+      }
+      When call run_latest_pattern
+      The status should be success
+      The output should equal "v1.1.0"
+    End
+
+    It "returns non-zero when there are no tags"
+      When call transverse.git.latest_tag
+      The status should not be success
+    End
+  End
+
+  Describe "transverse.git.current_branch"
+    Before 'setup_enrich_repo'
+    After 'cleanup_enrich_repo'
+
+    It "returns the current branch name"
+      When call transverse.git.current_branch
+      The status should be success
+      The output should equal "main"
+    End
+
+    It "returns the new name after a checkout -b"
+      run_current() {
+        git checkout -q -b feature/x
+        transverse.git.current_branch
+      }
+      When call run_current
+      The status should be success
+      The output should equal "feature/x"
+    End
+  End
+
+  Describe "transverse.git.short_sha"
+    Before 'setup_enrich_repo'
+    After 'cleanup_enrich_repo'
+
+    It "returns the short SHA of HEAD by default"
+      run_short() {
+        transverse.git.short_sha
+      }
+      When call run_short
+      The status should be success
+      The length of output should equal 7
+    End
+
+    It "returns the short SHA of a given ref"
+      run_short_ref() {
+        local full_sha
+        full_sha="$(git rev-parse HEAD)"
+        transverse.git.short_sha "$full_sha"
+      }
+      When call run_short_ref
+      The status should be success
+      The length of output should equal 7
     End
   End
 

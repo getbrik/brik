@@ -69,8 +69,9 @@ version.current() {
             ;;
         git)
             pipeline.require_tool git || return "$BRIK_EXIT_MISSING_DEP"
+            brik.use transverse.git
             local tag
-            tag="$(git describe --tags --abbrev=0 2>/dev/null)" || {
+            tag="$(transverse.git.latest_tag)" || {
                 log.error "no git tags found"
                 return "$BRIK_EXIT_FAILURE"
             }
@@ -86,8 +87,9 @@ version.current() {
             fi
             # Fallback to git tag
             if command -v git >/dev/null 2>&1; then
+                brik.use transverse.git
                 local tag
-                tag="$(git describe --tags --abbrev=0 2>/dev/null)" || {
+                tag="$(transverse.git.latest_tag)" || {
                     log.error "cannot determine version"
                     return "$BRIK_EXIT_FAILURE"
                 }
