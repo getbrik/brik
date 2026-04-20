@@ -19,7 +19,12 @@ jobs:
         run: |
           shellcheck --severity=warning bin/brik
           shellcheck --severity=warning -x lib/pipeline/*.sh
-          shellcheck --severity=warning -x lib/core/*.sh lib/core/**/*.sh
+          shellcheck --severity=warning -x lib/transverse/*.sh lib/transverse/**/*.sh
+          shellcheck --severity=warning -x lib/stages/*.sh lib/stages/**/*.sh
+          shellcheck --severity=warning -x lib/stacks/*.sh
+          shellcheck --severity=warning -x lib/deployments/*.sh
+          shellcheck --severity=warning -x lib/package-managers/*.sh
+          shellcheck --severity=warning -x lib/cli/*.sh
           shellcheck --severity=warning -x shared-libs/jenkins/scripts/*.sh
           shellcheck --severity=warning -x shared-libs/gitlab/scripts/*.sh
 

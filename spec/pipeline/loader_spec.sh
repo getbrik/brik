@@ -58,8 +58,8 @@ Describe "loader.sh"
     Describe "project extension priority"
       setup_ext() {
         EXT_DIR="$(mktemp -d)"
-        mkdir -p "${EXT_DIR}/.brik/lib/core"
-        printf '# project override\n_TEST_PROJECT_OVERRIDE=1\n' > "${EXT_DIR}/.brik/lib/core/version.sh"
+        mkdir -p "${EXT_DIR}/.brik/lib"
+        printf '# project override\n_TEST_PROJECT_OVERRIDE=1\n' > "${EXT_DIR}/.brik/lib/version.sh"
         export BRIK_PROJECT_DIR="$EXT_DIR"
         # Reset guard to allow re-loading
         unset _BRIK_MODULE_VERSION_LOADED

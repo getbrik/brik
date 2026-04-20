@@ -62,7 +62,6 @@ brik.wrapper.validate_home() {
 
     # Verify runtime files exist
     export _BRIK_PIPELINE_DIR="${BRIK_HOME}/lib/pipeline"
-    export _BRIK_CORE_DIR="${BRIK_HOME}/lib/core"
 
     if [[ ! -f "${_BRIK_PIPELINE_DIR}/stage.sh" ]]; then
         echo "error: stage.sh not found at ${_BRIK_PIPELINE_DIR}/stage.sh" >&2
@@ -86,10 +85,12 @@ brik.wrapper.set_standard_env() {
     export BRIK_WORKSPACE="${BRIK_WORKSPACE:-${BRIK_PROJECT_DIR}}"
     export BRIK_CONFIG_FILE="${BRIK_CONFIG_FILE:-${BRIK_PROJECT_DIR}/brik.yml}"
     export BRIK_LOG_DIR="${BRIK_LOG_DIR:-${BRIK_DEFAULT_LOG_DIR:-/tmp/brik/logs/run-$(date +%s)-$$}}"
-    export BRIK_LIB="${_BRIK_CORE_DIR}"
-    # Notion dirs (Phase 3 domain-driven layout) - populated progressively.
-    # Non-existent entries are harmless (loader tests existence before use).
-    export BRIK_LIB_EXTENSIONS="${BRIK_LIB_EXTENSIONS:-${BRIK_HOME}/lib/transverse:${BRIK_HOME}/lib/stacks:${BRIK_HOME}/lib/rollout:${BRIK_HOME}/lib/deployments:${BRIK_HOME}/lib/package-managers:${BRIK_HOME}/lib/stages:${BRIK_HOME}/lib/cli:${BRIK_HOME}/lib}"
+    # BRIK_LIB is an optional escape hatch for user overrides (empty by default
+    # now that lib/core/ has been absorbed into the notion directories).
+    export BRIK_LIB="${BRIK_LIB:-}"
+    # Notion dirs (domain-driven layout). Non-existent entries are harmless
+    # (loader tests existence before use).
+    export BRIK_LIB_EXTENSIONS="${BRIK_LIB_EXTENSIONS:-${BRIK_HOME}/lib/pipeline:${BRIK_HOME}/lib/transverse:${BRIK_HOME}/lib/stacks:${BRIK_HOME}/lib/rollout:${BRIK_HOME}/lib/deployments:${BRIK_HOME}/lib/package-managers:${BRIK_HOME}/lib/stages:${BRIK_HOME}/lib/cli:${BRIK_HOME}/lib}"
 }
 
 # ---------------------------------------------------------------------------
