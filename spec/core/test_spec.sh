@@ -2,7 +2,6 @@ Describe "test.sh"
   Include "$BRIK_PIPELINE_LIB/logging.sh"
   Include "$BRIK_PIPELINE_LIB/tools.sh"
   Include "$BRIK_PIPELINE_LIB/loader.sh"
-  Include "$BRIK_CORE_LIB/build.sh"
   Include "$BRIK_CORE_LIB/test.sh"
   Include "$BRIK_HOME/spec/support/mock_helper.sh"
 

@@ -1,4 +1,6 @@
 Describe "stages.build"
+  Include "$BRIK_PIPELINE_LIB/logging.sh"
+  Include "$BRIK_PIPELINE_LIB/tools.sh"
   Include "$BRIK_HOME/lib/pipeline/stage.sh"
   Include "$BRIK_HOME/lib/pipeline/loader.sh"
   Include "$BRIK_HOME/lib/transverse/config.sh"
@@ -27,10 +29,10 @@ Describe "stages.build"
     The status should be success
   End
 
-  It "returns 0 when build.run succeeds"
+  It "returns 0 when the stack build fn succeeds"
     run_build_success() {
       brik.use() { :; }
-      build.run() { return 0; }
+      stacks.node.build() { return 0; }
       local ctx
       ctx="$(context.create "build")" 2>/dev/null || ctx="$(mktemp)"
       stages.build "$ctx" >/dev/null 2>&1
@@ -42,7 +44,7 @@ Describe "stages.build"
   It "sets BRIK_BUILD_STATUS to success on success"
     run_build_ctx_success() {
       brik.use() { :; }
-      build.run() { return 0; }
+      stacks.node.build() { return 0; }
       local ctx
       ctx="$(context.create "build")" 2>/dev/null || ctx="$(mktemp)"
       stages.build "$ctx" >/dev/null 2>&1
@@ -52,10 +54,10 @@ Describe "stages.build"
     The output should equal "success"
   End
 
-  It "returns non-zero when build.run fails"
+  It "returns non-zero when the stack build fn fails"
     run_build_failure() {
       brik.use() { :; }
-      build.run() { return 1; }
+      stacks.node.build() { return 1; }
       local ctx
       ctx="$(context.create "build")" 2>/dev/null || ctx="$(mktemp)"
       stages.build "$ctx" >/dev/null 2>&1
@@ -67,7 +69,7 @@ Describe "stages.build"
   It "sets BRIK_BUILD_STATUS to failed on failure"
     run_build_ctx_failure() {
       brik.use() { :; }
-      build.run() { return 1; }
+      stacks.node.build() { return 1; }
       local ctx
       ctx="$(context.create "build")" 2>/dev/null || ctx="$(mktemp)"
       stages.build "$ctx" >/dev/null 2>&1 || true
@@ -80,7 +82,7 @@ Describe "stages.build"
   It "logs stack name"
     run_build_log_stack() {
       brik.use() { :; }
-      build.run() { return 0; }
+      stacks.node.build() { return 0; }
       local ctx
       ctx="$(context.create "build")" 2>/dev/null || ctx="$(mktemp)"
       stages.build "$ctx"
@@ -92,7 +94,7 @@ Describe "stages.build"
   It "calls config.export_build_vars to export BRIK_BUILD_STACK"
     run_build_check_export() {
       brik.use() { :; }
-      build.run() { return 0; }
+      stacks.node.build() { return 0; }
       local ctx
       ctx="$(context.create "build")" 2>/dev/null || ctx="$(mktemp)"
       stages.build "$ctx" >/dev/null 2>&1
@@ -100,6 +102,40 @@ Describe "stages.build"
     }
     When call run_build_check_export
     The output should equal "node"
+  End
+
+  It "runs build.command override instead of the stack module"
+    run_build_override() {
+      cat > "$BRIK_CONFIG_FILE" <<'YAML'
+version: 1
+project:
+  name: test
+  stack: node
+build:
+  command: "printf 'override-ran'"
+YAML
+      config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
+      brik.use() { :; }
+      local ctx
+      ctx="$(context.create "build")" 2>/dev/null || ctx="$(mktemp)"
+      stages.build "$ctx" 2>/dev/null
+    }
+    When call run_build_override
+    The output should include "override-ran"
+  End
+
+  It "returns config error when stack module does not provide a build fn"
+    run_build_missing_fn() {
+      brik.use() { :; }
+      unset -f stacks.node.build 2>/dev/null
+      local ctx
+      ctx="$(context.create "build")" 2>/dev/null || ctx="$(mktemp)"
+      stages.build "$ctx" 2>/dev/null
+      local rc=$?
+      printf '%s' "$rc"
+    }
+    When call run_build_missing_fn
+    The output should equal "7"
   End
 
   Describe "with java stack"
@@ -118,7 +154,7 @@ YAML
       run_build_java() {
         local loaded_modules=""
         brik.use() { loaded_modules="${loaded_modules} $1"; }
-        build.run() { return 0; }
+        stacks.java.build() { return 0; }
         local ctx
         ctx="$(context.create "build")" 2>/dev/null || ctx="$(mktemp)"
         stages.build "$ctx" >/dev/null 2>&1

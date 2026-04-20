@@ -24,13 +24,12 @@ esac'
     Before 'setup'
     After 'cleanup'
 
-    brik.use build
     brik.use stacks.node
 
     build_logic() {
       local ctx="$1"
       local ws="${WORKSPACE}"
-      build.run "$ws" --stack node
+      stacks.node.build "$ws"
       return $?
     }
 
@@ -80,12 +79,11 @@ exit 1'
     Before 'setup_fail'
     After 'cleanup_fail'
 
-    brik.use build
     brik.use stacks.node
 
     failing_build_logic() {
       local ctx="$1"
-      build.run "$WORKSPACE" --stack node
+      stacks.node.build "$WORKSPACE"
       return $?
     }
 
