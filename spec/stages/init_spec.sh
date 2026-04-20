@@ -1,7 +1,7 @@
 Describe "stages.init"
-  Include "$BRIK_HOME/lib/runtime/stage.sh"
-  Include "$BRIK_HOME/lib/core/_loader.sh"
-  Include "$BRIK_HOME/lib/core/config.sh"
+  Include "$BRIK_HOME/lib/pipeline/stage.sh"
+  Include "$BRIK_HOME/lib/pipeline/loader.sh"
+  Include "$BRIK_HOME/lib/transverse/config.sh"
   Include "$BRIK_HOME/lib/stages/init.sh"
 
   setup_env() {
@@ -87,9 +87,9 @@ Describe "stages.init"
       BRIK_CONFIG_FILE="$(mktemp)"
       printf 'version: 1\nproject:\n  name: test-project\n  stack: auto\n' > "$BRIK_CONFIG_FILE"
       config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
-      # Mock build.detect_stack to return 'node'
+      # Mock stacks.detect to return 'node'
       brik.use() { :; }
-      build.detect_stack() { printf 'node'; return 0; }
+      stacks.detect() { printf 'node'; return 0; }
       local ctx
       ctx="$(context.create "init")" 2>/dev/null || ctx="$(mktemp)"
       stages.init "$ctx" 2>/dev/null

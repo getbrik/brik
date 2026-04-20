@@ -1,8 +1,8 @@
 Describe "stages.scan"
-  Include "$BRIK_HOME/lib/runtime/stage.sh"
-  Include "$BRIK_HOME/lib/core/_loader.sh"
-  Include "$BRIK_HOME/lib/core/config.sh"
-  Include "$BRIK_HOME/lib/core/security.sh"
+  Include "$BRIK_HOME/lib/pipeline/stage.sh"
+  Include "$BRIK_HOME/lib/pipeline/loader.sh"
+  Include "$BRIK_HOME/lib/transverse/config.sh"
+  Include "$BRIK_HOME/lib/stages/verify/scan/scan.sh"
   Include "$BRIK_HOME/lib/stages/scan.sh"
 
   setup_env() {
@@ -46,8 +46,8 @@ YAML
 
     It "defaults to osv-scanner and gitleaks and returns success"
       run_scan_defaults() {
-        security.deps.run() { return 0; }
-        security.secret_scan.run() { return 0; }
+        verify.scan.deps.run() { return 0; }
+        verify.scan.secret.run() { return 0; }
         local ctx
         ctx="$(context.create "scan")" 2>/dev/null || ctx="$(mktemp)"
         stages.scan "$ctx" >/dev/null 2>&1
@@ -75,8 +75,8 @@ YAML
 
     It "runs dependency scan and sets status to success"
       run_deps() {
-        security.deps.run() { return 0; }
-        security.secret_scan.run() { return 0; }
+        verify.scan.deps.run() { return 0; }
+        verify.scan.secret.run() { return 0; }
         local ctx
         ctx="$(context.create "scan")" 2>/dev/null || ctx="$(mktemp)"
         stages.scan "$ctx" >/dev/null 2>&1
@@ -88,8 +88,8 @@ YAML
 
     It "sets status to failed when deps scan fails"
       run_deps_fail() {
-        security.deps.run() { return 1; }
-        security.secret_scan.run() { return 0; }
+        verify.scan.deps.run() { return 1; }
+        verify.scan.secret.run() { return 0; }
         local ctx
         ctx="$(context.create "scan")" 2>/dev/null || ctx="$(mktemp)"
         stages.scan "$ctx" >/dev/null 2>&1 || true
@@ -117,8 +117,8 @@ YAML
 
     It "runs secret scan and sets status to success"
       run_secrets() {
-        security.deps.run() { return 0; }
-        security.secret_scan.run() { return 0; }
+        verify.scan.deps.run() { return 0; }
+        verify.scan.secret.run() { return 0; }
         local ctx
         ctx="$(context.create "scan")" 2>/dev/null || ctx="$(mktemp)"
         stages.scan "$ctx" >/dev/null 2>&1
@@ -130,8 +130,8 @@ YAML
 
     It "sets status to failed when secret scan fails"
       run_secrets_fail() {
-        security.deps.run() { return 0; }
-        security.secret_scan.run() { return 1; }
+        verify.scan.deps.run() { return 0; }
+        verify.scan.secret.run() { return 1; }
         local ctx
         ctx="$(context.create "scan")" 2>/dev/null || ctx="$(mktemp)"
         stages.scan "$ctx" >/dev/null 2>&1 || true
@@ -161,8 +161,8 @@ YAML
 
     It "runs both scans"
       run_both() {
-        security.deps.run() { return 0; }
-        security.secret_scan.run() { return 0; }
+        verify.scan.deps.run() { return 0; }
+        verify.scan.secret.run() { return 0; }
         local ctx
         ctx="$(context.create "scan")" 2>/dev/null || ctx="$(mktemp)"
         stages.scan "$ctx" >/dev/null 2>&1
@@ -174,8 +174,8 @@ YAML
 
     It "fails if any scan fails"
       run_both_fail() {
-        security.deps.run() { return 0; }
-        security.secret_scan.run() { return 1; }
+        verify.scan.deps.run() { return 0; }
+        verify.scan.secret.run() { return 1; }
         local ctx
         ctx="$(context.create "scan")" 2>/dev/null || ctx="$(mktemp)"
         stages.scan "$ctx" >/dev/null 2>&1 || true
@@ -187,9 +187,9 @@ YAML
   End
 End
 
-Describe "_brik.install_deps (scan mode)"
-  Include "$BRIK_HOME/lib/runtime/stage.sh"
-  Include "$BRIK_HOME/lib/core/_loader.sh"
+Describe "stacks.install_deps (scan mode)"
+  Include "$BRIK_HOME/lib/pipeline/stage.sh"
+  Include "$BRIK_HOME/lib/pipeline/loader.sh"
   Include "$BRIK_HOME/lib/stages/scan.sh"
   Include "$BRIK_HOME/spec/support/mock_helper.sh"
 
@@ -212,7 +212,7 @@ Describe "_brik.install_deps (scan mode)"
         export BRIK_BUILD_STACK="node"
         mock.create_logging "npm" "$MOCK_LOG"
         mock.activate
-        _brik.install_deps "$DEPS_WS" scan 2>/dev/null
+        stacks.install_deps "$DEPS_WS" scan 2>/dev/null
         grep -q "npm ci" "$MOCK_LOG"
       }
       When call run_node_install
@@ -225,7 +225,7 @@ Describe "_brik.install_deps (scan mode)"
         mkdir -p "${DEPS_WS}/node_modules"
         mock.create_exit "npm" 1
         mock.activate
-        _brik.install_deps "$DEPS_WS" scan 2>/dev/null
+        stacks.install_deps "$DEPS_WS" scan 2>/dev/null
       }
       When call run_node_skip
       The status should be success
@@ -239,7 +239,7 @@ Describe "_brik.install_deps (scan mode)"
         printf '[project]\nname = "test"\n' > "${DEPS_WS}/pyproject.toml"
         mock.create_logging "pip" "$MOCK_LOG"
         mock.activate
-        _brik.install_deps "$DEPS_WS" scan 2>/dev/null
+        stacks.install_deps "$DEPS_WS" scan 2>/dev/null
         grep -q 'pip install .' "$MOCK_LOG"
       }
       When call run_python_pyproject
@@ -253,7 +253,7 @@ Describe "_brik.install_deps (scan mode)"
         printf 'requests\n' > "${DEPS_WS}/requirements.txt"
         mock.create_logging "pip" "$MOCK_LOG"
         mock.activate
-        _brik.install_deps "$DEPS_WS" scan 2>/dev/null
+        stacks.install_deps "$DEPS_WS" scan 2>/dev/null
         grep -q 'pip install -r requirements.txt' "$MOCK_LOG"
       }
       When call run_python_req
@@ -265,7 +265,7 @@ Describe "_brik.install_deps (scan mode)"
         export BRIK_BUILD_STACK="python"
         rm -f "${DEPS_WS}/pyproject.toml" "${DEPS_WS}/requirements.txt"
         rm -f "$MOCK_LOG"
-        _brik.install_deps "$DEPS_WS" scan 2>/dev/null
+        stacks.install_deps "$DEPS_WS" scan 2>/dev/null
         [[ ! -f "$MOCK_LOG" ]]
       }
       When call run_python_noop
@@ -278,7 +278,7 @@ Describe "_brik.install_deps (scan mode)"
       run_unknown_stack() {
         export BRIK_BUILD_STACK="java"
         rm -f "$MOCK_LOG"
-        _brik.install_deps "$DEPS_WS" scan 2>/dev/null
+        stacks.install_deps "$DEPS_WS" scan 2>/dev/null
         [[ ! -f "$MOCK_LOG" ]]
       }
       When call run_unknown_stack
@@ -289,7 +289,7 @@ Describe "_brik.install_deps (scan mode)"
       run_empty_stack() {
         unset BRIK_BUILD_STACK
         rm -f "$MOCK_LOG"
-        _brik.install_deps "$DEPS_WS" scan 2>/dev/null
+        stacks.install_deps "$DEPS_WS" scan 2>/dev/null
         [[ ! -f "$MOCK_LOG" ]]
       }
       When call run_empty_stack

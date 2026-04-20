@@ -1,8 +1,8 @@
 Describe "stages.lint"
-  Include "$BRIK_HOME/lib/runtime/stage.sh"
-  Include "$BRIK_HOME/lib/core/_loader.sh"
-  Include "$BRIK_HOME/lib/core/config.sh"
-  Include "$BRIK_HOME/lib/core/quality.sh"
+  Include "$BRIK_HOME/lib/pipeline/stage.sh"
+  Include "$BRIK_HOME/lib/pipeline/loader.sh"
+  Include "$BRIK_HOME/lib/transverse/config.sh"
+  Include "$BRIK_HOME/lib/stages/verify/verify.sh"
   Include "$BRIK_HOME/lib/stages/lint.sh"
 
   setup_env() {
@@ -79,7 +79,7 @@ YAML
     It "runs lint check and sets status to success"
       run_lint() {
         brik.use() { :; }
-        quality.lint.run() { return 0; }
+        verify.lint.run() { return 0; }
         local ctx
         ctx="$(context.create "lint")" 2>/dev/null || ctx="$(mktemp)"
         stages.lint "$ctx" >/dev/null 2>&1
@@ -92,7 +92,7 @@ YAML
     It "sets status to failed when lint fails"
       run_lint_fail() {
         brik.use() { :; }
-        quality.lint.run() { return 1; }
+        verify.lint.run() { return 1; }
         local ctx
         ctx="$(context.create "lint")" 2>/dev/null || ctx="$(mktemp)"
         stages.lint "$ctx" >/dev/null 2>&1 || true
@@ -105,13 +105,13 @@ YAML
     It "logs lint checks being run"
       run_lint_log() {
         brik.use() { :; }
-        quality.lint.run() { return 0; }
+        verify.lint.run() { return 0; }
         local ctx
         ctx="$(context.create "lint")" 2>/dev/null || ctx="$(mktemp)"
         stages.lint "$ctx"
       }
       When call run_lint_log
-      The error should include "running quality check: lint"
+      The error should include "running verify check: lint"
     End
   End
 
@@ -171,7 +171,7 @@ YAML
     It "runs format check and sets status to success"
       run_format() {
         brik.use() { :; }
-        quality.format.run() { return 0; }
+        verify.format.run() { return 0; }
         local ctx
         ctx="$(context.create "lint")" 2>/dev/null || ctx="$(mktemp)"
         stages.lint "$ctx" >/dev/null 2>&1
@@ -201,7 +201,7 @@ YAML
     It "runs type_check check"
       run_typecheck() {
         brik.use() { :; }
-        quality.type_check.run() { return 0; }
+        verify.type_check.run() { return 0; }
         local ctx
         ctx="$(context.create "lint")" 2>/dev/null || ctx="$(mktemp)"
         stages.lint "$ctx" >/dev/null 2>&1
@@ -233,8 +233,8 @@ YAML
     It "runs all configured checks"
       run_multi() {
         brik.use() { :; }
-        quality.lint.run() { return 0; }
-        quality.format.run() { return 0; }
+        verify.lint.run() { return 0; }
+        verify.format.run() { return 0; }
         local ctx
         ctx="$(context.create "lint")" 2>/dev/null || ctx="$(mktemp)"
         stages.lint "$ctx" >/dev/null 2>&1
@@ -247,8 +247,8 @@ YAML
     It "fails if any check fails"
       run_multi_fail() {
         brik.use() { :; }
-        quality.lint.run() { return 0; }
-        quality.format.run() { return 1; }
+        verify.lint.run() { return 0; }
+        verify.format.run() { return 1; }
         local ctx
         ctx="$(context.create "lint")" 2>/dev/null || ctx="$(mktemp)"
         stages.lint "$ctx" >/dev/null 2>&1 || true
@@ -260,9 +260,9 @@ YAML
   End
 End
 
-Describe "_brik.install_deps (dev mode)"
-  Include "$BRIK_HOME/lib/runtime/stage.sh"
-  Include "$BRIK_HOME/lib/core/_loader.sh"
+Describe "stacks.install_deps (dev mode)"
+  Include "$BRIK_HOME/lib/pipeline/stage.sh"
+  Include "$BRIK_HOME/lib/pipeline/loader.sh"
   Include "$BRIK_HOME/lib/stages/lint.sh"
   Include "$BRIK_HOME/spec/support/mock_helper.sh"
 
@@ -285,7 +285,7 @@ Describe "_brik.install_deps (dev mode)"
         export BRIK_BUILD_STACK="node"
         mock.create_logging "npm" "$MOCK_LOG"
         mock.activate
-        _brik.install_deps "$DEPS_WS" dev 2>/dev/null
+        stacks.install_deps "$DEPS_WS" dev 2>/dev/null
         grep -q "npm ci" "$MOCK_LOG"
       }
       When call run_node_install
@@ -298,7 +298,7 @@ Describe "_brik.install_deps (dev mode)"
         mkdir -p "${DEPS_WS}/node_modules"
         mock.create_exit "npm" 1
         mock.activate
-        _brik.install_deps "$DEPS_WS" dev 2>/dev/null
+        stacks.install_deps "$DEPS_WS" dev 2>/dev/null
       }
       When call run_node_skip
       The status should be success
@@ -312,7 +312,7 @@ Describe "_brik.install_deps (dev mode)"
         printf '[project]\nname = "test"\n' > "${DEPS_WS}/pyproject.toml"
         mock.create_logging "pip" "$MOCK_LOG"
         mock.activate
-        _brik.install_deps "$DEPS_WS" dev 2>/dev/null
+        stacks.install_deps "$DEPS_WS" dev 2>/dev/null
         grep -q 'pip install -e' "$MOCK_LOG"
       }
       When call run_python_pyproject
@@ -326,7 +326,7 @@ Describe "_brik.install_deps (dev mode)"
         printf 'pytest\n' > "${DEPS_WS}/requirements-dev.txt"
         mock.create_logging "pip" "$MOCK_LOG"
         mock.activate
-        _brik.install_deps "$DEPS_WS" dev 2>/dev/null
+        stacks.install_deps "$DEPS_WS" dev 2>/dev/null
         grep -q 'pip install -r requirements-dev.txt' "$MOCK_LOG"
       }
       When call run_python_reqdev
@@ -338,7 +338,7 @@ Describe "_brik.install_deps (dev mode)"
         export BRIK_BUILD_STACK="python"
         rm -f "${DEPS_WS}/pyproject.toml" "${DEPS_WS}/requirements-dev.txt"
         rm -f "$MOCK_LOG"
-        _brik.install_deps "$DEPS_WS" dev 2>/dev/null
+        stacks.install_deps "$DEPS_WS" dev 2>/dev/null
         [[ ! -f "$MOCK_LOG" ]]
       }
       When call run_python_noop
@@ -352,7 +352,7 @@ Describe "_brik.install_deps (dev mode)"
         export BRIK_BUILD_STACK="rust"
         mock.create_logging "rustup" "$MOCK_LOG"
         export PATH="${MOCK_BIN}:/usr/bin:/bin"
-        _brik.install_deps "$DEPS_WS" dev 2>/dev/null
+        stacks.install_deps "$DEPS_WS" dev 2>/dev/null
         grep -q "rustup component add clippy" "$MOCK_LOG"
       }
       When call run_rust_clippy
@@ -364,7 +364,7 @@ Describe "_brik.install_deps (dev mode)"
         export BRIK_BUILD_STACK="rust"
         mock.create_logging "rustup" "$MOCK_LOG"
         export PATH="${MOCK_BIN}:/usr/bin:/bin"
-        _brik.install_deps "$DEPS_WS" dev 2>/dev/null
+        stacks.install_deps "$DEPS_WS" dev 2>/dev/null
         grep -q "rustup component add rustfmt" "$MOCK_LOG"
       }
       When call run_rust_rustfmt
@@ -376,7 +376,7 @@ Describe "_brik.install_deps (dev mode)"
         export BRIK_BUILD_STACK="rust"
         rm -f "$MOCK_LOG"
         export PATH="${MOCK_BIN}:/usr/bin:/bin"
-        _brik.install_deps "$DEPS_WS" dev 2>/dev/null
+        stacks.install_deps "$DEPS_WS" dev 2>/dev/null
         [[ ! -f "$MOCK_LOG" ]]
       }
       When call run_rust_no_rustup
@@ -389,7 +389,7 @@ Describe "_brik.install_deps (dev mode)"
       run_unknown_stack() {
         export BRIK_BUILD_STACK="go"
         rm -f "$MOCK_LOG"
-        _brik.install_deps "$DEPS_WS" dev 2>/dev/null
+        stacks.install_deps "$DEPS_WS" dev 2>/dev/null
         [[ ! -f "$MOCK_LOG" ]]
       }
       When call run_unknown_stack
@@ -400,7 +400,7 @@ Describe "_brik.install_deps (dev mode)"
       run_empty_stack() {
         unset BRIK_BUILD_STACK
         rm -f "$MOCK_LOG"
-        _brik.install_deps "$DEPS_WS" dev 2>/dev/null
+        stacks.install_deps "$DEPS_WS" dev 2>/dev/null
         [[ ! -f "$MOCK_LOG" ]]
       }
       When call run_empty_stack

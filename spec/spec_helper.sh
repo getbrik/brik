@@ -27,8 +27,17 @@ spec_helper_loaded() {
   export EXAMPLES="${BRIK_HOME}/examples"
 
   # Runtime and core library paths
-  export BRIK_RUNTIME_LIB="${BRIK_HOME}/lib/runtime"
+  export BRIK_PIPELINE_LIB="${BRIK_HOME}/lib/pipeline"
   export BRIK_CORE_LIB="${BRIK_HOME}/lib/core"
+  export BRIK_TRANSVERSE_LIB="${BRIK_HOME}/lib/transverse"
+  export BRIK_STACKS_LIB="${BRIK_HOME}/lib/stacks"
+  export BRIK_ROLLOUT_LIB="${BRIK_HOME}/lib/rollout"
+  export BRIK_DEPLOYMENTS_LIB="${BRIK_HOME}/lib/deployments"
+  export BRIK_PACKAGE_MANAGERS_LIB="${BRIK_HOME}/lib/package-managers"
+  export BRIK_STAGES_LIB="${BRIK_HOME}/lib/stages"
+  # Notion dirs as loader extensions (non-existent entries are harmless).
+  export BRIK_LIB="${BRIK_CORE_LIB}"
+  export BRIK_LIB_EXTENSIONS="${BRIK_TRANSVERSE_LIB}:${BRIK_STACKS_LIB}:${BRIK_ROLLOUT_LIB}:${BRIK_DEPLOYMENTS_LIB}:${BRIK_PACKAGE_MANAGERS_LIB}:${BRIK_STAGES_LIB}:${BRIK_HOME}/lib"
   export WORKSPACES="${FIXTURES}/workspaces"
 }
 
@@ -38,5 +47,5 @@ spec_helper_configure() {
   BRIK_LOG_DIR="$(mktemp -d)"
 
   # Exit code constants - required by all modules using BRIK_EXIT_* returns
-  . "${BRIK_RUNTIME_LIB}/error.sh"
+  . "${BRIK_PIPELINE_LIB}/error.sh"
 }

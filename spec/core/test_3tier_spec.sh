@@ -1,6 +1,6 @@
 Describe "test.sh - 3-tier resolution"
-  Include "$BRIK_RUNTIME_LIB/logging.sh"
-  Include "$BRIK_RUNTIME_LIB/tools.sh"
+  Include "$BRIK_PIPELINE_LIB/logging.sh"
+  Include "$BRIK_PIPELINE_LIB/tools.sh"
   Include "$BRIK_CORE_LIB/test.sh"
 
   Describe "Tier 1: BRIK_TEST_COMMAND override"
@@ -26,32 +26,32 @@ Describe "test.sh - 3-tier resolution"
 
   Describe "extended framework mappings"
     It "maps vitest to node"
-      When call _test._stack_for_framework "vitest"
+      When call stacks.detect_from_framework "vitest"
       The output should equal "node"
     End
 
     It "maps mocha to node"
-      When call _test._stack_for_framework "mocha"
+      When call stacks.detect_from_framework "mocha"
       The output should equal "node"
     End
 
     It "maps unittest to python"
-      When call _test._stack_for_framework "unittest"
+      When call stacks.detect_from_framework "unittest"
       The output should equal "python"
     End
 
     It "maps tox to python"
-      When call _test._stack_for_framework "tox"
+      When call stacks.detect_from_framework "tox"
       The output should equal "python"
     End
 
     It "maps xunit to dotnet"
-      When call _test._stack_for_framework "xunit"
+      When call stacks.detect_from_framework "xunit"
       The output should equal "dotnet"
     End
 
     It "maps nunit to dotnet"
-      When call _test._stack_for_framework "nunit"
+      When call stacks.detect_from_framework "nunit"
       The output should equal "dotnet"
     End
   End

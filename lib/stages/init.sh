@@ -21,7 +21,7 @@ stages.init() {
 
     if [[ "$stack" == "auto" ]]; then
         brik.use build
-        stack="$(build.detect_stack "${BRIK_WORKSPACE}")" || {
+        stack="$(stacks.detect "${BRIK_WORKSPACE}")" || {
             log.warn "could not auto-detect stack, continuing without stack-specific defaults"
             stack="unknown"
         }

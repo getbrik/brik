@@ -55,7 +55,7 @@ _stages.release._prepare() {
         changelog_file="${BRIK_WORKSPACE:-.}/${changelog_file}"
     fi
 
-    runtime.require_tool git || return "$BRIK_EXIT_MISSING_DEP"
+    pipeline.require_tool git || return "$BRIK_EXIT_MISSING_DEP"
 
     if [[ "$dry_run" == "true" ]]; then
         [[ "$changelog_enabled" == "true" ]] && log.info "[dry-run] changelog.generate > $changelog_file"

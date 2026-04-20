@@ -1,7 +1,7 @@
 Describe "stages.package"
-  Include "$BRIK_HOME/lib/runtime/stage.sh"
-  Include "$BRIK_HOME/lib/core/_loader.sh"
-  Include "$BRIK_HOME/lib/core/config.sh"
+  Include "$BRIK_HOME/lib/pipeline/stage.sh"
+  Include "$BRIK_HOME/lib/pipeline/loader.sh"
+  Include "$BRIK_HOME/lib/transverse/config.sh"
   Include "$BRIK_HOME/lib/stages/package.sh"
 
   setup_env() {
@@ -59,10 +59,10 @@ YAML
     }
     Before 'setup_docker'
 
-    It "returns 0 when build.docker.run succeeds"
+    It "returns 0 when stacks.docker.build succeeds"
       run_package_success() {
         brik.use() { :; }
-        build.docker.run() { return 0; }
+        stacks.docker.build() { return 0; }
         local ctx
         ctx="$(context.create "package")" 2>/dev/null || ctx="$(mktemp)"
         stages.package "$ctx" >/dev/null 2>&1
@@ -74,7 +74,7 @@ YAML
     It "sets BRIK_PACKAGE_STATUS to success"
       run_package_ctx() {
         brik.use() { :; }
-        build.docker.run() { return 0; }
+        stacks.docker.build() { return 0; }
         local ctx
         ctx="$(context.create "package")" 2>/dev/null || ctx="$(mktemp)"
         stages.package "$ctx" >/dev/null 2>&1
@@ -87,7 +87,7 @@ YAML
     It "sets BRIK_PACKAGE_STATUS to failed when build fails"
       run_package_fail() {
         brik.use() { :; }
-        build.docker.run() { return 1; }
+        stacks.docker.build() { return 1; }
         local ctx
         ctx="$(context.create "package")" 2>/dev/null || ctx="$(mktemp)"
         stages.package "$ctx" >/dev/null 2>&1 || true
@@ -97,10 +97,10 @@ YAML
       The output should equal "failed"
     End
 
-    It "passes docker arguments to build.docker.run"
+    It "passes docker arguments to stacks.docker.build"
       run_package_args() {
         brik.use() { :; }
-        build.docker.run() { printf '%s ' "$@"; printf '\n'; return 0; }
+        stacks.docker.build() { printf '%s ' "$@"; printf '\n'; return 0; }
         local ctx
         ctx="$(context.create "package")" 2>/dev/null || ctx="$(mktemp)"
         stages.package "$ctx" 2>/dev/null
@@ -114,7 +114,7 @@ YAML
     It "logs docker image name"
       run_package_log() {
         brik.use() { :; }
-        build.docker.run() { return 0; }
+        stacks.docker.build() { return 0; }
         local ctx
         ctx="$(context.create "package")" 2>/dev/null || ctx="$(mktemp)"
         stages.package "$ctx"
@@ -145,7 +145,7 @@ YAML
     It "publishes docker image after build"
       run_publish_docker() {
         brik.use() { :; }
-        build.docker.run() { return 0; }
+        stacks.docker.build() { return 0; }
         local PUBLISH_CALLED=""
         publish.run() { PUBLISH_CALLED="$*"; return 0; }
         local ctx
@@ -160,7 +160,7 @@ YAML
     It "sets failed when docker publish fails"
       run_publish_docker_fail() {
         brik.use() { :; }
-        build.docker.run() { return 0; }
+        stacks.docker.build() { return 0; }
         publish.run() { return 1; }
         local ctx
         ctx="$(context.create "package")" 2>/dev/null || ctx="$(mktemp)"
@@ -193,7 +193,7 @@ YAML
     It "publishes npm package after build"
       run_publish_npm() {
         brik.use() { :; }
-        build.docker.run() { return 0; }
+        stacks.docker.build() { return 0; }
         local PUBLISH_CALLS=""
         publish.run() { PUBLISH_CALLS="${PUBLISH_CALLS}$* "; return 0; }
         local ctx
@@ -208,7 +208,7 @@ YAML
     It "sets failed when npm publish fails"
       run_publish_npm_fail() {
         brik.use() { :; }
-        build.docker.run() { return 0; }
+        stacks.docker.build() { return 0; }
         publish.run() {
           case "$*" in
             *docker*) return 0 ;;
@@ -248,7 +248,7 @@ YAML
     It "publishes maven artifact after build"
       run_publish_maven() {
         brik.use() { :; }
-        build.docker.run() { return 0; }
+        stacks.docker.build() { return 0; }
         local PUBLISH_CALLS=""
         publish.run() { PUBLISH_CALLS="${PUBLISH_CALLS}$* "; return 0; }
         local ctx
@@ -263,7 +263,7 @@ YAML
     It "sets failed when maven publish fails"
       run_publish_maven_fail() {
         brik.use() { :; }
-        build.docker.run() { return 0; }
+        stacks.docker.build() { return 0; }
         publish.run() {
           case "$*" in
             *docker*) return 0 ;;
@@ -302,7 +302,7 @@ YAML
     It "publishes pypi package after build"
       run_publish_pypi() {
         brik.use() { :; }
-        build.docker.run() { return 0; }
+        stacks.docker.build() { return 0; }
         local PUBLISH_CALLS=""
         publish.run() { PUBLISH_CALLS="${PUBLISH_CALLS}$* "; return 0; }
         local ctx
@@ -317,7 +317,7 @@ YAML
     It "sets failed when pypi publish fails"
       run_publish_pypi_fail() {
         brik.use() { :; }
-        build.docker.run() { return 0; }
+        stacks.docker.build() { return 0; }
         publish.run() {
           case "$*" in
             *docker*) return 0 ;;
@@ -355,7 +355,7 @@ YAML
     It "publishes cargo crate after build"
       run_publish_cargo() {
         brik.use() { :; }
-        build.docker.run() { return 0; }
+        stacks.docker.build() { return 0; }
         local PUBLISH_CALLS=""
         publish.run() { PUBLISH_CALLS="${PUBLISH_CALLS}$* "; return 0; }
         local ctx
@@ -370,7 +370,7 @@ YAML
     It "sets failed when cargo publish fails"
       run_publish_cargo_fail() {
         brik.use() { :; }
-        build.docker.run() { return 0; }
+        stacks.docker.build() { return 0; }
         publish.run() {
           case "$*" in
             *docker*) return 0 ;;
@@ -409,7 +409,7 @@ YAML
     It "publishes nuget package after build"
       run_publish_nuget() {
         brik.use() { :; }
-        build.docker.run() { return 0; }
+        stacks.docker.build() { return 0; }
         local PUBLISH_CALLS=""
         publish.run() { PUBLISH_CALLS="${PUBLISH_CALLS}$* "; return 0; }
         local ctx
@@ -424,7 +424,7 @@ YAML
     It "sets failed when nuget publish fails"
       run_publish_nuget_fail() {
         brik.use() { :; }
-        build.docker.run() { return 0; }
+        stacks.docker.build() { return 0; }
         publish.run() {
           case "$*" in
             *docker*) return 0 ;;
@@ -464,7 +464,7 @@ YAML
     It "publishes both docker and npm"
       run_publish_multi() {
         brik.use() { :; }
-        build.docker.run() { return 0; }
+        stacks.docker.build() { return 0; }
         local PUBLISH_CALLS=""
         publish.run() { PUBLISH_CALLS="${PUBLISH_CALLS}$* "; return 0; }
         local ctx
@@ -480,7 +480,7 @@ YAML
     It "stops on first publish failure (fail-fast)"
       run_publish_failfast() {
         brik.use() { :; }
-        build.docker.run() { return 0; }
+        stacks.docker.build() { return 0; }
         local PUBLISH_CALLS=""
         publish.run() {
           PUBLISH_CALLS="${PUBLISH_CALLS}$* "

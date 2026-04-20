@@ -22,12 +22,12 @@ stages.container_scan() {
 
     local severity="${BRIK_SECURITY_CONTAINER_SEVERITY:-${BRIK_SECURITY_SEVERITY_THRESHOLD:-high}}"
 
-    if ! declare -f security.run >/dev/null 2>&1; then
-        brik.use "security"
+    if ! declare -f verify.scan.run >/dev/null 2>&1; then
+        brik.use verify.scan.scan
     fi
 
     local result=0
-    security.run "${BRIK_WORKSPACE}" --scans "container" --image "$image" --severity "$severity" || result=$?
+    verify.scan.run "${BRIK_WORKSPACE}" --scans "container" --image "$image" --severity "$severity" || result=$?
 
     context.set_result "$context_file" "BRIK_CONTAINER_SCAN_STATUS" "$result"
 

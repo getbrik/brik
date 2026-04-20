@@ -70,7 +70,7 @@ and invoke `stage.run`. No business logic is allowed in shared libraries.
 ### 5. module.function naming
 
 Public functions use a dotted namespace mirroring the module hierarchy:
-`build.node.run`, `test.node.cmd`, `quality.lint.run`, `deploy.k8s.run`, `config.get`.
+`stacks.node.build`, `stacks.node.test`, `verify.lint.run`, `deploy.k8s.run`, `config.get`.
 This makes functions self-documenting and avoids name collisions.
 
 ### 6. Test everything
@@ -94,22 +94,22 @@ validation runs on briklab (a real GitLab instance).
 ├─────────────────────────────────────────────────────────┤
 │  Layer 1 - brik-lib (Bash library)                      │
 │  Reusable CI/CD business functions                      │
-│  build.*, test.*, quality.*, security.*, deploy.*       │
+│  stacks.*, verify.*, deploy.*, pkg.*, rollout.*, transverse.*       │
 ├─────────────────────────────────────────────────────────┤
 │  Layer 0 - Bash Runtime (stage.run)                     │
 │  Lifecycle, logging, context, hooks, summary            │
 └─────────────────────────────────────────────────────────┘
 ```
 
-**Layer 0 -- Bash Runtime** (`lib/runtime/`).
+**Layer 0 -- Bash Runtime** (`lib/pipeline/`).
 The execution framework that wraps every stage. Provides `stage.run` (lifecycle
 engine), structured logging, execution context, pre/post hooks, error handling,
 and step summary generation. Knows nothing about CI/CD -- it only runs functions
 with observability.
 
-**Layer 1 -- brik-lib** (`lib/core/`).
-Reusable CI/CD business functions organized by domain: `build.node.run`, `build.java.run`,
-`test.run`, `quality.lint.run`, `quality.format.run`, `security.run`, etc.
+**Layer 1 -- brik-lib** (`lib/{stages,stacks,deployments,rollout,package-managers,transverse,core}/`).
+Reusable CI/CD business functions organized by domain: `stacks.node.build`, `stacks.java.build`,
+`verify.lint.run`, `verify.scan.run`, `pkg.npm.publish`, etc.
 Each function knows how to perform one CI/CD action for one stack or tool. Layer 1
 depends on Layer 0 for logging and context but has no knowledge of any CI platform.
 
@@ -166,7 +166,7 @@ On other platforms that support parallelism, the same pattern applies.
 ## Stage Lifecycle (`stage.run`)
 
 Every stage is executed through `stage.run`, which provides a consistent lifecycle.
-Source: `lib/runtime/stage.sh`.
+Source: `lib/pipeline/stage.sh`.
 
 ```
 stage.run("build", stages.build)
@@ -211,41 +211,52 @@ Key decisions:
 ```
 brik/
 ├─ bin/brik                        # CLI (validate, doctor, init, run, version)
-├─ runtime/bash/
-│  ├─ lib/
-│  │  ├─ runtime/                  # Layer 0 -- stage.run, logging, hooks, context, errors
-│  │  │  ├─ stage.sh               #   Lifecycle engine (stage.run)
-│  │  │  ├─ logging.sh             #   Structured logging (log.info, log.error, etc.)
-│  │  │  ├─ context.sh             #   Execution context (key-value store per stage)
-│  │  │  ├─ hooks.sh               #   Pre/post stage hooks
-│  │  │  ├─ error.sh               #   Exit codes and error handling
-│  │  │  ├─ summary.sh             #   Stage summary generation
-│  │  │  ├─ banner.sh              #   Stage banner display
-│  │  │  ├─ tools.sh               #   Tool requirement checks (runtime.require_tool)
-│  │  │  ├─ setup.sh               #   Prerequisite installation (yq, jq, stack tools)
-│  │  │  ├─ pipeline-env.sh        #   Pipeline environment propagation
-│  │  │  ├─ runner-images.sh       #   Runner image resolution
-│  │  │  └─ version-info.sh        #   Version and schema exports
-│  │  ├─ core/                     # Layer 1 -- brik-lib business functions
-│  │  │  ├─ build.sh + build/      #   Dispatchers + stack-specific (node, java, python, rust, dotnet, docker)
-│  │  │  ├─ test.sh  + test/       #   Test runners per stack (node, java, python, rust, dotnet)
-│  │  │  ├─ quality.sh + quality/  #   Lint, format, type_check
-│  │  │  ├─ security.sh + security/#  SAST, deps, secrets, license, IaC, container
-│  │  │  ├─ config.sh + config/    #   Config reader + per-stack defaults
-│  │  │  ├─ deploy.sh + deploy/    #   Deploy targets (k8s, helm, gitops, compose, ssh, argocd)
-│  │  │  │                         #   + strategy, health checks, profiles
-│  │  │  ├─ publish.sh + publish/  #   Registry publishing (npm, pypi, maven, cargo, nuget, docker)
-│  │  │  ├─ notify.sh              #   Notification dispatcher (slack, email, webhook)
-│  │  │  ├─ doctor.sh              #   Prerequisite checks per stack
-│  │  │  ├─ validate.sh            #   Config validation against JSON Schema
-│  │  │  ├─ changelog.sh           #   Changelog generation
-│  │  │  ├─ condition.sh           #   Deploy condition evaluation
-│  │  │  ├─ git.sh                 #   Git operations
-│  │  │  ├─ version.sh             #   Version parsing
-│  │  │  ├─ _loader.sh             #   Module loading (3-level resolution)
-│  │  │  └─ _deps.sh               #   Internal dependency declarations
-│  │  └─ stages/                   # 11 entry points (init, release, build, lint, sast, scan, ...)
-│  └─ spec/                        # ShellSpec tests (mirrors lib/ structure)
+├─ lib/                            # Domain-driven layout (Phase 3)
+│  ├─ pipeline/                    # Notion #6 -- execution engine (stage.run, loader, logging)
+│  │  ├─ stage.sh                  #   Lifecycle engine (stage.run)
+│  │  ├─ loader.sh                 #   Module loader (brik.use, 3-level resolution)
+│  │  ├─ logging.sh                #   Structured logging (log.info, log.error, etc.)
+│  │  ├─ context.sh                #   Execution context (key-value per stage)
+│  │  ├─ hooks.sh                  #   Pre/post stage hooks
+│  │  ├─ error.sh                  #   Exit codes and error handling
+│  │  ├─ summary.sh                #   Stage summary generation
+│  │  ├─ banner.sh                 #   Stage banner display
+│  │  ├─ tools.sh                  #   Tool requirement checks (pipeline.require_tool)
+│  │  ├─ bootstrap.sh              #   Prerequisite installation (yq, jq, stack tools)
+│  │  ├─ pipeline-env.sh           #   Pipeline environment propagation
+│  │  ├─ runner-images.sh          #   Runner image resolution
+│  │  └─ version-info.sh           #   Version and schema exports
+│  ├─ stages/                      # Notion #3 -- pipeline stages
+│  │  ├─ init.sh, release.sh, build.sh, test.sh, package.sh
+│  │  ├─ lint.sh, scan.sh, sast.sh, container_scan.sh
+│  │  ├─ deploy.sh, notify.sh
+│  │  └─ verify/                   # Quality + scan umbrella (N7)
+│  │     ├─ verify.sh              #   verify.run dispatcher
+│  │     ├─ format.sh, lint.sh, type_check.sh, _tools.sh
+│  │     └─ scan/                  #   Security scans
+│  │        ├─ scan.sh             #     verify.scan.run dispatcher
+│  │        ├─ container.sh, deps.sh, iac.sh, license.sh, sast.sh, secret.sh
+│  │        └─ _scan.sh
+│  ├─ stacks/                      # Notion #2 -- per-stack build+test+install_deps
+│  │  ├─ node.sh, python.sh, java.sh, rust.sh, dotnet.sh
+│  │  ├─ docker.sh                 #   stacks.docker.build (image build)
+│  │  └─ _deps.sh                  #   stacks.install_deps dispatcher
+│  ├─ transverse/                  # Notion #5 -- cross-cutting helpers
+│  │  ├─ git.sh, version.sh, changelog.sh, conditions.sh
+│  │  ├─ config.sh
+│  │  └─ config/                   #   Per-stack config (node, python, java, rust, dotnet)
+│  ├─ deployments/                 # Notion #4 -- deploy targets
+│  │  ├─ k8s.sh, helm.sh, compose.sh, ssh.sh
+│  │  ├─ gitops.sh, argocd.sh
+│  ├─ rollout/                     # Notion #8 -- rollout (health, strategy, profile)
+│  │  ├─ health.sh, strategy.sh, profile.sh
+│  │  └─ data/deploy-profiles/     #   trunk-based.yml, git-flow.yml, github-flow.yml
+│  ├─ package-managers/            # Notion #7 -- registry publishing
+│  │  ├─ npm.sh, pypi.sh, maven.sh, cargo.sh, nuget.sh, docker.sh
+│  └─ core/                        # Remaining dispatchers (inlining deferred Phase 4)
+│     ├─ build.sh, test.sh, deploy.sh, publish.sh
+│     ├─ doctor.sh, notify.sh, validate.sh
+├─ spec/                           # ShellSpec tests (mirrors lib/ structure)
 ├─ shared-libs/                    # Layer 2 -- platform adapters
 │  ├─ common/scripts/               #   Shared logic (base-wrapper.sh)
 │  ├─ gitlab/                      #   GitLab CI pipeline template
@@ -265,27 +276,27 @@ To add support for a new stack (e.g., `go`):
 1. **JSON Schema** -- add `go` to the `stack` enum in `schemas/config/v1/brik.schema.json`
    and define any stack-specific properties (e.g., `go_version`).
 
-2. **Build module** -- create `lib/core/build/go.sh` implementing
-   `build.go.run()` with the standard build logic for the stack.
+2. **Build module** -- create `lib/stacks/go.sh` implementing
+   `stacks.go.build()` with the standard build logic for the stack.
 
-3. **Test module** -- create `lib/core/test/go.sh` implementing
-   `test.go.cmd()` (returns the test command) and `test.go.run_cmd()` (executes it).
+3. **Test module** -- create `lib/stacks/go.sh` (same file, fused per stack) implementing
+   `stacks.go.test_cmd()` (returns the test command) and `stacks.go.test()` (executes it).
 
-4. **Config module** -- create `lib/core/config/go.sh` implementing
+4. **Config module** -- create `lib/transverse/config/go.sh` implementing
    `config.go.default()` (sensible defaults), `config.go.export_build_vars()` (export
    stack-specific build variables), and `config.go.validate_coherence()` (cross-field
    validation).
 
 5. **Dynamic dispatch** -- no manual wiring needed. Dispatchers like `core/build.sh`
-   and `core/test.sh` use `brik.use "build.${stack}"` to dynamically load the correct
-   module at runtime. The new `build/go.sh` is picked up automatically.
+   and `core/test.sh` use `brik.use "stacks.${stack}"` to dynamically load the correct
+   module at runtime. The new `lib/stacks/go.sh` is picked up automatically.
 
 6. **Doctor** -- add Go-specific prerequisite checks to `lib/core/doctor.sh`.
 
 7. **Example** -- create `examples/minimal-go/brik.yml` with a minimal config.
 
-8. **Tests** -- add ShellSpec tests for each new module under `spec/core/build/`,
-   `spec/core/test/`, and `spec/core/config/`.
+8. **Tests** -- add ShellSpec tests under `spec/stacks/go_spec.sh` and
+   `spec/transverse/config/go_spec.sh`.
 
 9. **Validate on briklab** -- push a Go test project to the briklab GitLab instance
    and verify the full pipeline executes correctly.

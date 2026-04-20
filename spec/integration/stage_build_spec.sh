@@ -1,6 +1,6 @@
 Describe "Integration: stage.run with build"
-  Include "$BRIK_RUNTIME_LIB/stage.sh"
-  Include "$BRIK_CORE_LIB/_loader.sh"
+  Include "$BRIK_PIPELINE_LIB/stage.sh"
+  Include "$BRIK_PIPELINE_LIB/loader.sh"
   Include "$BRIK_HOME/spec/support/mock_helper.sh"
 
   Describe "stage.run build with node workspace"
@@ -25,7 +25,7 @@ esac'
     After 'cleanup'
 
     brik.use build
-    brik.use build.node
+    brik.use stacks.node
 
     build_logic() {
       local ctx="$1"
@@ -81,7 +81,7 @@ exit 1'
     After 'cleanup_fail'
 
     brik.use build
-    brik.use build.node
+    brik.use stacks.node
 
     failing_build_logic() {
       local ctx="$1"

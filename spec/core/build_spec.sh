@@ -1,38 +1,38 @@
 Describe "build.sh"
-  Include "$BRIK_RUNTIME_LIB/logging.sh"
-  Include "$BRIK_RUNTIME_LIB/tools.sh"
-  Include "$BRIK_CORE_LIB/_loader.sh"
+  Include "$BRIK_PIPELINE_LIB/logging.sh"
+  Include "$BRIK_PIPELINE_LIB/tools.sh"
+  Include "$BRIK_PIPELINE_LIB/loader.sh"
   Include "$BRIK_CORE_LIB/build.sh"
   Include "$BRIK_HOME/spec/support/mock_helper.sh"
 
-  Describe "build.detect_stack"
+  Describe "stacks.detect"
     It "detects node from package.json"
-      When call build.detect_stack "$WORKSPACES/node-simple"
+      When call stacks.detect "$WORKSPACES/node-simple"
       The output should equal "node"
     End
 
     It "detects java from pom.xml"
-      When call build.detect_stack "$WORKSPACES/java-maven"
+      When call stacks.detect "$WORKSPACES/java-maven"
       The output should equal "java"
     End
 
     It "detects python from pyproject.toml"
-      When call build.detect_stack "$WORKSPACES/python-simple"
+      When call stacks.detect "$WORKSPACES/python-simple"
       The output should equal "python"
     End
 
     It "detects rust from Cargo.toml"
-      When call build.detect_stack "$WORKSPACES/rust-simple"
+      When call stacks.detect "$WORKSPACES/rust-simple"
       The output should equal "rust"
     End
 
     It "detects dotnet from .csproj file"
-      When call build.detect_stack "$WORKSPACES/dotnet-simple"
+      When call stacks.detect "$WORKSPACES/dotnet-simple"
       The output should equal "dotnet"
     End
 
     It "returns 1 for unknown workspace"
-      When call build.detect_stack "$WORKSPACES/unknown"
+      When call stacks.detect "$WORKSPACES/unknown"
       The status should equal 1
       The stderr should include "cannot detect stack"
     End

@@ -1,15 +1,15 @@
 Describe "Integration: Quality and Security stages"
-  Include "$BRIK_RUNTIME_LIB/logging.sh"
-  Include "$BRIK_RUNTIME_LIB/tools.sh"
-  Include "$BRIK_CORE_LIB/quality/_tools.sh"
-  Include "$BRIK_CORE_LIB/_loader.sh"
-  Include "$BRIK_CORE_LIB/quality.sh"
-  Include "$BRIK_CORE_LIB/quality/lint.sh"
-  Include "$BRIK_CORE_LIB/quality/format.sh"
-  Include "$BRIK_CORE_LIB/security.sh"
+  Include "$BRIK_PIPELINE_LIB/logging.sh"
+  Include "$BRIK_PIPELINE_LIB/tools.sh"
+  Include "$BRIK_HOME/lib/stages/verify/_tools.sh"
+  Include "$BRIK_PIPELINE_LIB/loader.sh"
+  Include "$BRIK_HOME/lib/stages/verify/verify.sh"
+  Include "$BRIK_HOME/lib/stages/verify/lint.sh"
+  Include "$BRIK_HOME/lib/stages/verify/format.sh"
+  Include "$BRIK_HOME/lib/stages/verify/scan/scan.sh"
   Include "$BRIK_HOME/spec/support/mock_helper.sh"
 
-  Describe "quality.run with multiple real sub-modules"
+  Describe "verify.run with multiple real sub-modules"
     Describe "lint and format pass"
       setup_pass() {
         mock.setup
@@ -19,27 +19,27 @@ Describe "Integration: Quality and Security stages"
         printf 'export default [];\n' > "${TEST_WS}/eslint.config.js"
         mock.create_logging "npx" "$MOCK_NPX_LOG"
         mock.activate
-        eval "_BRIK_MODULE_QUALITY_LINT_LOADED=1"
-        eval "_BRIK_MODULE_QUALITY_FORMAT_LOADED=1"
-        export _BRIK_MODULE_QUALITY_LINT_LOADED _BRIK_MODULE_QUALITY_FORMAT_LOADED
+        eval "_BRIK_MODULE_VERIFY_LINT_LOADED=1"
+        eval "_BRIK_MODULE_VERIFY_FORMAT_LOADED=1"
+        export _BRIK_MODULE_VERIFY_LINT_LOADED _BRIK_MODULE_VERIFY_FORMAT_LOADED
       }
       cleanup_pass() {
         mock.cleanup
-        unset _BRIK_MODULE_QUALITY_LINT_LOADED _BRIK_MODULE_QUALITY_FORMAT_LOADED
+        unset _BRIK_MODULE_VERIFY_LINT_LOADED _BRIK_MODULE_VERIFY_FORMAT_LOADED
         rm -rf "$TEST_WS"
       }
       Before 'setup_pass'
       After 'cleanup_pass'
 
       It "runs lint and format checks successfully"
-        When call quality.run "$TEST_WS" --checks "lint,format"
+        When call verify.run "$TEST_WS" --checks "lint,format"
         The status should be success
         The stderr should include "2/2 passed"
       End
 
       It "actually invokes the real sub-module functions"
         invoke_check_logs() {
-          quality.run "$TEST_WS" --checks "lint,format" 2>/dev/null || return 1
+          verify.run "$TEST_WS" --checks "lint,format" 2>/dev/null || return 1
           [[ -f "$MOCK_NPX_LOG" ]]
         }
         When call invoke_check_logs
@@ -55,27 +55,27 @@ Describe "Integration: Quality and Security stages"
         printf 'export default [];\n' > "${TEST_WS}/eslint.config.js"
         mock.create_exit "npx" 1
         mock.activate
-        eval "_BRIK_MODULE_QUALITY_LINT_LOADED=1"
-        eval "_BRIK_MODULE_QUALITY_FORMAT_LOADED=1"
-        export _BRIK_MODULE_QUALITY_LINT_LOADED _BRIK_MODULE_QUALITY_FORMAT_LOADED
+        eval "_BRIK_MODULE_VERIFY_LINT_LOADED=1"
+        eval "_BRIK_MODULE_VERIFY_FORMAT_LOADED=1"
+        export _BRIK_MODULE_VERIFY_LINT_LOADED _BRIK_MODULE_VERIFY_FORMAT_LOADED
       }
       cleanup_mixed() {
         mock.cleanup
-        unset _BRIK_MODULE_QUALITY_LINT_LOADED _BRIK_MODULE_QUALITY_FORMAT_LOADED
+        unset _BRIK_MODULE_VERIFY_LINT_LOADED _BRIK_MODULE_VERIFY_FORMAT_LOADED
         rm -rf "$TEST_WS"
       }
       Before 'setup_mixed'
       After 'cleanup_mixed'
 
       It "returns 10 when any check fails"
-        When call quality.run "$TEST_WS" --checks "lint,format"
+        When call verify.run "$TEST_WS" --checks "lint,format"
         The status should equal 10
-        The stderr should include "quality check failed"
+        The stderr should include "verify check failed"
       End
     End
   End
 
-  Describe "security.run composing security sub-modules"
+  Describe "verify.scan.run composing security sub-modules"
     Describe "with mocked tools"
       setup_security() {
         mock.setup
@@ -95,14 +95,14 @@ Describe "Integration: Quality and Security stages"
       After 'cleanup_security'
 
       It "runs dependency and secret scans via security modules"
-        When call security.run "$TEST_WS"
+        When call verify.scan.run "$TEST_WS"
         The status should be success
         The stderr should include "2/2 scans passed"
       End
 
       It "secret scan invokes gitleaks"
         invoke_check_gitleaks() {
-          security.run "$TEST_WS" 2>/dev/null || return 1
+          verify.scan.run "$TEST_WS" 2>/dev/null || return 1
           grep -q "^gitleaks detect" "$MOCK_GITLEAKS_LOG"
         }
         When call invoke_check_gitleaks
@@ -128,7 +128,7 @@ Describe "Integration: Quality and Security stages"
       After 'cleanup_container'
 
       It "runs all three scans including container"
-        When call security.run "$TEST_WS" --scans "deps,secret,container" --image "myapp:1.0"
+        When call verify.scan.run "$TEST_WS" --scans "deps,secret,container" --image "myapp:1.0"
         The status should be success
         The stderr should include "3/3 scans passed"
       End

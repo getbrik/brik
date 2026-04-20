@@ -1,8 +1,8 @@
 Describe "stages.deploy - workflow and new target fields"
-  Include "$BRIK_HOME/lib/runtime/stage.sh"
-  Include "$BRIK_HOME/lib/core/_loader.sh"
-  Include "$BRIK_HOME/lib/core/config.sh"
-  Include "$BRIK_HOME/lib/core/condition.sh"
+  Include "$BRIK_HOME/lib/pipeline/stage.sh"
+  Include "$BRIK_HOME/lib/pipeline/loader.sh"
+  Include "$BRIK_HOME/lib/transverse/config.sh"
+  Include "$BRIK_HOME/lib/transverse/conditions.sh"
   Include "$BRIK_HOME/lib/stages/deploy.sh"
 
   setup_env() {

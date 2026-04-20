@@ -60,7 +60,7 @@ def call(Map params = [:]) {
                     libs_dir="${WORKSPACE}@libs"
                     if [ -d "$libs_dir" ]; then
                         for d in "$libs_dir"/*/; do
-                            if [ -d "${d}runtime" ]; then
+                            if [ -d "${d}lib" ]; then
                                 printf '%s' "${d%/}"
                                 exit 0
                             fi
@@ -84,7 +84,7 @@ def call(Map params = [:]) {
                 if (useDocker) {
                     resolvedImage = sh(
                         script: """#!/bin/bash
-                            . "${brikHome}/lib/runtime/runner-images.sh"
+                            . "${brikHome}/lib/pipeline/runner-images.sh"
                             STACK=\$(yq '.project.stack // "auto"' brik.yml 2>/dev/null || echo "auto")
                             VERSION=\$(yq '.project.stack_version // ""' brik.yml 2>/dev/null || echo "")
                             runner.resolve_image "\$STACK" "\$VERSION" 2>/dev/null || echo ""

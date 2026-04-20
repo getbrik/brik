@@ -1,5 +1,5 @@
 Describe "config.sh - deploy workflow integration"
-  Include "$BRIK_HOME/lib/core/config.sh"
+  Include "$BRIK_HOME/lib/transverse/config.sh"
 
   # =========================================================================
   # config.stage_enabled - deploy with workflow

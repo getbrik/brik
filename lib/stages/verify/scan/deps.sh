@@ -1,0 +1,78 @@
+#!/usr/bin/env bash
+# @module verify.scan.deps
+# @uses verify._tools verify._scan
+# @description Security-focused dependency vulnerability scanning.
+
+# Guard against double-sourcing
+[[ -n "${_BRIK_VERIFY_SCAN_DEPS_LOADED:-}" ]] && return 0
+_BRIK_VERIFY_SCAN_DEPS_LOADED=1
+
+# Load tool registry and common scan helper
+brik.use verify._tools
+brik.use verify.scan._scan
+
+# Register security dependency scanners (sec_ prefix avoids collision with quality.deps)
+verify.tool.register sec_deps osv-scanner osv-scanner "osv-scanner scan --format table ." 10
+verify.tool.register sec_deps grype       grype       "grype dir:{workspace}"              20
+
+# Run security dependency scan on a workspace.
+# Usage: verify.scan.deps.run <workspace> [--severity <threshold>]
+verify.scan.deps.run() {
+    local workspace="$1"
+    shift
+    local severity="high"
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --severity) severity="$2"; shift 2 ;;
+            *) shift ;;
+        esac
+    done
+
+    pipeline.require_dir "$workspace" || return "$BRIK_EXIT_IO_FAILURE"
+
+    # Tier 1: BRIK_SECURITY_DEPS_COMMAND
+    if [[ -n "${BRIK_SECURITY_DEPS_COMMAND:-}" ]]; then
+        log.info "security dependency scan (command override): $BRIK_SECURITY_DEPS_COMMAND"
+        (cd "$workspace" && eval "$BRIK_SECURITY_DEPS_COMMAND") || {
+            log.error "security dependency vulnerabilities found"
+            return "$BRIK_EXIT_CHECK_FAILED"
+        }
+        log.info "security dependency scan passed"
+        return 0
+    fi
+
+    # Tier 2+3: resolve via tool registry
+    local tool="${BRIK_SECURITY_DEPS_TOOL:-}"
+    local resolve_args=(sec_deps)
+    [[ -n "$tool" ]] && resolve_args+=(--tool "$tool")
+
+    local resolved rc=0
+    resolved="$(verify.tool.resolve "${resolve_args[@]}")" || rc=$?
+    if [[ "$rc" -ne 0 ]]; then
+        if [[ $rc -eq 3 ]]; then
+            log.error "security dependency scan tool not found: $tool"
+            return "$BRIK_EXIT_MISSING_DEP"
+        elif [[ $rc -eq 7 ]]; then
+            log.error "unknown security dependency scan tool: $tool"
+            return "$BRIK_EXIT_CONFIG_ERROR"
+        fi
+        log.warn "no security dependency scanner available - skipping"
+        return 0
+    fi
+
+    log.info "security dependency scan with $resolved"
+    local scan_output=""
+    scan_output="$(cd "$workspace" && verify.tool.exec sec_deps "$resolved" \
+        workspace="$workspace" severity="${severity^^}" 2>&1)" || {
+        # osv-scanner returns non-zero when no package sources found
+        if echo "$scan_output" | grep -qi "no package sources found"; then
+            log.warn "no package sources found for $resolved - skipping"
+            return 0
+        fi
+        log.error "security dependency vulnerabilities found"
+        return "$BRIK_EXIT_CHECK_FAILED"
+    }
+    log.info "security dependency scan passed"
+    return 0
+}

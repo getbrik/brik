@@ -18,10 +18,10 @@ validate.run() {
     local json_output=""
     local validation_output=""
 
-    runtime.require_file "$config_path" || return "$?"
-    runtime.require_file "$schema_path" || return "$?"
-    runtime.require_tool "yq" || return "$?"
-    runtime.require_tool "check-jsonschema" || return "$?"
+    pipeline.require_file "$config_path" || return "$?"
+    pipeline.require_file "$schema_path" || return "$?"
+    pipeline.require_tool "yq" || return "$?"
+    pipeline.require_tool "check-jsonschema" || return "$?"
 
     if ! json_output="$(yq -o json "$config_path" 2>&1)"; then
         log.error "failed to parse $config_path as YAML"

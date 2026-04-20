@@ -8,7 +8,7 @@ _BRIK_CORE_BUILD_LOADED=1
 
 # Detect the project stack based on marker files.
 # Prints the stack name on stdout. Returns 1 if not detected.
-build.detect_stack() {
+stacks.detect() {
     local workspace="$1"
 
     if [[ -f "${workspace}/package.json" ]]; then
@@ -52,11 +52,11 @@ build.run() {
         esac
     done
 
-    runtime.require_dir "$workspace" || return "$BRIK_EXIT_IO_FAILURE"
+    pipeline.require_dir "$workspace" || return "$BRIK_EXIT_IO_FAILURE"
 
     # Auto-detect stack if not specified
     if [[ -z "$stack" ]]; then
-        stack="$(build.detect_stack "$workspace")" || return "$BRIK_EXIT_CONFIG_ERROR"
+        stack="$(stacks.detect "$workspace")" || return "$BRIK_EXIT_CONFIG_ERROR"
     fi
 
     log.info "building with stack: $stack"
@@ -69,12 +69,12 @@ build.run() {
     fi
 
     # Load and delegate to the stack-specific module
-    brik.use "build.${stack}" || {
+    brik.use "stacks.${stack}" || {
         log.error "unsupported build stack: $stack"
         return "$BRIK_EXIT_CONFIG_ERROR"
     }
 
-    local build_fn="build.${stack}.run"
+    local build_fn="stacks.${stack}.build"
     if ! declare -f "$build_fn" >/dev/null 2>&1; then
         log.error "build function not found: $build_fn"
         return "$BRIK_EXIT_CONFIG_ERROR"

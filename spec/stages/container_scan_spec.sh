@@ -1,10 +1,10 @@
 Describe "stages/container_scan.sh"
-  Include "$BRIK_RUNTIME_LIB/logging.sh"
-  Include "$BRIK_RUNTIME_LIB/tools.sh"
-  Include "$BRIK_RUNTIME_LIB/context.sh"
-  Include "$BRIK_CORE_LIB/_loader.sh"
-  Include "$BRIK_CORE_LIB/config.sh"
-  Include "$BRIK_CORE_LIB/security.sh"
+  Include "$BRIK_PIPELINE_LIB/logging.sh"
+  Include "$BRIK_PIPELINE_LIB/tools.sh"
+  Include "$BRIK_PIPELINE_LIB/context.sh"
+  Include "$BRIK_PIPELINE_LIB/loader.sh"
+  Include "$BRIK_TRANSVERSE_LIB/config.sh"
+  Include "$BRIK_HOME/lib/stages/verify/scan/scan.sh"
   Include "$BRIK_HOME/lib/stages/container_scan.sh"
   Include "$BRIK_HOME/spec/support/mock_helper.sh"
 
@@ -77,12 +77,12 @@ Describe "stages/container_scan.sh"
         CTX_FILE="$(mktemp)"
         export BRIK_WORKSPACE
         BRIK_WORKSPACE="$(mktemp -d)"
-        security.container.run() { return 0; }
+        verify.scan.container.run() { return 0; }
       }
       cleanup_with_scanner() {
         rm -f "$BRIK_CONFIG_FILE" "$CTX_FILE"
         rm -rf "$BRIK_WORKSPACE"
-        unset -f security.container.run 2>/dev/null || true
+        unset -f verify.scan.container.run 2>/dev/null || true
       }
       Before 'setup_with_scanner'
       After 'cleanup_with_scanner'
@@ -108,12 +108,12 @@ Describe "stages/container_scan.sh"
         CTX_FILE="$(mktemp)"
         export BRIK_WORKSPACE
         BRIK_WORKSPACE="$(mktemp -d)"
-        security.container.run() { return 1; }
+        verify.scan.container.run() { return 1; }
       }
       cleanup_failing_scanner() {
         rm -f "$BRIK_CONFIG_FILE" "$CTX_FILE"
         rm -rf "$BRIK_WORKSPACE"
-        unset -f security.container.run 2>/dev/null || true
+        unset -f verify.scan.container.run 2>/dev/null || true
       }
       Before 'setup_failing_scanner'
       After 'cleanup_failing_scanner'

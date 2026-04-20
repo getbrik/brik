@@ -22,3 +22,9 @@ tmp/
 
 # ShellSpec
 report/
+
+# Claude Code workspace (local state, plans, checkpoints)
+.claude/
+
+# In-progress refactoring workshops (local notes)
+docs/chantiers/

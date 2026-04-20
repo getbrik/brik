@@ -1,7 +1,7 @@
 Describe "stages.build"
-  Include "$BRIK_HOME/lib/runtime/stage.sh"
-  Include "$BRIK_HOME/lib/core/_loader.sh"
-  Include "$BRIK_HOME/lib/core/config.sh"
+  Include "$BRIK_HOME/lib/pipeline/stage.sh"
+  Include "$BRIK_HOME/lib/pipeline/loader.sh"
+  Include "$BRIK_HOME/lib/transverse/config.sh"
   Include "$BRIK_HOME/lib/stages/build.sh"
 
   setup_env() {
@@ -125,7 +125,7 @@ YAML
         printf '%s' "$loaded_modules"
       }
       When call run_build_java
-      The output should include "build.java"
+      The output should include "stacks.java"
     End
   End
 End

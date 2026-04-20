@@ -3,7 +3,7 @@
 # @description SAST stage - static analysis, license, and IaC scans.
 # Runs in the analysis image (Python/Ruby tools like semgrep, checkov).
 
-# SAST stage: run SAST, license, and IaC scans via security.run facade.
+# SAST stage: run SAST, license, and IaC scans via verify.scan.run facade.
 # Usage: stages.sast <context_file>
 stages.sast() {
     local context_file="$1"
@@ -28,12 +28,12 @@ stages.sast() {
         scans="${scans},iac"
     fi
 
-    if ! declare -f security.run >/dev/null 2>&1; then
-        brik.use "security"
+    if ! declare -f verify.scan.run >/dev/null 2>&1; then
+        brik.use verify.scan.scan
     fi
 
     local result=0
-    security.run "${BRIK_WORKSPACE}" --scans "$scans" || result=$?
+    verify.scan.run "${BRIK_WORKSPACE}" --scans "$scans" || result=$?
 
     if [[ "$result" -eq 0 ]]; then
         context.set "$context_file" "BRIK_SAST_STATUS" "success"
