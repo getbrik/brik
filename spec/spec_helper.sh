@@ -35,9 +35,10 @@ spec_helper_loaded() {
   export BRIK_DEPLOYMENTS_LIB="${BRIK_HOME}/lib/deployments"
   export BRIK_PACKAGE_MANAGERS_LIB="${BRIK_HOME}/lib/package-managers"
   export BRIK_STAGES_LIB="${BRIK_HOME}/lib/stages"
+  export BRIK_CLI_LIB="${BRIK_HOME}/lib/cli"
   # Notion dirs as loader extensions (non-existent entries are harmless).
   export BRIK_LIB="${BRIK_CORE_LIB}"
-  export BRIK_LIB_EXTENSIONS="${BRIK_TRANSVERSE_LIB}:${BRIK_STACKS_LIB}:${BRIK_ROLLOUT_LIB}:${BRIK_DEPLOYMENTS_LIB}:${BRIK_PACKAGE_MANAGERS_LIB}:${BRIK_STAGES_LIB}:${BRIK_HOME}/lib"
+  export BRIK_LIB_EXTENSIONS="${BRIK_TRANSVERSE_LIB}:${BRIK_STACKS_LIB}:${BRIK_ROLLOUT_LIB}:${BRIK_DEPLOYMENTS_LIB}:${BRIK_PACKAGE_MANAGERS_LIB}:${BRIK_STAGES_LIB}:${BRIK_CLI_LIB}:${BRIK_HOME}/lib"
   export WORKSPACES="${FIXTURES}/workspaces"
 }
 
