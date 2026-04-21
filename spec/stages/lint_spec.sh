@@ -1,6 +1,7 @@
 Describe "stages.lint"
   Include "$BRIK_HOME/lib/pipeline/stage.sh"
   Include "$BRIK_HOME/lib/pipeline/loader.sh"
+  Include "$BRIK_HOME/lib/pipeline/report.sh"
   Include "$BRIK_HOME/lib/transverse/config.sh"
   Include "$BRIK_HOME/lib/transverse/csv.sh"
   Include "$BRIK_HOME/lib/stages/verify/verify.sh"
@@ -12,21 +13,32 @@ Describe "stages.lint"
     printf 'version: 1\nproject:\n  name: test\n  stack: node\n' > "$BRIK_CONFIG_FILE"
     export BRIK_WORKSPACE
     BRIK_WORKSPACE="$(mktemp -d)"
+    export BRIK_LOG_DIR
+    BRIK_LOG_DIR="$(mktemp -d)"
     export BRIK_PROJECT_DIR="$BRIK_WORKSPACE"
     export BRIK_PLATFORM="gitlab"
+    export BRIK_RUN_ID="lint-spec-fixture"
     config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
+    report.init >/dev/null 2>&1 || true
   }
   cleanup_env() {
     rm -f "$BRIK_CONFIG_FILE"
-    rm -rf "$BRIK_WORKSPACE"
+    rm -rf "$BRIK_WORKSPACE" "$BRIK_LOG_DIR"
     unset BRIK_QUALITY_LINT_TOOL BRIK_QUALITY_FORMAT_TOOL \
           BRIK_QUALITY_TYPE_CHECK_TOOL BRIK_QUALITY_LINT_COMMAND \
           BRIK_QUALITY_FORMAT_COMMAND BRIK_QUALITY_TYPE_CHECK_COMMAND \
           BRIK_QUALITY_LINT_FIX BRIK_QUALITY_LINT_CONFIG \
-          BRIK_LINT_ENABLED 2>/dev/null || true
+          BRIK_LINT_ENABLED BRIK_RUN_ID 2>/dev/null || true
   }
   Before 'setup_env'
   After 'cleanup_env'
+
+  # Read the recorded tech.status for the lint stage from the pipeline report.
+  # Prints the status (or empty string if none) on stdout.
+  read_lint_status() {
+    jq -r '.stages[] | select(.name == "lint") | .tech.status // empty' \
+      "$BRIK_LOG_DIR/pipeline-report.json" 2>/dev/null
+  }
 
   It "is callable as a function"
     callable_check() { declare -f stages.lint >/dev/null; }
@@ -46,15 +58,16 @@ YAML
     }
     Before 'setup_no_checks'
 
-    It "returns 0 and status skipped"
+    It "returns 0 and records status skipped in the report"
       run_lint_no_checks() {
         brik.use() { :; }
         local ctx
         ctx="$(context.create "lint")" 2>/dev/null || ctx="$(mktemp)"
-        stages.lint "$ctx" >/dev/null 2>&1
-        grep "^BRIK_LINT_STATUS=" "$ctx" | cut -d= -f2
+        stages.lint "$ctx" >/dev/null 2>&1 || return $?
+        read_lint_status
       }
       When call run_lint_no_checks
+      The status should be success
       The output should equal "skipped"
     End
   End
@@ -77,30 +90,30 @@ YAML
     }
     Before 'setup_lint'
 
-    It "runs lint check and sets status to success"
+    It "returns 0 when the lint check succeeds"
       run_lint() {
         brik.use() { :; }
         verify.lint.run() { return 0; }
         local ctx
         ctx="$(context.create "lint")" 2>/dev/null || ctx="$(mktemp)"
-        stages.lint "$ctx" >/dev/null 2>&1
-        grep "^BRIK_LINT_STATUS=" "$ctx" | cut -d= -f2
+        stages.lint "$ctx"
       }
       When call run_lint
-      The output should equal "success"
+      The status should be success
+      The error should be present
     End
 
-    It "sets status to failed when lint fails"
+    It "returns non-zero when the lint check fails"
       run_lint_fail() {
         brik.use() { :; }
         verify.lint.run() { return 1; }
         local ctx
         ctx="$(context.create "lint")" 2>/dev/null || ctx="$(mktemp)"
-        stages.lint "$ctx" >/dev/null 2>&1 || true
-        grep "^BRIK_LINT_STATUS=" "$ctx" | cut -d= -f2
+        stages.lint "$ctx"
       }
       When call run_lint_fail
-      The output should equal "failed"
+      The status should equal 10
+      The error should be present
     End
 
     It "logs lint checks being run"
@@ -112,6 +125,7 @@ YAML
         stages.lint "$ctx"
       }
       When call run_lint_log
+      The status should be success
       The error should include "running verify check: lint"
     End
   End
@@ -131,14 +145,15 @@ YAML
     }
     Before 'setup_disabled'
 
-    It "skips when lint is disabled"
+    It "skips when lint is disabled and records status skipped"
       run_lint_disabled() {
         local ctx
         ctx="$(context.create "lint")" 2>/dev/null || ctx="$(mktemp)"
-        stages.lint "$ctx" >/dev/null 2>&1
-        grep "^BRIK_LINT_STATUS=" "$ctx" | cut -d= -f2
+        stages.lint "$ctx" >/dev/null 2>&1 || return $?
+        read_lint_status
       }
       When call run_lint_disabled
+      The status should be success
       The output should equal "skipped"
     End
 
@@ -169,17 +184,17 @@ YAML
     }
     Before 'setup_format'
 
-    It "runs format check and sets status to success"
+    It "returns 0 when the format check succeeds"
       run_format() {
         brik.use() { :; }
         verify.format.run() { return 0; }
         local ctx
         ctx="$(context.create "lint")" 2>/dev/null || ctx="$(mktemp)"
-        stages.lint "$ctx" >/dev/null 2>&1
-        grep "^BRIK_LINT_STATUS=" "$ctx" | cut -d= -f2
+        stages.lint "$ctx"
       }
       When call run_format
-      The output should equal "success"
+      The status should be success
+      The error should be present
     End
   End
 
@@ -199,17 +214,17 @@ YAML
     }
     Before 'setup_typecheck'
 
-    It "runs type_check check"
+    It "returns 0 when the type_check succeeds"
       run_typecheck() {
         brik.use() { :; }
         verify.type_check.run() { return 0; }
         local ctx
         ctx="$(context.create "lint")" 2>/dev/null || ctx="$(mktemp)"
-        stages.lint "$ctx" >/dev/null 2>&1
-        grep "^BRIK_LINT_STATUS=" "$ctx" | cut -d= -f2
+        stages.lint "$ctx"
       }
       When call run_typecheck
-      The output should equal "success"
+      The status should be success
+      The error should be present
     End
   End
 
@@ -231,32 +246,32 @@ YAML
     }
     Before 'setup_multi'
 
-    It "runs all configured checks"
+    It "returns 0 when all configured checks pass"
       run_multi() {
         brik.use() { :; }
         verify.lint.run() { return 0; }
         verify.format.run() { return 0; }
         local ctx
         ctx="$(context.create "lint")" 2>/dev/null || ctx="$(mktemp)"
-        stages.lint "$ctx" >/dev/null 2>&1
-        grep "^BRIK_LINT_STATUS=" "$ctx" | cut -d= -f2
+        stages.lint "$ctx"
       }
       When call run_multi
-      The output should equal "success"
+      The status should be success
+      The error should be present
     End
 
-    It "fails if any check fails"
+    It "returns non-zero if any check fails"
       run_multi_fail() {
         brik.use() { :; }
         verify.lint.run() { return 0; }
         verify.format.run() { return 1; }
         local ctx
         ctx="$(context.create "lint")" 2>/dev/null || ctx="$(mktemp)"
-        stages.lint "$ctx" >/dev/null 2>&1 || true
-        grep "^BRIK_LINT_STATUS=" "$ctx" | cut -d= -f2
+        stages.lint "$ctx"
       }
       When call run_multi_fail
-      The output should equal "failed"
+      The status should equal 10
+      The error should be present
     End
   End
 End

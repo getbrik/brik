@@ -374,18 +374,17 @@ Describe "base-wrapper.sh"
       The error should be present
     End
 
-    It "runs lint stage and writes context"
-      run_lint_check() {
+    It "runs lint stage and records status=skipped in the pipeline report"
+      run_lint_check_report() {
         brik.wrapper.run_stage "lint" >/dev/null 2>&1
-        local context_file
-        context_file="$(ls "${BRIK_LOG_DIR}"/context-lint-* 2>/dev/null | head -1)"
-        if [[ -n "$context_file" ]]; then
-          grep "^BRIK_LINT_STATUS=" "$context_file" | cut -d= -f2
+        local report="${BRIK_LOG_DIR}/pipeline-report.json"
+        if [[ -f "$report" ]]; then
+          jq -r '.stages[] | select(.name == "lint") | .tech.status // empty' "$report"
         else
-          echo "no_context"
+          echo "no_report"
         fi
       }
-      When call run_lint_check
+      When call run_lint_check_report
       The output should equal "skipped"
     End
 
