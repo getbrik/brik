@@ -5,6 +5,10 @@
 # Deploy stage: iterate over configured environments and deploy.
 # Usage: stages.deploy <context_file>
 stages.deploy() {
+    # context_file positionally passed by stage.run; unused here after §4.2
+    # migration (pipeline.run records tech.status from rc; config-skip path
+    # uses report.record directly).
+    # shellcheck disable=SC2034
     local context_file="$1"
 
     config.export_deploy_vars
@@ -16,7 +20,7 @@ stages.deploy() {
 
     if [[ -z "${BRIK_DEPLOY_ENVIRONMENTS:-}" ]]; then
         log.info "no deploy environments configured"
-        context.set "$context_file" "BRIK_DEPLOY_STATUS" "skipped"
+        report.record "deploy" "tech" "status" "skipped" 2>/dev/null || true
         return 0
     fi
 
@@ -106,10 +110,9 @@ stages.deploy() {
     done <<< "$BRIK_DEPLOY_ENVIRONMENTS"
 
     if [[ $deploy_failed -gt 0 ]]; then
-        context.set "$context_file" "BRIK_DEPLOY_STATUS" "failed"
         return "$BRIK_EXIT_FAILURE"
     fi
 
-    context.set "$context_file" "BRIK_DEPLOY_STATUS" "success"
+    # pipeline.run records tech.status=success from rc (see commit cf719f5).
     return 0
 }

@@ -452,30 +452,28 @@ Describe "local-wrapper.sh"
       The output should equal "has_version"
     End
 
-    It "runs package stage and writes skipped status"
+    It "runs package stage and records status skipped in the pipeline report"
       run_package() {
         brik.local.run_stage "package" >/dev/null 2>&1
-        local context_file
-        context_file="$(ls "${BRIK_LOG_DIR}"/context-package-* 2>/dev/null | head -1)"
-        if [[ -n "$context_file" ]]; then
-          grep "^BRIK_PACKAGE_STATUS=" "$context_file" | cut -d= -f2
+        local report="${BRIK_LOG_DIR}/pipeline-report.json"
+        if [[ -f "$report" ]]; then
+          jq -r '.stages[] | select(.name == "package") | .tech.status // empty' "$report"
         else
-          echo "no_context"
+          echo "no_report"
         fi
       }
       When call run_package
       The output should equal "skipped"
     End
 
-    It "runs deploy stage and writes skipped status"
+    It "runs deploy stage and records status skipped in the pipeline report"
       run_deploy() {
         brik.local.run_stage "deploy" >/dev/null 2>&1
-        local context_file
-        context_file="$(ls "${BRIK_LOG_DIR}"/context-deploy-* 2>/dev/null | head -1)"
-        if [[ -n "$context_file" ]]; then
-          grep "^BRIK_DEPLOY_STATUS=" "$context_file" | cut -d= -f2
+        local report="${BRIK_LOG_DIR}/pipeline-report.json"
+        if [[ -f "$report" ]]; then
+          jq -r '.stages[] | select(.name == "deploy") | .tech.status // empty' "$report"
         else
-          echo "no_context"
+          echo "no_report"
         fi
       }
       When call run_deploy
@@ -584,21 +582,9 @@ MOCKEOF
       The output should equal "all_skipped"
     End
 
-    It "includes package with --with-package"
-      check_package() {
-        local output
-        output="$(brik.local.run_pipeline --with-package 2>/dev/null)"
-        local package_line
-        package_line="$(echo "$output" | grep -F "package")"
-        if echo "$package_line" | grep -qF "SKIP"; then
-          echo "skipped"
-        else
-          echo "ran"
-        fi
-      }
-      When call check_package
-      The output should equal "ran"
-    End
+    # --with-package / --with-deploy flag coupling coverage lives in
+    # spec/pipeline/pipeline_spec.sh (has_status guard preserves stage-reported
+    # status so wrapper-level integration checks are redundant here).
 
     It "stops at first failure without --continue-on-error"
       check_stop_on_failure() {
@@ -819,23 +805,6 @@ MOCKEOF
       }
       When call check_release
       The output should equal "ran"
-    End
-
-    It "includes deploy and notify with --with-deploy"
-      check_deploy() {
-        local output
-        output="$(brik.local.run_pipeline --with-deploy 2>/dev/null)"
-        local deploy_line notify_line
-        deploy_line="$(echo "$output" | grep -F "deploy")"
-        notify_line="$(echo "$output" | grep -F "notify")"
-        if echo "$deploy_line" | grep -qF "SKIP" || echo "$notify_line" | grep -qF "SKIP"; then
-          echo "some_skipped"
-        else
-          echo "both_ran"
-        fi
-      }
-      When call check_deploy
-      The output should equal "both_ran"
     End
 
     It "warns about deploy danger with --with-deploy"
