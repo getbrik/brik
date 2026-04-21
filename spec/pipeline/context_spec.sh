@@ -22,7 +22,7 @@ Describe "context.sh"
       get_stage_name() {
         local ctx
         ctx="$(context.create "test")"
-        context.get "$ctx" "BRIK_STAGE_NAME"
+        _context._get "$ctx" "BRIK_STAGE_NAME"
       }
       When call get_stage_name
       The output should equal "test"
@@ -32,7 +32,7 @@ Describe "context.sh"
       has_run_id() {
         local ctx
         ctx="$(context.create "build")"
-        context.exists "$ctx" "BRIK_RUN_ID"
+        _context._exists "$ctx" "BRIK_RUN_ID"
       }
       When call has_run_id
       The status should be success
@@ -42,14 +42,14 @@ Describe "context.sh"
       has_started_at() {
         local ctx
         ctx="$(context.create "build")"
-        context.exists "$ctx" "BRIK_STARTED_AT"
+        _context._exists "$ctx" "BRIK_STARTED_AT"
       }
       When call has_started_at
       The status should be success
     End
   End
 
-  Describe "context.get"
+  Describe "_context._get"
     setup() {
       CTX_FILE="$(mktemp)"
       printf 'KEY_A=value_a\nKEY_B=hello world\n' > "$CTX_FILE"
@@ -59,23 +59,23 @@ Describe "context.sh"
     After 'cleanup'
 
     It "returns the value for an existing key"
-      When call context.get "$CTX_FILE" "KEY_A"
+      When call _context._get "$CTX_FILE" "KEY_A"
       The status should be success
       The output should equal "value_a"
     End
 
     It "returns a value with spaces"
-      When call context.get "$CTX_FILE" "KEY_B"
+      When call _context._get "$CTX_FILE" "KEY_B"
       The output should equal "hello world"
     End
 
     It "returns 1 for a missing key"
-      When call context.get "$CTX_FILE" "MISSING"
+      When call _context._get "$CTX_FILE" "MISSING"
       The status should equal 1
     End
   End
 
-  Describe "context.set"
+  Describe "_context._set"
     setup() {
       CTX_FILE="$(mktemp)"
       printf 'EXISTING=old\n' > "$CTX_FILE"
@@ -85,20 +85,20 @@ Describe "context.sh"
     After 'cleanup'
 
     It "adds a new key"
-      When call context.set "$CTX_FILE" "NEW_KEY" "new_value"
+      When call _context._set "$CTX_FILE" "NEW_KEY" "new_value"
       The status should be success
       The contents of file "$CTX_FILE" should include "NEW_KEY=new_value"
     End
 
     It "replaces an existing key"
-      When call context.set "$CTX_FILE" "EXISTING" "updated"
+      When call _context._set "$CTX_FILE" "EXISTING" "updated"
       The status should be success
       The contents of file "$CTX_FILE" should include "EXISTING=updated"
       The contents of file "$CTX_FILE" should not include "EXISTING=old"
     End
   End
 
-  Describe "context.exists"
+  Describe "_context._exists"
     setup() {
       CTX_FILE="$(mktemp)"
       printf 'PRESENT=yes\n' > "$CTX_FILE"
@@ -108,12 +108,12 @@ Describe "context.sh"
     After 'cleanup'
 
     It "returns 0 for an existing key"
-      When call context.exists "$CTX_FILE" "PRESENT"
+      When call _context._exists "$CTX_FILE" "PRESENT"
       The status should be success
     End
 
     It "returns 1 for a missing key"
-      When call context.exists "$CTX_FILE" "ABSENT"
+      When call _context._exists "$CTX_FILE" "ABSENT"
       The status should equal 1
     End
   End

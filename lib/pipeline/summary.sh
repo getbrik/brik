@@ -29,7 +29,7 @@ summary.build() {
     [[ "$exit_code" -ne 0 ]] && status="FAILED"
 
     local started_at=""
-    started_at="$(context.get "$context_file" "BRIK_STARTED_AT" 2>/dev/null)" || started_at=""
+    started_at="$(_context._get "$context_file" "BRIK_STARTED_AT" 2>/dev/null)" || started_at=""
     local finished_at
     finished_at="$(date +"%Y-%m-%dT%H:%M:%S%z")"
 

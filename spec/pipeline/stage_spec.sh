@@ -145,7 +145,7 @@ HOOKEOF
       ctx_logic() {
         local ctx="$1"
         local stage_name
-        stage_name="$(context.get "$ctx" "BRIK_STAGE_NAME")"
+        stage_name="$(_context._get "$ctx" "BRIK_STAGE_NAME")"
         [[ "$stage_name" == "build" ]] || return 1
         return 0
       }

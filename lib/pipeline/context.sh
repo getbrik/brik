@@ -56,9 +56,12 @@ context.create() {
     return 0
 }
 
-# Get a value from the context file.
+# Private: get a value from the context file.
 # Prints the value on stdout. Returns 1 if key not found.
-context.get() {
+# §4.2 step 7: privatized. Only stage.sh + summary.sh call this (lifecycle
+# keys). External callers must go through report.record / report JSON
+# instead (pipeline-report.json is the public aggregated store).
+_context._get() {
     local context_file="$1"
     local key="$2"
     local line
@@ -68,9 +71,9 @@ context.get() {
     return 0
 }
 
-# Set a value in the context file (add or replace).
+# Private: set a value in the context file (add or replace).
 # Returns 0 on success, 6 on IO failure.
-context.set() {
+_context._set() {
     local context_file="$1"
     local key="$2"
     local value="$3"
@@ -90,24 +93,24 @@ context.set() {
     return 0
 }
 
-# Set a status key based on an exit code.
+# Private: set a status key based on an exit code.
 # Maps 0 -> "success", non-zero -> "failed".
-# Usage: context.set_result <context_file> <key> <exit_code>
-context.set_result() {
+# Usage: _context._set_result <context_file> <key> <exit_code>
+_context._set_result() {
     local context_file="$1"
     local key="$2"
     local exit_code="$3"
 
     if [[ "$exit_code" -eq 0 ]]; then
-        context.set "$context_file" "$key" "success"
+        _context._set "$context_file" "$key" "success"
     else
-        context.set "$context_file" "$key" "failed"
+        _context._set "$context_file" "$key" "failed"
     fi
 }
 
-# Check whether a key exists in the context file.
+# Private: check whether a key exists in the context file.
 # Returns 0 if found, 1 otherwise.
-context.exists() {
+_context._exists() {
     local context_file="$1"
     local key="$2"
     grep -q "^${key}=" "$context_file" 2>/dev/null
