@@ -8,13 +8,16 @@ brik.use "_deps"
 # Lint stage: run code quality checks (lint, format, type_check) via brik-lib.
 # Usage: stages.lint <context_file>
 stages.lint() {
+    # context_file positionally passed by stage.run; unused here after §4.2
+    # migration (report.record replaces context.set for status markers).
+    # shellcheck disable=SC2034
     local context_file="$1"
 
     config.export_quality_vars
 
     if [[ "${BRIK_LINT_ENABLED:-true}" != "true" ]]; then
         log.info "lint disabled (quality.lint.enabled=false) - skipping"
-        context.set "$context_file" "BRIK_LINT_STATUS" "skipped"
+        report.record "lint" "tech" "status" "skipped" 2>/dev/null || true
         return 0
     fi
 
@@ -33,17 +36,13 @@ stages.lint() {
 
     if [[ ${#checks[@]} -eq 0 ]]; then
         log.info "no lint checks configured"
-        context.set "$context_file" "BRIK_LINT_STATUS" "skipped"
+        report.record "lint" "tech" "status" "skipped" 2>/dev/null || true
         return 0
     fi
 
     local checks_csv
     checks_csv="$(IFS=','; printf '%s' "${checks[*]}")"
 
-    local result=0
-    verify.run "${BRIK_WORKSPACE}" --checks "$checks_csv" || result=$?
-
-    context.set_result "$context_file" "BRIK_LINT_STATUS" "$result"
-
-    return "$result"
+    # pipeline.run records tech.status from our rc (see commit cf719f5).
+    verify.run "${BRIK_WORKSPACE}" --checks "$checks_csv"
 }

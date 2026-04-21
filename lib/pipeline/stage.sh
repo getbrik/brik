@@ -38,6 +38,8 @@ _stage._load_runtime() {
     [[ -z "${_BRIK_PIPELINE_ENV_LOADED:-}" ]] && . "${runtime_dir}/pipeline-env.sh"
     # shellcheck source=banner.sh
     [[ -z "${_BRIK_BANNER_LOADED:-}" ]] && . "${runtime_dir}/banner.sh"
+    # shellcheck source=report.sh
+    [[ -z "${_BRIK_REPORT_LOADED:-}" ]] && . "${runtime_dir}/report.sh"
 }
 
 _stage._load_runtime
@@ -141,10 +143,17 @@ stage.run() {
     context.set "$context_file" "BRIK_FINISHED_AT" "$(date +"%Y-%m-%dT%H:%M:%S%z")" || true
 
     if [[ $exit_code -eq 0 ]]; then
-        # Check if the stage set its status to "skipped"
-        local _stage_upper _stage_status=""
-        _stage_upper="$(echo "$stage_name" | tr '[:lower:]-' '[:upper:]_')"
-        _stage_status="$(context.get "$context_file" "BRIK_${_stage_upper}_STATUS" 2>/dev/null)" || true
+        # Check if the stage recorded a "skipped" status in the pipeline
+        # report (config-skip pattern, e.g. quality.lint.enabled=false).
+        # Falls back silently to "completed successfully" if the report is
+        # absent or jq is unavailable (stage run standalone outside pipeline).
+        local _report_path _stage_status=""
+        _report_path="${BRIK_LOG_DIR:-${BRIK_DEFAULT_LOG_DIR:-/tmp/brik/logs}}/pipeline-report.json"
+        if [[ -f "$_report_path" ]] && command -v jq >/dev/null 2>&1; then
+            _stage_status="$(jq -r --arg s "$stage_name" \
+                '.stages[] | select(.name == $s) | .tech.status // empty' \
+                "$_report_path" 2>/dev/null)" || _stage_status=""
+        fi
         if [[ "$_stage_status" == "skipped" ]]; then
             log.info "stage $stage_name skipped (not configured)"
         else
@@ -189,6 +198,12 @@ stage.dispatch() {
 
     # Load cross-stage variables from previous stages.
     pipeline.env.load
+
+    # Ensure the pipeline report exists so stages can report.record. When
+    # invoked via pipeline.run, report.init was already called; in the
+    # single-stage path (brik.wrapper.run_stage) we lazily initialize here.
+    local _report_path="${BRIK_LOG_DIR:-${BRIK_DEFAULT_LOG_DIR:-/tmp/brik/logs}}/pipeline-report.json"
+    [[ -f "$_report_path" ]] || report.init >/dev/null 2>&1 || true
 
     local logic_function=""
     case "$stage_name" in
