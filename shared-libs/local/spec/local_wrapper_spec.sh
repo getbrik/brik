@@ -491,92 +491,10 @@ Describe "local-wrapper.sh"
     End
   End
 
-  # =========================================================================
-  # _brik_local_should_skip_stage
-  # =========================================================================
-  Describe "_brik_local_should_skip_stage"
-    Include "$BRIK_HOME/shared-libs/local/scripts/local-wrapper.sh"
-
-    It "skips release when with_release is false"
-      When call _brik_local_should_skip_stage "release" "false" "false" "false"
-      The status should be success
-    End
-
-    It "does not skip release when with_release is true"
-      When call _brik_local_should_skip_stage "release" "true" "false" "false"
-      The status should equal 1
-    End
-
-    It "skips package when with_package is false"
-      When call _brik_local_should_skip_stage "package" "false" "false" "false"
-      The status should be success
-    End
-
-    It "does not skip package when with_package is true"
-      When call _brik_local_should_skip_stage "package" "false" "true" "false"
-      The status should equal 1
-    End
-
-    It "skips deploy when with_deploy is false"
-      When call _brik_local_should_skip_stage "deploy" "false" "false" "false"
-      The status should be success
-    End
-
-    It "does not skip deploy when with_deploy is true"
-      When call _brik_local_should_skip_stage "deploy" "false" "false" "true"
-      The status should equal 1
-    End
-
-    It "skips notify when with_deploy is false"
-      When call _brik_local_should_skip_stage "notify" "false" "false" "false"
-      The status should be success
-    End
-
-    It "does not skip notify when with_deploy is true"
-      When call _brik_local_should_skip_stage "notify" "false" "false" "true"
-      The status should equal 1
-    End
-
-    It "never skips init"
-      When call _brik_local_should_skip_stage "init" "false" "false" "false"
-      The status should equal 1
-    End
-
-    It "never skips build"
-      When call _brik_local_should_skip_stage "build" "false" "false" "false"
-      The status should equal 1
-    End
-
-    It "never skips lint"
-      When call _brik_local_should_skip_stage "lint" "false" "false" "false"
-      The status should equal 1
-    End
-
-    It "never skips sast"
-      When call _brik_local_should_skip_stage "sast" "false" "false" "false"
-      The status should equal 1
-    End
-
-    It "never skips scan"
-      When call _brik_local_should_skip_stage "scan" "false" "false" "false"
-      The status should equal 1
-    End
-
-    It "never skips test"
-      When call _brik_local_should_skip_stage "test" "false" "false" "false"
-      The status should equal 1
-    End
-
-    It "skips container-scan when with_package is false"
-      When call _brik_local_should_skip_stage "container-scan" "false" "false" "false"
-      The status should be success
-    End
-
-    It "does not skip container-scan when with_package is true"
-      When call _brik_local_should_skip_stage "container-scan" "false" "true" "false"
-      The status should equal 1
-    End
-  End
+  # Skip-stage semantics moved to _pipeline._should_skip in lib/pipeline/pipeline.sh
+  # after the wrapper thin-delegator cut-over. Coverage lives in
+  # spec/pipeline/pipeline_spec.sh (default-flow skip test + --with-release /
+  # --with-package / --with-deploy flag tests). No wrapper-side duplicate.
 
   # =========================================================================
   # brik.local.run_pipeline
@@ -633,7 +551,7 @@ MOCKEOF
     It "returns error for unknown flag"
       When call brik.local.run_pipeline "--bad-flag"
       The status should equal 2
-      The error should include "unknown pipeline flag"
+      The error should include "unknown flag"
     End
 
     It "runs default pipeline and prints summary"
@@ -723,18 +641,32 @@ MOCKEOF
   End
 
   # =========================================================================
-  # brik.local.print_summary
+  # brik.local.print_summary (reads pipeline-report.json)
   # =========================================================================
   Describe "brik.local.print_summary"
     Include "$BRIK_HOME/shared-libs/local/scripts/local-wrapper.sh"
 
+    setup_summary_fixture() {
+      SUMMARY_REPORT="$(mktemp)"
+      jq -n '{
+        pipeline_id: "run-fixture",
+        started_at: "2026-01-01T00:00:00+0000",
+        finished_at: "2026-01-01T00:00:05+0000",
+        stages: [
+          { name: "init",  tech: { status: "success", duration_ms: "1000" }, business: {} },
+          { name: "build", tech: { status: "success", duration_ms: "2000" }, business: {} },
+          { name: "lint",  tech: { status: "skipped" },                       business: {} }
+        ]
+      }' > "$SUMMARY_REPORT"
+    }
+    cleanup_summary_fixture() { rm -f "$SUMMARY_REPORT"; }
+    Before 'setup_summary_fixture'
+    After 'cleanup_summary_fixture'
+
     It "prints pass/fail/skip counts"
       check_summary() {
-        local -a my_stages=(init build lint)
-        local -A my_status=([init]="PASS" [build]="PASS" [lint]="SKIP")
-        local -A my_duration=([init]="1" [build]="2" [lint]="0")
         local output
-        output="$(brik.local.print_summary my_stages my_status my_duration 3)"
+        output="$(brik.local.print_summary "$SUMMARY_REPORT")"
         if echo "$output" | grep -qF "2/2 passed" && echo "$output" | grep -qF "1 skipped"; then
           echo "correct"
         else
@@ -747,11 +679,20 @@ MOCKEOF
 
     It "shows FAIL result when any stage fails"
       check_fail() {
-        local -a my_stages=(init build)
-        local -A my_status=([init]="PASS" [build]="FAIL")
-        local -A my_duration=([init]="1" [build]="2")
+        local report
+        report="$(mktemp)"
+        jq -n '{
+          pipeline_id: "run-fail",
+          started_at: "2026-01-01T00:00:00+0000",
+          finished_at: "2026-01-01T00:00:02+0000",
+          stages: [
+            { name: "init",  tech: { status: "success", duration_ms: "1000" }, business: {} },
+            { name: "build", tech: { status: "failed",  duration_ms: "2000" }, business: {} }
+          ]
+        }' > "$report"
         local output
-        output="$(brik.local.print_summary my_stages my_status my_duration 3)"
+        output="$(brik.local.print_summary "$report")"
+        rm -f "$report"
         if echo "$output" | grep -qF "FAIL"; then
           echo "shows_fail"
         else
@@ -764,11 +705,22 @@ MOCKEOF
 
     It "shows correct counts with all 3 states"
       check_all_states() {
-        local -a my_stages=(init build lint scan)
-        local -A my_status=([init]="PASS" [build]="FAIL" [lint]="PASS" [scan]="SKIP")
-        local -A my_duration=([init]="1" [build]="2" [lint]="1" [scan]="0")
+        local report
+        report="$(mktemp)"
+        jq -n '{
+          pipeline_id: "run-mixed",
+          started_at: "2026-01-01T00:00:00+0000",
+          finished_at: "2026-01-01T00:00:04+0000",
+          stages: [
+            { name: "init",  tech: { status: "success", duration_ms: "1000" }, business: {} },
+            { name: "build", tech: { status: "failed",  duration_ms: "2000" }, business: {} },
+            { name: "lint",  tech: { status: "success", duration_ms: "1000" }, business: {} },
+            { name: "scan",  tech: { status: "skipped" },                       business: {} }
+          ]
+        }' > "$report"
         local output
-        output="$(brik.local.print_summary my_stages my_status my_duration 4)"
+        output="$(brik.local.print_summary "$report")"
+        rm -f "$report"
         if echo "$output" | grep -qF "2/3 passed" && echo "$output" | grep -qF "1 skipped"; then
           echo "correct"
         else
@@ -779,10 +731,10 @@ MOCKEOF
       The output should equal "correct"
     End
 
-    It "returns error with insufficient arguments"
-      When call brik.local.print_summary "a" "b"
-      The status should equal 2
-      The error should include "requires 4 arguments"
+    It "returns error when report does not exist"
+      When call brik.local.print_summary "/nonexistent/pipeline-report.json"
+      The status should equal 6
+      The error should include "pipeline report not found"
     End
   End
 
@@ -890,7 +842,7 @@ MOCKEOF
     It "warns about deploy danger with --with-deploy"
       When call brik.local.run_pipeline --with-deploy
       The output should be present
-      The error should include "be careful running deploy locally"
+      The error should include "review target environment before running"
     End
 
     It "returns exit code 1 when pipeline has failure"

@@ -105,6 +105,8 @@ brik.wrapper.bootstrap() {
     . "${_BRIK_PIPELINE_DIR}/stage.sh" || return "$BRIK_EXIT_IO_FAILURE"
     # shellcheck source=/dev/null
     . "${_BRIK_PIPELINE_DIR}/loader.sh" || return "$BRIK_EXIT_IO_FAILURE"
+    # shellcheck source=/dev/null
+    . "${_BRIK_PIPELINE_DIR}/pipeline.sh" || return "$BRIK_EXIT_IO_FAILURE"
 
     # Load portable config and condition modules
     brik.use config

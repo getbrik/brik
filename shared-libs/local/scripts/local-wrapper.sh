@@ -97,127 +97,44 @@ brik.local.run_stage() {
 # ---------------------------------------------------------------------------
 
 # Run the full fixed-flow pipeline locally.
+#
+# Thin delegator (per spec 6.15): wrapper setup has already been done by
+# brik.local.setup. We call pipeline.run in the lib layer, then render a
+# terminal-friendly summary from the produced pipeline-report.json.
+#
 # Usage: brik.local.run_pipeline [--continue-on-error] [--with-release]
 #        [--with-package] [--with-deploy]
-# Exit codes: 0=all stages passed, BRIK_EXIT_FAILURE=at least one stage failed, BRIK_EXIT_INVALID_INPUT=invalid flag
-# shellcheck disable=SC2034
+# Exit codes: pipeline.run's exit code
+#   (0 all passed, BRIK_EXIT_FAILURE any failed, BRIK_EXIT_INVALID_INPUT bad flag).
 brik.local.run_pipeline() {
-    local continue_on_error=false
-    local with_release=false
-    local with_package=false
-    local with_deploy=false
-    local stage="" stage_start=0 stage_end=0 rc=0
-
-    # Parse flags
-    while [[ $# -gt 0 ]]; do
-        case "$1" in
-            --continue-on-error) continue_on_error=true; shift ;;
-            --with-release)      with_release=true; shift ;;
-            --with-package)      with_package=true; shift ;;
-            --with-deploy)       with_deploy=true; shift ;;
-            *)
-                log.error "unknown pipeline flag: $1"
-                return "$BRIK_EXIT_INVALID_INPUT"
-                ;;
-        esac
-    done
-
-    if $with_deploy; then
-        log.warn "deploy stage enabled - be careful running deploy locally"
-    fi
-
-    # Fixed flow: stages to run and stages to skip
-    # Default: init, build, lint, sast, scan, test
-    # Opt-in: release, package, container-scan, deploy, notify
-    local -a all_stages=(init release build lint sast scan test package container-scan deploy notify)
-
-    # Track results: associative arrays for status and duration
-    local -A stage_status=()
-    local -A stage_duration=()
-    local pipeline_start=0
-    pipeline_start="$(date +%s)"
-    local had_failure=false
-    local pipeline_end=0
-    local total_duration=0
-
-    for stage in "${all_stages[@]}"; do
-        # Determine if this stage should run or be skipped
-        if _brik_local_should_skip_stage "$stage" "$with_release" "$with_package" "$with_deploy"; then
-            stage_status[$stage]="SKIP"
-            stage_duration[$stage]="0"
-            continue
-        fi
-
-        # If a previous stage failed and we're not continuing on error, skip rest
-        if $had_failure && ! $continue_on_error; then
-            stage_status[$stage]="SKIP"
-            stage_duration[$stage]="0"
-            continue
-        fi
-
-        stage_start="$(date +%s)"
-
-        brik.local.run_stage "$stage"
-        rc=$?
-
-        stage_end="$(date +%s)"
-        stage_duration[$stage]=$(( stage_end - stage_start ))
-
-        if [[ $rc -eq 0 ]]; then
-            stage_status[$stage]="PASS"
-        else
-            stage_status[$stage]="FAIL"
-            had_failure=true
-        fi
-    done
-
-    pipeline_end="$(date +%s)"
-    total_duration=$(( pipeline_end - pipeline_start ))
-
-    # Print summary
-    brik.local.print_summary all_stages stage_status stage_duration "$total_duration"
-
-    if $had_failure; then
-        return "$BRIK_EXIT_FAILURE"
-    fi
-    return 0
-}
-
-# Determine if a stage should be skipped based on flags.
-# Returns 0 (true) if the stage should be skipped.
-_brik_local_should_skip_stage() {
-    local stage="$1"
-    local with_release="$2"
-    local with_package="$3"
-    local with_deploy="$4"
-
-    case "$stage" in
-        release)        [[ "$with_release" != "true" ]] && return 0 ;;
-        package)        [[ "$with_package" != "true" ]] && return 0 ;;
-        container-scan) [[ "$with_package" != "true" ]] && return 0 ;;
-        deploy)         [[ "$with_deploy" != "true" ]] && return 0 ;;
-        notify)         [[ "$with_deploy" != "true" ]] && return 0 ;;
-    esac
-    return 1
+    local rc=0
+    pipeline.run "$@"
+    rc=$?
+    brik.local.print_summary || true
+    return "$rc"
 }
 
 # ---------------------------------------------------------------------------
 # Pipeline summary
 # ---------------------------------------------------------------------------
 
-# Print a visual summary of the pipeline execution.
-# Usage: brik.local.print_summary <stages_array_name> <status_array_name>
-#        <duration_array_name> <total_duration>
+# Render a human-readable pipeline summary on stdout from the pipeline report
+# JSON. Matches the legacy table layout (stage | status | duration) and
+# counts line ("X/Y passed, Z skipped"). Status labels: PASS (tech.status ==
+# success), FAIL (failed), SKIP (skipped).
+# Usage: brik.local.print_summary [<report_json_path>]
+# Default path: $BRIK_LOG_DIR/pipeline-report.json.
 brik.local.print_summary() {
-    if [[ $# -lt 4 ]]; then
-        echo "error: brik.local.print_summary requires 4 arguments" >&2
-        return "$BRIK_EXIT_INVALID_INPUT"
-    fi
+    local report_path="${1:-${BRIK_LOG_DIR:-${BRIK_DEFAULT_LOG_DIR:-/tmp/brik/logs}}/pipeline-report.json}"
 
-    local -n __brik_ps_stages="$1"
-    local -n __brik_ps_status="$2"
-    local -n __brik_ps_duration="$3"
-    local total_duration="$4"
+    if [[ ! -f "$report_path" ]]; then
+        log.warn "pipeline report not found: $report_path"
+        return "$BRIK_EXIT_IO_FAILURE"
+    fi
+    if ! command -v jq >/dev/null 2>&1; then
+        log.warn "jq not available, skipping summary"
+        return 0
+    fi
 
     # Detect color support
     local use_color=false
@@ -234,44 +151,44 @@ brik.local.print_summary() {
         reset=$'\033[0m'
     fi
 
-    local passed=0 failed=0 skipped=0 ran=0
-    local stage="" status="" duration_s="" color="" duration_str=""
+    # Extract per-stage rows as TAB-separated: name<TAB>status<TAB>duration_ms
+    local rows
+    rows="$(jq -r '.stages[] | [.name, (.tech.status // "skipped"), (.tech.duration_ms // "0")] | @tsv' "$report_path")" || {
+        log.warn "failed to parse pipeline report: $report_path"
+        return "$BRIK_EXIT_FAILURE"
+    }
+
+    local passed=0 failed=0 skipped=0 ran=0 total_duration_ms=0
+    local name status_raw duration_ms label color duration_str
 
     echo ""
     echo "${bold}--- Pipeline Summary ---${reset}"
 
-    for stage in "${__brik_ps_stages[@]}"; do
-        status="${__brik_ps_status[$stage]:-SKIP}"
-        duration_s="${__brik_ps_duration[$stage]:-0}"
-
-        color=""
-        duration_str=""
-        case "$status" in
-            PASS)
-                color="$green"
-                duration_str="${duration_s}s"
-                (( ++passed ))
-                (( ++ran ))
+    while IFS=$'\t' read -r name status_raw duration_ms; do
+        [[ -z "$name" ]] && continue
+        case "$status_raw" in
+            success)
+                label="PASS"; color="$green"
+                (( ++passed )); (( ++ran ))
+                duration_str="${duration_ms}ms"
+                total_duration_ms=$(( total_duration_ms + duration_ms ))
                 ;;
-            FAIL)
-                color="$red"
-                duration_str="${duration_s}s"
-                (( ++failed ))
-                (( ++ran ))
+            failed)
+                label="FAIL"; color="$red"
+                (( ++failed )); (( ++ran ))
+                duration_str="${duration_ms}ms"
+                total_duration_ms=$(( total_duration_ms + duration_ms ))
                 ;;
-            SKIP)
-                color="$gray"
-                duration_str=""
+            *)
+                label="SKIP"; color="$gray"
                 (( ++skipped ))
+                duration_str=""
                 ;;
         esac
-
-        printf "  %-12s %s%-4s%s" "$stage" "$color" "$status" "$reset"
-        if [[ -n "$duration_str" ]]; then
-            printf "  %s" "$duration_str"
-        fi
+        printf "  %-14s %s%-4s%s" "$name" "$color" "$label" "$reset"
+        [[ -n "$duration_str" ]] && printf "  %s" "$duration_str"
         echo ""
-    done
+    done <<< "$rows"
 
     echo "${bold}------------------------${reset}"
 
@@ -283,6 +200,6 @@ brik.local.print_summary() {
     fi
 
     echo "${bold}Result: ${result_color}${result_label}${reset} (${passed}/${ran} passed, ${skipped} skipped)"
-    echo "${bold}Duration: ${total_duration}s${reset}"
+    echo "${bold}Duration: $(( total_duration_ms / 1000 ))s${reset}"
     echo ""
 }
