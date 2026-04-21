@@ -415,15 +415,14 @@ Describe "gitlab-wrapper.sh"
 
     # --- Package stub ---
 
-    It "runs package stub and writes BRIK_PACKAGE_STATUS=skipped"
+    It "runs package stub and records status skipped in the pipeline report"
       run_package_check() {
         brik.gitlab.run_stage "package" >/dev/null 2>&1
-        local context_file
-        context_file="$(ls "${BRIK_LOG_DIR}"/context-package-* 2>/dev/null | head -1)"
-        if [[ -n "$context_file" ]]; then
-          grep "^BRIK_PACKAGE_STATUS=" "$context_file" | cut -d= -f2
+        local report="${BRIK_LOG_DIR}/pipeline-report.json"
+        if [[ -f "$report" ]]; then
+          jq -r '.stages[] | select(.name == "package") | .tech.status // empty' "$report"
         else
-          echo "no_context"
+          echo "no_report"
         fi
       }
       When call run_package_check
@@ -432,15 +431,14 @@ Describe "gitlab-wrapper.sh"
 
     # --- Deploy stub ---
 
-    It "runs deploy stub and writes BRIK_DEPLOY_STATUS=skipped"
+    It "runs deploy stub and records status skipped in the pipeline report"
       run_deploy_check() {
         brik.gitlab.run_stage "deploy" >/dev/null 2>&1
-        local context_file
-        context_file="$(ls "${BRIK_LOG_DIR}"/context-deploy-* 2>/dev/null | head -1)"
-        if [[ -n "$context_file" ]]; then
-          grep "^BRIK_DEPLOY_STATUS=" "$context_file" | cut -d= -f2
+        local report="${BRIK_LOG_DIR}/pipeline-report.json"
+        if [[ -f "$report" ]]; then
+          jq -r '.stages[] | select(.name == "deploy") | .tech.status // empty' "$report"
         else
-          echo "no_context"
+          echo "no_report"
         fi
       }
       When call run_deploy_check

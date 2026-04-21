@@ -21,6 +21,10 @@
 # Container scan stage: scan a built container image for vulnerabilities.
 # Usage: stages.container_scan <context_file>
 stages.container_scan() {
+    # context_file positionally passed by stage.run; unused here after §4.2
+    # migration (pipeline.run records tech.status from rc; config-skip path
+    # uses report.record directly).
+    # shellcheck disable=SC2034
     local context_file="$1"
 
     config.export_security_vars
@@ -29,7 +33,7 @@ stages.container_scan() {
 
     if [[ -z "$image" ]]; then
         log.info "no container image configured - skipping container scan"
-        context.set "$context_file" "BRIK_CONTAINER_SCAN_STATUS" "skipped"
+        report.record "container-scan" "tech" "status" "skipped" 2>/dev/null || true
         return 0
     fi
 
@@ -41,10 +45,6 @@ stages.container_scan() {
         brik.use verify.scan.scan
     fi
 
-    local result=0
-    verify.scan.run "${BRIK_WORKSPACE}" --scans "container" --image "$image" --severity "$severity" || result=$?
-
-    context.set_result "$context_file" "BRIK_CONTAINER_SCAN_STATUS" "$result"
-
-    return "$result"
+    # pipeline.run records tech.status from our rc (see commit cf719f5).
+    verify.scan.run "${BRIK_WORKSPACE}" --scans "container" --image "$image" --severity "$severity"
 }

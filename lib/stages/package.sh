@@ -5,6 +5,10 @@
 # Package stage: build container image via brik-lib.
 # Usage: stages.package <context_file>
 stages.package() {
+    # context_file positionally passed by stage.run; unused here after §4.2
+    # migration (pipeline.run records tech.status from rc; config-skip path
+    # uses report.record directly).
+    # shellcheck disable=SC2034
     local context_file="$1"
     local result=0 rc=0
 
@@ -16,7 +20,7 @@ stages.package() {
 
     if [[ -z "${BRIK_PACKAGE_DOCKER_IMAGE:-}" ]]; then
         log.warn "no docker image configured, skipping package stage"
-        context.set "$context_file" "BRIK_PACKAGE_STATUS" "skipped"
+        report.record "package" "tech" "status" "skipped" 2>/dev/null || true
         return 0
     fi
 
@@ -43,7 +47,6 @@ stages.package() {
     result=$?
 
     if [[ $result -ne 0 ]]; then
-        context.set "$context_file" "BRIK_PACKAGE_STATUS" "failed"
         return "$result"
     fi
 
@@ -80,25 +83,22 @@ stages.package() {
                 log.info "publishing ${_target}"
                 if ! brik.use "package-managers.${_target}"; then
                     log.error "unsupported publish target: ${_target}"
-                    context.set "$context_file" "BRIK_PACKAGE_STATUS" "failed"
                     return "$BRIK_EXIT_CONFIG_ERROR"
                 fi
                 local _publish_fn="pkg.${_target}.publish"
                 if ! declare -f "$_publish_fn" >/dev/null 2>&1; then
                     log.error "publish function not found: $_publish_fn"
-                    context.set "$context_file" "BRIK_PACKAGE_STATUS" "failed"
                     return "$BRIK_EXIT_CONFIG_ERROR"
                 fi
                 rc=0
                 "$_publish_fn" || rc=$?
                 if [[ $rc -ne 0 ]]; then
-                    context.set "$context_file" "BRIK_PACKAGE_STATUS" "failed"
                     return "$rc"
                 fi
             fi
         done
     fi
 
-    context.set "$context_file" "BRIK_PACKAGE_STATUS" "success"
+    # pipeline.run records tech.status=success from rc (see commit cf719f5).
     return 0
 }

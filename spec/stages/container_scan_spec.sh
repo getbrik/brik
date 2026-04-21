@@ -3,10 +3,16 @@ Describe "stages/container_scan.sh"
   Include "$BRIK_PIPELINE_LIB/tools.sh"
   Include "$BRIK_PIPELINE_LIB/context.sh"
   Include "$BRIK_PIPELINE_LIB/loader.sh"
+  Include "$BRIK_PIPELINE_LIB/report.sh"
   Include "$BRIK_TRANSVERSE_LIB/config.sh"
   Include "$BRIK_HOME/lib/stages/verify/scan/scan.sh"
   Include "$BRIK_HOME/lib/stages/container_scan.sh"
   Include "$BRIK_HOME/spec/support/mock_helper.sh"
+
+  read_container_scan_status() {
+    jq -r '.stages[] | select(.name == "container-scan") | .tech.status // empty' \
+      "$BRIK_LOG_DIR/pipeline-report.json" 2>/dev/null
+  }
 
   Describe "stages.container_scan"
     Describe "no image configured"
@@ -15,20 +21,24 @@ Describe "stages/container_scan.sh"
         BRIK_CONFIG_FILE="$(mktemp)"
         printf 'version: 1\nproject:\n  name: test\n  stack: node\n' > "$BRIK_CONFIG_FILE"
         CTX_FILE="$(mktemp)"
+        export BRIK_LOG_DIR
+        BRIK_LOG_DIR="$(mktemp -d)"
+        export BRIK_RUN_ID="container-scan-spec-fixture"
+        report.init >/dev/null 2>&1 || true
         unset BRIK_SECURITY_CONTAINER_IMAGE 2>/dev/null || true
       }
       cleanup_no_image() {
         rm -f "$BRIK_CONFIG_FILE" "$CTX_FILE"
+        rm -rf "$BRIK_LOG_DIR"
+        unset BRIK_RUN_ID 2>/dev/null || true
       }
       Before 'setup_no_image'
       After 'cleanup_no_image'
 
-      It "skips when no container image configured"
+      It "skips and records status skipped in the report"
         invoke_skip() {
-          stages.container_scan "$CTX_FILE" 2>/dev/null
-          local status=$?
-          grep "^BRIK_CONTAINER_SCAN_STATUS=" "$CTX_FILE" | cut -d= -f2
-          return $status
+          stages.container_scan "$CTX_FILE" 2>/dev/null || return $?
+          read_container_scan_status
         }
         When call invoke_skip
         The status should be success
@@ -59,13 +69,9 @@ Describe "stages/container_scan.sh"
       It "auto-loads security.container module and runs scan"
         invoke_autoload() {
           stages.container_scan "$CTX_FILE" 2>/dev/null
-          local status=$?
-          grep "^BRIK_CONTAINER_SCAN_STATUS=" "$CTX_FILE" | cut -d= -f2
-          return $status
         }
         When call invoke_autoload
         The status should be success
-        The output should equal "success"
       End
     End
 
@@ -87,16 +93,12 @@ Describe "stages/container_scan.sh"
       Before 'setup_with_scanner'
       After 'cleanup_with_scanner'
 
-      It "sets status to success when scan passes"
+      It "returns 0 when the scan passes"
         invoke_success() {
           stages.container_scan "$CTX_FILE" 2>/dev/null
-          local status=$?
-          grep "^BRIK_CONTAINER_SCAN_STATUS=" "$CTX_FILE" | cut -d= -f2
-          return $status
         }
         When call invoke_success
         The status should be success
-        The output should equal "success"
       End
     End
 
@@ -118,16 +120,12 @@ Describe "stages/container_scan.sh"
       Before 'setup_failing_scanner'
       After 'cleanup_failing_scanner'
 
-      It "sets status to failed and returns non-zero"
+      It "returns non-zero when the scan fails"
         invoke_fail() {
           stages.container_scan "$CTX_FILE" 2>/dev/null
-          local status=$?
-          grep "^BRIK_CONTAINER_SCAN_STATUS=" "$CTX_FILE" | cut -d= -f2
-          return $status
         }
         When call invoke_fail
         The status should equal 10
-        The output should equal "failed"
       End
     End
   End

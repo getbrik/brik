@@ -1,6 +1,7 @@
 Describe "stages.package"
   Include "$BRIK_HOME/lib/pipeline/stage.sh"
   Include "$BRIK_HOME/lib/pipeline/loader.sh"
+  Include "$BRIK_HOME/lib/pipeline/report.sh"
   Include "$BRIK_HOME/lib/transverse/config.sh"
   Include "$BRIK_HOME/lib/transverse/env.sh"
   Include "$BRIK_HOME/lib/stages/package.sh"
@@ -11,18 +12,27 @@ Describe "stages.package"
     printf 'version: 1\nproject:\n  name: test\n  stack: node\n' > "$BRIK_CONFIG_FILE"
     export BRIK_WORKSPACE
     BRIK_WORKSPACE="$(mktemp -d)"
+    export BRIK_LOG_DIR
+    BRIK_LOG_DIR="$(mktemp -d)"
     export BRIK_PROJECT_DIR="$BRIK_WORKSPACE"
     export BRIK_PLATFORM="gitlab"
     export BRIK_APP_VERSION="1.0.0"
+    export BRIK_RUN_ID="package-spec-fixture"
     config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
+    report.init >/dev/null 2>&1 || true
   }
   cleanup_env() {
     rm -f "$BRIK_CONFIG_FILE"
-    rm -rf "$BRIK_WORKSPACE"
-    unset BRIK_PACKAGE_DOCKER_IMAGE BRIK_APP_VERSION 2>/dev/null || true
+    rm -rf "$BRIK_WORKSPACE" "$BRIK_LOG_DIR"
+    unset BRIK_PACKAGE_DOCKER_IMAGE BRIK_APP_VERSION BRIK_RUN_ID 2>/dev/null || true
   }
   Before 'setup_env'
   After 'cleanup_env'
+
+  read_package_status() {
+    jq -r '.stages[] | select(.name == "package") | .tech.status // empty' \
+      "$BRIK_LOG_DIR/pipeline-report.json" 2>/dev/null
+  }
 
   It "is callable as a function"
     callable_check() { declare -f stages.package >/dev/null; }
@@ -30,13 +40,13 @@ Describe "stages.package"
     The status should be success
   End
 
-  It "sets BRIK_PACKAGE_STATUS to skipped when no docker image configured"
+  It "records status skipped in the pipeline report when no docker image"
     run_package_skip() {
       brik.use() { :; }
       local ctx
       ctx="$(context.create "package")" 2>/dev/null || ctx="$(mktemp)"
-      stages.package "$ctx" >/dev/null 2>&1
-      grep "^BRIK_PACKAGE_STATUS=" "$ctx" | cut -d= -f2
+      stages.package "$ctx" >/dev/null 2>&1 || return $?
+      read_package_status
     }
     When call run_package_skip
     The output should equal "skipped"
@@ -72,30 +82,16 @@ YAML
       The status should be success
     End
 
-    It "sets BRIK_PACKAGE_STATUS to success"
-      run_package_ctx() {
-        brik.use() { :; }
-        stacks.docker.build() { return 0; }
-        local ctx
-        ctx="$(context.create "package")" 2>/dev/null || ctx="$(mktemp)"
-        stages.package "$ctx" >/dev/null 2>&1
-        grep "^BRIK_PACKAGE_STATUS=" "$ctx" | cut -d= -f2
-      }
-      When call run_package_ctx
-      The output should equal "success"
-    End
-
-    It "sets BRIK_PACKAGE_STATUS to failed when build fails"
+    It "returns non-zero when build fails"
       run_package_fail() {
         brik.use() { :; }
         stacks.docker.build() { return 1; }
         local ctx
         ctx="$(context.create "package")" 2>/dev/null || ctx="$(mktemp)"
-        stages.package "$ctx" >/dev/null 2>&1 || true
-        grep "^BRIK_PACKAGE_STATUS=" "$ctx" | cut -d= -f2
+        stages.package "$ctx" >/dev/null 2>&1
       }
       When call run_package_fail
-      The output should equal "failed"
+      The status should equal 1
     End
 
     It "passes docker arguments to stacks.docker.build"
@@ -165,11 +161,10 @@ YAML
         pkg.docker.publish() { return 1; }
         local ctx
         ctx="$(context.create "package")" 2>/dev/null || ctx="$(mktemp)"
-        stages.package "$ctx" 2>/dev/null || true
-        grep "^BRIK_PACKAGE_STATUS=" "$ctx" | cut -d= -f2
+        stages.package "$ctx" 2>/dev/null
       }
       When call run_publish_docker_fail
-      The output should equal "failed"
+      The status should equal 1
     End
   End
 
@@ -213,11 +208,10 @@ YAML
         pkg.npm.publish() { return 1; }
         local ctx
         ctx="$(context.create "package")" 2>/dev/null || ctx="$(mktemp)"
-        stages.package "$ctx" 2>/dev/null || true
-        grep "^BRIK_PACKAGE_STATUS=" "$ctx" | cut -d= -f2
+        stages.package "$ctx" 2>/dev/null
       }
       When call run_publish_npm_fail
-      The output should equal "failed"
+      The status should equal 1
     End
   End
 
@@ -263,11 +257,10 @@ YAML
         pkg.maven.publish() { return 1; }
         local ctx
         ctx="$(context.create "package")" 2>/dev/null || ctx="$(mktemp)"
-        stages.package "$ctx" 2>/dev/null || true
-        grep "^BRIK_PACKAGE_STATUS=" "$ctx" | cut -d= -f2
+        stages.package "$ctx" 2>/dev/null
       }
       When call run_publish_maven_fail
-      The output should equal "failed"
+      The status should equal 1
     End
   End
 
@@ -312,11 +305,10 @@ YAML
         pkg.pypi.publish() { return 1; }
         local ctx
         ctx="$(context.create "package")" 2>/dev/null || ctx="$(mktemp)"
-        stages.package "$ctx" 2>/dev/null || true
-        grep "^BRIK_PACKAGE_STATUS=" "$ctx" | cut -d= -f2
+        stages.package "$ctx" 2>/dev/null
       }
       When call run_publish_pypi_fail
-      The output should equal "failed"
+      The status should equal 1
     End
   End
 
@@ -360,11 +352,10 @@ YAML
         pkg.cargo.publish() { return 1; }
         local ctx
         ctx="$(context.create "package")" 2>/dev/null || ctx="$(mktemp)"
-        stages.package "$ctx" 2>/dev/null || true
-        grep "^BRIK_PACKAGE_STATUS=" "$ctx" | cut -d= -f2
+        stages.package "$ctx" 2>/dev/null
       }
       When call run_publish_cargo_fail
-      The output should equal "failed"
+      The status should equal 1
     End
   End
 
@@ -409,11 +400,10 @@ YAML
         pkg.nuget.publish() { return 1; }
         local ctx
         ctx="$(context.create "package")" 2>/dev/null || ctx="$(mktemp)"
-        stages.package "$ctx" 2>/dev/null || true
-        grep "^BRIK_PACKAGE_STATUS=" "$ctx" | cut -d= -f2
+        stages.package "$ctx" 2>/dev/null
       }
       When call run_publish_nuget_fail
-      The output should equal "failed"
+      The status should equal 1
     End
   End
 
