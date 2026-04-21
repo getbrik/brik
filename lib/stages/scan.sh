@@ -8,6 +8,9 @@ brik.use "_deps"
 # Scan stage: run dependency and secret scans via verify.scan.run facade.
 # Usage: stages.scan <context_file>
 stages.scan() {
+    # context_file positionally passed by stage.run; unused here after §4.2
+    # migration (pipeline.run records tech.status from rc).
+    # shellcheck disable=SC2034
     local context_file="$1"
 
     config.export_security_vars
@@ -26,14 +29,6 @@ stages.scan() {
         brik.use verify.scan.scan
     fi
 
-    local result=0
-    verify.scan.run "${BRIK_WORKSPACE}" --scans "deps,secret" --severity "$severity" || result=$?
-
-    if [[ "$result" -eq 0 ]]; then
-        context.set "$context_file" "BRIK_SCAN_STATUS" "success"
-    else
-        context.set "$context_file" "BRIK_SCAN_STATUS" "failed"
-    fi
-
-    return "$result"
+    # pipeline.run records tech.status from our rc (see commit cf719f5).
+    verify.scan.run "${BRIK_WORKSPACE}" --scans "deps,secret" --severity "$severity"
 }

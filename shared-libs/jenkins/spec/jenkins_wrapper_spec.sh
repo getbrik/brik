@@ -381,19 +381,17 @@ Describe "jenkins-wrapper.sh"
 
     # --- Scan stage ---
 
-    It "runs scan stage and writes BRIK_SCAN_STATUS to context"
-      run_scan_check_context() {
+    It "runs scan stage and lazy-initializes the pipeline report"
+      run_scan_check_report() {
         brik.jenkins.run_stage "scan" >/dev/null 2>&1
-        local context_file
-        context_file="$(ls "${BRIK_LOG_DIR}"/context-scan-* 2>/dev/null | head -1)"
-        if [[ -n "$context_file" ]]; then
-          grep "^BRIK_SCAN_STATUS=" "$context_file" | cut -d= -f2
+        if [[ -f "${BRIK_LOG_DIR}/pipeline-report.json" ]]; then
+          echo "report_present"
         else
-          echo "no_context"
+          echo "no_report"
         fi
       }
-      When call run_scan_check_context
-      The output should be present
+      When call run_scan_check_report
+      The output should equal "report_present"
     End
 
     # --- Backward compat ---

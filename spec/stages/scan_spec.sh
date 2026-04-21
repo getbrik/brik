@@ -50,11 +50,11 @@ YAML
         verify.scan.secret.run() { return 0; }
         local ctx
         ctx="$(context.create "scan")" 2>/dev/null || ctx="$(mktemp)"
-        stages.scan "$ctx" >/dev/null 2>&1
-        grep "^BRIK_SCAN_STATUS=" "$ctx" | cut -d= -f2
+        stages.scan "$ctx"
       }
       When call run_scan_defaults
-      The output should equal "success"
+      The status should be success
+      The error should be present
     End
   End
 
@@ -79,11 +79,11 @@ YAML
         verify.scan.secret.run() { return 0; }
         local ctx
         ctx="$(context.create "scan")" 2>/dev/null || ctx="$(mktemp)"
-        stages.scan "$ctx" >/dev/null 2>&1
-        grep "^BRIK_SCAN_STATUS=" "$ctx" | cut -d= -f2
+        stages.scan "$ctx"
       }
       When call run_deps
-      The output should equal "success"
+      The status should be success
+      The error should be present
     End
 
     It "sets status to failed when deps scan fails"
@@ -92,11 +92,11 @@ YAML
         verify.scan.secret.run() { return 0; }
         local ctx
         ctx="$(context.create "scan")" 2>/dev/null || ctx="$(mktemp)"
-        stages.scan "$ctx" >/dev/null 2>&1 || true
-        grep "^BRIK_SCAN_STATUS=" "$ctx" | cut -d= -f2
+        stages.scan "$ctx"
       }
       When call run_deps_fail
-      The output should equal "failed"
+      The status should equal 10
+      The error should be present
     End
   End
 
@@ -121,11 +121,11 @@ YAML
         verify.scan.secret.run() { return 0; }
         local ctx
         ctx="$(context.create "scan")" 2>/dev/null || ctx="$(mktemp)"
-        stages.scan "$ctx" >/dev/null 2>&1
-        grep "^BRIK_SCAN_STATUS=" "$ctx" | cut -d= -f2
+        stages.scan "$ctx"
       }
       When call run_secrets
-      The output should equal "success"
+      The status should be success
+      The error should be present
     End
 
     It "sets status to failed when secret scan fails"
@@ -134,11 +134,11 @@ YAML
         verify.scan.secret.run() { return 1; }
         local ctx
         ctx="$(context.create "scan")" 2>/dev/null || ctx="$(mktemp)"
-        stages.scan "$ctx" >/dev/null 2>&1 || true
-        grep "^BRIK_SCAN_STATUS=" "$ctx" | cut -d= -f2
+        stages.scan "$ctx"
       }
       When call run_secrets_fail
-      The output should equal "failed"
+      The status should equal 10
+      The error should be present
     End
   End
 
@@ -165,11 +165,11 @@ YAML
         verify.scan.secret.run() { return 0; }
         local ctx
         ctx="$(context.create "scan")" 2>/dev/null || ctx="$(mktemp)"
-        stages.scan "$ctx" >/dev/null 2>&1
-        grep "^BRIK_SCAN_STATUS=" "$ctx" | cut -d= -f2
+        stages.scan "$ctx"
       }
       When call run_both
-      The output should equal "success"
+      The status should be success
+      The error should be present
     End
 
     It "fails if any scan fails"
@@ -178,11 +178,11 @@ YAML
         verify.scan.secret.run() { return 1; }
         local ctx
         ctx="$(context.create "scan")" 2>/dev/null || ctx="$(mktemp)"
-        stages.scan "$ctx" >/dev/null 2>&1 || true
-        grep "^BRIK_SCAN_STATUS=" "$ctx" | cut -d= -f2
+        stages.scan "$ctx"
       }
       When call run_both_fail
-      The output should equal "failed"
+      The status should equal 10
+      The error should be present
     End
   End
 End

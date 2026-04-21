@@ -41,19 +41,6 @@ Describe "stages.build"
     The status should be success
   End
 
-  It "sets BRIK_BUILD_STATUS to success on success"
-    run_build_ctx_success() {
-      brik.use() { :; }
-      stacks.node.build() { return 0; }
-      local ctx
-      ctx="$(context.create "build")" 2>/dev/null || ctx="$(mktemp)"
-      stages.build "$ctx" >/dev/null 2>&1
-      grep "^BRIK_BUILD_STATUS=" "$ctx" | cut -d= -f2
-    }
-    When call run_build_ctx_success
-    The output should equal "success"
-  End
-
   It "returns non-zero when the stack build fn fails"
     run_build_failure() {
       brik.use() { :; }
@@ -64,19 +51,6 @@ Describe "stages.build"
     }
     When call run_build_failure
     The status should be failure
-  End
-
-  It "sets BRIK_BUILD_STATUS to failed on failure"
-    run_build_ctx_failure() {
-      brik.use() { :; }
-      stacks.node.build() { return 1; }
-      local ctx
-      ctx="$(context.create "build")" 2>/dev/null || ctx="$(mktemp)"
-      stages.build "$ctx" >/dev/null 2>&1 || true
-      grep "^BRIK_BUILD_STATUS=" "$ctx" | cut -d= -f2
-    }
-    When call run_build_ctx_failure
-    The output should equal "failed"
   End
 
   It "logs stack name"
@@ -145,12 +119,10 @@ YAML
       ctx="$(context.create "build")" 2>/dev/null || ctx="$(mktemp)"
       export BRIK_WORKSPACE="/nonexistent/brik-workspace-$$"
       stages.build "$ctx" 2>/dev/null
-      local rc=$?
-      printf '%s\n%s' "$rc" "$(grep "^BRIK_BUILD_STATUS=" "$ctx" | cut -d= -f2)"
+      printf '%s' "$?"
     }
     When call run_build_no_workspace
-    The line 1 of output should equal "6"
-    The line 2 of output should equal "failed"
+    The output should equal "6"
   End
 
   It "returns CONFIG_ERROR when auto-detect finds no stack"

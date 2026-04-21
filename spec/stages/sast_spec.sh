@@ -45,16 +45,16 @@ YAML
     }
     Before 'setup_no_scans'
 
-    It "defaults to semgrep and returns success"
+    It "defaults to semgrep and returns 0 when the scan succeeds"
       run_sast_defaults() {
         verify.scan.sast.run() { return 0; }
         local ctx
         ctx="$(context.create "sast")" 2>/dev/null || ctx="$(mktemp)"
-        stages.sast "$ctx" >/dev/null 2>&1
-        grep "^BRIK_SAST_STATUS=" "$ctx" | cut -d= -f2
+        stages.sast "$ctx"
       }
       When call run_sast_defaults
-      The output should equal "success"
+      The status should be success
+      The error should be present
     End
   End
 
@@ -74,30 +74,30 @@ YAML
     }
     Before 'setup_sast'
 
-    It "runs SAST scan and sets status to success"
+    It "returns 0 when the SAST scan succeeds"
       run_sast() {
         brik.use() { :; }
         verify.scan.sast.run() { return 0; }
         local ctx
         ctx="$(context.create "sast")" 2>/dev/null || ctx="$(mktemp)"
-        stages.sast "$ctx" >/dev/null 2>&1
-        grep "^BRIK_SAST_STATUS=" "$ctx" | cut -d= -f2
+        stages.sast "$ctx"
       }
       When call run_sast
-      The output should equal "success"
+      The status should be success
+      The error should be present
     End
 
-    It "sets status to failed when SAST fails"
+    It "returns non-zero when the SAST scan fails"
       run_sast_fail() {
         brik.use() { :; }
         verify.scan.sast.run() { return 1; }
         local ctx
         ctx="$(context.create "sast")" 2>/dev/null || ctx="$(mktemp)"
-        stages.sast "$ctx" >/dev/null 2>&1 || true
-        grep "^BRIK_SAST_STATUS=" "$ctx" | cut -d= -f2
+        stages.sast "$ctx"
       }
       When call run_sast_fail
-      The output should equal "failed"
+      The status should equal 10
+      The error should be present
     End
   End
 
@@ -116,18 +116,18 @@ YAML
     }
     Before 'setup_license'
 
-    It "runs license scan and sets status to success"
+    It "returns 0 when the license scan succeeds"
       run_license() {
         brik.use() { :; }
         verify.scan.sast.run() { return 0; }
         verify.scan.license.run() { return 0; }
         local ctx
         ctx="$(context.create "sast")" 2>/dev/null || ctx="$(mktemp)"
-        stages.sast "$ctx" >/dev/null 2>&1
-        grep "^BRIK_SAST_STATUS=" "$ctx" | cut -d= -f2
+        stages.sast "$ctx"
       }
       When call run_license
-      The output should equal "success"
+      The status should be success
+      The error should be present
     End
   End
 
@@ -146,18 +146,18 @@ YAML
     }
     Before 'setup_iac'
 
-    It "runs IaC scan and sets status to success"
+    It "returns 0 when the IaC scan succeeds"
       run_iac() {
         brik.use() { :; }
         verify.scan.sast.run() { return 0; }
         verify.scan.iac.run() { return 0; }
         local ctx
         ctx="$(context.create "sast")" 2>/dev/null || ctx="$(mktemp)"
-        stages.sast "$ctx" >/dev/null 2>&1
-        grep "^BRIK_SAST_STATUS=" "$ctx" | cut -d= -f2
+        stages.sast "$ctx"
       }
       When call run_iac
-      The output should equal "success"
+      The status should be success
+      The error should be present
     End
   End
 
@@ -178,32 +178,32 @@ YAML
     }
     Before 'setup_multi'
 
-    It "runs all configured scans"
+    It "returns 0 when all configured scans pass"
       run_multi() {
         brik.use() { :; }
         verify.scan.sast.run() { return 0; }
         verify.scan.license.run() { return 0; }
         local ctx
         ctx="$(context.create "sast")" 2>/dev/null || ctx="$(mktemp)"
-        stages.sast "$ctx" >/dev/null 2>&1
-        grep "^BRIK_SAST_STATUS=" "$ctx" | cut -d= -f2
+        stages.sast "$ctx"
       }
       When call run_multi
-      The output should equal "success"
+      The status should be success
+      The error should be present
     End
 
-    It "fails if any scan fails"
+    It "returns non-zero if any scan fails"
       run_multi_fail() {
         brik.use() { :; }
         verify.scan.sast.run() { return 0; }
         verify.scan.license.run() { return 1; }
         local ctx
         ctx="$(context.create "sast")" 2>/dev/null || ctx="$(mktemp)"
-        stages.sast "$ctx" >/dev/null 2>&1 || true
-        grep "^BRIK_SAST_STATUS=" "$ctx" | cut -d= -f2
+        stages.sast "$ctx"
       }
       When call run_multi_fail
-      The output should equal "failed"
+      The status should equal 10
+      The error should be present
     End
   End
 End

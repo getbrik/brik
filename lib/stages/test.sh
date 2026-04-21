@@ -7,16 +7,14 @@ brik.use "_deps"
 # Test stage: run tests via stack-specific modules.
 # Usage: stages.test <context_file>
 stages.test() {
+    # context_file positionally passed by stage.run; unused here after §4.2
+    # migration (pipeline.run records tech.status from rc).
+    # shellcheck disable=SC2034
     local context_file="$1"
-    local result=0
 
     config.export_test_vars
 
-    pipeline.require_dir "${BRIK_WORKSPACE}" || {
-        result=$?
-        context.set_result "$context_file" "BRIK_TEST_STATUS" "$result"
-        return "$result"
-    }
+    pipeline.require_dir "${BRIK_WORKSPACE}" || return $?
 
     stacks.install_deps "${BRIK_WORKSPACE}" test
 
@@ -34,12 +32,10 @@ stages.test() {
         (cd "${BRIK_WORKSPACE}" && eval "$BRIK_TEST_COMMAND") || exit_code=$?
         if [[ "$exit_code" -ne 0 ]]; then
             log.error "tests failed with exit code $exit_code"
-            result="$BRIK_EXIT_CHECK_FAILED"
-        else
-            log.info "tests passed"
+            return "$BRIK_EXIT_CHECK_FAILED"
         fi
-        context.set_result "$context_file" "BRIK_TEST_STATUS" "$result"
-        return "$result"
+        log.info "tests passed"
+        return 0
     fi
 
     # Tier 2/3: resolve stack from framework name or workspace marker files.
@@ -48,38 +44,22 @@ stages.test() {
     if [[ -n "${BRIK_TEST_FRAMEWORK:-}" ]]; then
         stack="$(stacks.detect_from_framework "$BRIK_TEST_FRAMEWORK")" || {
             log.error "unsupported test framework: $BRIK_TEST_FRAMEWORK"
-            result="$BRIK_EXIT_CONFIG_ERROR"
-            context.set_result "$context_file" "BRIK_TEST_STATUS" "$result"
-            return "$result"
+            return "$BRIK_EXIT_CONFIG_ERROR"
         }
     else
-        stack="$(stacks.detect "${BRIK_WORKSPACE}")" || {
-            result="$BRIK_EXIT_MISSING_DEP"
-            context.set_result "$context_file" "BRIK_TEST_STATUS" "$result"
-            return "$result"
-        }
+        stack="$(stacks.detect "${BRIK_WORKSPACE}")" || return "$BRIK_EXIT_MISSING_DEP"
     fi
 
     if ! brik.use "stacks.${stack}"; then
         log.error "no test module: $stack"
-        result="$BRIK_EXIT_CONFIG_ERROR"
-        context.set_result "$context_file" "BRIK_TEST_STATUS" "$result"
-        return "$result"
+        return "$BRIK_EXIT_CONFIG_ERROR"
     fi
 
     local test_cmd=""
     if [[ -n "${BRIK_TEST_FRAMEWORK:-}" ]]; then
-        test_cmd="$(stacks."${stack}".test_cmd "$BRIK_TEST_FRAMEWORK" "${BRIK_WORKSPACE}" "")" || {
-            result=$?
-            context.set_result "$context_file" "BRIK_TEST_STATUS" "$result"
-            return "$result"
-        }
+        test_cmd="$(stacks."${stack}".test_cmd "$BRIK_TEST_FRAMEWORK" "${BRIK_WORKSPACE}" "")" || return $?
     else
-        test_cmd="$(stacks."${stack}".test "${BRIK_WORKSPACE}" "")" || {
-            result=$?
-            context.set_result "$context_file" "BRIK_TEST_STATUS" "$result"
-            return "$result"
-        }
+        test_cmd="$(stacks."${stack}".test "${BRIK_WORKSPACE}" "")" || return $?
     fi
 
     log.info "running tests: $test_cmd"
@@ -88,11 +68,9 @@ stages.test() {
     (cd "${BRIK_WORKSPACE}" && eval "$test_cmd") || exit_code2=$?
     if [[ "$exit_code2" -ne 0 ]]; then
         log.error "tests failed with exit code $exit_code2"
-        result="$BRIK_EXIT_CHECK_FAILED"
-    else
-        log.info "tests passed"
+        return "$BRIK_EXIT_CHECK_FAILED"
     fi
-
-    context.set_result "$context_file" "BRIK_TEST_STATUS" "$result"
-    return "$result"
+    log.info "tests passed"
+    # pipeline.run records tech.status=success from rc (see commit cf719f5).
+    return 0
 }
