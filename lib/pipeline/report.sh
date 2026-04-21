@@ -96,6 +96,33 @@ report.record() {
     _report._append_json "$backend" "$stage" "$category" "$key" "$value"
 }
 
+# Check whether a stage already has a tech.status recorded in the report.
+# Used by pipeline.run to avoid overwriting a status that a stage set itself
+# (e.g. a config-skipped stage that records status=skipped before returning 0).
+# Usage: report.has_status <stage>
+# Returns: 0 if status is present, 1 if absent, BRIK_EXIT_INVALID_INPUT on bad arg.
+report.has_status() {
+    local stage="${1:-}"
+    if [[ -z "$stage" ]]; then
+        error.raise "$BRIK_EXIT_INVALID_INPUT" \
+            "report.has_status expects 1 argument: stage"
+        return "$?"
+    fi
+
+    local backend
+    backend="$(_report._backend_path)"
+    [[ -f "$backend" ]] || return 1
+
+    command -v jq >/dev/null 2>&1 || return 1
+
+    local status
+    status="$(jq -r --arg s "$stage" \
+        '.stages[] | select(.name == $s) | .tech.status // empty' \
+        "$backend" 2>/dev/null)" || return 1
+
+    [[ -n "$status" ]]
+}
+
 # Atomic read-modify-write of the backend JSON: create stage on first touch,
 # then set .stages[name=stage].<category>.<key> = value.
 _report._append_json() {

@@ -255,4 +255,69 @@ Describe "report.sh"
       The error should be present
     End
   End
+
+  Describe "report.has_status"
+    Before 'setup_report_dir'
+    After 'cleanup_report_dir'
+
+    It "returns 1 when no report has been initialized"
+      When call report.has_status "build"
+      The status should equal 1
+    End
+
+    It "returns 1 when the stage has no entry in the report"
+      no_entry_for_stage() {
+        report.init || return 2
+        report.has_status "build"
+      }
+      When call no_entry_for_stage
+      The status should equal 1
+    End
+
+    It "returns 1 when the stage entry has no tech.status"
+      stage_without_status() {
+        report.init || return 2
+        report.record "build" "tech" "duration_ms" "1234" || return 2
+        report.has_status "build"
+      }
+      When call stage_without_status
+      The status should equal 1
+    End
+
+    It "returns 0 when tech.status is success"
+      status_success() {
+        report.init || return 2
+        report.record "build" "tech" "status" "success" || return 2
+        report.has_status "build"
+      }
+      When call status_success
+      The status should be success
+    End
+
+    It "returns 0 when tech.status is failed"
+      status_failed() {
+        report.init || return 2
+        report.record "build" "tech" "status" "failed" || return 2
+        report.has_status "build"
+      }
+      When call status_failed
+      The status should be success
+    End
+
+    It "returns 0 when tech.status is skipped"
+      status_skipped() {
+        report.init || return 2
+        report.record "lint" "tech" "status" "skipped" || return 2
+        report.has_status "lint"
+      }
+      When call status_skipped
+      The status should be success
+    End
+
+    It "rejects a missing stage argument"
+      When call report.has_status
+      The status should equal 2
+      The error should be present
+    End
+  End
 End
