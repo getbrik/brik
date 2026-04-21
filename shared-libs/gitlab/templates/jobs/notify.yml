@@ -24,3 +24,11 @@ brik-notify:
   script:
     - bash -c '. /tmp/brik-bootstrap.sh && brik.gitlab.run_stage notify'
   when: always
+  # Expose the pipeline report written by stages.notify so it is reachable
+  # via the GitLab job artifact URL (suitable for Slack/email links later).
+  artifacts:
+    when: always
+    expire_in: 1 week
+    name: "pipeline-report-${CI_PIPELINE_ID}"
+    paths:
+      - brik-artifacts/

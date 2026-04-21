@@ -117,8 +117,35 @@ pipeline.run() {
 
     report.render || true
 
+    # Archive the report into a workspace-relative dir so GitLab/Jenkins can
+    # pick it up as a build artifact (declared in shared-libs templates).
+    # Runs unconditionally (notify stage is opt-in, we cannot rely on it).
+    _pipeline._archive_report || true
+
     if $had_failure; then
         return "$BRIK_EXIT_FAILURE"
     fi
     return 0
+}
+
+# Copy pipeline-report.{md,json} to a workspace-relative directory so CI
+# systems (GitLab via CI_PROJECT_DIR, Jenkins via WORKSPACE) can archive it.
+# No-op when no workspace root resolves (standalone local run outside CI).
+_pipeline._archive_report() {
+    local _log_dir="${BRIK_LOG_DIR:-${BRIK_DEFAULT_LOG_DIR:-/tmp/brik/logs}}"
+    local _report_md="${_log_dir}/pipeline-report.md"
+    local _report_json="${_log_dir}/pipeline-report.json"
+
+    local _artifacts_root="${CI_PROJECT_DIR:-${WORKSPACE:-${BRIK_WORKSPACE:-}}}"
+    [[ -n "$_artifacts_root" && -d "$_artifacts_root" ]] || return 0
+
+    local _artifacts_dir="${_artifacts_root}/brik-artifacts"
+    mkdir -p "$_artifacts_dir" 2>/dev/null || return 0
+
+    [[ -f "$_report_md" ]] && cp "$_report_md" "$_artifacts_dir/" 2>/dev/null || true
+    [[ -f "$_report_json" ]] && cp "$_report_json" "$_artifacts_dir/" 2>/dev/null || true
+
+    if [[ -f "${_artifacts_dir}/pipeline-report.md" ]]; then
+        log.info "pipeline report archived: ${_artifacts_dir}/pipeline-report.{md,json}"
+    fi
 }

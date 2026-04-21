@@ -160,7 +160,15 @@ def call(Map params = [:]) {
                     runInDeploy('deploy')
                 }
             } finally {
-                stage('Notify') { brikStage('notify', brikHome) }
+                stage('Notify') {
+                    brikStage('notify', brikHome)
+                    // Expose the pipeline report written by stages.notify so
+                    // it is reachable via Jenkins's build artifact URL
+                    // (suitable for Slack/email links later).
+                    archiveArtifacts artifacts: 'brik-artifacts/**/*',
+                        allowEmptyArchive: true,
+                        fingerprint: false
+                }
             }
 
             } // withEnv(scmEnv)

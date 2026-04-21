@@ -263,25 +263,34 @@ stages.notify() {
     local project_name
     project_name="$(config.get '.project.name' 'unnamed')"
 
-    echo "========================================"
-    echo "  Brik Pipeline Summary"
-    echo "========================================"
-    echo "  Project : $project_name"
-    echo "  Platform: ${BRIK_PLATFORM:-unknown}"
-    echo "  Ref     : ${BRIK_COMMIT_REF:-unknown}"
-    echo "  SHA     : ${BRIK_COMMIT_SHORT_SHA:-unknown}"
-    echo "========================================"
+    local _log_dir="${BRIK_LOG_DIR:-${BRIK_DEFAULT_LOG_DIR:-/tmp/brik/logs}}"
+    local _report_md="${_log_dir}/pipeline-report.md"
+    local _report_json="${_log_dir}/pipeline-report.json"
+
+    # Emit the rendered pipeline-report.md on stdout so the full stage table +
+    # business section are visible in CI job logs. Falls back to a minimal
+    # banner if the report is absent (e.g. single-stage run outside pipeline.run).
+    if [[ -f "$_report_md" ]]; then
+        cat "$_report_md"
+    else
+        echo "========================================"
+        echo "  Brik Pipeline Summary"
+        echo "========================================"
+        echo "  Project : $project_name"
+        echo "  Platform: ${BRIK_PLATFORM:-unknown}"
+        echo "  Ref     : ${BRIK_COMMIT_REF:-unknown}"
+        echo "  SHA     : ${BRIK_COMMIT_SHORT_SHA:-unknown}"
+        echo "========================================"
+    fi
 
     # Determine pipeline status from the aggregated pipeline report.
-    # Fixed in §4.2 step 7: previously read a BRIK_PIPELINE_STATUS context
-    # key that nobody wrote. Now derives from any tech.status=failed in
-    # pipeline-report.json. Defaults to "success" when no report or no jq.
+    # Derives from any tech.status=failed in pipeline-report.json. Defaults
+    # to "success" when no report or no jq.
     local pipeline_status="success"
-    local _report_path="${BRIK_LOG_DIR:-${BRIK_DEFAULT_LOG_DIR:-/tmp/brik/logs}}/pipeline-report.json"
-    if [[ -f "$_report_path" ]] && command -v jq >/dev/null 2>&1; then
+    if [[ -f "$_report_json" ]] && command -v jq >/dev/null 2>&1; then
         local _failed_count
         _failed_count="$(jq '[.stages[] | select(.tech.status == "failed")] | length' \
-            "$_report_path" 2>/dev/null || echo 0)"
+            "$_report_json" 2>/dev/null || echo 0)"
         [[ "$_failed_count" -gt 0 ]] && pipeline_status="failed"
     fi
 
