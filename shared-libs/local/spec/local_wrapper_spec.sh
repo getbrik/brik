@@ -436,17 +436,16 @@ Describe "local-wrapper.sh"
       The error should be present
     End
 
-    It "runs release stage and creates context"
+    It "runs release stage and records app_version in the pipeline report"
       run_release() {
         brik.local.run_stage "release" >/dev/null 2>&1
-        local context_file
-        context_file="$(ls "${BRIK_LOG_DIR}"/context-release-* 2>/dev/null | head -1)"
-        if [[ -n "$context_file" ]]; then
+        local report="${BRIK_LOG_DIR}/pipeline-report.json"
+        if [[ -f "$report" ]]; then
           local version
-          version="$(grep "^BRIK_APP_VERSION=" "$context_file" | cut -d= -f2)"
+          version="$(jq -r '.stages[] | select(.name == "release") | .business.app_version // empty' "$report")"
           if [[ -n "$version" ]]; then echo "has_version"; else echo "no_version"; fi
         else
-          echo "no_context"
+          echo "no_report"
         fi
       }
       When call run_release

@@ -5,6 +5,10 @@
 # Init stage: detect stack, validate config, setup environment.
 # Usage: stages.init <context_file>
 stages.init() {
+    # context_file positionally passed by stage.run; unused here after §4.2
+    # migration (detected stack now lands in the pipeline report's business
+    # section via report.record).
+    # shellcheck disable=SC2034
     local context_file="$1"
 
     log.info "initializing pipeline"
@@ -30,7 +34,7 @@ stages.init() {
         log.info "configured stack: $stack"
     fi
 
-    context.set "$context_file" "BRIK_STACK" "$stack"
+    report.record "init" "business" "stack" "$stack" 2>/dev/null || true
 
     # Export config and override stack with the runtime-resolved value.
     # config.export_build_vars re-reads .project.stack from brik.yml, which may
