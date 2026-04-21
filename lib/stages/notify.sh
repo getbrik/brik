@@ -250,6 +250,10 @@ notify.send() {
 
 # Usage: stages.notify <context_file>
 stages.notify() {
+    # context_file positionally passed by stage.run; unused here after §4.2
+    # step 7 (dead BRIK_PIPELINE_STATUS read replaced by pipeline-report.json
+    # query).
+    # shellcheck disable=SC2034
     local context_file="$1"
 
     config.export_notify_vars
@@ -268,13 +272,17 @@ stages.notify() {
     echo "  SHA     : ${BRIK_COMMIT_SHORT_SHA:-unknown}"
     echo "========================================"
 
-    # Determine pipeline status from context.
+    # Determine pipeline status from the aggregated pipeline report.
+    # Fixed in §4.2 step 7: previously read a BRIK_PIPELINE_STATUS context
+    # key that nobody wrote. Now derives from any tech.status=failed in
+    # pipeline-report.json. Defaults to "success" when no report or no jq.
     local pipeline_status="success"
-    if [[ -n "$context_file" && -f "$context_file" ]]; then
-        local ctx_val
-        # optional: key may not exist in context
-        ctx_val="$(context.get "$context_file" "BRIK_PIPELINE_STATUS" 2>/dev/null)" || true
-        [[ -n "$ctx_val" ]] && pipeline_status="$ctx_val"
+    local _report_path="${BRIK_LOG_DIR:-${BRIK_DEFAULT_LOG_DIR:-/tmp/brik/logs}}/pipeline-report.json"
+    if [[ -f "$_report_path" ]] && command -v jq >/dev/null 2>&1; then
+        local _failed_count
+        _failed_count="$(jq '[.stages[] | select(.tech.status == "failed")] | length' \
+            "$_report_path" 2>/dev/null || echo 0)"
+        [[ "$_failed_count" -gt 0 ]] && pipeline_status="failed"
     fi
 
     local summary_msg="Pipeline $pipeline_status for $project_name (${BRIK_COMMIT_REF:-unknown})"

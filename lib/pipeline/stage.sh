@@ -122,7 +122,7 @@ stage.run() {
     # Create execution context
     context_file="$(context.create "$stage_name")" || return "$BRIK_EXIT_INVALID_ENV"
     log_file="$(stage.create_log_file "$stage_name")" || return "$BRIK_EXIT_IO_FAILURE"
-    context.set "$context_file" "BRIK_LOG_FILE" "$log_file" || return "$BRIK_EXIT_IO_FAILURE"
+    _context._set "$context_file" "BRIK_LOG_FILE" "$log_file" || return "$BRIK_EXIT_IO_FAILURE"
 
     # Pre-stage hook (can abort)
     hook.pre_stage "$stage_name" "$context_file" "$log_file" || {
@@ -140,7 +140,7 @@ stage.run() {
     exit_code=$?
 
     # best-effort: finalization below must not override the stage exit code
-    context.set "$context_file" "BRIK_FINISHED_AT" "$(date +"%Y-%m-%dT%H:%M:%S%z")" || true
+    _context._set "$context_file" "BRIK_FINISHED_AT" "$(date +"%Y-%m-%dT%H:%M:%S%z")" || true
 
     if [[ $exit_code -eq 0 ]]; then
         # Check if the stage recorded a "skipped" status in the pipeline
