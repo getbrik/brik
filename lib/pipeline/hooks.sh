@@ -46,7 +46,9 @@ _hook._resolve_config() {
     local hook_type="$1"  # pre or post
     local stage_name="$2"
     local upper_stage
-    upper_stage="$(printf '%s' "$stage_name" | tr '[:lower:]' '[:upper:]')"
+    # Sanitize hyphens to underscores so kebab-case stages (e.g. container-scan)
+    # yield valid bash variable names. Matches stage.sh status-key sanitization.
+    upper_stage="$(printf '%s' "$stage_name" | tr '[:lower:]-' '[:upper:]_')"
     local var_name="BRIK_HOOK_${hook_type}_${upper_stage}"
 
     if [[ -n "${!var_name:-}" ]]; then
