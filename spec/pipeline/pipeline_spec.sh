@@ -185,6 +185,37 @@ Describe "pipeline.sh"
       The output should be present
       The error should be present
     End
+
+    It "preserves a stage-recorded skipped status (config-skip)"
+      lint_config_skip() {
+        # Simulate a stage that records its own skipped status before rc=0
+        # (mirrors the "BRIK_LINT_ENABLED=false" pattern used by stages.lint).
+        stages.lint() {
+          report.record "lint" "tech" "status" "skipped"
+          return 0
+        }
+        pipeline.run >/dev/null 2>&1
+        jq -r '.stages[] | select(.name == "lint") | .tech.status' \
+          "$PIPELINE_LOG_DIR/pipeline-report.json"
+      }
+      When call lint_config_skip
+      The output should equal "skipped"
+    End
+
+    It "still marks pipeline as failed when a later stage fails after a self-skip"
+      self_skip_then_fail() {
+        stages.lint() {
+          report.record "lint" "tech" "status" "skipped"
+          return 0
+        }
+        stages.test() { return 1; }
+        pipeline.run --continue-on-error
+      }
+      When call self_skip_then_fail
+      The status should equal 1
+      The output should be present
+      The error should be present
+    End
   End
 
   Describe "pipeline.run flag validation"

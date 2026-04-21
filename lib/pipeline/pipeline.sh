@@ -100,12 +100,19 @@ pipeline.run() {
 
         report.record "$stage" "tech" "duration_ms" "$duration_ms" || true
         report.record "$stage" "tech" "exit_code" "$rc" || true
-        if [[ $rc -eq 0 ]]; then
-            report.record "$stage" "tech" "status" "success" || true
-        else
-            report.record "$stage" "tech" "status" "failed" || true
-            had_failure=true
+
+        # Respect a status the stage set itself (e.g. config-skip where the
+        # stage records status=skipped before returning 0). Only deduce
+        # status from rc when the stage did not already record one.
+        if ! report.has_status "$stage"; then
+            if [[ $rc -eq 0 ]]; then
+                report.record "$stage" "tech" "status" "success" || true
+            else
+                report.record "$stage" "tech" "status" "failed" || true
+            fi
         fi
+
+        [[ $rc -ne 0 ]] && had_failure=true
     done
 
     report.render || true
