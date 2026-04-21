@@ -6,6 +6,9 @@
 # SAST stage: run SAST, license, and IaC scans via verify.scan.run facade.
 # Usage: stages.sast <context_file>
 stages.sast() {
+    # context_file positionally passed by stage.run; unused here after §4.2
+    # migration (pipeline.run records tech.status from rc).
+    # shellcheck disable=SC2034
     local context_file="$1"
 
     config.export_security_vars
@@ -32,14 +35,6 @@ stages.sast() {
         brik.use verify.scan.scan
     fi
 
-    local result=0
-    verify.scan.run "${BRIK_WORKSPACE}" --scans "$scans" || result=$?
-
-    if [[ "$result" -eq 0 ]]; then
-        context.set "$context_file" "BRIK_SAST_STATUS" "success"
-    else
-        context.set "$context_file" "BRIK_SAST_STATUS" "failed"
-    fi
-
-    return "$result"
+    # pipeline.run records tech.status from our rc (see commit cf719f5).
+    verify.scan.run "${BRIK_WORKSPACE}" --scans "$scans"
 }

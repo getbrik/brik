@@ -58,18 +58,6 @@ Describe "stages.test"
     The status should be success
   End
 
-  It "sets BRIK_TEST_STATUS to success on success"
-    run_test_ctx_success() {
-      _stub_leaf_success
-      local ctx
-      ctx="$(context.create "test")" 2>/dev/null || ctx="$(mktemp)"
-      stages.test "$ctx" >/dev/null 2>&1
-      grep "^BRIK_TEST_STATUS=" "$ctx" | cut -d= -f2
-    }
-    When call run_test_ctx_success
-    The output should equal "success"
-  End
-
   It "returns non-zero when the stack test cmd fails"
     run_test_failure() {
       _stub_leaf_failure
@@ -79,18 +67,6 @@ Describe "stages.test"
     }
     When call run_test_failure
     The status should be failure
-  End
-
-  It "sets BRIK_TEST_STATUS to failed on failure"
-    run_test_ctx_failure() {
-      _stub_leaf_failure
-      local ctx
-      ctx="$(context.create "test")" 2>/dev/null || ctx="$(mktemp)"
-      stages.test "$ctx" >/dev/null 2>&1 || true
-      grep "^BRIK_TEST_STATUS=" "$ctx" | cut -d= -f2
-    }
-    When call run_test_ctx_failure
-    The output should equal "failed"
   End
 
   It "exports BRIK_TEST_FRAMEWORK from config"
@@ -132,12 +108,10 @@ YAML
       local ctx
       ctx="$(context.create "test")" 2>/dev/null || ctx="$(mktemp)"
       stages.test "$ctx" 2>/dev/null
-      local rc=$?
-      printf '%s\n%s' "$rc" "$(grep "^BRIK_TEST_STATUS=" "$ctx" | cut -d= -f2)"
+      printf '%s' "$?"
     }
     When call run_test_no_workspace
-    The line 1 of output should equal "6"
-    The line 2 of output should equal "failed"
+    The output should equal "6"
   End
 
   It "runs BRIK_TEST_COMMAND override and reports success"
@@ -155,12 +129,10 @@ YAML
       local ctx
       ctx="$(context.create "test")" 2>/dev/null || ctx="$(mktemp)"
       stages.test "$ctx" 2>/dev/null
-      local rc=$?
-      printf '%s\n%s' "$rc" "$(grep "^BRIK_TEST_STATUS=" "$ctx" | cut -d= -f2)"
+      printf '%s' "$?"
     }
     When call run_test_cmd_success
-    The line 1 of output should equal "0"
-    The line 2 of output should equal "success"
+    The output should equal "0"
   End
 
   It "returns CHECK_FAILED when BRIK_TEST_COMMAND override fails"
@@ -178,12 +150,10 @@ YAML
       local ctx
       ctx="$(context.create "test")" 2>/dev/null || ctx="$(mktemp)"
       stages.test "$ctx" 2>/dev/null
-      local rc=$?
-      printf '%s\n%s' "$rc" "$(grep "^BRIK_TEST_STATUS=" "$ctx" | cut -d= -f2)"
+      printf '%s' "$?"
     }
     When call run_test_cmd_failure
-    The line 1 of output should equal "10"
-    The line 2 of output should equal "failed"
+    The output should equal "10"
   End
 
   It "returns CONFIG_ERROR when test framework is unsupported"
