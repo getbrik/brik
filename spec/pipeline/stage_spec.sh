@@ -173,4 +173,72 @@ HOOKEOF
       The stderr should include "logic function not defined"
     End
   End
+
+  Describe "stage.dispatch"
+    setup_dispatch() {
+      export BRIK_WORKSPACE="${BRIK_LOG_DIR}"
+      export BRIK_CONFIG_FILE="${BRIK_LOG_DIR}/brik.yml"
+      : > "$BRIK_CONFIG_FILE"
+      # Dummy logic functions for every real stage mapping
+      stages.init()            { printf 'ran:init\n'; return 0; }
+      stages.release()         { printf 'ran:release\n'; return 0; }
+      stages.build()           { printf 'ran:build\n'; return 0; }
+      stages.lint()            { printf 'ran:lint\n'; return 0; }
+      stages.sast()            { printf 'ran:sast\n'; return 0; }
+      stages.scan()            { printf 'ran:scan\n'; return 0; }
+      stages.test()            { printf 'ran:test\n'; return 0; }
+      stages.package()         { printf 'ran:package\n'; return 0; }
+      stages.container_scan()  { printf 'ran:container_scan\n'; return 0; }
+      stages.deploy()          { printf 'ran:deploy\n'; return 0; }
+      stages.notify()          { printf 'ran:notify\n'; return 0; }
+    }
+    Before 'setup_dispatch'
+
+    It "returns BRIK_EXIT_INVALID_INPUT for empty stage name"
+      When call stage.dispatch ""
+      The status should equal 2
+      The stderr should include "stage name is required"
+    End
+
+    It "returns BRIK_EXIT_INVALID_INPUT for unknown stage"
+      When call stage.dispatch "foobar"
+      The status should equal 2
+      The stderr should include "unknown stage"
+    End
+
+    It "dispatches build to stages.build"
+      When call stage.dispatch "build"
+      The status should be success
+      The output should include "ran:build"
+      The error should be present
+    End
+
+    It "dispatches container-scan (kebab) to stages.container_scan (snake)"
+      When call stage.dispatch "container-scan"
+      The status should be success
+      The output should include "ran:container_scan"
+      The error should be present
+    End
+
+    It "dispatches quality to stages.lint (backward compat)"
+      When call stage.dispatch "quality"
+      The status should be success
+      The output should include "ran:lint"
+      The error should be present
+    End
+
+    It "dispatches security to stages.scan (backward compat)"
+      When call stage.dispatch "security"
+      The status should be success
+      The output should include "ran:scan"
+      The error should be present
+    End
+
+    It "shows the brik banner on init"
+      When call stage.dispatch "init"
+      The status should be success
+      The error should include "██"
+      The output should be present
+    End
+  End
 End

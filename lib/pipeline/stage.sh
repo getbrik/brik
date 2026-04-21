@@ -163,3 +163,55 @@ stage.run() {
 
     return "$exit_code"
 }
+
+# Map a stage name (kebab-case) to its business-logic function (stages.<snake>),
+# show the Brik banner once before the first stage, load cross-stage pipeline
+# env, and dispatch to stage.run. This is the business-logic dispatcher shared
+# by the lib-level pipeline.run orchestrator and the wrapper-level
+# brik.wrapper.run_stage entry point.
+#
+# Precondition: wrapper setup has exported BRIK_WORKSPACE and BRIK_CONFIG_FILE.
+# Backward-compat aliases quality->lint and security->scan are deprecated.
+# Usage: stage.dispatch <stage_name>
+# Returns: stage.run exit code, or BRIK_EXIT_INVALID_INPUT for empty/unknown stage.
+stage.dispatch() {
+    local stage_name="$1"
+
+    if [[ -z "$stage_name" ]]; then
+        log.error "stage name is required"
+        return "$BRIK_EXIT_INVALID_INPUT"
+    fi
+
+    # Show the Brik logo once, before the first stage.
+    if [[ "$stage_name" == "init" ]]; then
+        banner.brik "${BRIK_VERSION:-}"
+    fi
+
+    # Load cross-stage variables from previous stages.
+    pipeline.env.load
+
+    local logic_function=""
+    case "$stage_name" in
+        init)            logic_function="stages.init" ;;
+        release)         logic_function="stages.release" ;;
+        build)           logic_function="stages.build" ;;
+        lint)            logic_function="stages.lint" ;;
+        sast)            logic_function="stages.sast" ;;
+        scan)            logic_function="stages.scan" ;;
+        test)            logic_function="stages.test" ;;
+        package)         logic_function="stages.package" ;;
+        container-scan)  logic_function="stages.container_scan" ;;
+        deploy)          logic_function="stages.deploy" ;;
+        notify)          logic_function="stages.notify" ;;
+        # Backward-compat aliases (deprecated)
+        quality)         logic_function="stages.lint" ;;
+        security)        logic_function="stages.scan" ;;
+        *)
+            log.error "unknown stage: $stage_name"
+            log.error "valid stages: init, release, build, lint, sast, scan, test, package, container-scan, deploy, notify"
+            return "$BRIK_EXIT_INVALID_INPUT"
+            ;;
+    esac
+
+    stage.run "$stage_name" "$logic_function" "${BRIK_WORKSPACE}" "${BRIK_CONFIG_FILE}"
+}
