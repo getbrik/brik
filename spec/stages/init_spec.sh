@@ -1,6 +1,7 @@
 Describe "stages.init"
   Include "$BRIK_HOME/lib/pipeline/stage.sh"
   Include "$BRIK_HOME/lib/pipeline/loader.sh"
+  Include "$BRIK_HOME/lib/pipeline/report.sh"
   Include "$BRIK_HOME/lib/transverse/config.sh"
   Include "$BRIK_HOME/lib/stages/init.sh"
 
@@ -10,14 +11,24 @@ Describe "stages.init"
     printf 'version: 1\nproject:\n  name: test-project\n  stack: node\n' > "$BRIK_CONFIG_FILE"
     export BRIK_WORKSPACE
     BRIK_WORKSPACE="$(mktemp -d)"
+    export BRIK_LOG_DIR
+    BRIK_LOG_DIR="$(mktemp -d)"
     export BRIK_PROJECT_DIR="$BRIK_WORKSPACE"
     export BRIK_PLATFORM="gitlab"
     export BRIK_LOG_LEVEL="info"
+    export BRIK_RUN_ID="init-spec-fixture"
     config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
+    report.init >/dev/null 2>&1 || true
   }
   cleanup_env() {
     rm -f "$BRIK_CONFIG_FILE"
-    rm -rf "$BRIK_WORKSPACE"
+    rm -rf "$BRIK_WORKSPACE" "$BRIK_LOG_DIR"
+    unset BRIK_RUN_ID 2>/dev/null || true
+  }
+
+  read_init_stack() {
+    jq -r '.stages[] | select(.name == "init") | .business.stack // empty' \
+      "$BRIK_LOG_DIR/pipeline-report.json" 2>/dev/null
   }
   Before 'setup_env'
   After 'cleanup_env'
@@ -38,12 +49,12 @@ Describe "stages.init"
     The status should be success
   End
 
-  It "sets BRIK_STACK in context"
+  It "records init.business.stack in the pipeline report"
     run_init_check() {
       local ctx
       ctx="$(context.create "init")" 2>/dev/null || ctx="$(mktemp)"
-      stages.init "$ctx" >/dev/null 2>&1
-      grep "^BRIK_STACK=" "$ctx" | cut -d= -f2
+      stages.init "$ctx" >/dev/null 2>&1 || return $?
+      read_init_stack
     }
     When call run_init_check
     The output should equal "node"
@@ -93,7 +104,7 @@ Describe "stages.init"
       local ctx
       ctx="$(context.create "init")" 2>/dev/null || ctx="$(mktemp)"
       stages.init "$ctx" 2>/dev/null
-      grep "^BRIK_STACK=" "$ctx" | cut -d= -f2
+      read_init_stack
       rm -f "$BRIK_CONFIG_FILE"
       BRIK_CONFIG_FILE="$orig_config"
       config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true

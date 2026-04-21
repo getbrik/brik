@@ -1,6 +1,7 @@
 Describe "stages.release"
   Include "$BRIK_HOME/lib/pipeline/stage.sh"
   Include "$BRIK_HOME/lib/pipeline/loader.sh"
+  Include "$BRIK_HOME/lib/pipeline/report.sh"
   Include "$BRIK_HOME/lib/transverse/config.sh"
   Include "$BRIK_HOME/lib/stages/release.sh"
 
@@ -10,13 +11,23 @@ Describe "stages.release"
     printf 'version: 1\nproject:\n  name: test\n  stack: node\n' > "$BRIK_CONFIG_FILE"
     export BRIK_WORKSPACE
     BRIK_WORKSPACE="$(mktemp -d)"
+    export BRIK_LOG_DIR
+    BRIK_LOG_DIR="$(mktemp -d)"
     export BRIK_PROJECT_DIR="$BRIK_WORKSPACE"
     export BRIK_PLATFORM="gitlab"
+    export BRIK_RUN_ID="release-spec-fixture"
     config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
+    report.init >/dev/null 2>&1 || true
   }
   cleanup_env() {
     rm -f "$BRIK_CONFIG_FILE"
-    rm -rf "$BRIK_WORKSPACE"
+    rm -rf "$BRIK_WORKSPACE" "$BRIK_LOG_DIR"
+    unset BRIK_RUN_ID 2>/dev/null || true
+  }
+
+  read_release_app_version() {
+    jq -r '.stages[] | select(.name == "release") | .business.app_version // empty' \
+      "$BRIK_LOG_DIR/pipeline-report.json" 2>/dev/null
   }
   Before 'setup_env'
   After 'cleanup_env'
@@ -37,13 +48,13 @@ Describe "stages.release"
     The status should be success
   End
 
-  It "writes BRIK_APP_VERSION to context"
+  It "records app_version in the pipeline report business section"
     run_release_check() {
       local ctx
       ctx="$(context.create "release")" 2>/dev/null || ctx="$(mktemp)"
       stages.release "$ctx" >/dev/null 2>&1
       local version
-      version="$(grep "^BRIK_APP_VERSION=" "$ctx" | cut -d= -f2)"
+      version="$(read_release_app_version)"
       if [[ -n "$version" ]]; then echo "has_version"; else echo "no_version"; fi
     }
     When call run_release_check

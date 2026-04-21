@@ -5,6 +5,10 @@
 # Release stage: compute version from git tags, optionally generate changelog and tag.
 # Usage: stages.release <context_file>
 stages.release() {
+    # context_file positionally passed by stage.run; unused here after §4.2
+    # migration (app_version now lands in the pipeline report's business
+    # section via report.record; cross-stage sharing via pipeline.env.set).
+    # shellcheck disable=SC2034
     local context_file="$1"
 
     config.export_release_vars
@@ -27,7 +31,7 @@ stages.release() {
 
     log.info "current version: $current_version"
     export BRIK_APP_VERSION="$current_version"
-    context.set "$context_file" "BRIK_APP_VERSION" "$current_version"
+    report.record "release" "business" "app_version" "$current_version" 2>/dev/null || true
     pipeline.env.set "BRIK_APP_VERSION" "$current_version"
 
     # If on a tag (release trigger), prepare and finalize

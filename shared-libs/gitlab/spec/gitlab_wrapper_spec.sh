@@ -310,20 +310,19 @@ Describe "gitlab-wrapper.sh"
       The output should equal "summary_exists"
     End
 
-    It "runs init stage and sets BRIK_STACK in context"
-      run_init_check_context() {
+    It "runs init stage and records business.stack in the pipeline report"
+      run_init_check_report() {
         brik.gitlab.run_stage "init" >/dev/null 2>&1
         local status=$?
-        local context_file
-        context_file="$(ls "${BRIK_LOG_DIR}"/context-init-* 2>/dev/null | head -1)"
-        if [[ -n "$context_file" ]]; then
-          grep "^BRIK_STACK=" "$context_file" | cut -d= -f2
+        local report="${BRIK_LOG_DIR}/pipeline-report.json"
+        if [[ -f "$report" ]]; then
+          jq -r '.stages[] | select(.name == "init") | .business.stack // empty' "$report"
         else
-          echo "no_context"
+          echo "no_report"
         fi
         return $status
       }
-      When call run_init_check_context
+      When call run_init_check_report
       The status should be success
       The output should equal "node"
     End
@@ -466,17 +465,16 @@ Describe "gitlab-wrapper.sh"
 
     # --- Release stage ---
 
-    It "runs release stage and writes BRIK_APP_VERSION to context"
+    It "runs release stage and records app_version in the pipeline report"
       run_release_check() {
         brik.gitlab.run_stage "release" >/dev/null 2>&1
-        local context_file
-        context_file="$(ls "${BRIK_LOG_DIR}"/context-release-* 2>/dev/null | head -1)"
-        if [[ -n "$context_file" ]]; then
+        local report="${BRIK_LOG_DIR}/pipeline-report.json"
+        if [[ -f "$report" ]]; then
           local version
-          version="$(grep "^BRIK_APP_VERSION=" "$context_file" | cut -d= -f2)"
+          version="$(jq -r '.stages[] | select(.name == "release") | .business.app_version // empty' "$report")"
           if [[ -n "$version" ]]; then echo "has_version"; else echo "no_version"; fi
         else
-          echo "no_context"
+          echo "no_report"
         fi
       }
       When call run_release_check
