@@ -24,6 +24,20 @@ def call(Map params = [:]) {
     def useDocker = params.useDockerAgent != null ? params.useDockerAgent : true
 
     node(label) {
+        // Register job parameters that the shared library interprets.
+        // Jenkins's buildWithParameters API rejects triggers carrying unknown
+        // parameters, so these must be declared up-front for CI callers
+        // (and E2E harnesses) to be able to pass them in.
+        properties([
+            parameters([
+                booleanParam(
+                    name: 'BRIK_DRY_RUN',
+                    defaultValue: false,
+                    description: 'Skip destructive deploy actions (compose up, k8s apply, helm upgrade, argocd sync, rsync). Print what would run instead.'
+                )
+            ])
+        ])
+
         ansiColor('xterm') {
         timeout(time: timeoutMinutes, unit: 'MINUTES') {
             // Selective cleanup: remove build outputs but preserve dependency caches
@@ -106,7 +120,7 @@ def call(Map params = [:]) {
                 ).trim()
                 def networkArg = dockerNetwork ? "--network ${dockerNetwork}" : ''
                 // Export global node env vars to a file so Docker containers can access them
-                sh 'env | grep -E "^(NEXUS_|BRIK_|REGISTRY_|ARGOCD_)" > "${WORKSPACE}/.brik-env" 2>/dev/null || true'
+                sh 'env | grep -E "^(NEXUS_|BRIK_|REGISTRY_|ARGOCD_|CARGO_|SSH_)" > "${WORKSPACE}/.brik-env" 2>/dev/null || true'
                 def envFile = "${env.WORKSPACE}/.brik-env"
                 def globalEnvArgs = fileExists(envFile) && readFile(envFile).trim() ? "--env-file ${envFile}" : ''
                 // HOME=$WORKSPACE redirects npm, pip, cargo, nuget caches into workspace.
@@ -134,9 +148,15 @@ def call(Map params = [:]) {
                         brikStage(name, brikHome)
                     }
                 }
+                // Deploy tools (ssh, rsync, helm, argocd CLI) read $HOME from
+                // /etc/passwd via getpwuid. brik-runner-deploy has no uid-1000
+                // user, so Jenkins's default "-u <jenkinsUid>:<gid>" launch
+                // breaks ssh with "No user exists for uid 1000". Run the
+                // deploy container as root to keep those tools happy.
+                def deployDockerArgs = "-u 0:0 ${dockerArgs}"
                 def runInDeploy = { name ->
                     if (useDocker) {
-                        docker.image(deployImage).inside(dockerArgs) { brikStage(name, brikHome) }
+                        docker.image(deployImage).inside(deployDockerArgs) { brikStage(name, brikHome) }
                     } else {
                         brikStage(name, brikHome)
                     }
