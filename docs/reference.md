@@ -588,7 +588,9 @@ Separately, **module loading** uses a three-level resolution for `.sh` files
 (not configuration values):
 
 ```
-1. Project extensions: ${BRIK_PROJECT_DIR}/.brik/lib/core/
-2. Organization extensions: BRIK_LIB_EXTENSIONS (colon-separated paths)
-3. Standard library: ${BRIK_HOME}/lib/core/
+1. Project extensions: ${BRIK_PROJECT_DIR}/.brik/lib/
+2. BRIK_LIB            -- optional legacy override (skipped when unset)
+3. BRIK_LIB_EXTENSIONS -- colon-separated notion paths (pipeline, transverse,
+                          stages, stacks, rollout, deployments,
+                          package-managers, cli)
 ```
