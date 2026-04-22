@@ -1,0 +1,14 @@
+{
+  "name": "my-node-app",
+  "version": "0.1.0",
+  "description": "Minimal Node.js example for the Brik CLI",
+  "main": "src/index.js",
+  "scripts": {
+    "build": "esbuild src/index.js --bundle --platform=node --outfile=dist/index.js",
+    "test": "node test/index.test.js"
+  },
+  "devDependencies": {
+    "esbuild": "^0.27.0"
+  },
+  "license": "MIT"
+}

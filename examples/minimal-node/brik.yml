@@ -3,3 +3,6 @@ version: 1
 project:
   name: my-node-app
   stack: node
+
+test:
+  framework: npm
