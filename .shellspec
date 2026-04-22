@@ -10,3 +10,6 @@
 --kcov-options "--include-path=./bin,./lib,./shared-libs/gitlab/scripts,./shared-libs/jenkins/scripts,./shared-libs/local/scripts --path-strip-level=1"
 --kcov-options "--include-pattern=.sh,/bin/brik"
 --kcov-options "--exclude-path=./spec,./shared-libs/gitlab/spec,./shared-libs/jenkins/spec,./shared-libs/local/spec"
+## Exclude multi-line jq/yq/awk script bodies from coverage counting.
+## Wrap with `# KCOV_EXCL_START` / `# KCOV_EXCL_STOP` comments in source.
+--kcov-options "--exclude-region=KCOV_EXCL_START:KCOV_EXCL_STOP"

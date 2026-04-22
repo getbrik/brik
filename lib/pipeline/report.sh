@@ -134,6 +134,7 @@ _report._append_json() {
         return "$BRIK_EXIT_IO_FAILURE"
     }
 
+    # KCOV_EXCL_START  -- jq script body is not bash code
     jq \
         --arg stage "$stage" \
         --arg category "$category" \
@@ -156,6 +157,7 @@ _report._append_json() {
         log.error "cannot append to report: $backend"
         return "$BRIK_EXIT_IO_FAILURE"
     }
+    # KCOV_EXCL_STOP
 
     mv "$tmp" "$backend" || {
         rm -f "$tmp"
@@ -257,6 +259,7 @@ report.render() {
 # Render the backend JSON as Markdown on stdout.
 _report._render_md() {
     local backend="$1"
+    # KCOV_EXCL_START  -- jq script body is not bash code
     jq -r '
         "# Pipeline Report",
         "",
@@ -281,4 +284,5 @@ _report._render_md() {
              "")
         )
     ' "$backend"
+    # KCOV_EXCL_STOP
 }

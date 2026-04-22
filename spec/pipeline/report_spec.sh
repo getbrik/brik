@@ -254,6 +254,77 @@ Describe "report.sh"
       The status should equal 2
       The error should be present
     End
+
+    It "rejects an empty --output value"
+      When call report.render --output ""
+      The status should equal 2
+      The error should be present
+    End
+
+    It "rejects an unknown positional argument"
+      When call report.render bogus
+      The status should equal 2
+      The error should be present
+    End
+
+    It "fails when report is not initialized"
+      render_uninit() {
+        report.render --format md
+      }
+      When call render_uninit
+      The status should equal "$BRIK_EXIT_IO_FAILURE"
+      The stderr should include "report not initialized"
+    End
+
+    It "writes json to the custom output path when --output is given with --format json"
+      render_json_custom() {
+        seed_report
+        local out="$REPORT_LOG_DIR/custom.json"
+        report.render --format json --output "$out" >/dev/null
+        [[ -f "$out" ]] && jq -r '.stages | length' "$out"
+      }
+      When call render_json_custom
+      The status should be success
+      The output should equal "2"
+    End
+  End
+
+  Describe "report.record error paths"
+    Before 'setup_report_dir'
+    After 'cleanup_report_dir'
+
+    It "rejects wrong number of arguments"
+      When call report.record "build" "tech" "key"
+      The status should equal 2
+      The error should be present
+    End
+
+    It "rejects invalid category"
+      record_bad_cat() {
+        report.init || return 2
+        report.record "build" "bogus" "key" "value"
+      }
+      When call record_bad_cat
+      The status should equal 2
+      The error should be present
+    End
+
+    It "fails when report is not initialized"
+      When call report.record "build" "tech" "key" "value"
+      The status should equal "$BRIK_EXIT_IO_FAILURE"
+      The stderr should include "report not initialized"
+    End
+  End
+
+  Describe "report.has_status argument validation"
+    Before 'setup_report_dir'
+    After 'cleanup_report_dir'
+
+    It "rejects empty stage argument"
+      When call report.has_status ""
+      The status should equal 2
+      The error should be present
+    End
   End
 
   Describe "report.has_status"
@@ -318,6 +389,82 @@ Describe "report.sh"
       When call report.has_status
       The status should equal 2
       The error should be present
+    End
+  End
+
+  Describe "IO error paths"
+    Before 'setup_report_dir'
+    After 'cleanup_report_dir'
+
+    It "_report._require_jq returns BRIK_EXIT_MISSING_DEP when jq is absent"
+      require_jq_no_path() {
+        # Shadow PATH with a tempdir that has no jq.
+        local empty_path
+        empty_path="$(mktemp -d)"
+        local orig_path="$PATH"
+        export PATH="$empty_path"
+        _report._require_jq
+        local rc=$?
+        export PATH="$orig_path"
+        rm -rf "$empty_path"
+        return "$rc"
+      }
+      When call require_jq_no_path
+      The status should equal "$BRIK_EXIT_MISSING_DEP"
+      The stderr should include "jq is required"
+    End
+
+    It "report.init returns BRIK_EXIT_IO_FAILURE when log dir is unwritable"
+      init_bad_dir() {
+        local bad_root
+        bad_root="$(mktemp -d)"
+        chmod 000 "$bad_root"
+        export BRIK_LOG_DIR="${bad_root}/nested"
+        report.init
+        local rc=$?
+        chmod 755 "$bad_root" 2>/dev/null
+        rm -rf "$bad_root"
+        return "$rc"
+      }
+      When call init_bad_dir
+      The status should equal "$BRIK_EXIT_IO_FAILURE"
+      The stderr should include "cannot create log directory"
+    End
+
+    It "report.render returns BRIK_EXIT_IO_FAILURE when md output is unwritable"
+      render_bad_output() {
+        report.init >/dev/null || return 2
+        report.record "build" "tech" "status" "success" >/dev/null || return 2
+        local bad_root
+        bad_root="$(mktemp -d)"
+        chmod 000 "$bad_root"
+        report.render --format md --output "${bad_root}/nested/report.md"
+        local rc=$?
+        chmod 755 "$bad_root" 2>/dev/null
+        rm -rf "$bad_root"
+        return "$rc"
+      }
+      When call render_bad_output
+      The status should equal "$BRIK_EXIT_IO_FAILURE"
+      The stderr should include "cannot write md report"
+    End
+
+    It "report.render returns BRIK_EXIT_IO_FAILURE when json output destination is unwritable"
+      render_bad_json() {
+        report.init >/dev/null || return 2
+        report.record "build" "tech" "status" "success" >/dev/null || return 2
+        local bad_root
+        bad_root="$(mktemp -d)"
+        chmod 000 "$bad_root"
+        report.render --format json --output "${bad_root}/nested/report.json"
+        local rc=$?
+        chmod 755 "$bad_root" 2>/dev/null
+        rm -rf "$bad_root"
+        return "$rc"
+      }
+      When call render_bad_json
+      The status should equal "$BRIK_EXIT_IO_FAILURE"
+      The stderr should include "cannot copy json report"
     End
   End
 End
