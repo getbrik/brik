@@ -1,18 +1,26 @@
 #!/usr/bin/env bash
-# @module verify._tools
-# @description Centralized tool registry for quality/security scanning.
-# Provides register/resolve/exec abstraction to decouple modules from specific tools.
+# @module transverse.tools
+# @description Centralized 3-tier tool registry.
+#
+# Promoted from lib/stages/verify/_tools.sh (Phase 4 refactor, §11.5). The
+# registry is now a transverse primitive reusable by verify stages, stack
+# detection, and deploy workflows.
+#
+# 3-tier resolution:
+#   Tier 1 - explicit command via BRIK_QUALITY_<CAT>_COMMAND / BRIK_SECURITY_<CAT>_COMMAND
+#   Tier 2 - explicit tool name via BRIK_QUALITY_<CAT>_TOOL / BRIK_SECURITY_<CAT>_TOOL or --tool
+#   Tier 3 - auto-detect by priority among registered tools whose binary is on PATH
 
-# Guard against double-sourcing
-[[ -n "${_BRIK_VERIFY_TOOLS_LOADED:-}" ]] && return 0
-_BRIK_VERIFY_TOOLS_LOADED=1
+# Guard against double-sourcing.
+[[ -n "${_BRIK_MODULE_TOOLS_REGISTRY_LOADED:-}" ]] && return 0
+_BRIK_MODULE_TOOLS_REGISTRY_LOADED=1
 
 # Registry storage: _BRIK_TOOL_<CATEGORY>_<N>="priority|tool|binary|template"
 declare -g _BRIK_TOOL_COUNTER=0
 
 # Register a tool for a scan category.
-# Usage: verify.tool.register <category> <tool> <binary> <command_template> [priority]
-verify.tool.register() {
+# Usage: transverse.tools.register <category> <tool> <binary> <command_template> [priority]
+transverse.tools.register() {
     local category="$1" tool="$2" binary="$3" template="$4" priority="${5:-50}"
     _BRIK_TOOL_COUNTER=$((_BRIK_TOOL_COUNTER + 1))
     local key="_BRIK_TOOL_${category}_${_BRIK_TOOL_COUNTER}"
@@ -90,8 +98,8 @@ _brik_tool_resolve_tier3() {
 
 # Resolve which tool to use for a category (3-tier resolution).
 # Outputs tool name on stdout. Returns 1 if none available, 3 if explicit tool missing, 7 if unknown.
-# Usage: verify.tool.resolve <category> [--tool <name>]
-verify.tool.resolve() {
+# Usage: transverse.tools.resolve <category> [--tool <name>]
+transverse.tools.resolve() {
     local category="$1"
     shift
     local explicit_tool=""
@@ -123,8 +131,8 @@ verify.tool.resolve() {
 }
 
 # Execute a resolved tool with variable substitution.
-# Usage: verify.tool.exec <category> <resolved_tool> [key=value...]
-verify.tool.exec() {
+# Usage: transverse.tools.exec <category> <resolved_tool> [key=value...]
+transverse.tools.exec() {
     local category="$1" resolved="$2"
     shift 2
 

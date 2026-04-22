@@ -65,27 +65,17 @@ rollout.profile.merge() {
     local profile_path
     profile_path="$(rollout.profile.resolve "$workflow")" || return $?
 
-    if ! command -v yq >/dev/null 2>&1; then
-        log.error "yq is required for profile merge but not found on PATH"
-        return "$BRIK_EXIT_MISSING_DEP"
-    fi
-
     # Create temporary file for the merged result
     local merged_file
     merged_file="$(mktemp /tmp/brik-profile-XXXXXX.yml)"
     chmod 600 "$merged_file"
 
     # Deep merge: profile is the base, user brik.yml overrides on top.
-    # yq 'select(fileIndex == 0) * select(fileIndex == 1)' merges two files
-    # with the second file's values taking precedence.
-    local yq_stderr
-    yq_stderr="$(yq eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' \
-            "$profile_path" "$brik_yml_path" 2>&1 1>"$merged_file")"
-    local yq_rc=$?
-    if [[ $yq_rc -ne 0 ]]; then
-        log.error "failed to merge profile with overrides: $yq_stderr"
+    brik.use transverse.yaml
+    if ! transverse.yaml.merge "$profile_path" "$brik_yml_path" --output "$merged_file"; then
+        local rc=$?
         rm -f "$merged_file"
-        return "$BRIK_EXIT_EXTERNAL_FAIL"
+        return "$rc"
     fi
 
     printf '%s' "$merged_file"

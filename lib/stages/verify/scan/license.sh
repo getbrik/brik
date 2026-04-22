@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # @module verify.scan.license
-# @uses verify._tools
+# @uses transverse.tools
 # @description Security-focused license compliance checking.
 
 # Guard against double-sourcing
@@ -8,11 +8,11 @@
 _BRIK_VERIFY_SCAN_LICENSE_LOADED=1
 
 # Load tool registry
-brik.use verify._tools
+brik.use transverse.tools
 
 # Register license scanners (license_finder handled inline for conditional flags)
-verify.tool.register sec_license syft     syft     "syft scan . -o spdx-json" 20
-verify.tool.register sec_license scancode scancode "scancode --license --only-findings ." 30
+transverse.tools.register sec_license syft     syft     "syft scan . -o spdx-json" 20
+transverse.tools.register sec_license scancode scancode "scancode --license --only-findings ." 30
 
 # Run license compliance check.
 # Usage: verify.scan.license.run <workspace>
@@ -57,12 +57,12 @@ verify.scan.license.run() {
 
     # Fallback via registry (syft, scancode)
     local resolved
-    resolved="$(verify.tool.resolve sec_license)" || {
+    resolved="$(transverse.tools.resolve sec_license)" || {
         log.warn "no license scanner available (install license_finder or syft) - skipping"
         return 0
     }
     log.info "checking licenses with ${resolved}"
-    (cd "$workspace" && verify.tool.exec sec_license "$resolved") || {
+    (cd "$workspace" && transverse.tools.exec sec_license "$resolved") || {
         log.error "license violations found"
         return "$BRIK_EXIT_CHECK_FAILED"
     }

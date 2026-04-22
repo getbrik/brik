@@ -120,15 +120,15 @@ deploy.gitops.render_manifests() {
                 log.error "copy failed"
                 return "$BRIK_EXIT_IO_FAILURE"
             }
-            # Apply --set values via yq if provided
+            # Apply --set values via transverse.yaml.patch if provided
             if [[ ${#set_values[@]} -gt 0 ]]; then
-                pipeline.require_tool yq || return "$BRIK_EXIT_MISSING_DEP"
+                brik.use transverse.yaml
                 local sv2
                 for sv2 in "${set_values[@]}"; do
                     local key="${sv2%%=*}"
                     local val="${sv2#*=}"
                     find "$output_dir" -name '*.yaml' -o -name '*.yml' | while read -r f; do
-                        yq -i ".${key} = \"${val}\"" "$f" 2>/dev/null || true
+                        transverse.yaml.patch "$f" ".${key}" "$val" 2>/dev/null || true
                     done
                 done
             fi
@@ -225,14 +225,13 @@ deploy.gitops.push_manifests() {
 
     # Substitute image tags if --image-tag was provided
     if [[ -n "$image_tag" ]]; then
-        if ! pipeline.require_tool yq; then
-            rm -rf "$tmpdir"
-            return "$BRIK_EXIT_MISSING_DEP"
-        fi
+        brik.use transverse.yaml
         local manifest_file
         while IFS= read -r manifest_file; do
-            yq -i "(.spec.template.spec.containers[]?.image) |= sub(\":[^:]*$\", \":${image_tag}\")" "$manifest_file" 2>/dev/null || true
-            yq -i "(.spec.template.spec.initContainers[]?.image) |= sub(\":[^:]*$\", \":${image_tag}\")" "$manifest_file" 2>/dev/null || true
+            transverse.yaml.set_image_tag "$manifest_file" \
+                ".spec.template.spec.containers[]?.image" "$image_tag" 2>/dev/null || true
+            transverse.yaml.set_image_tag "$manifest_file" \
+                ".spec.template.spec.initContainers[]?.image" "$image_tag" 2>/dev/null || true
         done < <(find "$dest" -name '*.yaml' -o -name '*.yml')
         log.info "image tags substituted to :${image_tag}"
     fi
@@ -271,6 +270,7 @@ deploy.gitops.push_manifests() {
 }
 
 # Generic poll loop waiting for a GitOps controller to sync.
+# Delegates to transverse.wait.until; preserves --check-fn as public flag.
 # Usage: deploy.gitops.wait_sync --check-fn <function>
 #        [--timeout <s>] [--interval <s>] [--dry-run]
 deploy.gitops.wait_sync() {
@@ -292,47 +292,16 @@ deploy.gitops.wait_sync() {
         return "$BRIK_EXIT_INVALID_INPUT"
     fi
 
-    # Extract function name (first word) for validation
-    local fn_name="${check_fn%% *}"
-    if ! declare -f "$fn_name" >/dev/null 2>&1; then
-        log.error "check-fn is not a declared function: $fn_name"
-        return "$BRIK_EXIT_INVALID_INPUT"
-    fi
+    brik.use transverse.wait
+    local -a wait_args=(
+        "$check_fn"
+        --timeout  "$timeout"
+        --interval "$interval"
+        --message  "gitops sync"
+    )
+    [[ "$dry_run" == "true" ]] && wait_args+=(--dry-run)
 
-    if ! [[ "$timeout" =~ ^[0-9]+$ ]]; then
-        log.error "timeout must be a positive integer, got: $timeout"
-        return "$BRIK_EXIT_INVALID_INPUT"
-    fi
-
-    if ! [[ "$interval" =~ ^[0-9]+$ ]] || [[ "$interval" -lt 1 ]]; then
-        log.error "interval must be a positive integer >= 1, got: $interval"
-        return "$BRIK_EXIT_INVALID_INPUT"
-    fi
-
-    if [[ "$dry_run" == "true" ]]; then
-        log.info "[dry-run] would wait for sync: check-fn=${check_fn} timeout=${timeout}s interval=${interval}s"
-        return 0
-    fi
-
-    log.info "waiting for sync (timeout=${timeout}s, interval=${interval}s, check-fn=${fn_name})"
-
-    # Split check_fn into array for safe execution
-    local -a check_cmd
-    read -ra check_cmd <<< "$check_fn"
-
-    local elapsed=0
-    while [[ "$elapsed" -lt "$timeout" ]]; do
-        if "${check_cmd[@]}" 2>/dev/null; then
-            log.info "sync completed after ${elapsed}s"
-            return 0
-        fi
-        log.info "sync pending (${elapsed}s/${timeout}s), waiting ${interval}s..."
-        sleep "$interval"
-        elapsed=$(( elapsed + interval ))
-    done
-
-    log.error "sync timeout after ${timeout}s"
-    return "$BRIK_EXIT_TIMEOUT"
+    transverse.wait.until "${wait_args[@]}"
 }
 
 # Preview changes before pushing to config-repo.

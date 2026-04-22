@@ -1,4 +1,7 @@
 Describe "config.sh - deploy workflow integration"
+  Include "$BRIK_PIPELINE_LIB/tools.sh"
+  Include "$BRIK_PIPELINE_LIB/loader.sh"
+  Include "$BRIK_TRANSVERSE_LIB/yaml.sh"
   Include "$BRIK_HOME/lib/transverse/config.sh"
 
   # =========================================================================

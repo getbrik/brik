@@ -2,7 +2,7 @@ Describe "security/license.sh"
   Include "$BRIK_PIPELINE_LIB/logging.sh"
   Include "$BRIK_PIPELINE_LIB/tools.sh"
   Include "$BRIK_PIPELINE_LIB/loader.sh"
-  Include "$BRIK_HOME/lib/stages/verify/_tools.sh"
+  Include "$BRIK_HOME/lib/transverse/tools.sh"
   Include "$BRIK_HOME/lib/stages/verify/scan/license.sh"
   Include "$BRIK_HOME/spec/support/mock_helper.sh"
 

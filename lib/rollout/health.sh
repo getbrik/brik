@@ -64,7 +64,17 @@ rollout.health.check() {
     fi
 }
 
+# Internal: single-shot HTTP status match. Used as check-fn for wait loop.
+# Usage: _rollout.health._url_status_check <url> <expected_status>
+_rollout.health._url_status_check() {
+    local url="$1" expected_status="$2"
+    local actual_status
+    actual_status="$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 --connect-timeout 5 "$url" 2>/dev/null)" || true
+    [[ "$actual_status" == "$expected_status" ]]
+}
+
 # Poll a URL repeatedly until the expected HTTP status is returned or timeout is reached.
+# Delegates the polling loop to transverse.wait.until.
 # Returns 0 if healthy before timeout, BRIK_EXIT_TIMEOUT if timeout reached.
 #
 # Usage: rollout.health.wait --url <url> [--timeout <seconds>] [--interval <seconds>]
@@ -95,16 +105,6 @@ rollout.health.wait() {
         return "$BRIK_EXIT_INVALID_INPUT"
     fi
 
-    if ! [[ "$timeout" =~ ^[0-9]+$ ]]; then
-        log.error "timeout must be a positive integer, got: $timeout"
-        return "$BRIK_EXIT_INVALID_INPUT"
-    fi
-
-    if ! [[ "$interval" =~ ^[0-9]+$ ]] || [[ "$interval" -lt 1 ]]; then
-        log.error "interval must be a positive integer >= 1, got: $interval"
-        return "$BRIK_EXIT_INVALID_INPUT"
-    fi
-
     if ! [[ "$expected_status" =~ ^[0-9]{3}$ ]]; then
         log.error "expected-status must be a 3-digit HTTP status code, got: $expected_status"
         return "$BRIK_EXIT_INVALID_INPUT"
@@ -112,30 +112,16 @@ rollout.health.wait() {
 
     pipeline.require_tool curl || return "$BRIK_EXIT_MISSING_DEP"
 
-    if [[ "$dry_run" == "true" ]]; then
-        log.info "[dry-run] health wait: polling ${url} (timeout=${timeout}s, interval=${interval}s, expected=${expected_status})"
-        return 0
-    fi
+    brik.use transverse.wait
+    local -a wait_args=(
+        "_rollout.health._url_status_check $url $expected_status"
+        --timeout  "$timeout"
+        --interval "$interval"
+        --message  "health ${url}"
+    )
+    [[ "$dry_run" == "true" ]] && wait_args+=(--dry-run)
 
-    log.info "waiting for health check: ${url} (timeout=${timeout}s, interval=${interval}s)"
-
-    local elapsed=0
-    while [[ "$elapsed" -lt "$timeout" ]]; do
-        local actual_status
-        actual_status="$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 --connect-timeout 5 "$url" 2>/dev/null)" || true
-
-        if [[ "$actual_status" == "$expected_status" ]]; then
-            log.info "health check passed after ${elapsed}s: ${url} returned ${actual_status}"
-            return 0
-        fi
-
-        log.info "health check pending (${elapsed}s/${timeout}s): got ${actual_status}, waiting ${interval}s..."
-        sleep "$interval"
-        elapsed=$(( elapsed + interval ))
-    done
-
-    log.error "health check timeout after ${timeout}s: ${url} did not return ${expected_status}"
-    return "$BRIK_EXIT_TIMEOUT"
+    transverse.wait.until "${wait_args[@]}"
 }
 
 # Wait for a Kubernetes deployment rollout to complete.
