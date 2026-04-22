@@ -1,12 +1,12 @@
-Describe "quality/_tools.sh"
+Describe "transverse/tools.sh"
   Include "$BRIK_PIPELINE_LIB/logging.sh"
   Include "$BRIK_TRANSVERSE_LIB/env.sh"
-  Include "$BRIK_HOME/lib/stages/verify/_tools.sh"
+  Include "$BRIK_TRANSVERSE_LIB/tools.sh"
   Include "$BRIK_HOME/spec/support/mock_helper.sh"
 
   brik.use() { :; }
 
-  Describe "verify.tool.register + verify.tool.resolve"
+  Describe "transverse.tools.register + transverse.tools.resolve"
     setup_tools() {
       mock.setup
       mock.create_exit "grype" 0
@@ -23,9 +23,9 @@ Describe "quality/_tools.sh"
 
     It "resolves highest-priority tool"
       invoke_resolve() {
-        verify.tool.register testcat grype grype "grype {image}" 10
-        verify.tool.register testcat dockle dockle "dockle {image}" 20
-        verify.tool.resolve testcat
+        transverse.tools.register testcat grype grype "grype {image}" 10
+        transverse.tools.register testcat dockle dockle "dockle {image}" 20
+        transverse.tools.resolve testcat
       }
       When call invoke_resolve
       The output should equal "grype"
@@ -34,9 +34,9 @@ Describe "quality/_tools.sh"
 
     It "resolves lower-priority tool when higher not available"
       invoke_fallback() {
-        verify.tool.register testcat2 missing missing_bin "missing {x}" 10
-        verify.tool.register testcat2 dockle dockle "dockle {x}" 20
-        verify.tool.resolve testcat2
+        transverse.tools.register testcat2 missing missing_bin "missing {x}" 10
+        transverse.tools.register testcat2 dockle dockle "dockle {x}" 20
+        transverse.tools.resolve testcat2
       }
       When call invoke_fallback
       The output should equal "dockle"
@@ -61,8 +61,8 @@ Describe "quality/_tools.sh"
 
     It "resolves to __command__ when env command is set"
       invoke_tier1() {
-        verify.tool.register mycat sometool sometool "sometool" 10
-        verify.tool.resolve mycat
+        transverse.tools.register mycat sometool sometool "sometool" 10
+        transverse.tools.resolve mycat
       }
       When call invoke_tier1
       The output should equal "__command__"
@@ -86,9 +86,9 @@ Describe "quality/_tools.sh"
 
     It "resolves explicit --tool even if not highest priority"
       invoke_explicit() {
-        verify.tool.register tier2cat grype grype "grype {x}" 10
-        verify.tool.register tier2cat dockle dockle "dockle {x}" 20
-        verify.tool.resolve tier2cat --tool dockle
+        transverse.tools.register tier2cat grype grype "grype {x}" 10
+        transverse.tools.register tier2cat dockle dockle "dockle {x}" 20
+        transverse.tools.resolve tier2cat --tool dockle
       }
       When call invoke_explicit
       The output should equal "dockle"
@@ -111,9 +111,9 @@ Describe "quality/_tools.sh"
 
     It "returns 1 when no tool is available"
       invoke_none() {
-        verify.tool.register nocat missing1 missing1 "cmd1" 10
-        verify.tool.register nocat missing2 missing2 "cmd2" 20
-        verify.tool.resolve nocat
+        transverse.tools.register nocat missing1 missing1 "cmd1" 10
+        transverse.tools.register nocat missing2 missing2 "cmd2" 20
+        transverse.tools.resolve nocat
       }
       When call invoke_none
       The status should equal 1
@@ -135,8 +135,8 @@ Describe "quality/_tools.sh"
 
     It "returns 3 when explicit tool binary is not found"
       invoke_missing() {
-        verify.tool.register misscat grype grype "grype {x}" 10
-        verify.tool.resolve misscat --tool grype
+        transverse.tools.register misscat grype grype "grype {x}" 10
+        transverse.tools.resolve misscat --tool grype
       }
       When call invoke_missing
       The status should equal 3
@@ -158,15 +158,15 @@ Describe "quality/_tools.sh"
 
     It "returns 7 when explicit tool is not registered"
       invoke_unknown() {
-        verify.tool.register unkcat grype grype "grype {x}" 10
-        verify.tool.resolve unkcat --tool nonexistent
+        transverse.tools.register unkcat grype grype "grype {x}" 10
+        transverse.tools.resolve unkcat --tool nonexistent
       }
       When call invoke_unknown
       The status should equal 7
     End
   End
 
-  Describe "verify.tool.exec"
+  Describe "transverse.tools.exec"
     setup_exec() {
       mock.setup
       TEST_LOG="$(mktemp)"
@@ -185,8 +185,8 @@ exit 0"
 
     It "substitutes {var} placeholders and executes"
       invoke_exec() {
-        verify.tool.register execcat grype grype "grype {image} --fail-on {severity}" 10
-        verify.tool.exec execcat grype image="myapp:1.0" severity="high" 2>/dev/null || return 1
+        transverse.tools.register execcat grype grype "grype {image} --fail-on {severity}" 10
+        transverse.tools.exec execcat grype image="myapp:1.0" severity="high" 2>/dev/null || return 1
         grep -q "myapp:1.0" "$TEST_LOG" && grep -q "high" "$TEST_LOG"
       }
       When call invoke_exec
@@ -194,7 +194,7 @@ exit 0"
     End
   End
 
-  Describe "verify.tool.exec with command override"
+  Describe "transverse.tools.exec with command override"
     setup_cmd_exec() {
       mock.setup
       TEST_LOG="$(mktemp)"
@@ -215,7 +215,7 @@ exit 0"
 
     It "executes command override directly"
       invoke_cmd_exec() {
-        verify.tool.exec cmdcat "__command__" 2>/dev/null || return 1
+        transverse.tools.exec cmdcat "__command__" 2>/dev/null || return 1
         grep -q "my-scanner ran" "$TEST_LOG"
       }
       When call invoke_cmd_exec

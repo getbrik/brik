@@ -1,6 +1,8 @@
 Describe "deploy/health.sh"
   Include "$BRIK_PIPELINE_LIB/logging.sh"
   Include "$BRIK_PIPELINE_LIB/tools.sh"
+  Include "$BRIK_PIPELINE_LIB/loader.sh"
+  Include "$BRIK_TRANSVERSE_LIB/wait.sh"
   Include "$BRIK_ROLLOUT_LIB/health.sh"
   Include "$BRIK_HOME/spec/support/mock_helper.sh"
 

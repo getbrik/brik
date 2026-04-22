@@ -1,7 +1,7 @@
 Describe "security.sh"
   Include "$BRIK_PIPELINE_LIB/logging.sh"
   Include "$BRIK_PIPELINE_LIB/tools.sh"
-  Include "$BRIK_HOME/lib/stages/verify/_tools.sh"
+  Include "$BRIK_HOME/lib/transverse/tools.sh"
   Include "$BRIK_HOME/lib/stages/verify/scan/scan.sh"
 
   # brik.use is called lazily; sub-modules are mocked in test setup

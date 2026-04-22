@@ -1,6 +1,9 @@
 Describe "deploy/profile.sh"
   Include "$BRIK_PIPELINE_LIB/logging.sh"
   Include "$BRIK_PIPELINE_LIB/error.sh"
+  Include "$BRIK_PIPELINE_LIB/tools.sh"
+  Include "$BRIK_PIPELINE_LIB/loader.sh"
+  Include "$BRIK_TRANSVERSE_LIB/yaml.sh"
   Include "$BRIK_ROLLOUT_LIB/profile.sh"
 
   # =========================================================================

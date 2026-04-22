@@ -48,7 +48,7 @@ _verify._scan._run() {
     [[ -n "$tool" ]] && resolve_args+=(--tool "$tool")
 
     local resolved rc=0
-    resolved="$(verify.tool.resolve "${resolve_args[@]}")" || rc=$?
+    resolved="$(transverse.tools.resolve "${resolve_args[@]}")" || rc=$?
     if [[ "$rc" -ne 0 ]]; then
         if [[ $rc -eq 3 ]]; then
             log.error "${tool} not found"
@@ -62,7 +62,7 @@ _verify._scan._run() {
     fi
 
     log.info "$label with $resolved"
-    (cd "$workspace" && verify.tool.exec "$category" "$resolved") || {
+    (cd "$workspace" && transverse.tools.exec "$category" "$resolved") || {
         log.error "$label findings detected"
         return "$BRIK_EXIT_CHECK_FAILED"
     }

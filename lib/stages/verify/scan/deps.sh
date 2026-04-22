@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # @module verify.scan.deps
-# @uses verify._tools verify._scan
+# @uses transverse.tools verify._scan
 # @description Security-focused dependency vulnerability scanning.
 
 # Guard against double-sourcing
@@ -8,12 +8,12 @@
 _BRIK_VERIFY_SCAN_DEPS_LOADED=1
 
 # Load tool registry and common scan helper
-brik.use verify._tools
+brik.use transverse.tools
 brik.use verify.scan._scan
 
 # Register security dependency scanners (sec_ prefix avoids collision with quality.deps)
-verify.tool.register sec_deps osv-scanner osv-scanner "osv-scanner scan --format table ." 10
-verify.tool.register sec_deps grype       grype       "grype dir:{workspace}"              20
+transverse.tools.register sec_deps osv-scanner osv-scanner "osv-scanner scan --format table ." 10
+transverse.tools.register sec_deps grype       grype       "grype dir:{workspace}"              20
 
 # Run security dependency scan on a workspace.
 # Usage: verify.scan.deps.run <workspace> [--severity <threshold>]
@@ -48,7 +48,7 @@ verify.scan.deps.run() {
     [[ -n "$tool" ]] && resolve_args+=(--tool "$tool")
 
     local resolved rc=0
-    resolved="$(verify.tool.resolve "${resolve_args[@]}")" || rc=$?
+    resolved="$(transverse.tools.resolve "${resolve_args[@]}")" || rc=$?
     if [[ "$rc" -ne 0 ]]; then
         if [[ $rc -eq 3 ]]; then
             log.error "security dependency scan tool not found: $tool"
@@ -63,7 +63,7 @@ verify.scan.deps.run() {
 
     log.info "security dependency scan with $resolved"
     local scan_output=""
-    scan_output="$(cd "$workspace" && verify.tool.exec sec_deps "$resolved" \
+    scan_output="$(cd "$workspace" && transverse.tools.exec sec_deps "$resolved" \
         workspace="$workspace" severity="${severity^^}" 2>&1)" || {
         # osv-scanner returns non-zero when no package sources found
         if echo "$scan_output" | grep -qi "no package sources found"; then

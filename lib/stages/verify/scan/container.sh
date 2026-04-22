@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # @module verify.scan.container
-# @uses verify._tools
+# @uses transverse.tools
 # @description Security-focused container image scanning.
 
 # Guard against double-sourcing
@@ -8,11 +8,11 @@
 _BRIK_VERIFY_SCAN_CONTAINER_LOADED=1
 
 # Load tool registry
-brik.use verify._tools
+brik.use transverse.tools
 
 # Register security container scanners
-verify.tool.register sec_container grype  grype  "grype {image} --fail-on {severity}" 10
-verify.tool.register sec_container dockle dockle "dockle {image}"                     20
+transverse.tools.register sec_container grype  grype  "grype {image} --fail-on {severity}" 10
+transverse.tools.register sec_container dockle dockle "dockle {image}"                     20
 
 # Run security container scan.
 # Usage: verify.scan.container.run <workspace> [--image <image>] [--severity <threshold>]
@@ -43,13 +43,13 @@ verify.scan.container.run() {
     fi
 
     local resolved
-    resolved="$(verify.tool.resolve sec_container)" || {
+    resolved="$(transverse.tools.resolve sec_container)" || {
         log.warn "no security container scanner available (install grype) - skipping"
         return 0
     }
 
     log.info "security container scan with ${resolved}"
-    verify.tool.exec sec_container "$resolved" \
+    transverse.tools.exec sec_container "$resolved" \
         image="$image" severity="${severity,,}" || {
         log.error "security container vulnerabilities found in: $image"
         return "$BRIK_EXIT_CHECK_FAILED"

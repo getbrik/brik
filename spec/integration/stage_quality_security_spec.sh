@@ -1,7 +1,7 @@
 Describe "Integration: Quality and Security stages"
   Include "$BRIK_PIPELINE_LIB/logging.sh"
   Include "$BRIK_PIPELINE_LIB/tools.sh"
-  Include "$BRIK_HOME/lib/stages/verify/_tools.sh"
+  Include "$BRIK_HOME/lib/transverse/tools.sh"
   Include "$BRIK_PIPELINE_LIB/loader.sh"
   Include "$BRIK_HOME/lib/stages/verify/verify.sh"
   Include "$BRIK_HOME/lib/stages/verify/lint.sh"

@@ -860,7 +860,8 @@ SCRIPT
         _mock_sync_fail() { return 1; }
         When call deploy.gitops.wait_sync --check-fn "_mock_sync_fail" --timeout 2 --interval 1
         The status should equal 8
-        The stderr should include "sync timeout"
+        The stderr should include "gitops sync"
+        The stderr should include "timeout"
       End
     End
 

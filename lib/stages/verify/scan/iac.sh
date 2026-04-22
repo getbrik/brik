@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # @module verify.scan.iac
-# @uses verify._tools
+# @uses transverse.tools
 # @description Security-focused Infrastructure as Code scanning.
 # 3-tier resolution: BRIK_SECURITY_IAC_COMMAND > BRIK_SECURITY_IAC_TOOL > auto-detect
 
@@ -9,11 +9,11 @@
 _BRIK_VERIFY_SCAN_IAC_LOADED=1
 
 # Load tool registry
-brik.use verify._tools
+brik.use transverse.tools
 
 # Register IaC scanners
-verify.tool.register sec_iac checkov checkov "checkov -d . --quiet --compact" 10
-verify.tool.register sec_iac tfsec   tfsec   "tfsec ."                        20
+transverse.tools.register sec_iac checkov checkov "checkov -d . --quiet --compact" 10
+transverse.tools.register sec_iac tfsec   tfsec   "tfsec ."                        20
 
 # Run IaC security scan on a workspace.
 # Usage: verify.scan.iac.run <workspace>
@@ -65,12 +65,12 @@ verify.scan.iac.run() {
 
     # Tier 3: auto-detect via registry
     local resolved
-    resolved="$(verify.tool.resolve sec_iac)" || {
+    resolved="$(transverse.tools.resolve sec_iac)" || {
         log.warn "no IaC scanner available (install checkov or tfsec) - skipping"
         return 0
     }
     log.info "IaC scan with ${resolved}"
-    (cd "$workspace" && verify.tool.exec sec_iac "$resolved") || {
+    (cd "$workspace" && transverse.tools.exec sec_iac "$resolved") || {
         log.error "IaC security findings detected"
         return "$BRIK_EXIT_CHECK_FAILED"
     }
