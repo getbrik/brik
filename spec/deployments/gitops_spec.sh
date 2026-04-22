@@ -205,6 +205,118 @@ Describe "deploy/gitops.sh"
         The stderr should include "required tool not found"
       End
     End
+
+    Describe "kustomize type - happy path with mock"
+      setup_kust_ok() {
+        TEST_WS="$(mktemp -d)"
+        mkdir -p "${TEST_WS}/src"
+        mock.setup
+        # Mock kustomize: `edit set image` is a no-op (writes nothing); `build -o <dir>` writes a manifest.
+        mock.create_script "kustomize" '
+          case "$1" in
+            edit) exit 0 ;;
+            build)
+              out_dir=""
+              while [ $# -gt 0 ]; do
+                case "$1" in
+                  -o) out_dir="$2"; shift 2 ;;
+                  *) shift ;;
+                esac
+              done
+              [ -n "$out_dir" ] && mkdir -p "$out_dir" && printf "apiVersion: v1\nkind: ConfigMap\n" > "$out_dir/out.yaml"
+              exit 0 ;;
+            *) exit 0 ;;
+          esac'
+        mock.activate
+      }
+      cleanup_kust_ok() {
+        mock.cleanup
+        rm -rf "$TEST_WS"
+      }
+      Before 'setup_kust_ok'
+      After 'cleanup_kust_ok'
+
+      It "renders via kustomize build and returns 0"
+        invoke_kust() {
+          deploy.gitops.render_manifests --source "${TEST_WS}/src" --output "${TEST_WS}/out" --type kustomize >/dev/null 2>&1
+        }
+        When call invoke_kust
+        The status should be success
+        The file "${TEST_WS}/out/out.yaml" should be exist
+      End
+
+      It "applies --set values via kustomize edit"
+        invoke_kust_set() {
+          deploy.gitops.render_manifests --source "${TEST_WS}/src" --output "${TEST_WS}/out" \
+            --type kustomize --set "app=nginx:v2" >/dev/null 2>&1
+        }
+        When call invoke_kust_set
+        The status should be success
+      End
+
+      It "returns BRIK_EXIT_EXTERNAL_FAIL when kustomize build fails"
+        mock.create_script "kustomize" '
+          [ "$1" = "build" ] && exit 3
+          exit 0'
+        invoke_kust_fail() {
+          deploy.gitops.render_manifests --source "${TEST_WS}/src" --output "${TEST_WS}/out" --type kustomize 2>/dev/null
+        }
+        When call invoke_kust_fail
+        The status should equal "$BRIK_EXIT_EXTERNAL_FAIL"
+      End
+    End
+
+    Describe "helm_template type - happy path with mock"
+      setup_helm_ok() {
+        TEST_WS="$(mktemp -d)"
+        mkdir -p "${TEST_WS}/src"
+        mock.setup
+        mock.create_script "helm" '
+          if [ "$1" = "template" ]; then
+            printf "apiVersion: v1\nkind: ConfigMap\n"
+            exit 0
+          fi
+          exit 0'
+        mock.activate
+      }
+      cleanup_helm_ok() {
+        mock.cleanup
+        rm -rf "$TEST_WS"
+      }
+      Before 'setup_helm_ok'
+      After 'cleanup_helm_ok'
+
+      It "renders via helm template and writes manifests.yaml"
+        invoke_helm() {
+          deploy.gitops.render_manifests --source "${TEST_WS}/src" --output "${TEST_WS}/out" --type helm_template >/dev/null 2>&1
+        }
+        When call invoke_helm
+        The status should be success
+        The file "${TEST_WS}/out/manifests.yaml" should be exist
+      End
+
+      It "passes --set values to helm template"
+        invoke_helm_set() {
+          mkdir -p "${TEST_WS}/out"
+          deploy.gitops.render_manifests --source "${TEST_WS}/src" --output "${TEST_WS}/out" \
+            --type helm_template --set "image.tag=v2" >/dev/null 2>&1
+        }
+        When call invoke_helm_set
+        The status should be success
+      End
+
+      It "returns BRIK_EXIT_EXTERNAL_FAIL when helm template fails"
+        mock.create_script "helm" '
+          [ "$1" = "template" ] && exit 5
+          exit 0'
+        invoke_helm_fail() {
+          mkdir -p "${TEST_WS}/out"
+          deploy.gitops.render_manifests --source "${TEST_WS}/src" --output "${TEST_WS}/out" --type helm_template 2>/dev/null
+        }
+        When call invoke_helm_fail
+        The status should equal "$BRIK_EXIT_EXTERNAL_FAIL"
+      End
+    End
   End
 
   # =========================================================================

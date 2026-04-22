@@ -117,4 +117,53 @@ Describe "context.sh"
       The status should equal 1
     End
   End
+
+  Describe "_context._set_result"
+    setup_result() {
+      CTX_FILE="$(mktemp)"
+      printf '' > "$CTX_FILE"
+    }
+    cleanup_result() { rm -f "$CTX_FILE"; }
+    Before 'setup_result'
+    After 'cleanup_result'
+
+    It "writes 'success' when exit code is 0"
+      When call _context._set_result "$CTX_FILE" "RESULT" 0
+      The status should be success
+      The contents of file "$CTX_FILE" should include "RESULT=success"
+    End
+
+    It "writes 'failed' when exit code is non-zero"
+      When call _context._set_result "$CTX_FILE" "RESULT" 42
+      The status should be success
+      The contents of file "$CTX_FILE" should include "RESULT=failed"
+    End
+
+    It "writes 'failed' when exit code is 1"
+      When call _context._set_result "$CTX_FILE" "RESULT" 1
+      The status should be success
+      The contents of file "$CTX_FILE" should include "RESULT=failed"
+    End
+  End
+
+  Describe "context.create IO failures"
+    setup_bad_dir() {
+      BAD_LOG_DIR="$(mktemp -d)"
+      chmod 000 "$BAD_LOG_DIR"
+      export BRIK_LOG_DIR="${BAD_LOG_DIR}/nested"
+    }
+    cleanup_bad_dir() {
+      chmod 755 "$BAD_LOG_DIR" 2>/dev/null
+      rm -rf "$BAD_LOG_DIR"
+      unset BRIK_LOG_DIR
+    }
+    Before 'setup_bad_dir'
+    After 'cleanup_bad_dir'
+
+    It "returns BRIK_EXIT_IO_FAILURE when log dir cannot be created"
+      When call context.create "badstage"
+      The status should equal "$BRIK_EXIT_IO_FAILURE"
+      The stderr should include "cannot create log directory"
+    End
+  End
 End

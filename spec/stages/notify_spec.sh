@@ -14,11 +14,22 @@ Describe "stages.notify"
     export BRIK_PLATFORM="gitlab"
     export BRIK_COMMIT_REF="main"
     export BRIK_COMMIT_SHORT_SHA="abc123d"
+    # Isolate BRIK_LOG_DIR so a stale pipeline-report.md left by earlier specs
+    # (e.g. report_spec) doesn't get `cat`'d by notify.sh, masking the fallback
+    # banner the notify tests assert against.
+    _NOTIFY_ORIG_LOG_DIR="${BRIK_LOG_DIR:-}"
+    export BRIK_LOG_DIR
+    BRIK_LOG_DIR="$(mktemp -d)"
     config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
   }
   cleanup_env() {
     rm -f "$BRIK_CONFIG_FILE"
-    rm -rf "$BRIK_WORKSPACE"
+    rm -rf "$BRIK_WORKSPACE" "$BRIK_LOG_DIR"
+    if [[ -n "${_NOTIFY_ORIG_LOG_DIR}" ]]; then
+      export BRIK_LOG_DIR="${_NOTIFY_ORIG_LOG_DIR}"
+    else
+      unset BRIK_LOG_DIR
+    fi
     unset BRIK_NOTIFY_SLACK_CHANNEL BRIK_NOTIFY_EMAIL_TO BRIK_NOTIFY_WEBHOOK_URL 2>/dev/null || true
   }
   Before 'setup_env'

@@ -158,4 +158,81 @@ YAML
       The stderr should include "tag"
     End
   End
+
+  Describe "error paths - option and positional validation"
+    Before 'setup_tmp'
+    After 'teardown_tmp'
+
+    It "merge rejects unknown option"
+      When call transverse.yaml.merge --nosuch value
+      The status should equal "$BRIK_EXIT_INVALID_INPUT"
+      The stderr should include "unknown option"
+    End
+
+    It "merge rejects a 3rd positional argument"
+      printf 'a: 1\n' > "${_YAML_TMP}/a.yml"
+      printf 'b: 2\n' > "${_YAML_TMP}/b.yml"
+      When call transverse.yaml.merge "${_YAML_TMP}/a.yml" "${_YAML_TMP}/b.yml" "${_YAML_TMP}/c.yml"
+      The status should equal "$BRIK_EXIT_INVALID_INPUT"
+      The stderr should include "unexpected positional"
+    End
+
+    It "merge fails when override file is missing"
+      printf 'a: 1\n' > "${_YAML_TMP}/a.yml"
+      When call transverse.yaml.merge "${_YAML_TMP}/a.yml" "${_YAML_TMP}/missing.yml"
+      The status should equal "$BRIK_EXIT_IO_FAILURE"
+      The stderr should include "override file not found"
+    End
+
+    It "patch rejects unknown option"
+      When call transverse.yaml.patch --nosuch file
+      The status should equal "$BRIK_EXIT_INVALID_INPUT"
+      The stderr should include "unknown option"
+    End
+
+    It "patch rejects a 4th positional argument"
+      printf 'a: 1\n' > "${_YAML_TMP}/file.yml"
+      When call transverse.yaml.patch "${_YAML_TMP}/file.yml" ".a" "2" "extra"
+      The status should equal "$BRIK_EXIT_INVALID_INPUT"
+      The stderr should include "unexpected positional"
+    End
+
+    It "patch fails when file arg is empty"
+      When call transverse.yaml.patch "" ".a" "1"
+      The status should equal "$BRIK_EXIT_INVALID_INPUT"
+      The stderr should include "file is required"
+    End
+
+    It "set_image_tag rejects unknown option"
+      When call transverse.yaml.set_image_tag --nosuch file
+      The status should equal "$BRIK_EXIT_INVALID_INPUT"
+      The stderr should include "unknown option"
+    End
+
+    It "set_image_tag rejects a 4th positional argument"
+      printf 'spec: {}\n' > "${_YAML_TMP}/file.yml"
+      When call transverse.yaml.set_image_tag "${_YAML_TMP}/file.yml" ".img" "v1" "extra"
+      The status should equal "$BRIK_EXIT_INVALID_INPUT"
+      The stderr should include "unexpected positional"
+    End
+
+    It "set_image_tag fails when file does not exist"
+      When call transverse.yaml.set_image_tag "${_YAML_TMP}/missing.yml" ".img" "v1"
+      The status should equal "$BRIK_EXIT_IO_FAILURE"
+      The stderr should include "not found"
+    End
+
+    It "patch fails when path arg is empty but no extra value"
+      printf 'a: 1\n' > "${_YAML_TMP}/file.yml"
+      When call transverse.yaml.patch "${_YAML_TMP}/file.yml" ""
+      The status should equal "$BRIK_EXIT_INVALID_INPUT"
+      The stderr should include "path is required"
+    End
+
+    It "merge fails when second positional arg is empty"
+      When call transverse.yaml.merge "" ""
+      The status should equal "$BRIK_EXIT_INVALID_INPUT"
+      The stderr should include "required"
+    End
+  End
 End
