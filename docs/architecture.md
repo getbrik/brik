@@ -107,9 +107,9 @@ engine), structured logging, execution context, pre/post hooks, error handling,
 and step summary generation. Knows nothing about CI/CD -- it only runs functions
 with observability.
 
-**Layer 1 -- brik-lib** (`lib/{stages,stacks,deployments,rollout,package-managers,transverse,core}/`).
+**Layer 1 -- brik-lib** (`lib/{stages,stacks,deployments,rollout,package-managers,transverse,cli}/`).
 Reusable CI/CD business functions organized by domain: `stacks.node.build`, `stacks.java.build`,
-`verify.lint.run`, `verify.scan.run`, `pkg.npm.publish`, etc.
+`verify.lint.run`, `verify.scan.run`, `pkg.npm.publish`, `transverse.wait.until`, `cli.validate.run`, etc.
 Each function knows how to perform one CI/CD action for one stack or tool. Layer 1
 depends on Layer 0 for logging and context but has no knowledge of any CI platform.
 
@@ -208,15 +208,20 @@ Key decisions:
 
 ## Directory Structure
 
+> For a higher-level view mapping the `lib/` tree to the 8 domain notions, see
+> [layout.md](layout.md).
+
 ```
 brik/
-├─ bin/brik                        # CLI (validate, doctor, init, run, version)
-├─ lib/                            # Domain-driven layout (Phase 3)
+├─ bin/brik                        # Thin CLI dispatcher (~190 lines, delegates to lib/cli/)
+├─ lib/                            # Domain-driven layout (Phases 3-5)
 │  ├─ pipeline/                    # Notion #6 -- execution engine (stage.run, loader, logging)
 │  │  ├─ stage.sh                  #   Lifecycle engine (stage.run)
+│  │  ├─ pipeline.sh               #   Full-pipeline orchestrator (pipeline.run)
 │  │  ├─ loader.sh                 #   Module loader (brik.use, 3-level resolution)
 │  │  ├─ logging.sh                #   Structured logging (log.info, log.error, etc.)
-│  │  ├─ context.sh                #   Execution context (key-value per stage)
+│  │  ├─ context.sh                #   Lifecycle-only context (create, _context._* privates)
+│  │  ├─ report.sh                 #   Pipeline report (report.record / render)
 │  │  ├─ hooks.sh                  #   Pre/post stage hooks
 │  │  ├─ error.sh                  #   Exit codes and error handling
 │  │  ├─ summary.sh                #   Stage summary generation
@@ -226,13 +231,23 @@ brik/
 │  │  ├─ pipeline-env.sh           #   Pipeline environment propagation
 │  │  ├─ runner-images.sh          #   Runner image resolution
 │  │  └─ version-info.sh           #   Version and schema exports
+│  ├─ cli/                         # CLI command modules (Phase 4.5 Lot 6)
+│  │  ├─ helpers.sh                #   brik_print/error/usage_error + _brik_detect_install_method
+│  │  ├─ validate.sh               #   cli.validate.run
+│  │  ├─ doctor.sh                 #   cli.doctor.run
+│  │  ├─ version.sh                #   cli.version.run
+│  │  ├─ help.sh                   #   cli.help.run
+│  │  ├─ init.sh                   #   cli.init.run (+ scaffold private helpers)
+│  │  ├─ run.sh                    #   cli.run.{run,stage,pipeline}
+│  │  ├─ self_update.sh            #   cli.self_update.run
+│  │  └─ self_uninstall.sh         #   cli.self_uninstall.run
 │  ├─ stages/                      # Notion #3 -- pipeline stages
 │  │  ├─ init.sh, release.sh, build.sh, test.sh, package.sh
 │  │  ├─ lint.sh, scan.sh, sast.sh, container_scan.sh
 │  │  ├─ deploy.sh, notify.sh
 │  │  └─ verify/                   # Quality + scan umbrella (N7)
 │  │     ├─ verify.sh              #   verify.run dispatcher
-│  │     ├─ format.sh, lint.sh, type_check.sh, _tools.sh
+│  │     ├─ format.sh, lint.sh, type_check.sh
 │  │     └─ scan/                  #   Security scans
 │  │        ├─ scan.sh             #     verify.scan.run dispatcher
 │  │        ├─ container.sh, deps.sh, iac.sh, license.sh, sast.sh, secret.sh
@@ -243,22 +258,26 @@ brik/
 │  │  └─ _deps.sh                  #   stacks.install_deps dispatcher
 │  ├─ transverse/                  # Notion #5 -- cross-cutting helpers
 │  │  ├─ git.sh, version.sh, changelog.sh, conditions.sh
+│  │  ├─ env.sh                    #   transverse.env.{resolve_indirect,...}
+│  │  ├─ secrets.sh                #   transverse.secrets.require_var
+│  │  ├─ ssh.sh                    #   transverse.ssh.setup_agent
+│  │  ├─ csv.sh                    #   transverse.csv.foreach
+│  │  ├─ wait.sh                   #   transverse.wait.until (poll-until-timeout)
+│  │  ├─ yaml.sh                   #   transverse.yaml.{merge,patch,set_image_tag}
+│  │  ├─ tools.sh                  #   transverse.tools.{register,resolve,exec} (3-tier registry)
 │  │  ├─ config.sh
 │  │  └─ config/                   #   Per-stack config (node, python, java, rust, dotnet)
 │  ├─ deployments/                 # Notion #4 -- deploy targets
 │  │  ├─ k8s.sh, helm.sh, compose.sh, ssh.sh
-│  │  ├─ gitops.sh, argocd.sh
+│  │  └─ gitops.sh, argocd.sh
 │  ├─ rollout/                     # Notion #8 -- rollout (health, strategy, profile)
 │  │  ├─ health.sh, strategy.sh, profile.sh
 │  │  └─ data/deploy-profiles/     #   trunk-based.yml, git-flow.yml, github-flow.yml
-│  ├─ package-managers/            # Notion #7 -- registry publishing
-│  │  ├─ npm.sh, pypi.sh, maven.sh, cargo.sh, nuget.sh, docker.sh
-│  └─ core/                        # Remaining dispatchers (inlining deferred Phase 4)
-│     ├─ build.sh, test.sh, deploy.sh, publish.sh
-│     ├─ doctor.sh, notify.sh, validate.sh
+│  └─ package-managers/            # Notion #7 -- registry publishing
+│     └─ npm.sh, pypi.sh, maven.sh, cargo.sh, nuget.sh, docker.sh
 ├─ spec/                           # ShellSpec tests (mirrors lib/ structure)
 ├─ shared-libs/                    # Layer 2 -- platform adapters
-│  ├─ common/scripts/               #   Shared logic (base-wrapper.sh)
+│  ├─ common/scripts/              #   Shared logic (base-wrapper.sh)
 │  ├─ gitlab/                      #   GitLab CI pipeline template
 │  ├─ jenkins/                     #   Jenkins Shared Library
 │  ├─ local/                       #   Local execution wrapper
@@ -287,11 +306,12 @@ To add support for a new stack (e.g., `go`):
    stack-specific build variables), and `config.go.validate_coherence()` (cross-field
    validation).
 
-5. **Dynamic dispatch** -- no manual wiring needed. Dispatchers like `core/build.sh`
-   and `core/test.sh` use `brik.use "stacks.${stack}"` to dynamically load the correct
-   module at runtime. The new `lib/stacks/go.sh` is picked up automatically.
+5. **Dynamic dispatch** -- no manual wiring needed. The build and test stages
+   (`lib/stages/build.sh`, `lib/stages/test.sh`) use `brik.use "stacks.${stack}"`
+   to dynamically load the correct module at runtime. The new `lib/stacks/go.sh`
+   is picked up automatically.
 
-6. **Doctor** -- add Go-specific prerequisite checks to `lib/core/doctor.sh`.
+6. **Doctor** -- add Go-specific prerequisite checks to `lib/cli/doctor.sh`.
 
 7. **Example** -- create `examples/minimal-go/brik.yml` with a minimal config.
 
