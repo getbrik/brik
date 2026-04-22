@@ -37,3 +37,20 @@ brik_require_arg() {
         return "${BRIK_EXIT_INVALID_INPUT}"
     fi
 }
+
+# _brik_detect_install_method - classify the Brik install source.
+# Used by cli.version and cli.self_update to pick display/update strategy.
+# Prints one of: brew, source, git, unknown.
+_brik_detect_install_method() {
+    if command -v brew >/dev/null 2>&1 && brew list brik >/dev/null 2>&1; then
+        printf 'brew'
+    elif [[ -d "${BRIK_HOME}/.git" ]]; then
+        if [[ "${BRIK_HOME}" != "${HOME}/.brik" ]]; then
+            printf 'source'
+        else
+            printf 'git'
+        fi
+    else
+        printf 'unknown'
+    fi
+}
