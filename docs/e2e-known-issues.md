@@ -74,38 +74,8 @@ Cascade-skipped: same set as GitLab.
 
 ## Status Overview - Remaining Issues
 
-| Scenario              | Platform        | Class            | Status              |
-|-----------------------|-----------------|------------------|---------------------|
-| node-deploy-gitops    | GitLab + Jenkins| infra (ArgoCD)   | open                |
-
-Issues that were on this list and are now resolved are listed in the
-"Recently Fixed" section at the bottom for audit trail.
-
-## GitLab
-
-### node-deploy-gitops - ArgoCD unreachable
-
-```
-[ERROR] [deploy] argocd app sync failed for: brik-e2e-gitops
-Failed to establish connection to host.docker.internal:9080:
-  error dial proxy: dial tcp 192.168.65.254:9080: connect: connection refused
-```
-
-ArgoCD port-forward from the runner container to the k3d cluster on the
-briklab host is intermittently unavailable. The yaml-migration positive
-signal stands - `image tags substituted to :0.1.0` logged correctly, so
-`transverse.yaml.set_image_tag` is not the problem.
-
-Fix options:
-- (a) Make the port-forward persistent or self-healing on briklab.
-- (b) Retry with backoff inside `deploy.argocd.sync` before failing.
-
-## Jenkins
-
-### node-deploy-gitops (Jenkins)
-
-Same root cause as the GitLab side: ArgoCD port-forward from the runner
-to the k3d cluster is unreachable. Single fix covers both platforms.
+_No open issues tracked at 2026-04-23. Previously-open entries are
+listed in "Recently Fixed" for audit trail._
 
 ## Procedure When a New Flake Appears
 
@@ -218,3 +188,19 @@ commit, and the briklab/brik repo it landed in.
   `branch == 'main'` (staging) and `tag =~ 'v*'` (production). Verified
   build #13 PASS on Jenkins, all 8 stages green, zero `invalid
   condition` hits in console. briklab `67ee1df`.
+
+- `node-deploy-gitops` (GitLab + Jenkins) - the ArgoCD port-forward is
+  started by `scripts/lib/auth/argocd-portfwd.sh` during briklab setup
+  as a host-side `kubectl port-forward` background process. It dies
+  silently when the setup shell exits, the laptop sleeps, or the k3d
+  network hiccups, and nothing respawns it. The next E2E run then fails
+  with `Failed to establish connection to host.docker.internal:9080`.
+  Added `e2e.argocd.ensure_port_forward` as a per-scenario pre-cleanup
+  hook in both gitlab-suite.sh and jenkins-suite.sh (gated on kubectl +
+  an active kubeconfig + the argocd namespace). It delegates to the
+  canonical `ensure_argocd_port_forward` which probes `:9080` and
+  relaunches the port-forward if dead. Verified: killed the
+  port-forward, then re-ran node-deploy-gitops on both platforms;
+  preflight logged "port-forward not active, (re)starting" then "ready
+  on :9080 (attempt 1/10)", scenarios passed end-to-end. Non-ArgoCD
+  scenarios (e.g. node-minimal) unaffected. briklab `e7e070f`.
