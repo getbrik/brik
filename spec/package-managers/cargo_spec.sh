@@ -68,6 +68,15 @@ Describe "publish/cargo.sh"
         The status should be success
       End
 
+      It "always passes --allow-dirty (CI workspaces reuse tree between stages)"
+        invoke_allow_dirty() {
+          pkg.cargo.publish 2>/dev/null || return 1
+          grep -q "\-\-allow-dirty" "$MOCK_LOG"
+        }
+        When call invoke_allow_dirty
+        The status should be success
+      End
+
       It "passes registry option"
         invoke_registry() {
           pkg.cargo.publish --registry "my-registry" 2>/dev/null || return 1

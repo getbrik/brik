@@ -59,7 +59,8 @@ pkg.cargo.publish() {
         export "$index_env_var"="$index"
     fi
 
-    local -a cmd=(cargo publish)
+    # --allow-dirty: Jenkins-style runners reuse workspaces across stages, so cargo's git-clean guard always trips in CI.
+    local -a cmd=(cargo publish --allow-dirty)
     [[ -n "$registry" ]] && cmd+=(--registry "$registry")
 
     local target="${registry:-crates.io}"
