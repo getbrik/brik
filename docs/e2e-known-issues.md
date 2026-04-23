@@ -78,7 +78,6 @@ Cascade-skipped: same set as GitLab.
 |-----------------------|-----------------|------------------|---------------------|
 | node-deploy-gitops    | GitLab + Jenkins| infra (ArgoCD)   | open                |
 | workflow-trunk-main   | Jenkins only    | trigger config   | open                |
-| rust-complete         | Jenkins only    | publish strict mode | open             |
 | java-minimal          | Jenkins         | CVE flake        | open / monitoring   |
 | java-complete         | GitLab + Jenkins| flake            | open / monitoring   |
 
@@ -148,28 +147,6 @@ Fix options (pick one):
   `http://jenkins.briklab.test:9090/gitea-webhook/post`.
 - For the E2E harness, after `git push` poll Jenkins's `/queue/api/json`
   with the SHA in the build cause instead of waiting on `lastBuild`.
-
-### rust-complete - cargo refuses dirty working tree
-
-```
-error: 4 files in the working directory contain changes that were not yet committed into git:
-[ERROR] [package] cargo publish failed
-[ERROR] [brik] stage package failed with exit code 5
-```
-
-Authentication is now correct (the previous `token rejected for brik-cargo`
-401 is resolved by `NEXUS_CARGO_TOKEN` propagation). New failure: cargo
-publishes refuse to run when the workspace has uncommitted changes,
-which happens on Jenkins because earlier stages (build, test, scan) wrote
-artifacts into the workspace.
-
-Fix options:
-- Add `--allow-dirty` to the cargo publish command in
-  `brik/lib/package-managers/cargo.sh` (one-line change). This is the
-  GitLab-Runner default behavior because GitLab-Runner re-clones a fresh
-  workspace per stage; Jenkins reuses the workspace across stages.
-- Alternative: clean the workspace (`git stash` / `git checkout -- .`)
-  before the publish step. Less surgical.
 
 ### java-minimal / java-complete - osv-scanner CVE flake
 
@@ -252,3 +229,12 @@ commit, and the briklab/brik repo it landed in.
   `facca85`.
 - `examples/minimal-node` local build - missing `package.json`,
   `src/`, `test/`. Restored. brik `e037886`.
+
+## Recently Fixed (2026-04-23)
+
+- `rust-complete` (Jenkins) - `cargo publish` refused to run against a
+  dirty workspace (Jenkins reuses its workspace across stages; build and
+  test artefacts remained in the tree). Always pass `--allow-dirty` in
+  `pkg.cargo.publish`. Verified end-to-end: GitLab rust-minimal #551 +
+  rust-complete #554 PASS, Jenkins rust-minimal #5 + rust-complete #8
+  PASS. brik `431f51c`.
