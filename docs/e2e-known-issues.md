@@ -77,8 +77,6 @@ Cascade-skipped: same set as GitLab.
 | Scenario              | Platform        | Class            | Status              |
 |-----------------------|-----------------|------------------|---------------------|
 | node-deploy-gitops    | GitLab + Jenkins| infra (ArgoCD)   | open                |
-| java-minimal          | Jenkins         | CVE flake        | open / monitoring   |
-| java-complete         | GitLab + Jenkins| flake            | open / monitoring   |
 
 Issues that were on this list and are now resolved are listed in the
 "Recently Fixed" section at the bottom for audit trail.
@@ -102,46 +100,7 @@ Fix options:
 - (a) Make the port-forward persistent or self-healing on briklab.
 - (b) Retry with backoff inside `deploy.argocd.sync` before failing.
 
-### java-complete - brik-package skipped
-
-```
-[FAIL] Job 'brik-package' status -- expected='success' actual='skipped'
-[WARN]  brik-quality: not_found (optional)
-[WARN]  brik-security: not_found (optional)
-```
-
-The pipeline ran but `brik-package` was skipped, meaning a `rules:` clause
-in the GitLab template excluded it. Optional jobs (`brik-quality`,
-`brik-security`) were also `not_found`, suggesting the template evaluated
-a different rule branch than expected for this scenario.
-
-Fix options:
-- Reproduce on a single scenario run and inspect the pipeline's
-  `parsed_yaml` to see which rule excluded `brik-package`.
-- This was PASS in batches `20260422T140016` and `20260422T172517` - mark
-  as flake until reproducible.
-
 ## Jenkins
-
-### java-minimal / java-complete - osv-scanner CVE flake
-
-```
-[WARN] [scan] security scan failed: deps
-[INFO] [scan] security summary: 1/2 scans passed, 1 failed
-[ERROR] [brik] stage scan failed with exit code 10
-```
-
-osv-scanner found a deps vulnerability in the java fixture that was not
-reported earlier in the day. CVE feeds change daily; java fixtures are
-small and pinned to old versions, so each new CVE in those exact deps
-flips the scan from PASS to FAIL.
-
-Fix options:
-- Bump the java fixture deps to current LTS versions periodically.
-- Lower the deps-scan severity threshold for fixtures (e.g.
-  `security.deps.severity: critical` instead of `high` in the brik.yml).
-- Pin the osv-scanner database snapshot in CI so feed drift doesn't
-  flip green-to-red between runs.
 
 ### node-deploy-gitops (Jenkins)
 
@@ -228,3 +187,34 @@ commit, and the briklab/brik repo it landed in.
   `pkg.cargo.publish`. Verified end-to-end: GitLab rust-minimal #551 +
   rust-complete #554 PASS, Jenkins rust-minimal #5 + rust-complete #8
   PASS. brik `431f51c`.
+
+- `java-minimal` / `java-complete` (GitLab + Jenkins) - previously
+  labelled "CVE flake" and "brik-package skipped flake" but both were
+  the same root cause. osv-scanner's transitive Maven resolver makes an
+  RPC call to `deps.dev` to resolve transitive deps from `pom.xml`; when
+  that service is unreachable or flaky, osv-scanner prints
+  `Error during extraction: (extracting as transitivedependency/pomxml)
+  failed resolving ...: rpc error: code = Unavailable desc = service
+  unavailable` and exits non-zero while still reporting `Total 0 packages
+  affected by 0 known vulnerabilities`. Brik treated the non-zero exit
+  as "vulnerabilities found" without surfacing the scanner's own output,
+  which hid the real cause. Two-part fix: (a) `verify.scan.deps.run`
+  prints the scanner output on the failure branch so CVEs (or extraction
+  errors) are visible, and treats "Total 0 packages affected by 0 known
+  vulnerabilities" in the output as a pass even when exit code is
+  non-zero (warn-only). (b) `e2e.jenkins.trigger_build` auto-detects
+  parameterized jobs and routes to `buildWithParameters` instead of
+  `build`, fixing an HTTP 400 trigger failure introduced by the
+  `BRIK_DRY_RUN` parameter now present on all brik jobs. Verified:
+  java-minimal + java-complete PASS on both GitLab and Jenkins.
+  brik `c165d35`, briklab `7b68502`.
+
+- `workflow-trunk-main` (Jenkins) - `deploy.environments.*.when` used
+  `ref: main` / `ref: tag`, which are not valid brik condition
+  expressions (`conditions.eval` expects `subject <op> '<value>'`, e.g.
+  `branch == 'main'`). Pipelines succeeded because the deploy stage
+  skipped silently, but emitted `[ERROR] [deploy] invalid condition
+  expression: ref: main` in logs. Fixed the fixture to use
+  `branch == 'main'` (staging) and `tag =~ 'v*'` (production). Verified
+  build #13 PASS on Jenkins, all 8 stages green, zero `invalid
+  condition` hits in console. briklab `67ee1df`.
