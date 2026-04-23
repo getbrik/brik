@@ -77,7 +77,6 @@ Cascade-skipped: same set as GitLab.
 | Scenario              | Platform        | Class            | Status              |
 |-----------------------|-----------------|------------------|---------------------|
 | node-deploy-gitops    | GitLab + Jenkins| infra (ArgoCD)   | open                |
-| workflow-trunk-main   | Jenkins only    | trigger config   | open                |
 | java-minimal          | Jenkins         | CVE flake        | open / monitoring   |
 | java-complete         | GitLab + Jenkins| flake            | open / monitoring   |
 
@@ -123,30 +122,6 @@ Fix options:
   as flake until reproducible.
 
 ## Jenkins
-
-### workflow-trunk-main - no build triggered after push
-
-```
-[INFO]  Triggering via git push (ref: main)...
-[OK]    Push SHA: 85216442f3a33ca0a4de89586137a270d48a3c63
-[INFO]  Waiting for build triggered by SHA 85216442...
-..................                   <- 90s of polling, then timeout
-```
-
-The CasC seed job for `node-workflow-trunk` is in place (verified: HTTP
-200 on `/job/node-workflow-trunk/api/json`). Git push to Gitea succeeds.
-Jenkins does not auto-build because the seed job has no `triggers`
-clause, no Gitea webhook is configured to call back to Jenkins, and no
-SCM-polling schedule is set.
-
-Fix options (pick one):
-- Add `triggers { scm('* * * * *') }` to the JobDSL block in
-  `briklab/config/jenkins/casc.yaml` for `node-workflow-trunk` (and any
-  other push-driven scenarios added later).
-- Configure a Gitea push webhook pointing at
-  `http://jenkins.briklab.test:9090/gitea-webhook/post`.
-- For the E2E harness, after `git push` poll Jenkins's `/queue/api/json`
-  with the SHA in the build cause instead of waiting on `lastBuild`.
 
 ### java-minimal / java-complete - osv-scanner CVE flake
 
@@ -231,6 +206,21 @@ commit, and the briklab/brik repo it landed in.
   `src/`, `test/`. Restored. brik `e037886`.
 
 ## Recently Fixed (2026-04-23)
+
+- `workflow-trunk-main` (Jenkins) - seed job existed but nothing was
+  wiring Jenkins to Gitea on push, so the E2E push timed out waiting
+  for a build. Installed the Gitea plugin and converted the seed to a
+  `multibranchPipelineJob` backed by `giteaSCMSource` with
+  `manageHooks: true` in SYSTEM mode, so Jenkins auto-registers the
+  webhook at first scan. Side-patches in the E2E harness: multibranch
+  URL resolver (`job/<name>/job/<branch>`), `curl -g` in `api_get` so
+  `tree=builds[...]` queries don't get globbed, `>&2` on the log lines
+  inside `wait_build_by_sha` / `wait_build` / `trigger_build` so the
+  captured build-number isn't contaminated. Credential scope on the
+  Jenkins side is GLOBAL (not SYSTEM) so the GiteaNotifier can look it
+  up from the project context when pushing commit statuses back to
+  Gitea. Verified E2E: build #12 PASS, "Notified" in Jenkins log
+  instead of 401. briklab `6d46930`.
 
 - `rust-complete` (Jenkins) - `cargo publish` refused to run against a
   dirty workspace (Jenkins reuses its workspace across stages; build and
