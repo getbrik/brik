@@ -108,6 +108,37 @@ exit 1'
         When call verify.scan.deps.run "$TEST_WS"
         The status should equal 10
         The stderr should include "security dependency vulnerabilities found"
+        The stderr should include "Found 3 vulnerabilities"
+      End
+    End
+
+    Describe "Tier 2: tool exits non-zero but reports zero vulnerabilities"
+      setup_zero_vulns() {
+        mock.setup
+        TEST_WS="$(mktemp -d)"
+        mock.create_script "osv-scanner" 'cat <<'"'"'SCAN'"'"'
+Error during extraction: (extracting as transitivedependency/pomxml) failed resolving: rpc error: code = Unavailable desc = service unavailable
+
+Total 0 packages affected by 0 known vulnerabilities (0 Critical, 0 High, 0 Medium, 0 Low, 0 Unknown) from 0 ecosystems.
+0 vulnerabilities can be fixed.
+SCAN
+exit 1'
+        mock.activate
+        export BRIK_SECURITY_DEPS_TOOL="osv-scanner"
+      }
+      cleanup_zero_vulns() {
+        unset BRIK_SECURITY_DEPS_TOOL
+        mock.cleanup
+        rm -rf "$TEST_WS"
+      }
+      Before 'setup_zero_vulns'
+      After 'cleanup_zero_vulns'
+
+      It "treats extraction error with zero vulnerabilities as pass"
+        When call verify.scan.deps.run "$TEST_WS"
+        The status should be success
+        The stderr should include "extraction errors but found no vulnerabilities"
+        The stderr should include "Total 0 packages affected by 0 known vulnerabilities"
       End
     End
 

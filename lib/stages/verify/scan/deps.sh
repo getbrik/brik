@@ -70,6 +70,15 @@ verify.scan.deps.run() {
             log.warn "no package sources found for $resolved - skipping"
             return 0
         fi
+        # osv-scanner can exit non-zero on transient extraction errors
+        # (e.g. transitivedependency/pomxml RPC to deps.dev unreachable)
+        # while still reporting zero vulnerabilities. Treat that as a pass.
+        if echo "$scan_output" | grep -qE "Total 0 packages affected by 0 known vulnerabilities"; then
+            log.warn "$resolved reported extraction errors but found no vulnerabilities - treating as pass"
+            printf '%s\n' "$scan_output" >&2
+            return 0
+        fi
+        printf '%s\n' "$scan_output" >&2
         log.error "security dependency vulnerabilities found"
         return "$BRIK_EXIT_CHECK_FAILED"
     }
