@@ -96,6 +96,73 @@ Describe "stages.notify"
     The error should be present
   End
 
+  Describe "pipeline-report copy into workspace"
+    # CI templates declare artifacts: paths: [brik-artifacts/]; if notify
+    # leaves the report only under BRIK_LOG_DIR (outside the workspace),
+    # GitLab/Jenkins emit "no matching files" warnings on every run.
+    setup_report() {
+      printf '# Pipeline Report\n' > "${BRIK_LOG_DIR}/pipeline-report.md"
+      printf '{"stages":[]}\n'      > "${BRIK_LOG_DIR}/pipeline-report.json"
+    }
+    Before 'setup_report'
+
+    It "copies pipeline-report.md into workspace brik-artifacts/"
+      run_notify_copy_md() {
+        local ctx
+        ctx="$(context.create "notify")" 2>/dev/null || ctx="$(mktemp)"
+        stages.notify "$ctx" >/dev/null 2>&1
+        [[ -f "${BRIK_WORKSPACE}/brik-artifacts/pipeline-report.md" ]]
+      }
+      When call run_notify_copy_md
+      The status should be success
+    End
+
+    It "copies pipeline-report.json into workspace brik-artifacts/"
+      run_notify_copy_json() {
+        local ctx
+        ctx="$(context.create "notify")" 2>/dev/null || ctx="$(mktemp)"
+        stages.notify "$ctx" >/dev/null 2>&1
+        [[ -f "${BRIK_WORKSPACE}/brik-artifacts/pipeline-report.json" ]]
+      }
+      When call run_notify_copy_json
+      The status should be success
+    End
+
+    It "logs a warning when the copy into brik-artifacts/ fails"
+      # Make brik-artifacts/ unwritable so cp must fail. The stage must
+      # still return 0 (notification is best-effort) but emit a WARN so
+      # operators see the I/O problem instead of a silent skip.
+      run_notify_copy_failure() {
+        mkdir -p "${BRIK_WORKSPACE}/brik-artifacts"
+        chmod a-w "${BRIK_WORKSPACE}/brik-artifacts"
+        local ctx
+        ctx="$(context.create "notify")" 2>/dev/null || ctx="$(mktemp)"
+        stages.notify "$ctx"
+        local rc=$?
+        chmod u+w "${BRIK_WORKSPACE}/brik-artifacts"
+        return $rc
+      }
+      When call run_notify_copy_failure
+      The status should be success
+      The error should include "WARN"
+      The error should include "brik-artifacts"
+      The output should be present
+    End
+  End
+
+  Describe "pipeline-report copy when reports absent"
+    It "does not create brik-artifacts/ when no report exists"
+      run_notify_no_report() {
+        local ctx
+        ctx="$(context.create "notify")" 2>/dev/null || ctx="$(mktemp)"
+        stages.notify "$ctx" >/dev/null 2>&1
+        [[ ! -d "${BRIK_WORKSPACE}/brik-artifacts" ]]
+      }
+      When call run_notify_no_report
+      The status should be success
+    End
+  End
+
   Describe "with slack notification configured"
     setup_slack() {
       cat > "$BRIK_CONFIG_FILE" <<'YAML'

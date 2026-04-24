@@ -298,6 +298,29 @@ stages.notify() {
     local level="info"
     [[ "$pipeline_status" == "failed" ]] && level="error"
 
+    # Copy pipeline report into workspace for CI artifact upload.
+    # BRIK_LOG_DIR lives outside the workspace (/tmp/brik/logs by default),
+    # so the GitLab/Jenkins "artifacts: brik-artifacts/" archive cannot find
+    # it. Copying the report here makes it downloadable from the CI job
+    # artifact URL and removes the "no matching files" warning that fired
+    # on every notify run. I/O failures are non-fatal (notify is best-effort)
+    # but surfaced as warnings so operators do not lose visibility.
+    if [[ -n "${BRIK_WORKSPACE:-}" ]] && [[ -f "$_report_md" || -f "$_report_json" ]]; then
+        local _artifacts_dir="${BRIK_WORKSPACE}/brik-artifacts"
+        if ! mkdir -p "$_artifacts_dir" 2>/dev/null; then
+            log.warn "could not create brik-artifacts/ at ${_artifacts_dir} (non-fatal)"
+        else
+            if [[ -f "$_report_md" ]]; then
+                cp "$_report_md" "$_artifacts_dir/" 2>/dev/null || \
+                    log.warn "could not copy pipeline-report.md to brik-artifacts/ (non-fatal)"
+            fi
+            if [[ -f "$_report_json" ]]; then
+                cp "$_report_json" "$_artifacts_dir/" 2>/dev/null || \
+                    log.warn "could not copy pipeline-report.json to brik-artifacts/ (non-fatal)"
+            fi
+        fi
+    fi
+
     # Slack notification.
     if [[ -n "${BRIK_NOTIFY_SLACK_CHANNEL:-}" ]]; then
         local slack_on="${BRIK_NOTIFY_SLACK_ON:-always}"
