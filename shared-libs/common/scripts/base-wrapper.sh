@@ -151,6 +151,85 @@ brik.wrapper.load_config() {
 }
 
 # ---------------------------------------------------------------------------
+# brik.wrapper.ensure_artefact_markers -- pre-create cache and artefact dirs
+# ---------------------------------------------------------------------------
+
+# CI templates declare a fixed set of cache (.npm/, .cache/pip, ...) and
+# artefact (coverage/, reports/) paths so a single template covers every
+# supported stack. The active stack only populates one or two of them, so
+# GitLab logs "no matching files" for every other path on every run.
+# Pre-creating each path with an empty .brik-keep file makes the cache and
+# artefact steps always find at least one file, eliminating the warnings.
+# Real outputs (npm modules, junit XML, coverage HTML, ...) coexist with the
+# marker without conflict.
+#
+# Arguments: $1 = workspace dir (optional, defaults to $BRIK_WORKSPACE).
+# Operates inside a subshell so the caller's PWD is never altered.
+# Returns: 0 on success or partial success; 4 if no workspace can be resolved.
+# A read-only filesystem or per-path permission error is tolerated: one bad
+# path must not break the rest of the stage.
+brik.wrapper.ensure_artefact_markers() {
+    local workspace="${1:-${BRIK_WORKSPACE:-}}"
+
+    if [[ -z "$workspace" ]]; then
+        # Hard fail rather than silently polluting the caller's cwd. Every
+        # legitimate caller (CI wrapper, local wrapper, test) sets
+        # BRIK_WORKSPACE before reaching here.
+        echo "error: brik.wrapper.ensure_artefact_markers: workspace required (set BRIK_WORKSPACE or pass as \$1)" >&2
+        return "$BRIK_EXIT_INVALID_ENV"
+    fi
+    if [[ ! -d "$workspace" ]]; then
+        echo "error: brik.wrapper.ensure_artefact_markers: workspace not a directory: $workspace" >&2
+        return "$BRIK_EXIT_INVALID_ENV"
+    fi
+
+    # Directory markers: dirs declared in cache:paths or artifacts:paths
+    # that the active stack may not populate. A .brik-keep file ensures
+    # GitLab's "no matching files" warning never fires.
+    local paths=(
+        ".npm"
+        ".cache/pip"
+        ".m2/repository"
+        ".gradle/caches"
+        ".gradle/wrapper"
+        ".cargo/registry"
+        ".cargo/git"
+        ".nuget/packages"
+        "coverage"
+        "reports"
+        "build"
+        "target"
+        "bin"
+        "dist"
+    )
+    # Glob-pattern placeholders: artifacts:paths and reports:junit list
+    # glob patterns (*.whl, *.tar.gz, reports/*.xml) that no stack-output
+    # dir can satisfy. A zero-byte placeholder file matches the glob and
+    # silences the warning without affecting real archives produced by the
+    # stage. Each entry is a path relative to the workspace root.
+    local glob_placeholders=(
+        ".brik-keep.whl"
+        ".brik-keep.tar.gz"
+        "reports/.brik-keep.xml"
+    )
+    (
+        cd "$workspace" || exit 0
+        local p
+        for p in "${paths[@]}"; do
+            [[ -f "$p/.brik-keep" ]] && continue
+            mkdir -p "$p" 2>/dev/null || continue
+            : > "$p/.brik-keep" 2>/dev/null || true
+        done
+        for p in "${glob_placeholders[@]}"; do
+            [[ -f "$p" ]] && continue
+            mkdir -p "$(dirname "$p")" 2>/dev/null || continue
+            : > "$p" 2>/dev/null || true
+        done
+    )
+    return 0
+}
+
+# ---------------------------------------------------------------------------
 # brik.wrapper.run_stage -- wrapper-side entry point for single-stage execution
 # ---------------------------------------------------------------------------
 
@@ -174,6 +253,16 @@ brik.wrapper.run_stage() {
     if [[ -z "${BRIK_HOME:-}" ]]; then
         echo "error: wrapper setup must be called before run_stage" >&2
         return "$BRIK_EXIT_INVALID_ENV"
+    fi
+
+    # Pre-create cache and artefact dirs so CI cache/artifact upload steps
+    # never log "no matching files" warnings for stack paths the active
+    # stack does not populate. Markers persist between runs alongside real
+    # outputs. Skip silently if no workspace is set (e.g. early CLI errors
+    # before set_standard_env ran); the function's hard-fail mode is
+    # reserved for direct callers.
+    if [[ -n "${BRIK_WORKSPACE:-}" ]]; then
+        brik.wrapper.ensure_artefact_markers "$BRIK_WORKSPACE" >/dev/null 2>&1 || true
     fi
 
     stage.dispatch "$stage_name"
