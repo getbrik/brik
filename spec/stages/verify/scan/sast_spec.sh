@@ -79,7 +79,7 @@ Describe "security/sast.sh"
       It "runs semgrep with auto config"
         invoke_tool() {
           verify.scan.sast.run "$TEST_WS" 2>/dev/null || return 1
-          grep -q "semgrep scan --config auto" "$MOCK_LOG"
+          grep -q "semgrep scan .* --config auto" "$MOCK_LOG"
         }
         When call invoke_tool
         The status should be success
@@ -89,9 +89,47 @@ Describe "security/sast.sh"
         invoke_with_ruleset() {
           export BRIK_SECURITY_SAST_RULESET="p/owasp-top-ten"
           verify.scan.sast.run "$TEST_WS" 2>/dev/null || return 1
-          grep -q "semgrep scan --config p/owasp-top-ten" "$MOCK_LOG"
+          grep -q "semgrep scan .* --config p/owasp-top-ten" "$MOCK_LOG"
         }
         When call invoke_with_ruleset
+        The status should be success
+      End
+
+      It "passes --error so semgrep exits non-zero on findings"
+        invoke_error_flag() {
+          verify.scan.sast.run "$TEST_WS" 2>/dev/null || return 1
+          grep -q "semgrep scan --error" "$MOCK_LOG"
+        }
+        When call invoke_error_flag
+        The status should be success
+      End
+
+      It "defaults to --severity ERROR"
+        invoke_default_severity() {
+          verify.scan.sast.run "$TEST_WS" 2>/dev/null || return 1
+          grep -q -- "--severity ERROR" "$MOCK_LOG"
+        }
+        When call invoke_default_severity
+        The status should be success
+      End
+
+      It "honors BRIK_SECURITY_SAST_SEVERITY=WARNING"
+        invoke_warning_severity() {
+          export BRIK_SECURITY_SAST_SEVERITY="WARNING"
+          verify.scan.sast.run "$TEST_WS" 2>/dev/null || return 1
+          grep -q -- "--severity WARNING" "$MOCK_LOG"
+        }
+        When call invoke_warning_severity
+        The status should be success
+      End
+
+      It "omits --severity when BRIK_SECURITY_SAST_SEVERITY=ALL"
+        invoke_all_severity() {
+          export BRIK_SECURITY_SAST_SEVERITY="ALL"
+          verify.scan.sast.run "$TEST_WS" 2>/dev/null || return 1
+          ! grep -q -- "--severity" "$MOCK_LOG"
+        }
+        When call invoke_all_severity
         The status should be success
       End
     End
