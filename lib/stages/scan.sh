@@ -21,7 +21,7 @@ stages.scan() {
     export BRIK_SECURITY_DEPS_TOOL="${BRIK_SECURITY_DEPS_TOOL:-osv-scanner}"
     export BRIK_SECURITY_SECRETS_TOOL="${BRIK_SECURITY_SECRETS_TOOL:-gitleaks}"
 
-    stacks.install_deps "${BRIK_WORKSPACE}" scan
+    stacks.install_deps "${BRIK_WORKSPACE}" scan || return $?
 
     local severity="${BRIK_SECURITY_DEPS_SEVERITY:-${BRIK_SECURITY_SEVERITY_THRESHOLD:-high}}"
 

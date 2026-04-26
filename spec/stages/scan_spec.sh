@@ -210,6 +210,7 @@ Describe "stacks.install_deps (scan mode)"
     It "runs npm ci when node_modules is missing"
       run_node_install() {
         export BRIK_BUILD_STACK="node"
+        printf '{"name":"t","version":"0.0.0"}\n' > "$DEPS_WS/package.json"
         mock.create_logging "npm" "$MOCK_LOG"
         mock.activate
         stacks.install_deps "$DEPS_WS" scan 2>/dev/null
