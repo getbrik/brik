@@ -6,6 +6,8 @@ brik-init:
   script:
     - bash -c '. /tmp/brik-bootstrap.sh && brik.gitlab.run_stage init'
   artifacts:
+    paths:
+      - .brik-logs/pipeline.env
     reports:
       dotenv: brik-init.env
     expire_in: 1 hour
