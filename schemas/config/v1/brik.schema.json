@@ -199,6 +199,56 @@
               "minLength": 1
             }
           }
+        },
+        "reports": {
+          "description": "Test report generation. When enabled, Brik injects framework-specific flags into the test command to produce coverage and JUnit-compatible XML reports for the CI to consume.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "description": "Whether to produce test reports. Default: false (test runner uses its native defaults).",
+              "type": "boolean",
+              "default": false
+            },
+            "coverage": {
+              "description": "Coverage report configuration.",
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": {
+                  "type": "boolean",
+                  "default": true
+                },
+                "format": {
+                  "description": "Coverage report format. Stack defaults: lcov for node/rust, cobertura for python/dotnet, jacoco for java. Use 'auto' (default) to let Brik pick.",
+                  "type": "string",
+                  "enum": ["lcov", "cobertura", "jacoco", "auto"],
+                  "default": "auto"
+                },
+                "output_dir": {
+                  "description": "Directory where the coverage report is written. Default: coverage.",
+                  "type": "string",
+                  "default": "coverage"
+                }
+              }
+            },
+            "junit": {
+              "description": "JUnit-compatible XML test report configuration.",
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": {
+                  "type": "boolean",
+                  "default": true
+                },
+                "output_path": {
+                  "description": "Path where the JUnit XML report is written. Default: reports/junit.xml.",
+                  "type": "string",
+                  "default": "reports/junit.xml"
+                }
+              }
+            }
+          }
         }
       }
     },
