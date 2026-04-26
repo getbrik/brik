@@ -50,7 +50,11 @@ pipeline.env.set() {
         return "$BRIK_EXIT_IO_FAILURE"
     fi
 
-    printf '%s=%s\n' "$key" "$value" >> "$BRIK_PIPELINE_ENV" || {
+    # Use %q so values containing newlines, quotes, or shell metachars
+    # remain a single safe assignment when pipeline.env.load sources the
+    # file. Without this, a multi-line CI variable would land as a
+    # second bare line that bash tries to execute as a command.
+    printf '%s=%q\n' "$key" "$value" >> "$BRIK_PIPELINE_ENV" || {
         log.error "cannot write to pipeline env file: $BRIK_PIPELINE_ENV"
         return "$BRIK_EXIT_IO_FAILURE"
     }
