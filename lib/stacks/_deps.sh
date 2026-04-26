@@ -48,6 +48,9 @@ _brik._install_deps_node() {
     local workspace="$1"
     [[ -f "${workspace}/package.json" ]] || return 0
     [[ -d "${workspace}/node_modules" ]] && return 0
+    # Some runner images (scanner, analysis) do not ship npm. Skip silently
+    # when the tool is missing -- those stages do not need installed deps.
+    command -v npm >/dev/null 2>&1 || return 0
 
     log.info "installing node dependencies"
     if (cd "$workspace" && npm ci --ignore-scripts); then
