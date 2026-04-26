@@ -300,6 +300,31 @@ hooks:
 | `test.coverage.threshold` | integer | no | `80` | Minimum coverage percentage required (0-100). |
 | `test.coverage.report` | string | no | -- | Path to Cobertura XML coverage report. |
 
+#### `test.reports`
+
+Opt-in contract for producing coverage and JUnit XML reports during
+the test stage. When enabled, Brik injects framework-specific flags
+into the test command so `coverage/` and `reports/junit.xml` are
+populated and surfaced as CI artefacts (GitLab `coverage_report` /
+`junit` reports, Jenkins JUnit plugin).
+
+| Key | Type | Required | Default | Description |
+|-----|------|----------|---------|-------------|
+| `test.reports.enabled` | boolean | no | `false` | Master switch. When false, the test runner uses its native defaults (no coverage, no JUnit). |
+| `test.reports.coverage.enabled` | boolean | no | `true` | Whether to produce a coverage report. Ignored when `reports.enabled=false`. |
+| `test.reports.coverage.format` | enum | no | `auto` | One of `lcov`, `cobertura`, `jacoco`, `auto`. `auto` picks the native format per stack: lcov for node/rust, cobertura for python/dotnet, jacoco for java. |
+| `test.reports.coverage.output_dir` | string | no | `coverage` | Directory where the coverage report is written. |
+| `test.reports.junit.enabled` | boolean | no | `true` | Whether to produce a JUnit-compatible XML report. |
+| `test.reports.junit.output_path` | string | no | `reports/junit.xml` | Path where the JUnit XML file is written. |
+
+The configured paths are exposed to downstream stages via four
+`brik-init.env` variables (`BRIK_TEST_REPORTS_ENABLED`,
+`BRIK_TEST_COVERAGE_FORMAT`, `BRIK_TEST_COVERAGE_DIR`,
+`BRIK_TEST_JUNIT_PATH`). Per-stack flag injection (jest --coverage,
+pytest --cov, surefire/jacoco, cargo-llvm-cov + cargo-nextest, dotnet
+--collect "XPlat Code Coverage") is rolled out incrementally; today
+only the schema and the dotenv exposure are wired up.
+
 ---
 
 ### `quality`

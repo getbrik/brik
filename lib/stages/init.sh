@@ -159,6 +159,14 @@ _stages.init._write_dotenv() {
         printf 'BRIK_RELEASE_PROFILE=%s\n' "$(config.get '.release.profile' 'none')"
         printf 'BRIK_PACKAGE_ENABLED=%s\n' "$(_stages.init._has_block '.package')"
         printf 'BRIK_DEPLOY_ENABLED=%s\n'  "$(_stages.init._has_block '.deploy')"
+
+        # Test reports opt-in (consumed by lib/stacks/<stack>.sh to inject
+        # coverage/junit flags into the test command). Default: false ->
+        # test runners keep their native defaults.
+        printf 'BRIK_TEST_REPORTS_ENABLED=%s\n'  "$(config.get '.test.reports.enabled' 'false')"
+        printf 'BRIK_TEST_COVERAGE_FORMAT=%s\n' "$(config.get '.test.reports.coverage.format' 'auto')"
+        printf 'BRIK_TEST_COVERAGE_DIR=%s\n'    "$(config.get '.test.reports.coverage.output_dir' 'coverage')"
+        printf 'BRIK_TEST_JUNIT_PATH=%s\n'      "$(config.get '.test.reports.junit.output_path' 'reports/junit.xml')"
     } > "$dotenv" 2>/dev/null || {
         log.warn "could not write dotenv to $dotenv"
         return 0
