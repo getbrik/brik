@@ -136,6 +136,8 @@ YAML
 
     It "handles release trigger with BRIK_TAG"
       run_release_tag() {
+        _stages.release._prepare()  { return 0; }
+        _stages.release._finalize() { return 0; }
         local ctx
         ctx="$(context.create "release")" 2>/dev/null || ctx="$(mktemp)"
         stages.release "$ctx" 2>/dev/null
@@ -147,6 +149,8 @@ YAML
     It "handles changelog disabled"
       run_release_no_changelog() {
         export BRIK_RELEASE_CHANGELOG_ENABLED="false"
+        _stages.release._prepare()  { return 0; }
+        _stages.release._finalize() { return 0; }
         local ctx
         ctx="$(context.create "release")" 2>/dev/null || ctx="$(mktemp)"
         stages.release "$ctx" 2>/dev/null
@@ -159,6 +163,8 @@ YAML
       run_release_changelog_file() {
         export BRIK_RELEASE_CHANGELOG_ENABLED="true"
         export BRIK_RELEASE_CHANGELOG_FILE="CHANGES.md"
+        _stages.release._prepare()  { return 0; }
+        _stages.release._finalize() { return 0; }
         local ctx
         ctx="$(context.create "release")" 2>/dev/null || ctx="$(mktemp)"
         stages.release "$ctx" 2>/dev/null
@@ -178,6 +184,29 @@ YAML
       When call run_release_dryrun
       The error should include "[dry-run]"
       The error should include "release prepared (dry-run)"
+    End
+
+    It "propagates _prepare failure as the stage exit code"
+      run_release_prepare_fail() {
+        _stages.release._prepare() { return 5; }
+        local ctx
+        ctx="$(context.create "release")" 2>/dev/null || ctx="$(mktemp)"
+        stages.release "$ctx" 2>/dev/null
+      }
+      When call run_release_prepare_fail
+      The status should equal 5
+    End
+
+    It "propagates _finalize failure as the stage exit code"
+      run_release_finalize_fail() {
+        _stages.release._prepare()  { return 0; }
+        _stages.release._finalize() { return 5; }
+        local ctx
+        ctx="$(context.create "release")" 2>/dev/null || ctx="$(mktemp)"
+        stages.release "$ctx" 2>/dev/null
+      }
+      When call run_release_finalize_fail
+      The status should equal 5
     End
   End
 
