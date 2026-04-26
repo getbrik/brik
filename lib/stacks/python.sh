@@ -118,11 +118,20 @@ stacks.python.build() {
 stacks.python.test_cmd() {
     local framework="$1" _workspace="$2" report_dir="$3"
     local cmd=""
+    local reports_on="${BRIK_TEST_REPORTS_ENABLED:-false}"
 
     case "$framework" in
         pytest)
             cmd="python -m pytest"
-            [[ -n "$report_dir" ]] && cmd="$cmd --junitxml=${report_dir}/report.xml"
+            if [[ "$reports_on" == "true" ]]; then
+                local cov_dir="${BRIK_TEST_COVERAGE_DIR:-coverage}"
+                local junit="${BRIK_TEST_JUNIT_PATH:-reports/junit.xml}"
+                # pytest-cov writes the cobertura XML at the configured
+                # path; pytest itself emits the JUnit XML.
+                cmd="${cmd} --cov=. --cov-report=xml:'${cov_dir}/coverage.xml' --junitxml='${junit}'"
+            elif [[ -n "$report_dir" ]]; then
+                cmd="$cmd --junitxml=${report_dir}/report.xml"
+            fi
             ;;
         unittest)
             cmd="python -m unittest discover"
