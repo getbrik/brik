@@ -82,6 +82,10 @@
     "hooks": {
       "description": "Inline pre and post stage hook commands. Evaluated by the shared library (Layer 2). File-based hooks (.brik/hooks/pre-build.sh) are handled separately by the Bash Runtime (Layer 0).",
       "$ref": "#/$defs/hooks"
+    },
+    "git": {
+      "description": "Git operations configuration. Currently exposes the user identity used by stages that commit or annotate tags (release, gitops deploy).",
+      "$ref": "#/$defs/git"
     }
   },
   "$defs": {
@@ -887,6 +891,29 @@
         "post_notify": {
           "description": "Commands executed after the notify stage completes successfully.",
           "$ref": "#/$defs/hookCommandList"
+        }
+      }
+    },
+    "git": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "user": {
+          "description": "Git user identity applied via 'git config --global' before stages that commit or annotate tags.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "email": {
+              "description": "Git user.email. If absent, falls back to CI-platform vars (GITLAB_USER_EMAIL, CHANGE_AUTHOR_EMAIL) then to brik-ci@brik.local.",
+              "type": "string",
+              "format": "email"
+            },
+            "name": {
+              "description": "Git user.name. If absent, falls back to CI-platform vars then to 'Brik CI'.",
+              "type": "string",
+              "minLength": 1
+            }
+          }
         }
       }
     }

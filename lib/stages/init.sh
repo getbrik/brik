@@ -63,6 +63,30 @@ stages.init() {
         return "$BRIK_EXIT_MISSING_DEP"
     fi
 
+    _stages.init._resolve_git_identity
+
     log.info "init stage complete"
     return 0
+}
+
+# Resolve the git user identity for downstream stages that commit or annotate
+# tags (release.prepare, deploy.gitops). Resolution order, first non-empty
+# wins:
+#   1. brik.yml .git.user.email / .git.user.name
+#   2. CI platform vars: $GITLAB_USER_EMAIL / $CHANGE_AUTHOR_EMAIL,
+#      $GITLAB_USER_NAME / $CHANGE_AUTHOR_DISPLAY_NAME
+#   3. fallback "brik-ci@brik.local" / "Brik CI"
+#
+# The resolved values are written to the pipeline env file as
+# BRIK_GIT_USER_EMAIL and BRIK_GIT_USER_NAME so transverse.git.config_identity
+# (called by consuming stages) can apply them via `git config --global`.
+_stages.init._resolve_git_identity() {
+    local git_email git_name
+    git_email="$(config.get '.git.user.email' '')"
+    [[ -z "$git_email" ]] && git_email="${GITLAB_USER_EMAIL:-${CHANGE_AUTHOR_EMAIL:-brik-ci@brik.local}}"
+    git_name="$(config.get '.git.user.name' '')"
+    [[ -z "$git_name" ]] && git_name="${GITLAB_USER_NAME:-${CHANGE_AUTHOR_DISPLAY_NAME:-Brik CI}}"
+
+    pipeline.env.set "BRIK_GIT_USER_EMAIL" "$git_email" 2>/dev/null || true
+    pipeline.env.set "BRIK_GIT_USER_NAME"  "$git_name"  2>/dev/null || true
 }

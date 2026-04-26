@@ -75,6 +75,40 @@ git.tag() {
     return 0
 }
 
+# transverse.git.config_identity - apply git user.email/user.name from env.
+#
+# Reads $BRIK_GIT_USER_EMAIL and $BRIK_GIT_USER_NAME (resolved by stages.init
+# from brik.yml git.user.* or fallback chain) and applies them via
+# `git config --global`. Pure apply function: no fallback logic (init owns
+# the resolution). If both vars are empty, the function logs a warning and
+# returns 0 -- callers that truly need an identity (release._prepare) will
+# then fail at commit time with the original "Author identity unknown"
+# error, which is the right signal.
+#
+# Returns 0 on success or empty input. Non-fatal on `git config` write
+# failures (read-only HOME, etc.) -- logs warn and lets the caller decide.
+transverse.git.config_identity() {
+    command -v git >/dev/null 2>&1 || return 0
+
+    local email="${BRIK_GIT_USER_EMAIL:-}"
+    local name="${BRIK_GIT_USER_NAME:-}"
+
+    if [[ -z "$email" && -z "$name" ]]; then
+        log.warn "no git identity configured (BRIK_GIT_USER_EMAIL/_NAME empty)"
+        return 0
+    fi
+
+    if [[ -n "$email" ]]; then
+        git config --global user.email "$email" 2>/dev/null \
+            || log.warn "could not set git user.email"
+    fi
+    if [[ -n "$name" ]]; then
+        git config --global user.name "$name" 2>/dev/null \
+            || log.warn "could not set git user.name"
+    fi
+    return 0
+}
+
 # transverse.git.commit_all - stage all changes and commit with a message.
 # By default returns 0 with a log message when the working tree is clean
 # (callers typically want idempotent GitOps commits). Pass --fail-if-empty to
