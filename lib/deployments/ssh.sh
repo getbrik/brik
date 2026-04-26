@@ -50,8 +50,19 @@ deploy.ssh.run() {
     # Determine source files: --source or current directory
     local src="${source:-.}"
 
-    # Build rsync command
-    local -a rsync_cmd=(rsync -avz --delete -e "ssh ${ssh_opts[*]}")
+    # Build rsync command. Exclude internal CI state directories that the
+    # workspace accumulates between stages: .ssh holds the deployer key
+    # plus an ssh-agent socket that rsync cannot transfer (--exclude
+    # avoids "failed to set times on agent socket" errors), and .kube
+    # caches the kubeconfig copy.
+    local -a rsync_cmd=(
+        rsync -avz --delete
+        --exclude='.ssh'
+        --exclude='.kube'
+        --exclude='.brik-logs'
+        --exclude='.brik-keep'
+        -e "ssh ${ssh_opts[*]}"
+    )
     [[ "$dry_run" == "true" ]] && rsync_cmd+=(--dry-run)
     rsync_cmd+=("${src}/" "${host}:${remote_path}/")
 
