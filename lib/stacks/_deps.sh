@@ -63,6 +63,9 @@ _brik._install_deps_node() {
 _brik._install_deps_python() {
     local workspace="$1" mode="$2"
     export PATH="${HOME}/.local/bin:${PATH}"
+    # Some runner images (scanner, analysis) do not ship pip. Skip silently
+    # when the tool is missing -- those stages do not need installed deps.
+    command -v pip >/dev/null 2>&1 || return 0
     local pip_flags="--quiet"
     if pip install --help 2>&1 | grep -q -- '--break-system-packages'; then
         pip_flags="$pip_flags --break-system-packages"
