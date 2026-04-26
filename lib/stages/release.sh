@@ -34,15 +34,12 @@ stages.release() {
     report.record "release" "business" "app_version" "$current_version" 2>/dev/null || true
     pipeline.env.set "BRIK_APP_VERSION" "$current_version"
 
-    # If on a tag (release trigger), prepare and finalize
+    # If on a tag (release trigger), prepare and finalize. A failure in either
+    # step must propagate so the pipeline (and pipeline-report.json) reflect
+    # the real outcome instead of the previous warn-and-return-0 behaviour.
     if [[ -n "${BRIK_TAG:-}" ]]; then
-        local rc=0
-        _stages.release._prepare "$current_version" || rc=$?
-        [[ $rc -ne 0 ]] && log.warn "release prepare skipped or failed (rc=$rc)"
-
-        rc=0
-        _stages.release._finalize "$current_version" "$tag_prefix" || rc=$?
-        [[ $rc -ne 0 ]] && log.warn "release finalize skipped or failed (rc=$rc)"
+        _stages.release._prepare "$current_version" || return $?
+        _stages.release._finalize "$current_version" "$tag_prefix" || return $?
     fi
 
     return 0
