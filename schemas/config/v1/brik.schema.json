@@ -142,31 +142,6 @@
           "description": "Build tool to use (e.g. npm, yarn, pnpm, maven, gradle, poetry, uv, pip, pipenv, cargo, dotnet). Overrides auto-detection from lock/marker files (Tier 2). Ignored when command is set.",
           "type": "string",
           "minLength": 1
-        },
-        "node_version": {
-          "description": "Node.js version to use (e.g. \"20\", \"18\"). Applicable when stack is node.",
-          "type": "string",
-          "minLength": 1
-        },
-        "java_version": {
-          "description": "Java version to use (e.g. \"21\", \"17\"). Applicable when stack is java.",
-          "type": "string",
-          "minLength": 1
-        },
-        "python_version": {
-          "description": "Python version to use (e.g. \"3.12\", \"3.11\"). Applicable when stack is python.",
-          "type": "string",
-          "minLength": 1
-        },
-        "dotnet_version": {
-          "description": ".NET version to use (e.g. \"8.0\", \"9.0\"). Applicable when stack is dotnet.",
-          "type": "string",
-          "minLength": 1
-        },
-        "rust_version": {
-          "description": "Rust version to use (e.g. \"1.76\", \"stable\"). Applicable when stack is rust.",
-          "type": "string",
-          "minLength": 1
         }
       }
     },
