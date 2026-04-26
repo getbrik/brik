@@ -105,6 +105,11 @@ _stages.release._prepare() {
     fi
 
     brik.use transverse.git
+    # Apply the git identity resolved by stages.init (BRIK_GIT_USER_EMAIL /
+    # BRIK_GIT_USER_NAME) before committing. CI runners are ephemeral and
+    # rarely have ~/.gitconfig; without this step `git commit` fails with
+    # "Author identity unknown".
+    transverse.git.config_identity
     # --fail-if-empty preserves the pre-migration hard-fail semantics: a clean
     # working tree at this point indicates a bug in the release prepare flow
     # (changelog + version patch should have produced a diff), not an

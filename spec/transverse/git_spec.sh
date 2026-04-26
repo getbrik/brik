@@ -124,6 +124,58 @@ Describe "git.sh"
     End
   End
 
+  Describe "transverse.git.config_identity"
+    setup_identity_repo() {
+      GIT_DIR="$(mktemp -d)"
+      cd "$GIT_DIR" || return 1
+      git init -q
+      # Use a sandbox HOME so we never touch the host ~/.gitconfig
+      export HOME="$GIT_DIR"
+      unset BRIK_GIT_USER_EMAIL BRIK_GIT_USER_NAME
+    }
+    cleanup_identity_repo() { rm -rf "$GIT_DIR"; cd /tmp || true; unset HOME; }
+    Before 'setup_identity_repo'
+    After 'cleanup_identity_repo'
+
+    It "applies email and name from BRIK_GIT_USER_*"
+      run_apply() {
+        export BRIK_GIT_USER_EMAIL="release-bot@example.com"
+        export BRIK_GIT_USER_NAME="Release Bot"
+        transverse.git.config_identity
+        git config --global --get user.email
+        git config --global --get user.name
+      }
+      When call run_apply
+      The status should be success
+      The output should include "release-bot@example.com"
+      The output should include "Release Bot"
+    End
+
+    It "warns and returns 0 when both env vars are empty"
+      run_empty() {
+        unset BRIK_GIT_USER_EMAIL BRIK_GIT_USER_NAME
+        transverse.git.config_identity
+      }
+      When call run_empty
+      The status should be success
+      The stderr should include "no git identity configured"
+    End
+
+    It "applies email only when name is empty"
+      run_email_only() {
+        export BRIK_GIT_USER_EMAIL="ci@example.com"
+        unset BRIK_GIT_USER_NAME
+        transverse.git.config_identity
+        git config --global --get user.email
+        git config --global --get user.name 2>&1 || echo "name-not-set"
+      }
+      When call run_email_only
+      The status should be success
+      The output should include "ci@example.com"
+      The output should include "name-not-set"
+    End
+  End
+
   Describe "transverse.git.commit_all"
     Before 'setup_enrich_repo'
     After 'cleanup_enrich_repo'

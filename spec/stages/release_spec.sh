@@ -285,6 +285,22 @@ YAML
       When call run_prep_commit_fail
       The output should equal "5"
     End
+
+    It "calls transverse.git.config_identity before commit_all"
+      run_prep_identity() {
+        unset BRIK_DRY_RUN
+        export BRIK_RELEASE_CHANGELOG_ENABLED="false"
+        ORDER=""
+        brik.use() { :; }
+        transverse.git.config_identity() { ORDER="${ORDER}identity,"; return 0; }
+        transverse.git.commit_all() { ORDER="${ORDER}commit,"; return 0; }
+        pipeline.require_tool() { return 0; }
+        _stages.release._prepare 2>/dev/null "1.0.0"
+        printf '%s' "$ORDER"
+      }
+      When call run_prep_identity
+      The output should equal "identity,commit,"
+    End
   End
 
   Describe "_stages.release._finalize"
