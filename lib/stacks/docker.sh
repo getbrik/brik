@@ -37,8 +37,14 @@ stacks.docker.build() {
     pipeline.require_file "$dockerfile" || return "$BRIK_EXIT_IO_FAILURE"
     pipeline.require_tool docker || return "$BRIK_EXIT_MISSING_DEP"
 
-    # Build the command
-    local -a cmd=(docker build -f "$dockerfile" -t "$tag")
+    _stacks.docker._ensure_buildx
+
+    # Use docker buildx (BuildKit) -- the legacy `docker build` is deprecated
+    # in Docker Engine 27+ and removed in some 28+ distributions. --load
+    # places the produced image in the local docker store so subsequent
+    # stages (publish, container scan) can pull it; the publish step issues
+    # its own --push later via lib/package-managers/docker.sh.
+    local -a cmd=(docker buildx build --load -f "$dockerfile" -t "$tag")
     if [[ ${#build_args[@]} -gt 0 ]]; then
         cmd+=("${build_args[@]}")
     fi
@@ -56,5 +62,24 @@ stacks.docker.build() {
     }
 
     log.info "build completed successfully"
+    return 0
+}
+
+# _stacks.docker._ensure_buildx -- idempotently ensure a buildx builder.
+#
+# Reuses an existing 'brik' builder if available, otherwise creates one
+# with the docker-container driver. Falls back silently to whatever
+# builder is currently active when buildx itself is missing or refuses to
+# create a new builder (restricted seccomp, daemon flags, ...). Never
+# fatal -- the caller's `docker buildx build` will surface a clean error
+# if buildx is genuinely unavailable.
+_stacks.docker._ensure_buildx() {
+    command -v docker >/dev/null 2>&1 || return 0
+    docker buildx inspect brik >/dev/null 2>&1 && return 0
+    docker buildx create --use --name brik --driver docker-container >/dev/null 2>&1 || {
+        log.warn "could not create buildx builder 'brik'; falling back to default builder"
+        return 0
+    }
+    log.info "created buildx builder 'brik'"
     return 0
 }
