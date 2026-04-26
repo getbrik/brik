@@ -41,18 +41,50 @@ verify.lint.run() {
     if [[ -n "$tool" ]]; then
         case "$tool" in
             eslint)
-                if command -v npx >/dev/null 2>&1; then
-                    if ! compgen -G "${workspace}/eslint.config.*" >/dev/null 2>&1 \
-                        && ! compgen -G "${workspace}/.eslintrc*" >/dev/null 2>&1; then
+                # Tier 2 strict resolution: the user explicitly declared
+                # quality.lint.tool=eslint, so we refuse to silently fall
+                # back to `npx eslint` (which would pull whatever ESLint
+                # version is currently latest on the registry, breaking
+                # configs of installed eslint versions). The binary must
+                # exist locally (node_modules/.bin/eslint) or in PATH.
+                local eslint_bin
+                if [[ -x "${workspace}/node_modules/.bin/eslint" ]]; then
+                    eslint_bin="${workspace}/node_modules/.bin/eslint"
+                elif command -v eslint >/dev/null 2>&1; then
+                    eslint_bin="$(command -v eslint)"
+                else
+                    log.error "eslint binary not found in node_modules or PATH; install dependencies before running lint"
+                    return "$BRIK_EXIT_MISSING_DEP"
+                fi
+
+                # Detect installed major version. ESLint 9+ requires the
+                # flat config (eslint.config.*) and rejects .eslintrc.*.
+                local eslint_version eslint_major
+                eslint_version="$("$eslint_bin" --version 2>/dev/null | sed 's/^v//' || true)"
+                eslint_major="${eslint_version%%.*}"
+
+                local has_flat=false has_legacy=false
+                compgen -G "${workspace}/eslint.config.*" >/dev/null 2>&1 && has_flat=true
+                compgen -G "${workspace}/.eslintrc*" >/dev/null 2>&1 && has_legacy=true
+
+                if [[ "$eslint_major" =~ ^[0-9]+$ ]] && [[ "$eslint_major" -ge 9 ]]; then
+                    if [[ "$has_flat" != "true" ]]; then
+                        if [[ "$has_legacy" == "true" ]]; then
+                            log.error "eslint $eslint_version requires eslint.config.* (flat config); .eslintrc.* is no longer supported"
+                            return "$BRIK_EXIT_CONFIG_ERROR"
+                        fi
                         log.warn "no eslint config found - skipping lint"
                         return 0
                     fi
-                    lint_cmd="npx eslint ."
-                    [[ "$fix" == "true" ]] && lint_cmd="$lint_cmd --fix"
                 else
-                    log.error "npx not found for eslint"
-                    return "$BRIK_EXIT_MISSING_DEP"
+                    if [[ "$has_flat" != "true" && "$has_legacy" != "true" ]]; then
+                        log.warn "no eslint config found - skipping lint"
+                        return 0
+                    fi
                 fi
+
+                lint_cmd="$eslint_bin ."
+                [[ "$fix" == "true" ]] && lint_cmd="$lint_cmd --fix"
                 ;;
             biome)
                 if command -v npx >/dev/null 2>&1; then

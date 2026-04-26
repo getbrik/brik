@@ -28,25 +28,34 @@ Describe "quality/lint.sh - Tier 1 and Tier 2 tool selection"
       End
     End
 
-    Describe "Tier 2: eslint with npx present"
+    Describe "Tier 2: eslint with local binary present"
       setup_eslint_tool() {
         mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock.log"
         printf 'export default [];\n' > "${TEST_WS}/eslint.config.js"
-        mock.create_logging "npx" "$MOCK_LOG"
+        # Local eslint v10 shim that succeeds and logs invocations.
+        mkdir -p "${TEST_WS}/node_modules/.bin"
+        cat > "${TEST_WS}/node_modules/.bin/eslint" <<'EOF'
+#!/usr/bin/env bash
+if [[ "$1" == "--version" ]]; then echo "v10.2.1"; exit 0; fi
+echo "eslint $*" >> "$MOCK_LOG"
+exit 0
+EOF
+        chmod +x "${TEST_WS}/node_modules/.bin/eslint"
+        export MOCK_LOG
         mock.activate
         export BRIK_QUALITY_LINT_TOOL="eslint"
       }
       cleanup_eslint_tool() {
-        unset BRIK_QUALITY_LINT_TOOL
+        unset BRIK_QUALITY_LINT_TOOL MOCK_LOG
         mock.cleanup
         rm -rf "$TEST_WS"
       }
       Before 'setup_eslint_tool'
       After 'cleanup_eslint_tool'
 
-      It "runs eslint via npx"
+      It "runs the local eslint binary"
         invoke_eslint_tool() {
           verify.lint.run "$TEST_WS" 2>/dev/null || return 1
           grep -q "eslint" "$MOCK_LOG"
@@ -56,34 +65,41 @@ Describe "quality/lint.sh - Tier 1 and Tier 2 tool selection"
       End
     End
 
-    Describe "Tier 2: eslint npx missing"
-      setup_eslint_no_npx() {
+    Describe "Tier 2: eslint binary missing"
+      setup_eslint_no_bin() {
         mock.setup
         TEST_WS="$(mktemp -d)"
         printf 'export default [];\n' > "${TEST_WS}/eslint.config.js"
+        # No local node_modules/.bin/eslint; isolate PATH so no global eslint either.
         mock.isolate
         export BRIK_QUALITY_LINT_TOOL="eslint"
       }
-      cleanup_eslint_no_npx() {
+      cleanup_eslint_no_bin() {
         unset BRIK_QUALITY_LINT_TOOL
         mock.cleanup
         rm -rf "$TEST_WS"
       }
-      Before 'setup_eslint_no_npx'
-      After 'cleanup_eslint_no_npx'
+      Before 'setup_eslint_no_bin'
+      After 'cleanup_eslint_no_bin'
 
-      It "returns 3 when npx not found for eslint"
+      It "returns 3 when eslint binary not found"
         When call verify.lint.run "$TEST_WS"
         The status should equal 3
-        The stderr should include "npx not found"
+        The stderr should include "eslint binary not found"
       End
     End
 
-    Describe "Tier 2: eslint without config skips"
+    Describe "Tier 2: eslint v10 without config skips"
       setup_eslint_no_cfg() {
         mock.setup
         TEST_WS="$(mktemp -d)"
-        mock.create_exit "npx" 0
+        mkdir -p "${TEST_WS}/node_modules/.bin"
+        cat > "${TEST_WS}/node_modules/.bin/eslint" <<'EOF'
+#!/usr/bin/env bash
+if [[ "$1" == "--version" ]]; then echo "v10.2.1"; exit 0; fi
+exit 0
+EOF
+        chmod +x "${TEST_WS}/node_modules/.bin/eslint"
         mock.activate
         export BRIK_QUALITY_LINT_TOOL="eslint"
       }
@@ -99,6 +115,72 @@ Describe "quality/lint.sh - Tier 1 and Tier 2 tool selection"
         When call verify.lint.run "$TEST_WS"
         The status should be success
         The stderr should include "no eslint config found"
+      End
+    End
+
+    Describe "Tier 2: eslint v10 with legacy .eslintrc rejects"
+      setup_eslint_v10_legacy() {
+        mock.setup
+        TEST_WS="$(mktemp -d)"
+        printf '{}\n' > "${TEST_WS}/.eslintrc.json"
+        mkdir -p "${TEST_WS}/node_modules/.bin"
+        cat > "${TEST_WS}/node_modules/.bin/eslint" <<'EOF'
+#!/usr/bin/env bash
+if [[ "$1" == "--version" ]]; then echo "v10.2.1"; exit 0; fi
+exit 0
+EOF
+        chmod +x "${TEST_WS}/node_modules/.bin/eslint"
+        mock.activate
+        export BRIK_QUALITY_LINT_TOOL="eslint"
+      }
+      cleanup_eslint_v10_legacy() {
+        unset BRIK_QUALITY_LINT_TOOL
+        mock.cleanup
+        rm -rf "$TEST_WS"
+      }
+      Before 'setup_eslint_v10_legacy'
+      After 'cleanup_eslint_v10_legacy'
+
+      It "returns 7 when eslint v9+ encounters legacy .eslintrc only"
+        When call verify.lint.run "$TEST_WS"
+        The status should equal 7
+        The stderr should include "requires eslint.config"
+      End
+    End
+
+    Describe "Tier 2: eslint v8 with legacy .eslintrc accepts"
+      setup_eslint_v8_legacy() {
+        mock.setup
+        TEST_WS="$(mktemp -d)"
+        MOCK_LOG="${TEST_WS}/mock.log"
+        printf '{}\n' > "${TEST_WS}/.eslintrc.json"
+        mkdir -p "${TEST_WS}/node_modules/.bin"
+        cat > "${TEST_WS}/node_modules/.bin/eslint" <<'EOF'
+#!/usr/bin/env bash
+if [[ "$1" == "--version" ]]; then echo "v8.57.0"; exit 0; fi
+echo "eslint $*" >> "$MOCK_LOG"
+exit 0
+EOF
+        chmod +x "${TEST_WS}/node_modules/.bin/eslint"
+        export MOCK_LOG
+        mock.activate
+        export BRIK_QUALITY_LINT_TOOL="eslint"
+      }
+      cleanup_eslint_v8_legacy() {
+        unset BRIK_QUALITY_LINT_TOOL MOCK_LOG
+        mock.cleanup
+        rm -rf "$TEST_WS"
+      }
+      Before 'setup_eslint_v8_legacy'
+      After 'cleanup_eslint_v8_legacy'
+
+      It "runs eslint v8 with legacy .eslintrc.json"
+        invoke_v8() {
+          verify.lint.run "$TEST_WS" 2>/dev/null || return 1
+          grep -q "eslint" "$MOCK_LOG"
+        }
+        When call invoke_v8
+        The status should be success
       End
     End
 
