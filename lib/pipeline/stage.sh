@@ -154,11 +154,20 @@ stage.run() {
                 '.stages[] | select(.name == $s) | .tech.status // empty' \
                 "$_report_path" 2>/dev/null)" || _stage_status=""
         fi
-        if [[ "$_stage_status" == "skipped" ]]; then
-            log.info "stage $stage_name skipped (not configured)"
-        else
-            log.info "stage $stage_name completed successfully"
-        fi
+        case "$_stage_status" in
+            disabled)
+                log.info "stage $stage_name skipped (disabled)"
+                ;;
+            not-applicable)
+                log.info "stage $stage_name skipped (not configured)"
+                ;;
+            skipped)
+                log.info "stage $stage_name skipped (no config detected)"
+                ;;
+            *)
+                log.info "stage $stage_name completed successfully"
+                ;;
+        esac
         hook.on_success "$stage_name" "$context_file" "$log_file" || true
     else
         log.error "stage $stage_name failed with exit code $exit_code"

@@ -15,9 +15,16 @@ stages.lint() {
 
     config.export_quality_vars
 
+    # Status semantics in pipeline-report.json:
+    #   - disabled       : explicit opt-out via quality.lint.enabled=false
+    #   - not-applicable : no lint/format/type_check tool configured, no
+    #                      auto-detect trigger fires either
+    #   - skipped        : tool configured but expected config absent (set
+    #                      by verify.lint.run on Tier 3 fall-through)
+    #   - passed/failed  : recorded by pipeline.run from the verify.run rc
     if [[ "${BRIK_LINT_ENABLED:-true}" != "true" ]]; then
         log.info "lint disabled (quality.lint.enabled=false) - skipping"
-        report.record "lint" "tech" "status" "skipped" 2>/dev/null || true
+        report.record "lint" "tech" "status" "disabled" 2>/dev/null || true
         return 0
     fi
 
@@ -36,7 +43,7 @@ stages.lint() {
 
     if [[ ${#checks[@]} -eq 0 ]]; then
         log.info "no lint checks configured"
-        report.record "lint" "tech" "status" "skipped" 2>/dev/null || true
+        report.record "lint" "tech" "status" "not-applicable" 2>/dev/null || true
         return 0
     fi
 
