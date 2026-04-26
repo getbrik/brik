@@ -53,8 +53,13 @@ stages.package() {
     # Publish configured targets
     config.export_publish_vars
 
+    # Trigger publish for each target only when intent-to-publish is
+    # declared. For docker, that intent now lives in BRIK_PUBLISH_DOCKER_ENABLED
+    # (set when the publish.docker block is present), because
+    # BRIK_PUBLISH_DOCKER_IMAGE now falls back to package.docker.image and
+    # would otherwise always be set on docker projects.
     local -a _publish_targets=(
-        "docker:BRIK_PUBLISH_DOCKER_IMAGE"
+        "docker:BRIK_PUBLISH_DOCKER_ENABLED"
         "npm:BRIK_PUBLISH_NPM_TOKEN_VAR"
         "maven:BRIK_PUBLISH_MAVEN_REPOSITORY"
         "pypi:BRIK_PUBLISH_PYPI_TOKEN_VAR"

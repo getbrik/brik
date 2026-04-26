@@ -599,6 +599,7 @@ config.export_release_vars() {
 #       BRIK_PUBLISH_PYPI_*, BRIK_PUBLISH_CARGO_*, BRIK_PUBLISH_NUGET_*
 config.export_publish_vars() {
     local val
+    local config_file="${BRIK_CONFIG_FILE:-${BRIK_WORKSPACE:-.}/brik.yml}"
 
     # npm
     val="$(config.get '.publish.npm.registry' '')"
@@ -613,9 +614,19 @@ config.export_publish_vars() {
     val="$(config.get '.publish.npm.token_var' '')"
     [[ -n "$val" ]] && export BRIK_PUBLISH_NPM_TOKEN_VAR="$val"
 
-    # docker
+    # docker -- fall back to package.docker.image when publish.docker.image
+    # is absent (single source of truth, see chantier 12 §3.4).
     val="$(config.get '.publish.docker.image' '')"
+    [[ -z "$val" ]] && val="$(config.get '.package.docker.image' '')"
     [[ -n "$val" ]] && export BRIK_PUBLISH_DOCKER_IMAGE="$val"
+
+    # Intent-to-publish flag: true when the user declared a publish.docker
+    # block (with image, registry, or credentials). Decoupled from
+    # BRIK_PUBLISH_DOCKER_IMAGE because the latter now falls back to
+    # package.docker.image and would always be set on docker projects.
+    if [[ "$(yq '.publish.docker // null' "$config_file" 2>/dev/null)" != "null" ]]; then
+        export BRIK_PUBLISH_DOCKER_ENABLED="true"
+    fi
 
     val="$(config.get '.publish.docker.registry' '')"
     [[ -n "$val" ]] && export BRIK_PUBLISH_DOCKER_REGISTRY="$val"
