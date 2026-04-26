@@ -110,13 +110,27 @@ stacks.node.build() {
 stacks.node.test_cmd() {
     local framework="$1" workspace="$2" report_dir="$3"
     local cmd=""
+    local reports_on="${BRIK_TEST_REPORTS_ENABLED:-false}"
 
     case "$framework" in
         jest)
             cmd="npx jest"
-            [[ -n "$report_dir" ]] && cmd="$cmd --reporters=default --reporters=jest-junit"
+            if [[ "$reports_on" == "true" ]]; then
+                local cov_dir="${BRIK_TEST_COVERAGE_DIR:-coverage}"
+                local junit="${BRIK_TEST_JUNIT_PATH:-reports/junit.xml}"
+                # JEST_JUNIT_OUTPUT_FILE is the env var jest-junit honours.
+                # It must be inlined in the command because stages.test
+                # eval's the resulting string in a subshell.
+                cmd="JEST_JUNIT_OUTPUT_FILE='${junit}' ${cmd} --coverage --coverageDirectory='${cov_dir}' --reporters=default --reporters=jest-junit"
+            elif [[ -n "$report_dir" ]]; then
+                # Legacy explicit report_dir argument (pre-test.reports.enabled).
+                cmd="$cmd --reporters=default --reporters=jest-junit"
+            fi
             ;;
         npm)
+            # The user owns scripts.test; we cannot add coverage/reporter
+            # flags without breaking custom commands. They must wire it up
+            # in package.json themselves.
             cmd="npm test"
             ;;
         *)
