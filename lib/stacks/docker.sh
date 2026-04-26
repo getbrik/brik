@@ -37,14 +37,18 @@ stacks.docker.build() {
     pipeline.require_file "$dockerfile" || return "$BRIK_EXIT_IO_FAILURE"
     pipeline.require_tool docker || return "$BRIK_EXIT_MISSING_DEP"
 
-    _stacks.docker._ensure_buildx
-
-    # Use docker buildx (BuildKit) -- the legacy `docker build` is deprecated
-    # in Docker Engine 27+ and removed in some 28+ distributions. --load
-    # places the produced image in the local docker store so subsequent
-    # stages (publish, container scan) can pull it; the publish step issues
-    # its own --push later via lib/package-managers/docker.sh.
-    local -a cmd=(docker buildx build --load -f "$dockerfile" -t "$tag")
+    # Prefer docker buildx (BuildKit) -- the legacy `docker build` is
+    # deprecated in Docker Engine 27+ and removed in some 28+ distributions.
+    # When buildx is not installed (older runner images, restricted
+    # environments), fall back to legacy `docker build`.
+    local -a cmd
+    if docker buildx version >/dev/null 2>&1; then
+        _stacks.docker._ensure_buildx
+        cmd=(docker buildx build --load -f "$dockerfile" -t "$tag")
+    else
+        log.warn "docker buildx unavailable; falling back to legacy 'docker build'"
+        cmd=(docker build -f "$dockerfile" -t "$tag")
+    fi
     if [[ ${#build_args[@]} -gt 0 ]]; then
         cmd+=("${build_args[@]}")
     fi
