@@ -12,7 +12,7 @@ brik.use transverse.tools
 brik.use verify.scan._scan
 
 # Register security dependency scanners (sec_ prefix avoids collision with quality.deps)
-transverse.tools.register sec_deps osv-scanner osv-scanner "osv-scanner scan --format table --severity {severity} ." 10
+transverse.tools.register sec_deps osv-scanner osv-scanner "osv-scanner scan --format table ." 10
 transverse.tools.register sec_deps grype       grype       "grype dir:{workspace}"              20
 
 # Run security dependency scan on a workspace.
