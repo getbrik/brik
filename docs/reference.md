@@ -314,6 +314,41 @@ hooks:
 | `quality.lint.config` | string | no | -- | Path to lint configuration file. Exported as `BRIK_QUALITY_LINT_CONFIG` but not yet consumed by the linter. |
 | `quality.lint.fix` | boolean | no | `false` | Run the linter in auto-fix mode. |
 
+##### Lint contract per tool
+
+When `quality.lint.tool` is declared (Tier 2 strict resolution),
+Brik enforces the following contract per tool. Tier 3 (auto-detect
+from project files) keeps a permissive fallback that skips with a
+warning when the expected config is missing.
+
+| Tool | Accepted config files | Behaviour if config absent | Behaviour if installed binary missing |
+|------|-----------------------|----------------------------|---------------------------------------|
+| `eslint` | `eslint.config.{js,mjs,cjs}` (ESLint 9+) ; `.eslintrc.*` (ESLint <= 8 only) | Tier 2: `BRIK_EXIT_CONFIG_ERROR` if eslint major >= 9 and only legacy `.eslintrc.*` is present ; otherwise `skipped` with warn. Tier 3: silent `skipped`. | `BRIK_EXIT_MISSING_DEP` (no fallback to `npx` registry-pull which would silently break legacy configs). |
+| `biome` | `biome.json` (recommended, optional -- biome ships defaults) | `skipped` with warn | `BRIK_EXIT_MISSING_DEP` |
+| `ruff` | `pyproject.toml` `[tool.ruff]`, `ruff.toml`, or `.ruff.toml` | Ruff applies its defaults; no skip | `BRIK_EXIT_MISSING_DEP` |
+| `checkstyle` | `pom.xml` (`maven-checkstyle-plugin`) or `build.gradle` (`apply plugin: 'checkstyle'`) | `BRIK_EXIT_MISSING_DEP` | `BRIK_EXIT_MISSING_DEP` |
+| `clippy` | none (Rust defaults); `clippy.toml` optional for overrides | No skip | `BRIK_EXIT_MISSING_DEP` |
+| `dotnet-format` | `.editorconfig` recommended for project rules | No skip; uses `dotnet-format` defaults | `BRIK_EXIT_MISSING_DEP` |
+
+Universal rule: if `quality.lint.tool` is declared in `brik.yml`,
+the expected config must exist. Otherwise Brik fails fast at the
+lint stage instead of producing a cryptic tool error several lines
+down. The permissive fallback (skip + warn) is reserved for Tier 3
+auto-detect, where the user did not declare an explicit intent.
+
+##### Lint stage status semantics
+
+`pipeline-report.json` records `stages.lint.tech.status` with one
+of five values:
+
+| Status | Meaning | Stage exit code |
+|--------|---------|-----------------|
+| `disabled` | `quality.lint.enabled: false` (explicit user opt-out) | 0 |
+| `not-applicable` | No lint/format/type_check tool configured | 0 |
+| `skipped` | Tool configured but expected config file absent (Tier 3 only) | 0 |
+| `passed` | The configured check ran and succeeded | 0 |
+| `failed` | The configured check ran and reported violations | non-zero |
+
 #### `quality.format`
 
 | Key | Type | Required | Default | Description |
