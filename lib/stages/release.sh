@@ -66,6 +66,21 @@ _stages.release._prepare() {
         return 0
     fi
 
+    # Re-trigger detection: if the version's tag already points at HEAD,
+    # the release was prepared and finalized on a previous run. Treat
+    # _prepare as a no-op so we don't create a new commit (which would
+    # advance HEAD and invalidate the existing tag).
+    local tag_prefix="${BRIK_RELEASE_TAG_PREFIX:-v}"
+    if git -C "${BRIK_WORKSPACE:-.}" rev-parse --verify --quiet "refs/tags/${tag_prefix}${version}" >/dev/null 2>&1; then
+        local tag_sha head_sha
+        tag_sha="$(git -C "${BRIK_WORKSPACE:-.}" rev-parse "refs/tags/${tag_prefix}${version}^{commit}" 2>/dev/null)"
+        head_sha="$(git -C "${BRIK_WORKSPACE:-.}" rev-parse HEAD 2>/dev/null)"
+        if [[ -n "$tag_sha" && "$tag_sha" == "$head_sha" ]]; then
+            log.info "release ${version} already prepared (tag at HEAD); skipping prepare"
+            return 0
+        fi
+    fi
+
     if [[ "$changelog_enabled" == "true" ]]; then
         brik.use changelog
         log.info "generating changelog to $changelog_file"
