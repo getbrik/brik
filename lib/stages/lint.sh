@@ -24,7 +24,7 @@ stages.lint() {
     brik.use verify.verify
 
     # Ensure project dependencies are available (quality tools may be dev deps).
-    stacks.install_deps "${BRIK_WORKSPACE}" dev
+    stacks.install_deps "${BRIK_WORKSPACE}" dev || return $?
 
     log.info "lint stage - running checks"
 

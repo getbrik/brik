@@ -99,6 +99,7 @@ Describe "brik run"
     setup() {
       mock.setup
       mock.create_script "npx" 'echo "mock npx: $*"'
+      mock.create_script "npm" 'exit 0'
       mock.activate
       WORKSPACE="$(mktemp -d)"
       printf '{"name":"cli-test","version":"1.0.0","scripts":{"test":"echo ok"}}\n' > "${WORKSPACE}/package.json"

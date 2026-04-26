@@ -16,7 +16,7 @@ stages.test() {
 
     pipeline.require_dir "${BRIK_WORKSPACE}" || return $?
 
-    stacks.install_deps "${BRIK_WORKSPACE}" test
+    stacks.install_deps "${BRIK_WORKSPACE}" test || return $?
 
     log.info "running tests"
 

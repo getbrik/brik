@@ -20,27 +20,41 @@ stacks.install_deps() {
 
     case "$stack" in
         node)
-            _brik._install_deps_node "$workspace"
+            _brik._install_deps_node "$workspace" || return $?
             ;;
         python)
-            _brik._install_deps_python "$workspace" "$mode"
+            _brik._install_deps_python "$workspace" "$mode" || return $?
             ;;
         rust)
-            [[ "$mode" == "dev" ]] && _brik._install_deps_rust
+            [[ "$mode" == "dev" ]] && { _brik._install_deps_rust || return $?; }
             ;;
         dotnet)
-            [[ "$mode" == "test" ]] && _brik._install_deps_dotnet "$workspace"
+            [[ "$mode" == "test" ]] && { _brik._install_deps_dotnet "$workspace" || return $?; }
             ;;
     esac
+    return 0
 }
+
+# Per-stack helpers below propagate exit codes:
+#   - skip silently (return 0) when there is nothing to install (no package
+#     manifest, mode irrelevant, etc.).
+#   - return BRIK_EXIT_MISSING_DEP when the install command itself fails so
+#     the caller (lint/test/scan) surfaces a real failure instead of
+#     continuing with broken dependencies.
+# Output (stdout/stderr) of the install command is left visible so the user
+# sees the native error message; we do not redirect it to /dev/null.
 
 _brik._install_deps_node() {
     local workspace="$1"
-    if [[ ! -d "${workspace}/node_modules" ]]; then
-        log.info "installing node dependencies"
-        # best-effort: install may fail if package.json missing or network down
-        (cd "$workspace" && npm ci --ignore-scripts 2>/dev/null) || true
+    [[ -f "${workspace}/package.json" ]] || return 0
+    [[ -d "${workspace}/node_modules" ]] && return 0
+
+    log.info "installing node dependencies"
+    if (cd "$workspace" && npm ci --ignore-scripts); then
+        return 0
     fi
+    log.error "npm ci failed in $workspace"
+    return "$BRIK_EXIT_MISSING_DEP"
 }
 
 _brik._install_deps_python() {
@@ -51,60 +65,97 @@ _brik._install_deps_python() {
         pip_flags="$pip_flags --break-system-packages"
     fi
 
-    # best-effort: pip install may fail (missing extras, network, etc.)
     case "$mode" in
         test)
             if [[ -f "${workspace}/pyproject.toml" ]]; then
                 log.info "installing python dependencies for test"
+                # Try dev extras first; fall back to plain install when [dev]
+                # is not declared. Only the second attempt failing is fatal.
                 # shellcheck disable=SC2086
-                (cd "$workspace" && pip install -e ".[dev]" $pip_flags 2>/dev/null) || \
-                (cd "$workspace" && pip install -e . $pip_flags 2>/dev/null) || true
+                (cd "$workspace" && pip install -e ".[dev]" $pip_flags) && return 0
+                # shellcheck disable=SC2086
+                if (cd "$workspace" && pip install -e . $pip_flags); then
+                    return 0
+                fi
+                log.error "pip install failed in $workspace"
+                return "$BRIK_EXIT_MISSING_DEP"
             elif [[ -f "${workspace}/requirements.txt" ]]; then
                 log.info "installing python dependencies for test"
                 # shellcheck disable=SC2086
-                (cd "$workspace" && pip install -r requirements.txt $pip_flags 2>/dev/null) || true
+                if (cd "$workspace" && pip install -r requirements.txt $pip_flags); then
+                    return 0
+                fi
+                log.error "pip install -r requirements.txt failed in $workspace"
+                return "$BRIK_EXIT_MISSING_DEP"
             fi
+            return 0
             ;;
         dev)
             if [[ -f "${workspace}/pyproject.toml" ]]; then
                 log.info "installing python dev dependencies"
                 # shellcheck disable=SC2086
-                (cd "$workspace" && pip install -e ".[dev]" $pip_flags 2>/dev/null) || true
+                if (cd "$workspace" && pip install -e ".[dev]" $pip_flags); then
+                    return 0
+                fi
+                log.error "pip install -e .[dev] failed in $workspace"
+                return "$BRIK_EXIT_MISSING_DEP"
             elif [[ -f "${workspace}/requirements-dev.txt" ]]; then
                 log.info "installing python dev dependencies"
                 # shellcheck disable=SC2086
-                (cd "$workspace" && pip install -r requirements-dev.txt $pip_flags 2>/dev/null) || true
+                if (cd "$workspace" && pip install -r requirements-dev.txt $pip_flags); then
+                    return 0
+                fi
+                log.error "pip install -r requirements-dev.txt failed in $workspace"
+                return "$BRIK_EXIT_MISSING_DEP"
             fi
+            return 0
             ;;
         scan)
             if [[ -f "${workspace}/pyproject.toml" ]]; then
                 # shellcheck disable=SC2086
-                (cd "$workspace" && pip install . $pip_flags 2>/dev/null) || true
+                if (cd "$workspace" && pip install . $pip_flags); then
+                    return 0
+                fi
+                log.error "pip install . failed in $workspace"
+                return "$BRIK_EXIT_MISSING_DEP"
             elif [[ -f "${workspace}/requirements.txt" ]]; then
                 # shellcheck disable=SC2086
-                (cd "$workspace" && pip install -r requirements.txt $pip_flags 2>/dev/null) || true
+                if (cd "$workspace" && pip install -r requirements.txt $pip_flags); then
+                    return 0
+                fi
+                log.error "pip install -r requirements.txt failed in $workspace"
+                return "$BRIK_EXIT_MISSING_DEP"
             fi
+            return 0
             ;;
     esac
+    return 0
 }
 
 _brik._install_deps_rust() {
-    if command -v rustup >/dev/null 2>&1; then
-        if ! command -v cargo-clippy >/dev/null 2>&1; then
-            log.info "installing rustup component: clippy"
-            # best-effort: component may already be installed or unavailable
-            rustup component add clippy 2>/dev/null || true
-        fi
-        if ! command -v rustfmt >/dev/null 2>&1; then
-            log.info "installing rustup component: rustfmt"
-            rustup component add rustfmt 2>/dev/null || true  # same as clippy above
-        fi
+    command -v rustup >/dev/null 2>&1 || return 0
+    local rc=0
+    if ! command -v cargo-clippy >/dev/null 2>&1; then
+        log.info "installing rustup component: clippy"
+        rustup component add clippy || rc="$BRIK_EXIT_MISSING_DEP"
     fi
+    if ! command -v rustfmt >/dev/null 2>&1; then
+        log.info "installing rustup component: rustfmt"
+        rustup component add rustfmt || rc="$BRIK_EXIT_MISSING_DEP"
+    fi
+    if [[ "$rc" -ne 0 ]]; then
+        log.error "rustup component add failed"
+        return "$rc"
+    fi
+    return 0
 }
 
 _brik._install_deps_dotnet() {
     local workspace="$1"
     log.info "restoring dotnet dependencies"
-    # best-effort: restore may fail if no .csproj found
-    (cd "$workspace" && dotnet restore --verbosity quiet 2>/dev/null) || true
+    if (cd "$workspace" && dotnet restore --verbosity quiet); then
+        return 0
+    fi
+    log.error "dotnet restore failed in $workspace"
+    return "$BRIK_EXIT_MISSING_DEP"
 }
