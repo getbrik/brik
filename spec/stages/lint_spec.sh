@@ -58,7 +58,7 @@ YAML
     }
     Before 'setup_no_checks'
 
-    It "returns 0 and records status skipped in the report"
+    It "returns 0 and records status not-applicable in the report"
       run_lint_no_checks() {
         brik.use() { :; }
         local ctx
@@ -68,7 +68,7 @@ YAML
       }
       When call run_lint_no_checks
       The status should be success
-      The output should equal "skipped"
+      The output should equal "not-applicable"
     End
   End
 
@@ -145,7 +145,7 @@ YAML
     }
     Before 'setup_disabled'
 
-    It "skips when lint is disabled and records status skipped"
+    It "skips when lint is disabled and records status disabled"
       run_lint_disabled() {
         local ctx
         ctx="$(context.create "lint")" 2>/dev/null || ctx="$(mktemp)"
@@ -154,7 +154,7 @@ YAML
       }
       When call run_lint_disabled
       The status should be success
-      The output should equal "skipped"
+      The output should equal "disabled"
     End
 
     It "logs that lint is disabled"

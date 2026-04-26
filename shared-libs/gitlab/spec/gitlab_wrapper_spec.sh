@@ -343,7 +343,7 @@ Describe "gitlab-wrapper.sh"
 
     # --- Lint stage: verify side effects ---
 
-    It "runs lint stage and records status=skipped in the pipeline report"
+    It "runs lint stage and records status=disabled in the pipeline report"
       run_lint_check_report() {
         brik.gitlab.run_stage "lint" >/dev/null 2>&1
         local report="${BRIK_LOG_DIR}/pipeline-report.json"
@@ -354,7 +354,7 @@ Describe "gitlab-wrapper.sh"
         fi
       }
       When call run_lint_check_report
-      The output should equal "skipped"
+      The output should equal "disabled"
     End
 
     It "runs lint stage and logs message"
