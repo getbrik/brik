@@ -396,6 +396,29 @@ All security scans are configured as structured objects under `security:`.
 | `security.secrets.command` | string | no | -- | Secret scan command override (Tier 1). |
 | `security.secrets.tool` | string | no | `gitleaks` | Secret scanning tool: `gitleaks`, `trufflehog`. |
 
+##### Secret scan -- gitleaks platform
+
+`gitleaks` needs the SCM platform name to render commit/file links in
+findings. Brik derives it automatically from `BRIK_PLATFORM`:
+
+| `BRIK_PLATFORM` | `gitleaks --platform` |
+|-----------------|------------------------|
+| `gitlab`        | `gitlab` |
+| `jenkins`       | `gitea` (briklab default) |
+| anything else   | `gitlab` |
+
+Override via the `BRIK_GITLEAKS_PLATFORM` env var when Jenkins is wired
+to a non-Gitea git host (GitHub, etc.).
+
+#### Security scan actionability per scanner
+
+| Scanner | Default severity threshold | Override (env) | Ignore file | What blocks the stage |
+|---------|----------------------------|----------------|-------------|------------------------|
+| `semgrep` (SAST) | `ERROR` | `BRIK_SECURITY_SAST_SEVERITY` | `.semgrepignore` | Findings >= severity threshold |
+| `osv-scanner` (Deps) | `HIGH` | `BRIK_SECURITY_DEPS_SEVERITY` (also `security.deps.severity` in brik.yml) | `osv-scanner.toml` ignore section | Findings >= severity (Brik passes `--severity {threshold}` to the binary) |
+| `gitleaks` (Secret) | -- | -- (gitleaks reports any leak) | `.gitleaksignore` | Any finding |
+| `grype` (Container) | `HIGH` | `BRIK_SECURITY_CONTAINER_SCAN_SEVERITY` | `.grype.yaml` | Findings >= severity (`--fail-on $severity`) |
+
 #### `security.license`
 
 License compliance is checked using `license_finder` (primary), with `syft` and
