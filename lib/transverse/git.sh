@@ -31,6 +31,27 @@ git.tag() {
         return 0
     fi
 
+    # Idempotence: if the tag already exists on the same commit, treat as a
+    # no-op. A divergent tag (same name, different commit) must be a hard
+    # error -- we never force-move tags implicitly.
+    if git rev-parse --verify --quiet "refs/tags/$tag_name" >/dev/null 2>&1; then
+        local existing_sha head_sha
+        existing_sha="$(git rev-parse "refs/tags/$tag_name^{commit}" 2>/dev/null)"
+        head_sha="$(git rev-parse HEAD 2>/dev/null)"
+        if [[ -n "$existing_sha" && "$existing_sha" == "$head_sha" ]]; then
+            log.info "tag $tag_name already at HEAD ($head_sha), skipping create"
+            if [[ "$push" == "true" ]]; then
+                git push origin "$tag_name" || {
+                    log.error "failed to push existing tag: $tag_name"
+                    return "$BRIK_EXIT_EXTERNAL_FAIL"
+                }
+            fi
+            return 0
+        fi
+        log.error "tag $tag_name already exists on a different commit ($existing_sha != $head_sha); refusing to overwrite"
+        return "$BRIK_EXIT_EXTERNAL_FAIL"
+    fi
+
     if [[ -n "$message" ]]; then
         git tag -a "$tag_name" -m "$message" || {
             log.error "failed to create tag: $tag_name"

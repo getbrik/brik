@@ -79,6 +79,48 @@ Describe "git.sh"
         The status should be success
         The stderr should include "tag created: v4.0.0"
       End
+
+      It "is idempotent when tag already exists at HEAD"
+        verify_idempotent() {
+          git.tag "v5.0.0" 2>/dev/null
+          # Re-running on the same commit should succeed without error
+          git.tag "v5.0.0"
+        }
+        When call verify_idempotent
+        The status should be success
+        The stderr should include "already at HEAD"
+      End
+
+      It "fails when tag exists on a different commit"
+        verify_divergent() {
+          git.tag "v6.0.0" 2>/dev/null
+          # Create a new commit so HEAD diverges from the tagged commit
+          printf 'second\n' > file2.txt
+          git add file2.txt
+          git commit -q -m "second commit"
+          # Tag still points to the first commit -> must refuse
+          git.tag "v6.0.0"
+        }
+        When call verify_divergent
+        The status should equal "$BRIK_EXIT_EXTERNAL_FAIL"
+        The stderr should include "different commit"
+      End
+
+      It "pushes existing tag idempotently when --push is given"
+        verify_idempotent_push() {
+          # Create a local bare repo as a fake origin
+          remote_dir="$(mktemp -d)"
+          (cd "$remote_dir" && git init -q --bare) >/dev/null
+          git remote add origin "$remote_dir"
+          git.tag "v7.0.0" 2>/dev/null
+          # Run again with --push: tag already exists at HEAD, should push without re-creating
+          git.tag "v7.0.0" --push
+          rm -rf "$remote_dir"
+        }
+        When call verify_idempotent_push
+        The status should be success
+        The stderr should include "already at HEAD"
+      End
     End
   End
 
