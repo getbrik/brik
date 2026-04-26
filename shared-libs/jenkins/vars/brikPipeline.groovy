@@ -91,9 +91,27 @@ def call(Map params = [:]) {
             def scannerImage = 'ghcr.io/getbrik/brik-runner-scanner:latest'
             def deployImage = 'ghcr.io/getbrik/brik-runner-deploy:latest'
 
+            // Helper: wrap a stage in try/catch so the stage view shows the
+            // stage even when an earlier sh fails. Without this, an exception
+            // thrown by `sh` aborts the surrounding try block and the stages
+            // declared *after* the failure are never registered with the stage
+            // engine -- the pipeline log would only show "Init" and "Notify"
+            // even when Build/Verify/Deploy actually crashed.
+            def runStageWithReporting = { stageName, body ->
+                stage(stageName) {
+                    try {
+                        body()
+                    } catch (Exception e) {
+                        currentBuild.result = 'FAILURE'
+                        echo "[brik] stage ${stageName} failed: ${e.message}"
+                        throw e
+                    }
+                }
+            }
+
             try {
                 // Init stage always runs on the Jenkins agent (needs brik.yml)
-                stage('Init') { brikStage('init', brikHome) }
+                runStageWithReporting('Init') { brikStage('init', brikHome) }
 
                 if (useDocker) {
                     resolvedImage = sh(
@@ -119,9 +137,12 @@ def call(Map params = [:]) {
                     returnStdout: true
                 ).trim()
                 def networkArg = dockerNetwork ? "--network ${dockerNetwork}" : ''
-                // Export global node env vars to a file so Docker containers can access them
-                sh 'env | grep -E "^(NEXUS_|BRIK_|REGISTRY_|ARGOCD_|CARGO_|SSH_)" > "${WORKSPACE}/.brik-env" 2>/dev/null || true'
-                def envFile = "${env.WORKSPACE}/.brik-env"
+                // Export global node env vars to a file so Docker containers
+                // can access them via --env-file. The file lives outside the
+                // workspace because it contains tokens (ARGOCD_AUTH_TOKEN,
+                // ...) that secret scanners would otherwise flag.
+                def envFile = "/tmp/brik-env-${env.BUILD_TAG}"
+                sh """env | grep -E '^(NEXUS_|BRIK_|REGISTRY_|ARGOCD_|CARGO_|SSH_)' > '${envFile}' 2>/dev/null || true"""
                 def globalEnvArgs = fileExists(envFile) && readFile(envFile).trim() ? "--env-file ${envFile}" : ''
                 // HOME=$WORKSPACE redirects npm, pip, cargo, nuget caches into workspace.
                 // Java needs explicit overrides: JVM user.home ignores $HOME (uses getpwuid).
@@ -156,15 +177,33 @@ def call(Map params = [:]) {
                 def deployDockerArgs = "-u 0:0 ${dockerArgs}"
                 def runInDeploy = { name ->
                     if (useDocker) {
-                        docker.image(deployImage).inside(deployDockerArgs) { brikStage(name, brikHome) }
+                        try {
+                            docker.image(deployImage).inside(deployDockerArgs) { brikStage(name, brikHome) }
+                        } finally {
+                            // The deploy container ran as root and may have
+                            // created root-owned files in the workspace
+                            // (.ssh/id_rsa, .kube/config). Jenkins (uid 1000)
+                            // cannot cleanWs them on the next build. Chown
+                            // back to the Jenkins uid using a one-shot root
+                            // container.
+                            def jenkinsUid = sh(script: 'id -u', returnStdout: true).trim()
+                            def jenkinsGid = sh(script: 'id -g', returnStdout: true).trim()
+                            sh """
+                                docker run --rm -u 0:0 \
+                                    -v "\${WORKSPACE}:/ws" \
+                                    alpine:latest \
+                                    sh -c 'chown -R ${jenkinsUid}:${jenkinsGid} /ws/.ssh /ws/.kube 2>/dev/null || true' \
+                                    || true
+                            """
+                        }
                     } else {
                         brikStage(name, brikHome)
                     }
                 }
 
-                stage('Release') { runStage('release') }
-                stage('Build')   { runStage('build') }
-                stage('Verify') {
+                runStageWithReporting('Release')        { runStage('release') }
+                runStageWithReporting('Build')          { runStage('build') }
+                runStageWithReporting('Verify') {
                     parallel(
                         'Lint': { runStage('lint') },
                         'SAST': { runInAnalysis('sast') },
@@ -172,23 +211,30 @@ def call(Map params = [:]) {
                         'Test': { runStage('test') }
                     )
                 }
-                stage('Package') { runStage('package') }
-                stage('Container Scan') { runInScanner('container-scan') }
-                stage('Deploy') {
+                runStageWithReporting('Package')        { runStage('package') }
+                runStageWithReporting('Container Scan') { runInScanner('container-scan') }
+                runStageWithReporting('Deploy') {
                     // Copy kubeconfig to workspace for deploy containers (HOME=$WORKSPACE)
                     sh 'mkdir -p "${WORKSPACE}/.kube" && cp /opt/brik/kubeconfig "${WORKSPACE}/.kube/config" 2>/dev/null || true'
                     runInDeploy('deploy')
                 }
             } finally {
+                // Notify always runs, even on failure. Wrapped in try/catch
+                // without rethrow so a notify channel hiccup (slack token,
+                // webhook timeout) does not turn a SUCCESS into a FAILURE.
                 stage('Notify') {
-                    brikStage('notify', brikHome)
-                    // Expose the pipeline report written by stages.notify so
-                    // it is reachable via Jenkins's build artifact URL
-                    // (suitable for Slack/email links later).
-                    archiveArtifacts artifacts: 'brik-artifacts/**/*',
-                        allowEmptyArchive: true,
-                        fingerprint: false
+                    try {
+                        brikStage('notify', brikHome)
+                        archiveArtifacts artifacts: 'brik-artifacts/**/*',
+                            allowEmptyArchive: true,
+                            fingerprint: false
+                    } catch (Exception e) {
+                        echo "[brik] stage Notify failed: ${e.message}"
+                    }
                 }
+                // Best-effort cleanup of the temporary env file so we do not
+                // accumulate /tmp/brik-env-* across builds.
+                sh """rm -f '/tmp/brik-env-${env.BUILD_TAG}' 2>/dev/null || true"""
             }
 
             } // withEnv(scmEnv)
