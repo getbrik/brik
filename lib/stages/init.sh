@@ -64,6 +64,7 @@ stages.init() {
     fi
 
     _stages.init._resolve_git_identity
+    _stages.init._write_dotenv
 
     log.info "init stage complete"
     return 0
@@ -77,9 +78,10 @@ stages.init() {
 #      $GITLAB_USER_NAME / $CHANGE_AUTHOR_DISPLAY_NAME
 #   3. fallback "brik-ci@brik.local" / "Brik CI"
 #
-# The resolved values are written to the pipeline env file as
-# BRIK_GIT_USER_EMAIL and BRIK_GIT_USER_NAME so transverse.git.config_identity
-# (called by consuming stages) can apply them via `git config --global`.
+# Writes the resolved values to the pipeline env file (consumed by
+# pipeline.env.load in subsequent stages) AND exports them in the current
+# shell so the caller of _write_dotenv below can echo them into brik-init.env
+# without re-doing the resolution.
 _stages.init._resolve_git_identity() {
     local git_email git_name
     git_email="$(config.get '.git.user.email' '')"
@@ -87,6 +89,80 @@ _stages.init._resolve_git_identity() {
     git_name="$(config.get '.git.user.name' '')"
     [[ -z "$git_name" ]] && git_name="${GITLAB_USER_NAME:-${CHANGE_AUTHOR_DISPLAY_NAME:-Brik CI}}"
 
+    export BRIK_GIT_USER_EMAIL="$git_email"
+    export BRIK_GIT_USER_NAME="$git_name"
+
     pipeline.env.set "BRIK_GIT_USER_EMAIL" "$git_email" 2>/dev/null || true
     pipeline.env.set "BRIK_GIT_USER_NAME"  "$git_name"  2>/dev/null || true
+}
+
+# Resolve the runner image to use for downstream jobs based on the active
+# stack and version. Falls back to the base runner if no specific match.
+_stages.init._resolve_runner_image() {
+    local stack="${BRIK_BUILD_STACK:-auto}"
+    local version
+    version="$(config.get '.project.stack_version' '')"
+
+    local home="${BRIK_HOME:-/opt/brik}"
+    if [[ -f "${home}/lib/pipeline/runner-images.sh" ]]; then
+        # shellcheck source=/dev/null
+        . "${home}/lib/pipeline/runner-images.sh" 2>/dev/null || true
+        local image
+        image="$(runner.resolve_image "$stack" "$version" 2>/dev/null)" && {
+            printf '%s' "$image"
+            return 0
+        }
+    fi
+    printf 'ghcr.io/getbrik/brik-runner-base:latest'
+}
+
+# Detect whether a top-level brik.yml block exists (e.g. .package, .deploy).
+# Prints "true" if the block is present and non-null, "false" otherwise.
+_stages.init._has_block() {
+    local path="$1"
+    local val
+    val="$(yq "${path} // null" "${BRIK_CONFIG_FILE}" 2>/dev/null)"
+    [[ "$val" != "null" && -n "$val" ]] && printf 'true' || printf 'false'
+}
+
+# stages.init becomes the single source of truth for the dotenv consumed by
+# CI rules and downstream jobs. The schema is contractual: every key has a
+# predictable value with a sensible default if brik.yml does not specify it.
+# The dotenv lives at $BRIK_WORKSPACE/brik-init.env (the path GitLab's
+# artifacts.reports.dotenv consumes).
+_stages.init._write_dotenv() {
+    local dotenv="${BRIK_WORKSPACE:-.}/brik-init.env"
+
+    {
+        # Project identity (BRIK_BUILD_STACK already resolved by the caller).
+        printf 'BRIK_PROJECT_NAME=%s\n' "$(config.get '.project.name' 'unnamed')"
+        printf 'BRIK_BUILD_STACK=%s\n'  "${BRIK_BUILD_STACK:-auto}"
+        printf 'BRIK_BUILD_STACK_VERSION=%s\n' "$(config.get '.project.stack_version' '')"
+        printf 'BRIK_CI_IMAGE=%s\n' "$(_stages.init._resolve_runner_image)"
+
+        # Quality gating consumed by CI rules.
+        printf 'BRIK_LINT_ENABLED=%s\n'       "$(config.get '.quality.lint.enabled' 'true')"
+        printf 'BRIK_FORMAT_ENABLED=%s\n'     "$(config.get '.quality.format.enabled' 'true')"
+        printf 'BRIK_TYPE_CHECK_ENABLED=%s\n' "$(config.get '.quality.type_check.enabled' 'true')"
+
+        # Security gating.
+        printf 'BRIK_SAST_ENABLED=%s\n'           "$(config.get '.security.sast.enabled' 'true')"
+        printf 'BRIK_SCAN_ENABLED=%s\n'           "$(config.get '.security.scan.enabled' 'true')"
+        printf 'BRIK_CONTAINER_SCAN_ENABLED=%s\n' "$(config.get '.security.container_scan.enabled' 'true')"
+
+        # Git identity (already resolved + exported by _resolve_git_identity).
+        printf 'BRIK_GIT_USER_EMAIL=%s\n' "${BRIK_GIT_USER_EMAIL:-brik-ci@brik.local}"
+        printf 'BRIK_GIT_USER_NAME=%s\n'  "${BRIK_GIT_USER_NAME:-Brik CI}"
+
+        # Release / package / deploy gating (placeholder values that downstream
+        # CI rules can read; chantier 9.A will refine release.profile).
+        printf 'BRIK_RELEASE_PROFILE=%s\n' "$(config.get '.release.profile' 'none')"
+        printf 'BRIK_PACKAGE_ENABLED=%s\n' "$(_stages.init._has_block '.package')"
+        printf 'BRIK_DEPLOY_ENABLED=%s\n'  "$(_stages.init._has_block '.deploy')"
+    } > "$dotenv" 2>/dev/null || {
+        log.warn "could not write dotenv to $dotenv"
+        return 0
+    }
+
+    log.info "wrote $(wc -l < "$dotenv" 2>/dev/null | tr -d ' ') variables to $dotenv"
 }
