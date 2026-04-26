@@ -708,6 +708,7 @@ config.export_runner_vars() {
 # Returns 7 on coherence errors, 0 otherwise.
 config.validate_coherence() {
     local stack="${BRIK_BUILD_STACK:-auto}"
+    local config_file="${BRIK_CONFIG_FILE:-${BRIK_WORKSPACE:-.}/brik.yml}"
 
     if [[ -z "${BRIK_WORKSPACE:-}" ]]; then
         log.warn "BRIK_WORKSPACE not set - skipping coherence validation"
@@ -715,6 +716,56 @@ config.validate_coherence() {
     fi
 
     local workspace="$BRIK_WORKSPACE"
+
+    # Cross-block coherence rules (run regardless of stack auto-detection).
+    # All four rules originate from chantier 6 §2.12.
+    local errors=0
+
+    # Rule 1: build.<stack>_version was removed in favour of project.stack_version.
+    # Old brik.yml files still using these keys would otherwise pass JSON Schema
+    # silently (additionalProperties already rejects them, but we log a clearer
+    # error here when the file is parsed via legacy paths).
+    local legacy_v
+    for legacy_v in node_version java_version python_version dotnet_version rust_version; do
+        if [[ -n "$(yq ".build.${legacy_v} // \"\"" "$config_file" 2>/dev/null)" ]]; then
+            log.error "build.${legacy_v} is no longer supported; use project.stack_version"
+            ((errors++))
+        fi
+    done
+
+    # Rule 2: publish.docker.image is deprecated (will be removed in a future
+    # release in favour of package.docker.image as the single source of truth).
+    if [[ -n "$(yq '.publish.docker.image // ""' "$config_file" 2>/dev/null)" ]]; then
+        log.warn "publish.docker.image is deprecated; declare the image in package.docker.image instead"
+    fi
+
+    # Rule 3: deploy.environments.*.target=gitops requires both repo and path.
+    # Without these the gitops deploy crashes late with an unhelpful error.
+    local env_name target repo path
+    while IFS= read -r env_name; do
+        [[ -z "$env_name" ]] && continue
+        target="$(yq ".deploy.environments.\"${env_name}\".target // \"\"" "$config_file" 2>/dev/null)"
+        if [[ "$target" == "gitops" ]]; then
+            repo="$(yq ".deploy.environments.\"${env_name}\".repo // \"\"" "$config_file" 2>/dev/null)"
+            path="$(yq ".deploy.environments.\"${env_name}\".path // \"\"" "$config_file" 2>/dev/null)"
+            if [[ -z "$repo" || -z "$path" ]]; then
+                log.error "deploy.environments.${env_name}.target=gitops requires both 'repo' and 'path'"
+                ((errors++))
+            fi
+        fi
+    done < <(yq '.deploy.environments | keys | .[]' "$config_file" 2>/dev/null)
+
+    # Rule 4: a tag was pushed but release is disabled. Warn so the silent
+    # skip does not surprise the user.
+    if [[ "$(yq '.release.enabled // ""' "$config_file" 2>/dev/null)" == "false" \
+       && -n "${CI_COMMIT_TAG:-}" ]]; then
+        log.warn "tag '${CI_COMMIT_TAG}' pushed but release.enabled is false; release stage will be skipped"
+    fi
+
+    if [[ $errors -gt 0 ]]; then
+        log.error "config validation failed: ${errors} error(s)"
+        return "$BRIK_EXIT_CONFIG_ERROR"
+    fi
 
     if [[ "$stack" == "auto" || "$stack" == "unknown" ]]; then
         return 0
