@@ -172,5 +172,17 @@ _stages.init._write_dotenv() {
         return 0
     }
 
+    # Mirror every key into the pipeline env file so Jenkins (which loads
+    # pipeline.env at each stage via pipeline.env.load) sees the same
+    # values as GitLab (which gets brik-init.env auto-injected via the
+    # artifacts.reports.dotenv mechanism).
+    local _line _key _val
+    while IFS= read -r _line; do
+        [[ -z "$_line" ]] && continue
+        _key="${_line%%=*}"
+        _val="${_line#*=}"
+        pipeline.env.set "$_key" "$_val" 2>/dev/null || true
+    done < "$dotenv"
+
     log.info "wrote $(wc -l < "$dotenv" 2>/dev/null | tr -d ' ') variables to $dotenv"
 }
