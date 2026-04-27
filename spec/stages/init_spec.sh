@@ -184,4 +184,84 @@ Describe "stages.init"
     When call run_init_default_fallback
     The output should equal "BRIK_GIT_USER_EMAIL=brik-ci@brik.local"
   End
+
+  Describe "test-reports format and path resolution"
+    read_dotenv_var() {
+      grep "^${1}=" "${BRIK_WORKSPACE}/brik-init.env" | tail -1
+    }
+
+    It "resolves format=auto to lcov for stack=node"
+      run_init_node() {
+        local ctx
+        ctx="$(context.create "init")" 2>/dev/null || ctx="$(mktemp)"
+        stages.init "$ctx" >/dev/null 2>&1 || return $?
+        read_dotenv_var BRIK_TEST_COVERAGE_FORMAT_GITLAB
+      }
+      When call run_init_node
+      The output should equal "BRIK_TEST_COVERAGE_FORMAT_GITLAB=lcov"
+    End
+
+    It "resolves coverage path to coverage/lcov.info for stack=node"
+      run_init_node_path() {
+        local ctx
+        ctx="$(context.create "init")" 2>/dev/null || ctx="$(mktemp)"
+        stages.init "$ctx" >/dev/null 2>&1 || return $?
+        read_dotenv_var BRIK_TEST_COVERAGE_PATH
+      }
+      When call run_init_node_path
+      The output should equal "BRIK_TEST_COVERAGE_PATH=coverage/lcov.info"
+    End
+
+    It "resolves format=auto to jacoco for stack=java"
+      run_init_java() {
+        printf 'version: 1\nproject:\n  name: t\n  stack: java\n' > "$BRIK_CONFIG_FILE"
+        config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
+        local ctx
+        ctx="$(context.create "init")" 2>/dev/null || ctx="$(mktemp)"
+        stages.init "$ctx" >/dev/null 2>&1 || return $?
+        read_dotenv_var BRIK_TEST_COVERAGE_FORMAT_GITLAB
+      }
+      When call run_init_java
+      The output should equal "BRIK_TEST_COVERAGE_FORMAT_GITLAB=jacoco"
+    End
+
+    It "resolves coverage path to coverage/jacoco.xml for stack=java"
+      run_init_java_path() {
+        printf 'version: 1\nproject:\n  name: t\n  stack: java\n' > "$BRIK_CONFIG_FILE"
+        config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
+        local ctx
+        ctx="$(context.create "init")" 2>/dev/null || ctx="$(mktemp)"
+        stages.init "$ctx" >/dev/null 2>&1 || return $?
+        read_dotenv_var BRIK_TEST_COVERAGE_PATH
+      }
+      When call run_init_java_path
+      The output should equal "BRIK_TEST_COVERAGE_PATH=coverage/jacoco.xml"
+    End
+
+    It "honours an explicit coverage.format override"
+      run_init_explicit() {
+        printf 'version: 1\nproject:\n  name: t\n  stack: node\ntest:\n  reports:\n    coverage:\n      format: cobertura\n' > "$BRIK_CONFIG_FILE"
+        config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
+        local ctx
+        ctx="$(context.create "init")" 2>/dev/null || ctx="$(mktemp)"
+        stages.init "$ctx" >/dev/null 2>&1 || return $?
+        read_dotenv_var BRIK_TEST_COVERAGE_FORMAT_GITLAB
+      }
+      When call run_init_explicit
+      The output should equal "BRIK_TEST_COVERAGE_FORMAT_GITLAB=cobertura"
+    End
+
+    It "honours coverage.output_dir override in the resolved path"
+      run_init_custom_dir() {
+        printf 'version: 1\nproject:\n  name: t\n  stack: node\ntest:\n  reports:\n    coverage:\n      output_dir: custom/cov\n' > "$BRIK_CONFIG_FILE"
+        config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
+        local ctx
+        ctx="$(context.create "init")" 2>/dev/null || ctx="$(mktemp)"
+        stages.init "$ctx" >/dev/null 2>&1 || return $?
+        read_dotenv_var BRIK_TEST_COVERAGE_PATH
+      }
+      When call run_init_custom_dir
+      The output should equal "BRIK_TEST_COVERAGE_PATH=custom/cov/lcov.info"
+    End
+  End
 End
