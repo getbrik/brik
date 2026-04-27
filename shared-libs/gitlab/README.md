@@ -199,7 +199,31 @@ Out of the box:
 
 Stacks where the badge does not match still get their coverage files
 archived under `artifacts.paths` and the pipeline stays green -- only the
-inline GitLab badge is missing.
+inline GitLab MR-diff badge is missing.
+
+#### Coverage percentage badge (automatic)
+
+The pipeline-level **coverage % badge** (visible on the project page,
+the MR widget, and the pipeline trend) is wired automatically: after
+the test stage runs, brik emits a single canonical line on the job
+log:
+
+```
+[brik] coverage: 87.42%
+```
+
+The brik-test job in this template ships a `coverage:` regex that
+parses that line:
+
+```yaml
+brik-test:
+  coverage: '/\[brik\] coverage: ([\d\.]+)%/'
+```
+
+`lib/transverse/coverage.sh` reads either `coverage/coverage.xml`
+(Cobertura) or `coverage/jacoco.xml` (Jacoco) and computes the line
+percentage. No per-project regex needed -- works for python, node,
+java, rust, dotnet without override.
 
 #### Project-level override
 
