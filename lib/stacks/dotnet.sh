@@ -65,11 +65,18 @@ stacks.dotnet.test_cmd() {
                 local cov_dir="${BRIK_TEST_COVERAGE_DIR:-coverage}"
                 local junit="${BRIK_TEST_JUNIT_PATH:-reports/junit.xml}"
                 # XPlat Code Coverage produces coverage.cobertura.xml under
-                # the results directory. The junit logger requires the
-                # JUnitTestLogger nuget package on the test project.
+                # ${cov_dir}/<test-run-guid>/. GitLab coverage_report.path
+                # cannot glob, so flatten the file to ${cov_dir}/coverage.xml
+                # post-test. The junit logger requires the JUnitTestLogger
+                # nuget package on the test project.
+                # Use ; (not &&) so the flatten runs even when tests fail;
+                # preserve the test exit code via _rc.
                 cmd="${cmd} --collect:'XPlat Code Coverage'"
                 cmd="${cmd} --logger:'junit;LogFilePath=${junit}'"
                 cmd="${cmd} --results-directory '${cov_dir}'"
+                cmd="${cmd}; _rc=\$?"
+                cmd="${cmd}; find '${cov_dir}' -name 'coverage.cobertura.xml' -exec cp -f {} '${cov_dir}/coverage.xml' \\; 2>/dev/null"
+                cmd="${cmd}; exit \$_rc"
             fi
             ;;
         *)

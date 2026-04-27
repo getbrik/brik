@@ -66,14 +66,16 @@ stacks.rust.test_cmd() {
                 command -v cargo-llvm-cov >/dev/null 2>&1 && has_llvm_cov=1
 
                 if (( has_llvm_cov && has_nextest )); then
-                    # llvm-cov delegates execution to nextest: produces lcov +
+                    # llvm-cov delegates execution to nextest: produces
+                    # cobertura coverage at ${cov_dir}/coverage.xml plus
                     # JUnit (the latter via the project's nextest.toml ci profile).
-                    cmd="mkdir -p '${cov_dir}'; cargo llvm-cov --lcov --output-path '${cov_dir}/lcov.info' nextest --profile ci"
+                    # Cobertura is the format GitLab can render natively.
+                    cmd="mkdir -p '${cov_dir}'; cargo llvm-cov --cobertura --output-path '${cov_dir}/coverage.xml' nextest --profile ci"
                 elif (( has_nextest )); then
                     cmd="cargo nextest run --profile ci"
                     log.warn "cargo-llvm-cov not installed; JUnit produced but no coverage. Install via 'cargo install cargo-llvm-cov'."
                 elif (( has_llvm_cov )); then
-                    cmd="mkdir -p '${cov_dir}'; cargo llvm-cov --lcov --output-path '${cov_dir}/lcov.info'"
+                    cmd="mkdir -p '${cov_dir}'; cargo llvm-cov --cobertura --output-path '${cov_dir}/coverage.xml'"
                     log.warn "cargo-nextest not installed; coverage produced but no JUnit. Install via 'cargo install cargo-nextest'."
                 else
                     log.warn "cargo-nextest and cargo-llvm-cov not installed; reports.enabled=true has no effect. Use brik-runner-rust or 'cargo install cargo-nextest cargo-llvm-cov'."
