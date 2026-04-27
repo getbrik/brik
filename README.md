@@ -202,7 +202,7 @@ Lint/SAST/Scan to succeed (or be skipped).
 | Lint | Code quality | Lint, format check, type checking |
 | SAST | Static analysis | SAST scan, plus license and IaC scans when configured |
 | Scan | Dependency scan | Dependency audit and secret scan |
-| Test | Test suite | Runs in parallel with Lint/SAST/Scan |
+| Test | Test suite | Runs in parallel with Lint/SAST/Scan; emits JUnit + coverage reports when `quality.test.reports.enabled: true` |
 | Package | Artifacts | Docker image build + artifact publishing (npm, maven, pypi, cargo, nuget) |
 | Container Scan | Image security | Scan built container images for vulnerabilities |
 | Deploy | Deployment | Multi-environment with Git workflow profiles, condition-based (branch/tag) |
@@ -215,6 +215,28 @@ conditions from `brik.yml`.
 
 Users do not define pipeline structure. They configure behavior within each stage
 via `brik.yml`.
+
+### Test reports
+
+When `quality.test.reports.enabled: true`, brik injects per-stack coverage and
+JUnit reporter flags so the test stage produces real artifacts:
+
+| Stack | JUnit | Coverage |
+|-------|-------|----------|
+| node (jest) | jest-junit | jest cobertura reporter -> `coverage/coverage.xml` |
+| python (pytest) | pytest --junitxml | pytest-cov cobertura -> `coverage/coverage.xml` |
+| java (maven surefire) | surefire XMLs flattened to `reports/junit/` | jacoco plugin -> `coverage/jacoco.xml` |
+| rust (cargo nextest) | nextest.toml ci profile -> `reports/junit.xml` | cargo-llvm-cov cobertura -> `coverage/coverage.xml` |
+| dotnet | JunitXml.TestLogger | XPlat Code Coverage flattened -> `coverage/coverage.xml` |
+
+The GitLab template (`shared-libs/gitlab/templates/jobs/test.yml`) ships a generic
+`coverage:` regex that picks up the canonical `[brik] coverage: XX.XX%` line emitted
+by the test stage, so the **coverage badge is wired automatically** -- no
+per-project regex needed. The JUnit XML feeds the GitLab `Tests` tab and the
+Jenkins JUnit publisher.
+
+For java's jacoco-format coverage, override `coverage_report` at the project
+level; full recipe in [`shared-libs/gitlab/README.md#coverage-reports`](shared-libs/gitlab/README.md#coverage-reports).
 
 ## Supported Stacks
 
@@ -280,6 +302,8 @@ project:
 
 test:
   framework: junit
+  reports:
+    enabled: true        # opt-in: brik injects per-stack coverage + JUnit flags
 
 quality:
   lint:
