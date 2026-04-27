@@ -164,6 +164,47 @@ Describe "test/dotnet.sh"
       The status should equal 7
       The stderr should include "unsupported .NET test framework"
     End
+
+    Describe "with BRIK_TEST_REPORTS_ENABLED=true"
+      setup_reports_on() { export BRIK_TEST_REPORTS_ENABLED=true; }
+      cleanup_reports_on() {
+        unset BRIK_TEST_REPORTS_ENABLED BRIK_TEST_COVERAGE_DIR BRIK_TEST_JUNIT_PATH
+      }
+      Before 'setup_reports_on'
+      After 'cleanup_reports_on'
+
+      It "injects coverage and junit logger flags for dotnet"
+        When call stacks.dotnet.test_cmd "dotnet" "/workspace" ""
+        The output should include "dotnet test"
+        The output should include "--collect:'XPlat Code Coverage'"
+        The output should include "--logger:'junit;LogFilePath=reports/junit.xml'"
+        The output should include "--results-directory 'coverage'"
+      End
+
+      It "honours BRIK_TEST_COVERAGE_DIR override"
+        export BRIK_TEST_COVERAGE_DIR="custom/cov"
+        When call stacks.dotnet.test_cmd "dotnet" "/workspace" ""
+        The output should include "--results-directory 'custom/cov'"
+      End
+
+      It "honours BRIK_TEST_JUNIT_PATH override"
+        export BRIK_TEST_JUNIT_PATH="custom/junit.xml"
+        When call stacks.dotnet.test_cmd "dotnet" "/workspace" ""
+        The output should include "--logger:'junit;LogFilePath=custom/junit.xml'"
+      End
+    End
+
+    Describe "with BRIK_TEST_REPORTS_ENABLED=false"
+      setup_reports_off() { export BRIK_TEST_REPORTS_ENABLED=false; }
+      cleanup_reports_off() { unset BRIK_TEST_REPORTS_ENABLED; }
+      Before 'setup_reports_off'
+      After 'cleanup_reports_off'
+
+      It "leaves dotnet test_cmd unchanged"
+        When call stacks.dotnet.test_cmd "dotnet" "/workspace" ""
+        The output should equal "dotnet test"
+      End
+    End
   End
 
   Describe "stacks.dotnet.test"

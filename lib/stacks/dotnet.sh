@@ -56,10 +56,21 @@ stacks.dotnet.build() {
 stacks.dotnet.test_cmd() {
     local framework="$1"
     local cmd=""
+    local reports_on="${BRIK_TEST_REPORTS_ENABLED:-false}"
 
     case "$framework" in
         dotnet)
             cmd="dotnet test"
+            if [[ "$reports_on" == "true" ]]; then
+                local cov_dir="${BRIK_TEST_COVERAGE_DIR:-coverage}"
+                local junit="${BRIK_TEST_JUNIT_PATH:-reports/junit.xml}"
+                # XPlat Code Coverage produces coverage.cobertura.xml under
+                # the results directory. The junit logger requires the
+                # JUnitTestLogger nuget package on the test project.
+                cmd="${cmd} --collect:'XPlat Code Coverage'"
+                cmd="${cmd} --logger:'junit;LogFilePath=${junit}'"
+                cmd="${cmd} --results-directory '${cov_dir}'"
+            fi
             ;;
         *)
             log.error "unsupported .NET test framework: $framework"
