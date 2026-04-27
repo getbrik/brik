@@ -28,8 +28,12 @@ brik-test:
   artifacts:
     when: always
     reports:
-      junit: reports/*.xml
+      junit: ${BRIK_TEST_JUNIT_PATH:-reports/junit.xml}
+      coverage_report:
+        coverage_format: ${BRIK_TEST_COVERAGE_FORMAT_GITLAB:-cobertura}
+        path: ${BRIK_TEST_COVERAGE_PATH:-coverage/coverage.xml}
     paths:
-      - coverage/
+      - ${BRIK_TEST_COVERAGE_DIR:-coverage}/
+      - ${BRIK_TEST_JUNIT_PATH:-reports/junit.xml}
       - reports/
     expire_in: 1 week

@@ -210,6 +210,16 @@ def call(Map params = [:]) {
                         'Scan': { runInScanner('scan') },
                         'Test': { runStage('test') }
                     )
+                    // Publish JUnit results and archive coverage/reports.
+                    // The single-file path covers node/python/dotnet; the
+                    // junit/**/*.xml glob covers the standardized java
+                    // surefire/gradle output. allowEmptyResults stays true
+                    // because reports.enabled is opt-in.
+                    junit testResults: 'reports/junit.xml,reports/junit/**/*.xml',
+                          allowEmptyResults: true
+                    archiveArtifacts artifacts: 'coverage/**,reports/**',
+                                     allowEmptyArchive: true,
+                                     fingerprint: false
                 }
                 runStageWithReporting('Package')        { runStage('package') }
                 runStageWithReporting('Container Scan') { runInScanner('container-scan') }
