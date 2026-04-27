@@ -91,15 +91,39 @@ stacks.java.build() {
 stacks.java.test_cmd() {
     local framework="$1" workspace="$2" report_dir="$3"
     local cmd=""
+    local reports_on="${BRIK_TEST_REPORTS_ENABLED:-false}"
+    local cov_dir="${BRIK_TEST_COVERAGE_DIR:-coverage}"
 
     case "$framework" in
         junit|maven)
             cmd="mvn -B test"
-            [[ -n "$report_dir" ]] && cmd="$cmd -Dsurefire.reportsDirectory=${report_dir}"
+            if [[ "$reports_on" == "true" ]]; then
+                # Surefire writes JUnit XMLs natively under target/surefire-reports/.
+                # Standardize to reports/junit/. Jacoco is opt-in (project must
+                # configure the plugin); if jacoco.xml exists, copy it to ${cov_dir}.
+                # Use ; (not &&) so reports are captured even when tests fail.
+                cmd="${cmd}; _rc=\$?"
+                cmd="${cmd}; mkdir -p reports/junit"
+                cmd="${cmd}; find target/surefire-reports -name '*.xml' -exec cp -f {} reports/junit/ \\; 2>/dev/null"
+                cmd="${cmd}; if [[ -f target/site/jacoco/jacoco.xml ]]; then mkdir -p '${cov_dir}'; cp -f target/site/jacoco/jacoco.xml '${cov_dir}/jacoco.xml'; fi"
+                cmd="${cmd}; exit \$_rc"
+            elif [[ -n "$report_dir" ]]; then
+                cmd="$cmd -Dsurefire.reportsDirectory=${report_dir}"
+            fi
             ;;
         gradle)
             cmd="gradle test"
             [[ -x "${workspace}/gradlew" ]] && cmd="./gradlew test"
+            if [[ "$reports_on" == "true" ]]; then
+                # Gradle writes JUnit XMLs to build/test-results/test/. Standardize
+                # to reports/junit/. Jacoco default report path is
+                # build/reports/jacoco/test/jacocoTestReport.xml.
+                cmd="${cmd}; _rc=\$?"
+                cmd="${cmd}; mkdir -p reports/junit"
+                cmd="${cmd}; find build/test-results/test -name '*.xml' -exec cp -f {} reports/junit/ \\; 2>/dev/null"
+                cmd="${cmd}; if [[ -f build/reports/jacoco/test/jacocoTestReport.xml ]]; then mkdir -p '${cov_dir}'; cp -f build/reports/jacoco/test/jacocoTestReport.xml '${cov_dir}/jacoco.xml'; fi"
+                cmd="${cmd}; exit \$_rc"
+            fi
             ;;
         *)
             log.error "unsupported Java test framework: $framework"
