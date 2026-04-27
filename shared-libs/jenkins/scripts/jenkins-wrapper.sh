@@ -29,7 +29,10 @@ brik.jenkins.setup() {
     # Set project root from Jenkins WORKSPACE variable
     export BRIK_PROJECT_DIR="${BRIK_PROJECT_DIR:-${WORKSPACE:-$(pwd)}}"
     export BRIK_PLATFORM="jenkins"
-    export BRIK_LOG_DIR="${BRIK_LOG_DIR:-/tmp/brik/logs/${BUILD_TAG:-$$}}"
+    # Place runtime files inside the workspace so they persist across the
+    # per-stage docker containers (each stage gets a fresh /tmp; only
+    # WORKSPACE is mounted across all stage containers).
+    export BRIK_LOG_DIR="${BRIK_LOG_DIR:-${WORKSPACE:-/tmp}/.brik-logs}"
 
     # Platform variable normalization (Jenkins -> BRIK_*)
     # GIT_BRANCH in Jenkins often has "origin/" prefix - strip it
