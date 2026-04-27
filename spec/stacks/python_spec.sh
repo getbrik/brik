@@ -435,6 +435,51 @@ Describe "test/python.sh"
       The status should equal 7
       The stderr should include "unsupported Python test framework"
     End
+
+    Describe "with BRIK_TEST_REPORTS_ENABLED=true"
+      setup_reports_on() { export BRIK_TEST_REPORTS_ENABLED=true; }
+      cleanup_reports_on() {
+        unset BRIK_TEST_REPORTS_ENABLED BRIK_TEST_COVERAGE_DIR BRIK_TEST_JUNIT_PATH
+      }
+      Before 'setup_reports_on'
+      After 'cleanup_reports_on'
+
+      It "injects --cov and --junitxml flags for pytest"
+        When call stacks.python.test_cmd "pytest" "/workspace" ""
+        The output should include "python -m pytest"
+        The output should include "--cov=."
+        The output should include "--cov-report=xml:'coverage/coverage.xml'"
+        The output should include "--junitxml='reports/junit.xml'"
+      End
+
+      It "honours BRIK_TEST_COVERAGE_DIR override"
+        export BRIK_TEST_COVERAGE_DIR="custom/cov"
+        When call stacks.python.test_cmd "pytest" "/workspace" ""
+        The output should include "--cov-report=xml:'custom/cov/coverage.xml'"
+      End
+
+      It "honours BRIK_TEST_JUNIT_PATH override"
+        export BRIK_TEST_JUNIT_PATH="custom/junit.xml"
+        When call stacks.python.test_cmd "pytest" "/workspace" ""
+        The output should include "--junitxml='custom/junit.xml'"
+      End
+
+      It "ignores legacy report_dir argument when reports.enabled is true"
+        When call stacks.python.test_cmd "pytest" "/workspace" "/legacy/reports"
+        The output should not include "/legacy/reports/report.xml"
+        The output should include "--cov=."
+      End
+
+      It "leaves unittest framework untouched"
+        When call stacks.python.test_cmd "unittest" "/workspace" ""
+        The output should equal "python -m unittest discover"
+      End
+
+      It "leaves tox framework untouched"
+        When call stacks.python.test_cmd "tox" "/workspace" ""
+        The output should equal "tox"
+      End
+    End
   End
 
   Describe "stacks.python.test"
