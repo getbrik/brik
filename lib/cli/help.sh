@@ -76,7 +76,7 @@ Examples:
   brik run pipeline --with-package --continue-on-error
   brik self-update
   brik self-update --channel edge
-  brik self-update --version v0.2.0
+  brik self-update --version v0.3.0
   brik version
   brik version --verbose
 EOF
