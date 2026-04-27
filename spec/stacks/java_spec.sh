@@ -322,6 +322,71 @@ Describe "test/java.sh"
       The status should equal 7
       The stderr should include "unsupported Java test framework"
     End
+
+    Describe "with BRIK_TEST_REPORTS_ENABLED=true"
+      setup_reports_on() {
+        export BRIK_TEST_REPORTS_ENABLED=true
+      }
+      cleanup_reports_on() {
+        unset BRIK_TEST_REPORTS_ENABLED BRIK_TEST_COVERAGE_DIR
+      }
+      Before 'setup_reports_on'
+      After 'cleanup_reports_on'
+
+      It "appends post-test report standardization for maven"
+        When call stacks.java.test_cmd "maven" "/workspace" ""
+        The output should include "mvn -B test"
+        The output should include "mkdir -p reports/junit"
+        The output should include "target/surefire-reports"
+        The output should include "target/site/jacoco/jacoco.xml"
+        The output should include "coverage/jacoco.xml"
+        The output should include "exit \$_rc"
+      End
+
+      It "appends post-test report standardization for junit framework"
+        When call stacks.java.test_cmd "junit" "/workspace" ""
+        The output should include "mvn -B test"
+        The output should include "mkdir -p reports/junit"
+      End
+
+      It "appends post-test report standardization for gradle"
+        When call stacks.java.test_cmd "gradle" "/workspace" ""
+        The output should include "gradle test"
+        The output should include "build/test-results/test"
+        The output should include "build/reports/jacoco/test/jacocoTestReport.xml"
+        The output should include "coverage/jacoco.xml"
+        The output should include "exit \$_rc"
+      End
+
+      It "honours BRIK_TEST_COVERAGE_DIR override for jacoco copy target"
+        export BRIK_TEST_COVERAGE_DIR="custom/cov"
+        When call stacks.java.test_cmd "maven" "/workspace" ""
+        The output should include "custom/cov/jacoco.xml"
+      End
+
+      It "ignores legacy report_dir argument when reports.enabled is true"
+        When call stacks.java.test_cmd "maven" "/workspace" "/legacy/reports"
+        The output should not include "-Dsurefire.reportsDirectory=/legacy/reports"
+        The output should include "mkdir -p reports/junit"
+      End
+    End
+
+    Describe "with BRIK_TEST_REPORTS_ENABLED=false"
+      setup_reports_off() { export BRIK_TEST_REPORTS_ENABLED=false; }
+      cleanup_reports_off() { unset BRIK_TEST_REPORTS_ENABLED; }
+      Before 'setup_reports_off'
+      After 'cleanup_reports_off'
+
+      It "leaves maven test_cmd unchanged"
+        When call stacks.java.test_cmd "maven" "/workspace" ""
+        The output should equal "mvn -B test"
+      End
+
+      It "leaves gradle test_cmd unchanged"
+        When call stacks.java.test_cmd "gradle" "/workspace" ""
+        The output should equal "gradle test"
+      End
+    End
   End
 
   Describe "stacks.java.test"
