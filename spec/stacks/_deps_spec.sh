@@ -32,6 +32,7 @@ Describe "stacks.install_deps"
       }
       When call run_ok
       The status should be success
+      The stderr should include "installing node dependencies"
     End
 
     It "propagates BRIK_EXIT_MISSING_DEP when npm ci fails"
@@ -43,6 +44,7 @@ Describe "stacks.install_deps"
       }
       When call run_fail
       The status should equal "$BRIK_EXIT_MISSING_DEP"
+      The stderr should include "npm ci failed"
     End
 
     It "skips when node_modules already exists"
@@ -76,6 +78,7 @@ Describe "stacks.install_deps"
       }
       When call run_propagate
       The status should equal "$BRIK_EXIT_MISSING_DEP"
+      The stderr should include "npm ci failed"
     End
   End
 End
