@@ -47,10 +47,30 @@ stacks.install_deps() {
 _brik._install_deps_node() {
     local workspace="$1"
     [[ -f "${workspace}/package.json" ]] || return 0
-    [[ -d "${workspace}/node_modules" ]] && return 0
     # Some runner images (scanner, analysis) do not ship npm. Skip silently
     # when the tool is missing -- those stages do not need installed deps.
     command -v npm >/dev/null 2>&1 || return 0
+
+    # Skip the install only when node_modules is in sync with the current
+    # package-lock.json. npm ci writes node_modules/.package-lock.json as
+    # a copy of the project's lockfile after a successful install; if the
+    # two files match byte-for-byte we know the deps on disk are current.
+    # Without this check, Jenkins workspaces (which exclude node_modules
+    # from cleanWs to keep the cache hot) reuse stale installs across
+    # builds when package.json changes.
+    if [[ -d "${workspace}/node_modules/.bin" ]] \
+        && [[ -f "${workspace}/package-lock.json" ]] \
+        && [[ -f "${workspace}/node_modules/.package-lock.json" ]] \
+        && cmp -s "${workspace}/package-lock.json" \
+                  "${workspace}/node_modules/.package-lock.json"; then
+        return 0
+    fi
+    # Projects without a package-lock.json keep the legacy "skip if
+    # node_modules exists" behaviour; we have no signal to detect drift.
+    if [[ -d "${workspace}/node_modules/.bin" ]] \
+        && [[ ! -f "${workspace}/package-lock.json" ]]; then
+        return 0
+    fi
 
     log.info "installing node dependencies"
     if (cd "$workspace" && npm ci --ignore-scripts); then
