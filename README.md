@@ -278,10 +278,6 @@ project:
   stack: java
   stack_version: "21"
 
-build:
-  java_version: "21"
-  command: mvn package -DskipTests
-
 test:
   framework: junit
 
