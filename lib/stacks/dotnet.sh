@@ -64,18 +64,22 @@ stacks.dotnet.test_cmd() {
             if [[ "$reports_on" == "true" ]]; then
                 local cov_dir="${BRIK_TEST_COVERAGE_DIR:-coverage}"
                 local junit="${BRIK_TEST_JUNIT_PATH:-reports/junit.xml}"
-                # XPlat Code Coverage produces coverage.cobertura.xml under
-                # ${cov_dir}/<test-run-guid>/. GitLab coverage_report.path
-                # cannot glob, so flatten the file to ${cov_dir}/coverage.xml
-                # post-test. The junit logger requires the JUnitTestLogger
-                # nuget package on the test project.
+                # XPlat Code Coverage requires the coverlet.collector nuget
+                # package on the test project. The collector writes
+                # <test-project>/TestResults/<guid>/coverage.cobertura.xml;
+                # we flatten that to ${cov_dir}/coverage.xml post-test.
+                # JunitXml.TestLogger (also a nuget on the test project)
+                # writes LogFilePath relative to cwd (= workspace root), so
+                # the JUnit XML lands at ${junit} directly with no relocation.
+                # We do NOT pass --results-directory because that would
+                # redirect the JUnit XML under it too.
                 # Use ; (not &&) so the flatten runs even when tests fail;
                 # preserve the test exit code via _rc.
                 cmd="${cmd} --collect:'XPlat Code Coverage'"
                 cmd="${cmd} --logger:'junit;LogFilePath=${junit}'"
-                cmd="${cmd} --results-directory '${cov_dir}'"
                 cmd="${cmd}; _rc=\$?"
-                cmd="${cmd}; find '${cov_dir}' -name 'coverage.cobertura.xml' -exec cp -f {} '${cov_dir}/coverage.xml' \\; 2>/dev/null"
+                cmd="${cmd}; mkdir -p '${cov_dir}'"
+                cmd="${cmd}; find . -path '*/TestResults/*/coverage.cobertura.xml' -exec cp -f {} '${cov_dir}/coverage.xml' \\; 2>/dev/null"
                 cmd="${cmd}; exit \$_rc"
             fi
             ;;

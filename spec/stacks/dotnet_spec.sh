@@ -178,20 +178,21 @@ Describe "test/dotnet.sh"
         The output should include "dotnet test"
         The output should include "--collect:'XPlat Code Coverage'"
         The output should include "--logger:'junit;LogFilePath=reports/junit.xml'"
-        The output should include "--results-directory 'coverage'"
+        The output should not include "--results-directory"
       End
 
-      It "flattens coverage.cobertura.xml from the GUID subdir"
+      It "flattens coverage.cobertura.xml from TestResults to ${cov_dir}/coverage.xml"
         When call stacks.dotnet.test_cmd "dotnet" "/workspace" ""
-        The output should include "find 'coverage' -name 'coverage.cobertura.xml'"
+        The output should include "find . -path '*/TestResults/*/coverage.cobertura.xml'"
         The output should include "cp -f {} 'coverage/coverage.xml'"
         The output should include "exit \$_rc"
       End
 
-      It "honours BRIK_TEST_COVERAGE_DIR override"
+      It "honours BRIK_TEST_COVERAGE_DIR override in the flatten target"
         export BRIK_TEST_COVERAGE_DIR="custom/cov"
         When call stacks.dotnet.test_cmd "dotnet" "/workspace" ""
-        The output should include "--results-directory 'custom/cov'"
+        The output should include "mkdir -p 'custom/cov'"
+        The output should include "cp -f {} 'custom/cov/coverage.xml'"
       End
 
       It "honours BRIK_TEST_JUNIT_PATH override"

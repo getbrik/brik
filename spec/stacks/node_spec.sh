@@ -267,8 +267,15 @@ Describe "test/node.sh"
         The output should include "npx jest"
         The output should include "--coverage"
         The output should include "--coverageDirectory='coverage'"
+        The output should include "--coverageReporters=cobertura"
         The output should include "--reporters=default"
         The output should include "--reporters=jest-junit"
+      End
+
+      It "renames cobertura-coverage.xml to coverage.xml post-test"
+        When call stacks.node.test_cmd "jest" "/workspace" ""
+        The output should include "cp -f 'coverage/cobertura-coverage.xml' 'coverage/coverage.xml'"
+        The output should include "exit \$_rc"
       End
 
       It "honours BRIK_TEST_COVERAGE_DIR override"
