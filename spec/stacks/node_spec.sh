@@ -252,6 +252,48 @@ Describe "test/node.sh"
       The status should equal 7
       The stderr should include "unsupported Node.js test framework"
     End
+
+    Describe "with BRIK_TEST_REPORTS_ENABLED=true"
+      setup_reports_on() { export BRIK_TEST_REPORTS_ENABLED=true; }
+      cleanup_reports_on() {
+        unset BRIK_TEST_REPORTS_ENABLED BRIK_TEST_COVERAGE_DIR BRIK_TEST_JUNIT_PATH
+      }
+      Before 'setup_reports_on'
+      After 'cleanup_reports_on'
+
+      It "injects coverage and jest-junit flags for jest"
+        When call stacks.node.test_cmd "jest" "/workspace" ""
+        The output should include "JEST_JUNIT_OUTPUT_FILE='reports/junit.xml'"
+        The output should include "npx jest"
+        The output should include "--coverage"
+        The output should include "--coverageDirectory='coverage'"
+        The output should include "--reporters=default"
+        The output should include "--reporters=jest-junit"
+      End
+
+      It "honours BRIK_TEST_COVERAGE_DIR override"
+        export BRIK_TEST_COVERAGE_DIR="custom/cov"
+        When call stacks.node.test_cmd "jest" "/workspace" ""
+        The output should include "--coverageDirectory='custom/cov'"
+      End
+
+      It "honours BRIK_TEST_JUNIT_PATH override"
+        export BRIK_TEST_JUNIT_PATH="custom/junit.xml"
+        When call stacks.node.test_cmd "jest" "/workspace" ""
+        The output should include "JEST_JUNIT_OUTPUT_FILE='custom/junit.xml'"
+      End
+
+      It "ignores legacy report_dir argument when reports.enabled is true"
+        When call stacks.node.test_cmd "jest" "/workspace" "/legacy/reports"
+        The output should include "--coverage"
+        The output should include "JEST_JUNIT_OUTPUT_FILE='reports/junit.xml'"
+      End
+
+      It "leaves npm framework untouched"
+        When call stacks.node.test_cmd "npm" "/workspace" ""
+        The output should equal "npm test"
+      End
+    End
   End
 
   Describe "stacks.node.test"
