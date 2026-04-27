@@ -173,6 +173,60 @@ When `project.stack` is set, default tools are applied:
 | java | `mvn package` | `junit` | `checkstyle` | `google-java-format` |
 | python | `pip install .` | `pytest` | `ruff` | `ruff format` |
 
+### Coverage reports
+
+The `brik-test` job ships a `coverage_report` block so GitLab can render a
+coverage badge on merge requests. GitLab's YAML schema only accepts
+`cobertura` or `jacoco` for `coverage_format` and validates this at YAML
+parse time -- **before** any job runs -- so the value cannot be driven by an
+init-stage dotenv. The template therefore hardcodes the cobertura defaults:
+
+```yaml
+coverage_report:
+  coverage_format: cobertura
+  path: coverage/coverage.xml
+```
+
+Out of the box:
+
+| Stack | Coverage format produced | GitLab badge |
+|-------|--------------------------|--------------|
+| `python` (pytest-cov) | cobertura -> `coverage/coverage.xml` | works |
+| `dotnet` (XPlat Code Coverage) | cobertura -> `coverage/<guid>/coverage.cobertura.xml` | flatten or override path |
+| `java` (jacoco) | jacoco -> `coverage/jacoco.xml` | override format to jacoco |
+| `node` (jest --coverage) | lcov -> `coverage/lcov.info` | override or accept no badge |
+| `rust` (cargo-llvm-cov) | lcov -> `coverage/lcov.info` | override or accept no badge |
+
+Stacks where the badge does not match still get their coverage files
+archived under `artifacts.paths` and the pipeline stays green -- only the
+inline GitLab badge is missing.
+
+#### Project-level override
+
+To enable the badge for jacoco, lcov, or a non-default path, override the
+`brik-test` job in your own `.gitlab-ci.yml`. GitLab merges the override
+hash into the templated job:
+
+```yaml
+include:
+  - project: 'brik/gitlab-templates'
+    ref: v0.1.0
+    file: '/templates/pipeline.yml'
+
+# java example: switch the format to jacoco and point at the file the
+# Jacoco maven/gradle plugin produces.
+brik-test:
+  artifacts:
+    reports:
+      coverage_report:
+        coverage_format: jacoco
+        path: coverage/jacoco.xml
+```
+
+If you keep your coverage report under a non-default directory, set the
+matching `path:` value in the override. The rest of the templated `brik-test`
+job (script, cache, dependencies, paths, junit) continues to apply.
+
 ## Requirements
 
 - GitLab CI Runner with **Docker executor**
