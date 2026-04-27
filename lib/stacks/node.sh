@@ -121,7 +121,14 @@ stacks.node.test_cmd() {
                 # JEST_JUNIT_OUTPUT_FILE is the env var jest-junit honours.
                 # It must be inlined in the command because stages.test
                 # eval's the resulting string in a subshell.
-                cmd="JEST_JUNIT_OUTPUT_FILE='${junit}' ${cmd} --coverage --coverageDirectory='${cov_dir}' --reporters=default --reporters=jest-junit"
+                # --coverageReporters=cobertura emits ${cov_dir}/cobertura-coverage.xml
+                # which we rename to coverage.xml post-test so the GitLab
+                # template (coverage/coverage.xml default) finds it. Use ; (not
+                # &&) so the rename runs even when tests fail; preserve _rc.
+                cmd="JEST_JUNIT_OUTPUT_FILE='${junit}' ${cmd} --coverage --coverageDirectory='${cov_dir}' --coverageReporters=cobertura --coverageReporters=text-summary --reporters=default --reporters=jest-junit"
+                cmd="${cmd}; _rc=\$?"
+                cmd="${cmd}; [[ -f '${cov_dir}/cobertura-coverage.xml' ]] && cp -f '${cov_dir}/cobertura-coverage.xml' '${cov_dir}/coverage.xml' 2>/dev/null"
+                cmd="${cmd}; exit \$_rc"
             elif [[ -n "$report_dir" ]]; then
                 # Legacy explicit report_dir argument (pre-test.reports.enabled).
                 cmd="$cmd --reporters=default --reporters=jest-junit"
