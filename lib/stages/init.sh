@@ -167,30 +167,6 @@ _stages.init._write_dotenv() {
         printf 'BRIK_TEST_COVERAGE_FORMAT=%s\n' "$(config.get '.test.reports.coverage.format' 'auto')"
         printf 'BRIK_TEST_COVERAGE_DIR=%s\n'    "$(config.get '.test.reports.coverage.output_dir' 'coverage')"
         printf 'BRIK_TEST_JUNIT_PATH=%s\n'      "$(config.get '.test.reports.junit.output_path' 'reports/junit.xml')"
-
-        # Resolved coverage format and path for templates that need a concrete
-        # value (GitLab coverage_report.coverage_format only accepts
-        # cobertura | jacoco | lcov, so 'auto' is resolved per stack here).
-        local _gl_fmt _cov_path _fmt _cov_dir
-        _fmt="$(config.get '.test.reports.coverage.format' 'auto')"
-        _cov_dir="$(config.get '.test.reports.coverage.output_dir' 'coverage')"
-        if [[ "$_fmt" == "auto" ]]; then
-            case "${BRIK_BUILD_STACK:-auto}" in
-                node|rust)     _gl_fmt="lcov" ;;
-                python|dotnet) _gl_fmt="cobertura" ;;
-                java)          _gl_fmt="jacoco" ;;
-                *)             _gl_fmt="cobertura" ;;
-            esac
-        else
-            _gl_fmt="$_fmt"
-        fi
-        case "$_gl_fmt" in
-            lcov)   _cov_path="${_cov_dir}/lcov.info" ;;
-            jacoco) _cov_path="${_cov_dir}/jacoco.xml" ;;
-            *)      _cov_path="${_cov_dir}/coverage.xml" ;;
-        esac
-        printf 'BRIK_TEST_COVERAGE_FORMAT_GITLAB=%s\n' "$_gl_fmt"
-        printf 'BRIK_TEST_COVERAGE_PATH=%s\n'          "$_cov_path"
     } > "$dotenv" 2>/dev/null || {
         log.warn "could not write dotenv to $dotenv"
         return 0

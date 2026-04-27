@@ -29,9 +29,16 @@ brik-test:
     when: always
     reports:
       junit: ${BRIK_TEST_JUNIT_PATH:-reports/junit.xml}
+      # GitLab schema-validates coverage_format at YAML-parse time and
+      # only accepts "cobertura" or "jacoco" -- variables resolved from
+      # an upstream job's dotenv arrive too late. We hardcode the
+      # cobertura defaults so python and dotnet projects get a coverage
+      # badge out of the box. Java users (jacoco) and any project with
+      # a non-default path can override at the project level; see
+      # shared-libs/gitlab/README.md for the override recipe.
       coverage_report:
-        coverage_format: ${BRIK_TEST_COVERAGE_FORMAT_GITLAB:-cobertura}
-        path: ${BRIK_TEST_COVERAGE_PATH:-coverage/coverage.xml}
+        coverage_format: cobertura
+        path: coverage/coverage.xml
     paths:
       - ${BRIK_TEST_COVERAGE_DIR:-coverage}/
       - ${BRIK_TEST_JUNIT_PATH:-reports/junit.xml}
