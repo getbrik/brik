@@ -69,17 +69,23 @@ stacks.dotnet.test_cmd() {
                 # <test-project>/TestResults/<guid>/coverage.cobertura.xml;
                 # we flatten that to ${cov_dir}/coverage.xml post-test.
                 # JunitXml.TestLogger (also a nuget on the test project)
-                # writes LogFilePath relative to cwd (= workspace root), so
-                # the JUnit XML lands at ${junit} directly with no relocation.
+                # writes LogFilePath relative to the TEST PROJECT's cwd
+                # (e.g. test/Calculator.Tests/reports/junit.xml), not the
+                # workspace root, so we also flatten the JUnit XML to
+                # the workspace-rooted ${junit} path.
                 # We do NOT pass --results-directory because that would
                 # redirect the JUnit XML under it too.
                 # Use ; (not &&) so the flatten runs even when tests fail;
                 # preserve the test exit code via _rc.
+                local junit_dir junit_name
+                junit_dir="$(dirname "${junit}")"
+                junit_name="$(basename "${junit}")"
                 cmd="${cmd} --collect:'XPlat Code Coverage'"
                 cmd="${cmd} --logger:'junit;LogFilePath=${junit}'"
                 cmd="${cmd}; _rc=\$?"
-                cmd="${cmd}; mkdir -p '${cov_dir}'"
+                cmd="${cmd}; mkdir -p '${cov_dir}' '${junit_dir}'"
                 cmd="${cmd}; find . -path '*/TestResults/*/coverage.cobertura.xml' -exec cp -f {} '${cov_dir}/coverage.xml' \\; 2>/dev/null"
+                cmd="${cmd}; find . -path '*/${junit}' -not -path './${junit}' -exec cp -f {} '${junit}' \\; 2>/dev/null"
                 cmd="${cmd}; exit \$_rc"
             fi
             ;;
