@@ -3,6 +3,11 @@
 
 brik-test:
   stage: verify
+  # Generic regex that picks up the "[brik] coverage: XX.XX%" line emitted
+  # by stages.test post-test (via lib/transverse/coverage.sh). One regex
+  # works for all stacks because brik standardizes the summary line; the
+  # underlying coverage file may be cobertura or jacoco.
+  coverage: '/\[brik\] coverage: ([\d\.]+)%/'
   needs:
     - job: brik-init
       artifacts: true

@@ -66,6 +66,17 @@ stages.test() {
 
     local exit_code2=0
     (cd "${BRIK_WORKSPACE}" && eval "$test_cmd") || exit_code2=$?
+
+    # When reports.enabled=true, emit a single-line coverage summary that
+    # downstream CI templates pick up with a generic regex (the GitLab
+    # template ships a coverage: regex matching "[brik] coverage: ...%").
+    # Run regardless of test success/failure so a partial report still
+    # surfaces a percentage; never gate on the helper itself.
+    if [[ "${BRIK_TEST_REPORTS_ENABLED:-false}" == "true" ]]; then
+        brik.use transverse.coverage
+        (cd "${BRIK_WORKSPACE}" && brik.coverage.summary) || true
+    fi
+
     if [[ "$exit_code2" -ne 0 ]]; then
         log.error "tests failed with exit code $exit_code2"
         return "$BRIK_EXIT_CHECK_FAILED"
