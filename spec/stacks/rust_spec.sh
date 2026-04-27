@@ -160,11 +160,11 @@ Describe "test/rust.sh"
         Before 'setup_both'
         After 'cleanup_both'
 
-        It "drives llvm-cov with nextest and emits lcov to coverage/lcov.info"
+        It "drives llvm-cov with nextest and emits cobertura to coverage/coverage.xml"
           When call stacks.rust.test_cmd "cargo" "/workspace" ""
           The output should include "cargo llvm-cov"
-          The output should include "--lcov"
-          The output should include "--output-path 'coverage/lcov.info'"
+          The output should include "--cobertura"
+          The output should include "--output-path 'coverage/coverage.xml'"
           The output should include "nextest --profile ci"
           The output should include "mkdir -p 'coverage'"
         End
@@ -172,7 +172,7 @@ Describe "test/rust.sh"
         It "honours BRIK_TEST_COVERAGE_DIR override"
           export BRIK_TEST_COVERAGE_DIR="custom/cov"
           When call stacks.rust.test_cmd "cargo" "/workspace" ""
-          The output should include "--output-path 'custom/cov/lcov.info'"
+          The output should include "--output-path 'custom/cov/coverage.xml'"
           The output should include "mkdir -p 'custom/cov'"
         End
       End
@@ -214,7 +214,7 @@ Describe "test/rust.sh"
 
         It "uses llvm-cov standalone and warns about JUnit"
           When call stacks.rust.test_cmd "cargo" "/workspace" ""
-          The output should include "cargo llvm-cov --lcov --output-path 'coverage/lcov.info'"
+          The output should include "cargo llvm-cov --cobertura --output-path 'coverage/coverage.xml'"
           The output should not include "nextest"
           The stderr should include "cargo-nextest not installed"
         End

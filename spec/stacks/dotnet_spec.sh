@@ -181,6 +181,13 @@ Describe "test/dotnet.sh"
         The output should include "--results-directory 'coverage'"
       End
 
+      It "flattens coverage.cobertura.xml from the GUID subdir"
+        When call stacks.dotnet.test_cmd "dotnet" "/workspace" ""
+        The output should include "find 'coverage' -name 'coverage.cobertura.xml'"
+        The output should include "cp -f {} 'coverage/coverage.xml'"
+        The output should include "exit \$_rc"
+      End
+
       It "honours BRIK_TEST_COVERAGE_DIR override"
         export BRIK_TEST_COVERAGE_DIR="custom/cov"
         When call stacks.dotnet.test_cmd "dotnet" "/workspace" ""
