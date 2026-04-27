@@ -131,6 +131,8 @@ Describe "test/rust.sh"
   Include "$BRIK_STACKS_LIB/rust.sh"
 
   Describe "stacks.rust.test_cmd"
+    Include "$BRIK_HOME/spec/support/mock_helper.sh"
+
     It "returns cargo test for cargo framework"
       When call stacks.rust.test_cmd "cargo" "/workspace" ""
       The output should equal "cargo test"
@@ -140,6 +142,103 @@ Describe "test/rust.sh"
       When call stacks.rust.test_cmd "unknown" "/workspace" ""
       The status should equal 7
       The stderr should include "unsupported Rust test framework"
+    End
+
+    Describe "with BRIK_TEST_REPORTS_ENABLED=true"
+      Describe "and both cargo-nextest and cargo-llvm-cov on PATH"
+        setup_both() {
+          mock.setup
+          mock.create_exit "cargo-nextest" 0
+          mock.create_exit "cargo-llvm-cov" 0
+          mock.activate
+          export BRIK_TEST_REPORTS_ENABLED=true
+        }
+        cleanup_both() {
+          mock.cleanup
+          unset BRIK_TEST_REPORTS_ENABLED BRIK_TEST_COVERAGE_DIR
+        }
+        Before 'setup_both'
+        After 'cleanup_both'
+
+        It "drives llvm-cov with nextest and emits lcov to coverage/lcov.info"
+          When call stacks.rust.test_cmd "cargo" "/workspace" ""
+          The output should include "cargo llvm-cov"
+          The output should include "--lcov"
+          The output should include "--output-path 'coverage/lcov.info'"
+          The output should include "nextest --profile ci"
+          The output should include "mkdir -p 'coverage'"
+        End
+
+        It "honours BRIK_TEST_COVERAGE_DIR override"
+          export BRIK_TEST_COVERAGE_DIR="custom/cov"
+          When call stacks.rust.test_cmd "cargo" "/workspace" ""
+          The output should include "--output-path 'custom/cov/lcov.info'"
+          The output should include "mkdir -p 'custom/cov'"
+        End
+      End
+
+      Describe "and only cargo-nextest on PATH"
+        setup_nextest_only() {
+          mock.setup
+          mock.create_exit "cargo-nextest" 0
+          mock.isolate
+          export BRIK_TEST_REPORTS_ENABLED=true
+        }
+        cleanup_nextest_only() {
+          mock.cleanup
+          unset BRIK_TEST_REPORTS_ENABLED
+        }
+        Before 'setup_nextest_only'
+        After 'cleanup_nextest_only'
+
+        It "uses nextest standalone and warns about coverage"
+          When call stacks.rust.test_cmd "cargo" "/workspace" ""
+          The output should equal "cargo nextest run --profile ci"
+          The stderr should include "cargo-llvm-cov not installed"
+        End
+      End
+
+      Describe "and only cargo-llvm-cov on PATH"
+        setup_llvm_only() {
+          mock.setup
+          mock.create_exit "cargo-llvm-cov" 0
+          mock.isolate
+          export BRIK_TEST_REPORTS_ENABLED=true
+        }
+        cleanup_llvm_only() {
+          mock.cleanup
+          unset BRIK_TEST_REPORTS_ENABLED
+        }
+        Before 'setup_llvm_only'
+        After 'cleanup_llvm_only'
+
+        It "uses llvm-cov standalone and warns about JUnit"
+          When call stacks.rust.test_cmd "cargo" "/workspace" ""
+          The output should include "cargo llvm-cov --lcov --output-path 'coverage/lcov.info'"
+          The output should not include "nextest"
+          The stderr should include "cargo-nextest not installed"
+        End
+      End
+
+      Describe "and neither tool on PATH"
+        setup_neither() {
+          mock.setup
+          mock.isolate
+          export BRIK_TEST_REPORTS_ENABLED=true
+        }
+        cleanup_neither() {
+          mock.cleanup
+          unset BRIK_TEST_REPORTS_ENABLED
+        }
+        Before 'setup_neither'
+        After 'cleanup_neither'
+
+        It "falls back to cargo test and warns about both tools"
+          When call stacks.rust.test_cmd "cargo" "/workspace" ""
+          The output should equal "cargo test"
+          The stderr should include "cargo-nextest and cargo-llvm-cov not installed"
+        End
+      End
     End
   End
 
