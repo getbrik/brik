@@ -306,6 +306,7 @@ YAML
         unset BRIK_DRY_RUN
         export BRIK_RELEASE_CHANGELOG_ENABLED="false"
         brik.use() { :; }
+        transverse.git.config_identity() { :; }
         transverse.git.commit_all() { return 1; }
         pipeline.require_tool() { return 0; }
         _stages.release._prepare "1.0.0"

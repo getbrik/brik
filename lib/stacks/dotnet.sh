@@ -77,9 +77,8 @@ stacks.dotnet.test_cmd() {
                 # redirect the JUnit XML under it too.
                 # Use ; (not &&) so the flatten runs even when tests fail;
                 # preserve the test exit code via _rc.
-                local junit_dir junit_name
+                local junit_dir
                 junit_dir="$(dirname "${junit}")"
-                junit_name="$(basename "${junit}")"
                 cmd="${cmd} --collect:'XPlat Code Coverage'"
                 cmd="${cmd} --logger:'junit;LogFilePath=${junit}'"
                 cmd="${cmd}; _rc=\$?"
