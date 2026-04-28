@@ -147,7 +147,6 @@ release:
 
 build:
   command: mvn package -DskipTests
-  java_version: "21"
 
 test:
   framework: junit
