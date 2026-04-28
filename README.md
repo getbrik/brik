@@ -290,50 +290,16 @@ deploy:
 Brik follows a "declare what, not how" philosophy. Only `version` and `project.name`
 are required -- everything else has sensible defaults per stack.
 
-Full example (Java/Maven):
-
 ```yaml
 version: 1
-
 project:
-  name: my-java-app
-  stack: java
-  stack_version: "21"
-
-test:
-  framework: junit
-  reports:
-    enabled: true        # opt-in: brik injects per-stack coverage + JUnit flags
-
-quality:
-  lint:
-    tool: checkstyle
-    config: checkstyle.xml
-    fix: false
-  format:
-    tool: google-java-format
-    check: true
-
-security:
-  deps:
-    severity: high
-  secrets: {}
-
-deploy:
-  workflow: trunk-based   # or git-flow, github-flow
-  environments:
-    staging:
-      target: k8s
-      namespace: staging
-    production:
-      target: helm
-      chart: ./charts/my-app
-      namespace: production
+  name: my-app
+  stack: node
 ```
 
-- JSON Schema: [`schemas/config/v1/brik.schema.json`](schemas/config/v1/brik.schema.json)
-- Examples: [`examples/`](examples/) (minimal-node, java-maven, python-pytest, mono-dotnet)
-- Full parameter reference: [`docs/reference.md`](docs/reference.md)
+- Per-section reference and per-stack guides: [`docs/config/`](docs/config/README.md)
+- JSON Schema (source of truth): [`schemas/config/v1/brik.schema.json`](schemas/config/v1/brik.schema.json)
+- Worked examples: [`examples/`](examples/) (minimal-node, java-maven, python-pytest, mono-dotnet)
 - Credentials and secrets configuration: [`docs/credentials.md`](docs/credentials.md)
 
 ## CLI Reference
