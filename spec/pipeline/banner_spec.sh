@@ -3,14 +3,14 @@ Describe "banner.sh"
 
   Describe "banner.brik"
     It "outputs the ASCII logo on stderr"
-      When call banner.brik "0.2.0"
+      When call banner.brik "1.0.0"
       The status should be success
       The stderr should include "████████"
     End
 
     It "outputs the version below the logo"
-      When call banner.brik "0.2.0"
-      The stderr should include "v0.2.0"
+      When call banner.brik "1.0.0"
+      The stderr should include "v1.0.0"
     End
 
     It "handles version with v prefix"
@@ -25,7 +25,7 @@ Describe "banner.sh"
     End
 
     It "does not write anything to stdout"
-      When call banner.brik "0.2.0"
+      When call banner.brik "1.0.0"
       The stdout should equal ""
       The stderr should be present
     End
