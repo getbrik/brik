@@ -396,5 +396,5 @@ copies of the same logic. Thin adapters push all logic into the portable Bash la
 so a bug fix or feature addition benefits every platform at once.
 
 **Why JSON Schema?** `brik.yml` validation must be fast, offline, and tool-agnostic.
-JSON Schema provides all three. Tools like `check-jsonschema` and `yq` make validation
+JSON Schema provides all three. Tools like `jv` and `yq` make validation
 a single command with clear error messages.

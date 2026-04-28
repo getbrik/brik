@@ -150,7 +150,7 @@ For local usage, install the required tools:
 
 | Brik core | Stack tools |
 |-----------|-------------|
-| bash 4+, [yq](https://github.com/mikefarah/yq), [jq](https://jqlang.github.io/jq/), [check-jsonschema](https://github.com/python-jsonschema/check-jsonschema) | **node**: node, npm/yarn/pnpm |
+| bash 4+, [yq](https://github.com/mikefarah/yq), [jq](https://jqlang.github.io/jq/), [jv](https://github.com/santhosh-tekuri/jsonschema) | **node**: node, npm/yarn/pnpm |
 | | **java**: java, mvn/gradle |
 | | **python**: python3, pip3/poetry/uv |
 | | **rust**: rustc, cargo |
@@ -390,7 +390,11 @@ and how to extend Brik, see [docs/architecture.md](docs/architecture.md).
 ### Prerequisites
 
 ```bash
-brew install bash yq jq check-jsonschema shellspec shellcheck kcov
+brew install bash yq jq shellspec shellcheck kcov
+# jv is not in Homebrew core. Install the static binary from upstream releases:
+#   https://github.com/santhosh-tekuri/jsonschema/releases
+# Pick the darwin-arm64 or darwin-amd64 archive, extract, and place `jv`
+# somewhere on PATH (e.g. ~/.local/bin/jv).
 ```
 
 ### Makefile
