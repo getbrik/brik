@@ -150,10 +150,6 @@ build:
 
 test:
   framework: junit
-  commands:
-    unit: mvn test
-    integration: mvn verify -Pintegration
-    e2e: mvn verify -Pe2e
   coverage:
     threshold: 80
     report: target/site/cobertura/coverage.xml
@@ -286,11 +282,8 @@ hooks:
 
 | Key | Type | Required | Default | Description |
 |-----|------|----------|---------|-------------|
-| `test.command` | string | no | stack default | Test command override (Tier 1). For per-suite override, use `commands.*` instead. |
+| `test.command` | string | no | stack default | Test command override (Tier 1). |
 | `test.framework` | string | no | stack default | Test framework (e.g. `jest`, `junit`, `pytest`). |
-| `test.commands.unit` | string | no | derived from framework | Command to run unit tests. |
-| `test.commands.integration` | string | no | -- | Command to run integration tests. |
-| `test.commands.e2e` | string | no | -- | Command to run end-to-end tests. |
 
 #### `test.coverage`
 

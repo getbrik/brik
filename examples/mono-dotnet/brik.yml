@@ -10,9 +10,6 @@ build:
 
 test:
   framework: xunit
-  commands:
-    unit: dotnet test --filter Category=Unit
-    integration: dotnet test --filter Category=Integration
 
 quality:
   lint:

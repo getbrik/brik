@@ -8,9 +8,6 @@
 |-------|------|---------|-------------|
 | `test.command` | string | (stack-derived) | Single test command (Tier 1 override). |
 | `test.framework` | string | (stack default, see below) | Test framework (Tier 2). |
-| `test.commands.unit` | string | (none) | Per-suite override for unit tests. |
-| `test.commands.integration` | string | (none) | Per-suite override for integration tests. |
-| `test.commands.e2e` | string | (none) | Per-suite override for end-to-end tests. |
 | `test.coverage.threshold` | integer | `80` | Minimum coverage percentage required. |
 | `test.coverage.report` | string | (none) | Path to a Cobertura coverage report file. |
 | `test.reports.enabled` | boolean | `false` | Generate test reports (coverage + JUnit). |
@@ -66,25 +63,6 @@ test:
       output_path: target/junit.xml
 ```
 
-### Per-suite override
-
-When unit, integration, and e2e suites need different commands, set them
-under `test.commands`. Each command bypasses the framework-derived one
-for its suite.
-
-```yaml
-version: 1
-project:
-  name: my-app
-  stack: python
-test:
-  framework: pytest
-  commands:
-    unit: pytest tests/unit -v
-    integration: pytest tests/integration --slow
-    e2e: pytest tests/e2e --browser=chrome
-```
-
 ### Coverage threshold
 
 ```yaml
@@ -103,8 +81,7 @@ When coverage drops below the threshold, the `test` stage fails with
 ## Tier semantics
 
 `test.command` (Tier 1) wins over `test.framework` (Tier 2), which wins
-over the stack default (Tier 3). When `test.commands.<suite>` is set, it
-overrides `test.command` for that specific suite only.
+over the stack default (Tier 3).
 
 ## See also
 

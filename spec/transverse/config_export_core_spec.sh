@@ -116,10 +116,6 @@ project:
   stack: node
 test:
   framework: jest
-  commands:
-    unit: npm test -- --unit
-    integration: npm test -- --integration
-    e2e: npm run e2e
 YAML
         export BRIK_CONFIG_FILE="$TEMP_CONFIG"
       }
@@ -134,33 +130,6 @@ YAML
         }
         When call export_and_check
         The output should equal "jest"
-      End
-
-      It "exports BRIK_TEST_COMMAND_UNIT"
-        export_and_check() {
-          config.export_test_vars
-          printf '%s' "${BRIK_TEST_COMMAND_UNIT:-}"
-        }
-        When call export_and_check
-        The output should equal "npm test -- --unit"
-      End
-
-      It "exports BRIK_TEST_COMMAND_INTEGRATION"
-        export_and_check() {
-          config.export_test_vars
-          printf '%s' "${BRIK_TEST_COMMAND_INTEGRATION:-}"
-        }
-        When call export_and_check
-        The output should equal "npm test -- --integration"
-      End
-
-      It "exports BRIK_TEST_COMMAND_E2E"
-        export_and_check() {
-          config.export_test_vars
-          printf '%s' "${BRIK_TEST_COMMAND_E2E:-}"
-        }
-        When call export_and_check
-        The output should equal "npm run e2e"
       End
     End
 

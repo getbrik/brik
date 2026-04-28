@@ -244,19 +244,6 @@ config.export_test_vars() {
     framework="$(config.get '.test.framework' "$default_framework")"
     export BRIK_TEST_FRAMEWORK="$framework"
 
-    # Test commands per suite
-    local unit_cmd
-    unit_cmd="$(config.get '.test.commands.unit' '')"
-    [[ -n "$unit_cmd" ]] && export BRIK_TEST_COMMAND_UNIT="$unit_cmd"
-
-    local integration_cmd
-    integration_cmd="$(config.get '.test.commands.integration' '')"
-    [[ -n "$integration_cmd" ]] && export BRIK_TEST_COMMAND_INTEGRATION="$integration_cmd"
-
-    local e2e_cmd
-    e2e_cmd="$(config.get '.test.commands.e2e' '')"
-    [[ -n "$e2e_cmd" ]] && export BRIK_TEST_COMMAND_E2E="$e2e_cmd"
-
     # Test command override (Tier 1 of 3-tier resolution)
     local test_cmd
     test_cmd="$(config.get '.test.command' '')"

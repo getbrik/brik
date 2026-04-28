@@ -20,11 +20,6 @@ stages.test() {
 
     log.info "running tests"
 
-    # Log configured per-suite commands (surfaced from brik.yml, informational).
-    [[ -n "${BRIK_TEST_COMMAND_UNIT:-}" ]] && log.info "unit test command: $BRIK_TEST_COMMAND_UNIT"
-    [[ -n "${BRIK_TEST_COMMAND_INTEGRATION:-}" ]] && log.info "integration test command: $BRIK_TEST_COMMAND_INTEGRATION"
-    [[ -n "${BRIK_TEST_COMMAND_E2E:-}" ]] && log.info "e2e test command: $BRIK_TEST_COMMAND_E2E"
-
     # Tier 1: explicit test command override bypasses stack resolution.
     if [[ -n "${BRIK_TEST_COMMAND:-}" ]]; then
         log.info "running tests (command override): $BRIK_TEST_COMMAND"

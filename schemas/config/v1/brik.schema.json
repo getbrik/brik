@@ -159,28 +159,6 @@
           "type": "string",
           "minLength": 1
         },
-        "commands": {
-          "description": "Explicit test commands per test type. When present, these override the framework-derived defaults.",
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "unit": {
-              "description": "Command to run unit tests.",
-              "type": "string",
-              "minLength": 1
-            },
-            "integration": {
-              "description": "Command to run integration tests.",
-              "type": "string",
-              "minLength": 1
-            },
-            "e2e": {
-              "description": "Command to run end-to-end tests.",
-              "type": "string",
-              "minLength": 1
-            }
-          }
-        },
         "coverage": {
           "description": "Test coverage threshold enforcement.",
           "type": "object",

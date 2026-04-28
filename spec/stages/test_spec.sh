@@ -217,35 +217,6 @@ YAML
     When call run_test_unsupported_stack
     The output should equal "7"
   End
-
-  Describe "with test commands configured"
-    setup_test_cmds() {
-      cat > "$BRIK_CONFIG_FILE" <<'YAML'
-version: 1
-project:
-  name: test
-  stack: node
-test:
-  framework: jest
-  commands:
-    unit: npm test -- --unit
-    integration: npm test -- --integration
-YAML
-      config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
-    }
-    Before 'setup_test_cmds'
-
-    It "logs unit test command"
-      run_test_log_unit() {
-        _stub_leaf_success
-        local ctx
-        ctx="$(context.create "test")" 2>/dev/null || ctx="$(mktemp)"
-        stages.test "$ctx"
-      }
-      When call run_test_log_unit
-      The error should include "unit test command"
-    End
-  End
 End
 
 Describe "stacks.install_deps (test mode)"
