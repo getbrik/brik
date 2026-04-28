@@ -7,8 +7,11 @@ Describe "stages.init"
   Include "$BRIK_HOME/lib/stages/init.sh"
 
   setup_env() {
-    export BRIK_CONFIG_FILE
-    BRIK_CONFIG_FILE="$(mktemp)"
+    # jv detects YAML by file extension, so the fixture must live in
+    # a *.yml file rather than a bare mktemp tempfile.
+    export BRIK_CONFIG_DIR
+    BRIK_CONFIG_DIR="$(mktemp -d)"
+    export BRIK_CONFIG_FILE="$BRIK_CONFIG_DIR/brik.yml"
     printf 'version: 1\nproject:\n  name: test-project\n  stack: node\n' > "$BRIK_CONFIG_FILE"
     export BRIK_WORKSPACE
     BRIK_WORKSPACE="$(mktemp -d)"
@@ -24,10 +27,12 @@ Describe "stages.init"
     pipeline.env.init >/dev/null 2>&1 || true
   }
   cleanup_env() {
-    rm -f "$BRIK_CONFIG_FILE"
-    rm -rf "$BRIK_WORKSPACE" "$BRIK_LOG_DIR"
-    unset BRIK_RUN_ID BRIK_PIPELINE_ENV 2>/dev/null || true
+    rm -rf "$BRIK_CONFIG_DIR" "$BRIK_WORKSPACE" "$BRIK_LOG_DIR"
+    unset BRIK_RUN_ID BRIK_PIPELINE_ENV BRIK_CONFIG_DIR 2>/dev/null || true
   }
+
+  # Helper for the schema-validation test below: skip if jv is unavailable.
+  jv_missing() { ! command -v jv >/dev/null 2>&1; }
 
   read_init_stack() {
     jq -r '.stages[] | select(.name == "init") | .business.stack // empty' \
@@ -96,10 +101,17 @@ Describe "stages.init"
 
   It "auto-detects stack when config says auto"
     run_init_auto() {
-      # Override config to return 'auto' for stack
+      # Override config to return 'auto' for stack. Use a .yml-extensioned
+      # path because stages.init now invokes jv for schema validation, and
+      # jv detects format by extension.
       local orig_config="$BRIK_CONFIG_FILE"
-      BRIK_CONFIG_FILE="$(mktemp)"
-      printf 'version: 1\nproject:\n  name: test-project\n  stack: auto\n' > "$BRIK_CONFIG_FILE"
+      local tmpdir
+      tmpdir="$(mktemp -d)"
+      BRIK_CONFIG_FILE="$tmpdir/brik.yml"
+      # Omit .project.stack to trigger auto-detect path (the schema does not
+      # accept "auto" as a stack value -- absence of the field is the trigger,
+      # via the default in config.get '.project.stack' 'auto').
+      printf 'version: 1\nproject:\n  name: test-project\n' > "$BRIK_CONFIG_FILE"
       config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
       # Mock stacks.detect to return 'node'
       brik.use() { :; }
@@ -108,7 +120,7 @@ Describe "stages.init"
       ctx="$(context.create "init")" 2>/dev/null || ctx="$(mktemp)"
       stages.init "$ctx" 2>/dev/null
       read_init_stack
-      rm -f "$BRIK_CONFIG_FILE"
+      rm -rf "$tmpdir"
       BRIK_CONFIG_FILE="$orig_config"
       config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
     }
@@ -183,6 +195,20 @@ Describe "stages.init"
     }
     When call run_init_default_fallback
     The output should equal "BRIK_GIT_USER_EMAIL=brik-ci@brik.local"
+  End
+
+  It "returns 7 when brik.yml violates the JSON Schema"
+    Skip if "jv not installed" jv_missing
+    run_init_with_invalid_schema() {
+      printf 'version: 99\nproject:\n  name: bogus\n  unknown_top_level: true\n' \
+        > "$BRIK_CONFIG_FILE"
+      local ctx
+      ctx="$(context.create "init")" 2>/dev/null || ctx="$(mktemp)"
+      stages.init "$ctx"
+    }
+    When call run_init_with_invalid_schema
+    The status should equal 7
+    The error should include "validation failed"
   End
 
 End

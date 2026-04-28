@@ -19,6 +19,9 @@ stages.init() {
         return "$BRIK_EXIT_CONFIG_ERROR"
     fi
 
+    # Validate brik.yml against the JSON Schema (graceful skip if jv absent).
+    config.validate_schema || return $?
+
     # Detect or read stack
     local stack
     stack="$(config.get '.project.stack' 'auto')"

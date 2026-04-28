@@ -714,18 +714,9 @@ config.export_runner_vars() {
 # JSON Schema validation
 # ---------------------------------------------------------------------------
 
-# Validate brik.yml against the bundled JSON Schema using jv.
-# Returns 0 on success or graceful skip, BRIK_EXIT_CONFIG_ERROR (7) on
-# validation failure.
-#
-# Graceful degradation:
-#   - jv not on PATH         -> skip silently (debug log)
-#   - schema file absent     -> skip with warning
-#
-# This degradation is intentional: it lets pipelines run on images that
-# do not yet ship the validator (rolling fleet upgrade) and on dev hosts
-# without jv installed.
-#
+# Validate brik.yml against the bundled JSON Schema via yq | jv.
+# Returns 7 on validation failure, 0 on success or graceful skip.
+# Skips silently when jv is unavailable; warns when the schema is missing.
 # Usage: config.validate_schema [config_path]
 config.validate_schema() {
     local config_file="${1:-${BRIK_CONFIG_FILE:-}}"
@@ -748,7 +739,7 @@ config.validate_schema() {
 
     log.info "validating brik.yml against JSON Schema"
     local output rc
-    output="$(jv "$schema_file" "$config_file" 2>&1)" && rc=0 || rc=$?
+    output="$(yq -o json '.' "$config_file" 2>/dev/null | jv "$schema_file" - 2>&1)" && rc=0 || rc=$?
 
     if [[ $rc -ne 0 ]]; then
         log.error "brik.yml schema validation failed (rc=$rc)"
