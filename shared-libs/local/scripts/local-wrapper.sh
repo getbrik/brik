@@ -50,9 +50,15 @@ brik.local.setup() {
 }
 
 # Populate BRIK_* variables from the local Git repository.
+# Resolves the git context against BRIK_PROJECT_DIR (set by the CLI from
+# --workspace) so the host shell's cwd cannot leak in when brik runs
+# against a project located elsewhere. Falls back to cwd when
+# BRIK_PROJECT_DIR is unset (legacy callers and direct unit tests).
 # If not inside a git repo, emits a warning and sets empty values.
 _brik_local_setup_git_context() {
-    if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    local _project_dir="${BRIK_PROJECT_DIR:-$(pwd)}"
+
+    if ! git -C "$_project_dir" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
         if declare -f log.warn >/dev/null 2>&1; then
             log.warn "not inside a git repository - git context variables will be empty"
         else
@@ -69,13 +75,13 @@ _brik_local_setup_git_context() {
     fi
 
     export BRIK_BRANCH
-    BRIK_BRANCH="$(git branch --show-current 2>/dev/null || echo "")"
+    BRIK_BRANCH="$(git -C "$_project_dir" branch --show-current 2>/dev/null || echo "")"
     export BRIK_TAG
-    BRIK_TAG="$(git describe --tags --exact-match 2>/dev/null || echo "")"
+    BRIK_TAG="$(git -C "$_project_dir" describe --tags --exact-match 2>/dev/null || echo "")"
     export BRIK_COMMIT_SHA
-    BRIK_COMMIT_SHA="$(git rev-parse HEAD 2>/dev/null || echo "")"
+    BRIK_COMMIT_SHA="$(git -C "$_project_dir" rev-parse HEAD 2>/dev/null || echo "")"
     export BRIK_COMMIT_SHORT_SHA
-    BRIK_COMMIT_SHORT_SHA="$(git rev-parse --short HEAD 2>/dev/null || echo "")"
+    BRIK_COMMIT_SHORT_SHA="$(git -C "$_project_dir" rev-parse --short HEAD 2>/dev/null || echo "")"
     export BRIK_COMMIT_REF="${BRIK_BRANCH:-${BRIK_TAG:-}}"
     export BRIK_PIPELINE_SOURCE="local"
     export BRIK_MERGE_REQUEST_ID=""

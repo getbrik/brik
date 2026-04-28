@@ -24,9 +24,7 @@ brik.coverage.summary() {
     if [[ -f "${cov_dir}/coverage.xml" ]]; then
         # Cobertura: <coverage line-rate="0.8542" .../> on the root element.
         local rate
-        rate=$(grep -oE 'line-rate="[0-9.]+"' "${cov_dir}/coverage.xml" \
-                  | head -1 \
-                  | sed -E 's/line-rate="([0-9.]+)"/\1/')
+        rate=$(grep -oE 'line-rate="[0-9.]+"' "${cov_dir}/coverage.xml" | head -1 | sed -E 's/line-rate="([0-9.]+)"/\1/')
         if [[ -n "$rate" ]]; then
             pct=$(awk -v r="$rate" 'BEGIN { printf "%.2f", r * 100 }')
         fi
@@ -36,13 +34,10 @@ brik.coverage.summary() {
         # report-level aggregate.
         local last_counter missed covered
         last_counter=$(grep -oE '<counter type="LINE"[^/]*/>' "${cov_dir}/jacoco.xml" | tail -1)
-        missed=$(printf '%s' "$last_counter" | grep -oE 'missed="[0-9]+"' \
-                    | sed -E 's/missed="([0-9]+)"/\1/')
-        covered=$(printf '%s' "$last_counter" | grep -oE 'covered="[0-9]+"' \
-                    | sed -E 's/covered="([0-9]+)"/\1/')
+        missed=$(printf '%s' "$last_counter" | grep -oE 'missed="[0-9]+"' | sed -E 's/missed="([0-9]+)"/\1/')
+        covered=$(printf '%s' "$last_counter" | grep -oE 'covered="[0-9]+"' | sed -E 's/covered="([0-9]+)"/\1/')
         if [[ -n "$missed" && -n "$covered" && $((missed + covered)) -gt 0 ]]; then
-            pct=$(awk -v m="$missed" -v c="$covered" \
-                    'BEGIN { printf "%.2f", c / (c + m) * 100 }')
+            pct=$(awk -v m="$missed" -v c="$covered" 'BEGIN { printf "%.2f", c / (c + m) * 100 }')
         fi
     fi
 
