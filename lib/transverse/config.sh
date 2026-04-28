@@ -711,6 +711,58 @@ config.export_runner_vars() {
 }
 
 # ---------------------------------------------------------------------------
+# JSON Schema validation
+# ---------------------------------------------------------------------------
+
+# Validate brik.yml against the bundled JSON Schema using jv.
+# Returns 0 on success or graceful skip, BRIK_EXIT_CONFIG_ERROR (7) on
+# validation failure.
+#
+# Graceful degradation:
+#   - jv not on PATH         -> skip silently (debug log)
+#   - schema file absent     -> skip with warning
+#
+# This degradation is intentional: it lets pipelines run on images that
+# do not yet ship the validator (rolling fleet upgrade) and on dev hosts
+# without jv installed.
+#
+# Usage: config.validate_schema [config_path]
+config.validate_schema() {
+    local config_file="${1:-${BRIK_CONFIG_FILE:-}}"
+    local schema_file="${BRIK_HOME:-/opt/brik}/schemas/config/v1/brik.schema.json"
+
+    if [[ -z "$config_file" || ! -f "$config_file" ]]; then
+        log.error "config file not found: ${config_file:-<unset>}"
+        return "$BRIK_EXIT_CONFIG_ERROR"
+    fi
+
+    if [[ ! -f "$schema_file" ]]; then
+        log.warn "schema file not found: $schema_file - skipping validation"
+        return 0
+    fi
+
+    if ! command -v jv >/dev/null 2>&1; then
+        log.debug "jv not available - skipping schema validation"
+        return 0
+    fi
+
+    log.info "validating brik.yml against JSON Schema"
+    local output rc
+    output="$(jv "$schema_file" "$config_file" 2>&1)" && rc=0 || rc=$?
+
+    if [[ $rc -ne 0 ]]; then
+        log.error "brik.yml schema validation failed (rc=$rc)"
+        while IFS= read -r line; do
+            [[ -n "$line" ]] && log.error "  $line"
+        done <<< "$output"
+        return "$BRIK_EXIT_CONFIG_ERROR"
+    fi
+
+    log.debug "brik.yml schema validation passed"
+    return 0
+}
+
+# ---------------------------------------------------------------------------
 # Config coherence validation
 # ---------------------------------------------------------------------------
 
