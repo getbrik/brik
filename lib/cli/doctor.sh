@@ -83,11 +83,15 @@ doctor.run() {
         fi
     done
 
-    if command -v check-jsonschema >/dev/null 2>&1; then
-        printf '  [OK]      check-jsonschema\n'
+    if command -v jv >/dev/null 2>&1; then
+        tool_version="$(doctor._tool_version jv)"
+        printf '  [OK]      jv (%s)\n' "$tool_version"
+        passed=$((passed + 1))
+    elif command -v check-jsonschema >/dev/null 2>&1; then
+        printf '  [OK]      check-jsonschema (fallback validator)\n'
         passed=$((passed + 1))
     else
-        printf '  [WARNING] check-jsonschema not found (needed for '\''brik validate'\'')\n'
+        printf '  [WARNING] no JSON Schema validator found (install jv or check-jsonschema for '\''brik validate'\'')\n'
         warned=$((warned + 1))
     fi
 

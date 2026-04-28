@@ -7,29 +7,39 @@
 [[ -n "${_BRIK_MODULE_CLI_VALIDATE_LOADED:-}" ]] && return 0
 _BRIK_MODULE_CLI_VALIDATE_LOADED=1
 
-# validate.run - validate a brik.yml file against the JSON Schema.
+# validate.run - validate a brik.yml file against the JSON Schema and
+# coherence rules. Thin wrapper that delegates to config.* primitives so
+# the same checks run from `brik validate` (CLI) and `stages.init` (CI).
 # Usage: validate.run <config_path> <schema_path>
 # Outputs result to stdout, errors to stderr.
+# Codes: 0 valid, 2 invalid input/schema, 3 missing tool, 6 missing file.
 validate.run() {
     local config_path="${1:-brik.yml}"
     local schema_path="${2:-${BRIK_HOME}/schemas/config/v1/brik.schema.json}"
-    local json_output=""
-    local validation_output=""
 
     pipeline.require_file "$config_path" || return "$?"
     pipeline.require_file "$schema_path" || return "$?"
     pipeline.require_tool "yq" || return "$?"
-    pipeline.require_tool "check-jsonschema" || return "$?"
 
-    if ! json_output="$(yq -o json "$config_path" 2>&1)"; then
-        log.error "failed to parse $config_path as YAML"
-        printf '%s\n' "$json_output" >&2
+    brik.use transverse.config
+
+    # Well-formed YAML. config.read returns 2 on parse failure.
+    config.read "$config_path" || return "$?"
+
+    # Schema validation. config.validate_schema returns 7 on violation;
+    # remap to 2 (invalid input) for the CLI contract.
+    if ! config.validate_schema "$config_path" "$schema_path"; then
+        log.error "$config_path is invalid"
         return "$BRIK_EXIT_INVALID_INPUT"
     fi
 
-    if ! validation_output="$(printf '%s\n' "$json_output" | check-jsonschema --schemafile "$schema_path" - 2>&1)"; then
+    # Coherence (cross-block + stack rules). Default the workspace to
+    # the directory of the config file so coherence rules that need a
+    # workspace (e.g. stack-specific file checks) can run.
+    : "${BRIK_WORKSPACE:=$(dirname "$config_path")}"
+    export BRIK_WORKSPACE
+    if ! config.validate_coherence; then
         log.error "$config_path is invalid"
-        printf '%s\n' "$validation_output" >&2
         return "$BRIK_EXIT_INVALID_INPUT"
     fi
 

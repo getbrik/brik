@@ -162,4 +162,33 @@ Describe "brik validate"
     End
   End
 
+  # Coherence rules are checked alongside the schema. This catches errors
+  # the schema cannot express (e.g. a gitops target requiring both repo
+  # and path). Proves config.validate_coherence is wired into validate.run.
+  Describe "coherence rules wired"
+    setup_coherence_fixture() {
+      TEMP_DIR="$(mktemp -d)"
+      cat > "${TEMP_DIR}/brik.yml" <<'YAML'
+version: 1
+project:
+  name: gitops-test
+  stack: node
+deploy:
+  environments:
+    production:
+      target: gitops
+YAML
+    }
+    cleanup_coherence_fixture() { rm -rf "$TEMP_DIR"; }
+    Before 'setup_coherence_fixture'
+    After 'cleanup_coherence_fixture'
+
+    It "rejects a gitops target missing repo and path"
+      When run script "${BRIK_BIN}" validate --config "${TEMP_DIR}/brik.yml"
+      The status should eq 2
+      The stderr should include "gitops"
+      The stderr should include "repo"
+    End
+  End
+
 End

@@ -88,7 +88,6 @@ Describe "config.sh - validate_schema"
         Skip if "jv not installed" jv_missing
         When call config.validate_schema
         The status should be success
-        The error should include "validating brik.yml"
       End
     End
 
@@ -109,6 +108,68 @@ Describe "config.sh - validate_schema"
         When call config.validate_schema
         The status should equal 7
         The error should include "validation failed"
+      End
+    End
+
+    # ---------- Validator selection priority ----------
+    # When both jv and check-jsonschema are present, jv must win. When only
+    # check-jsonschema is present, the function must fall back to it. Stubs
+    # write to a marker file so the spec can verify which one ran.
+    Describe "validator selection priority"
+      setup_stubs() {
+        TEMP_DIR="$(mktemp -d)"
+        TEMP_CONFIG="$TEMP_DIR/brik.yml"
+        printf 'version: 1\nproject:\n  name: test\n  stack: node\n' > "$TEMP_CONFIG"
+        export BRIK_CONFIG_FILE="$TEMP_CONFIG"
+        STUB_BIN="$(mktemp -d)"
+        MARKER="$TEMP_DIR/marker"
+        cat > "$STUB_BIN/jv" <<EOF
+#!/usr/bin/env bash
+echo jv-ran > "$MARKER"
+exit 0
+EOF
+        cat > "$STUB_BIN/check-jsonschema" <<EOF
+#!/usr/bin/env bash
+echo check-jsonschema-ran > "$MARKER"
+exit 0
+EOF
+        chmod +x "$STUB_BIN/jv" "$STUB_BIN/check-jsonschema"
+        ORIG_PATH="$PATH"
+      }
+      cleanup_stubs() {
+        rm -rf "$TEMP_DIR" "$STUB_BIN"
+        export PATH="$ORIG_PATH"
+      }
+      Before 'setup_stubs'
+      After 'cleanup_stubs'
+
+      It "prefers jv when both validators are on PATH"
+        prefers_jv() {
+          export PATH="${STUB_BIN}:${ORIG_PATH}"
+          config.validate_schema
+          local rc=$?
+          export PATH="$ORIG_PATH"
+          cat "$MARKER" 2>/dev/null
+          return $rc
+        }
+        When call prefers_jv
+        The status should be success
+        The output should equal "jv-ran"
+      End
+
+      It "falls back to check-jsonschema when jv is absent"
+        falls_back() {
+          rm -f "$STUB_BIN/jv"
+          export PATH="${STUB_BIN}:/usr/bin:/bin"
+          config.validate_schema
+          local rc=$?
+          export PATH="$ORIG_PATH"
+          cat "$MARKER" 2>/dev/null
+          return $rc
+        }
+        When call falls_back
+        The status should be success
+        The output should equal "check-jsonschema-ran"
       End
     End
   End

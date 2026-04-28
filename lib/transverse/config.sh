@@ -714,13 +714,15 @@ config.export_runner_vars() {
 # JSON Schema validation
 # ---------------------------------------------------------------------------
 
-# Validate brik.yml against the bundled JSON Schema via yq | jv.
+# Validate brik.yml against the bundled JSON Schema.
+# Prefers jv (Go static binary, shipped in brik-runner-base); falls back
+# to check-jsonschema (Python) for dev hosts without jv.
 # Returns 7 on validation failure, 0 on success or graceful skip.
-# Skips silently when jv is unavailable; warns when the schema is missing.
-# Usage: config.validate_schema [config_path]
+# Skips silently when no validator is available; warns when the schema is missing.
+# Usage: config.validate_schema [config_path] [schema_path]
 config.validate_schema() {
     local config_file="${1:-${BRIK_CONFIG_FILE:-}}"
-    local schema_file="${BRIK_HOME:-/opt/brik}/schemas/config/v1/brik.schema.json"
+    local schema_file="${2:-${BRIK_HOME:-/opt/brik}/schemas/config/v1/brik.schema.json}"
 
     if [[ -z "$config_file" || ! -f "$config_file" ]]; then
         log.error "config file not found: ${config_file:-<unset>}"
@@ -732,14 +734,22 @@ config.validate_schema() {
         return 0
     fi
 
-    if ! command -v jv >/dev/null 2>&1; then
-        log.debug "jv not available - skipping schema validation"
+    local validator
+    if command -v jv >/dev/null 2>&1; then
+        validator="jv"
+    elif command -v check-jsonschema >/dev/null 2>&1; then
+        validator="check-jsonschema"
+    else
+        log.debug "no JSON Schema validator found - skipping schema validation"
         return 0
     fi
 
-    log.info "validating brik.yml against JSON Schema"
     local output rc
-    output="$(yq -o json '.' "$config_file" 2>/dev/null | jv "$schema_file" - 2>&1)" && rc=0 || rc=$?
+    if [[ "$validator" == "jv" ]]; then
+        output="$(yq -o json '.' "$config_file" 2>/dev/null | jv "$schema_file" - 2>&1)" && rc=0 || rc=$?
+    else
+        output="$(yq -o json '.' "$config_file" 2>/dev/null | check-jsonschema --schemafile "$schema_file" - 2>&1)" && rc=0 || rc=$?
+    fi
 
     if [[ $rc -ne 0 ]]; then
         log.error "brik.yml schema validation failed (rc=$rc)"
@@ -749,7 +759,7 @@ config.validate_schema() {
         return "$BRIK_EXIT_CONFIG_ERROR"
     fi
 
-    log.debug "brik.yml schema validation passed"
+    log.debug "brik.yml schema validation passed (via ${validator})"
     return 0
 }
 
