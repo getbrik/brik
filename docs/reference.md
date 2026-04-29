@@ -622,19 +622,16 @@ Inline shell commands executed before or after each stage. Available hooks:
 | `pre_deploy` / `post_deploy` | Before/after deploy stage |
 | `pre_notify` / `post_notify` | Before/after notify stage |
 
-Each hook is an array of shell commands:
+Each hook is an inline shell command. Chain multiple commands with `&&` or `;`:
 
 ```yaml
 hooks:
-  pre_build:
-    - echo "step 1"
-    - ./scripts/prepare.sh
-  post_deploy:
-    - ./scripts/smoke-test.sh
+  pre_build: echo "step 1" && ./scripts/prepare.sh
+  post_deploy: ./scripts/smoke-test.sh
 ```
 
-`pre_*` hooks can abort the stage. `post_*` hooks are best-effort and do not
-override the stage exit code.
+`pre_*` hooks can abort the stage (non-zero exit). `post_*` hooks are
+best-effort and do not override the stage exit code.
 
 File-based hooks (`.brik/hooks/pre-build.sh`) are also supported and handled by the
 Bash Runtime (Layer 0) independently of the `hooks` section in `brik.yml`.

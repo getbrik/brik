@@ -794,14 +794,10 @@
         }
       }
     },
-    "hookCommandList": {
-      "description": "Ordered list of shell commands to execute at a hook point.",
-      "type": "array",
-      "items": {
-        "type": "string",
-        "minLength": 1
-      },
-      "minItems": 1
+    "hookCommand": {
+      "description": "Inline shell command to execute at a hook point. Multiple commands can be chained with '&&' or ';'.",
+      "type": "string",
+      "minLength": 1
     },
     "hooks": {
       "type": "object",
@@ -809,91 +805,91 @@
       "properties": {
         "pre_init": {
           "description": "Commands executed before the init stage.",
-          "$ref": "#/$defs/hookCommandList"
+          "$ref": "#/$defs/hookCommand"
         },
         "post_init": {
           "description": "Commands executed after the init stage completes successfully.",
-          "$ref": "#/$defs/hookCommandList"
+          "$ref": "#/$defs/hookCommand"
         },
         "pre_release": {
           "description": "Commands executed before the release stage.",
-          "$ref": "#/$defs/hookCommandList"
+          "$ref": "#/$defs/hookCommand"
         },
         "post_release": {
           "description": "Commands executed after the release stage completes successfully.",
-          "$ref": "#/$defs/hookCommandList"
+          "$ref": "#/$defs/hookCommand"
         },
         "pre_build": {
           "description": "Commands executed before the build stage.",
-          "$ref": "#/$defs/hookCommandList"
+          "$ref": "#/$defs/hookCommand"
         },
         "post_build": {
           "description": "Commands executed after the build stage completes successfully.",
-          "$ref": "#/$defs/hookCommandList"
+          "$ref": "#/$defs/hookCommand"
         },
         "pre_lint": {
           "description": "Commands executed before the lint stage.",
-          "$ref": "#/$defs/hookCommandList"
+          "$ref": "#/$defs/hookCommand"
         },
         "post_lint": {
           "description": "Commands executed after the lint stage completes successfully.",
-          "$ref": "#/$defs/hookCommandList"
+          "$ref": "#/$defs/hookCommand"
         },
         "pre_sast": {
           "description": "Commands executed before the SAST scan.",
-          "$ref": "#/$defs/hookCommandList"
+          "$ref": "#/$defs/hookCommand"
         },
         "post_sast": {
           "description": "Commands executed after the SAST scan completes successfully.",
-          "$ref": "#/$defs/hookCommandList"
+          "$ref": "#/$defs/hookCommand"
         },
         "pre_scan": {
           "description": "Commands executed before the security scan stage.",
-          "$ref": "#/$defs/hookCommandList"
+          "$ref": "#/$defs/hookCommand"
         },
         "post_scan": {
           "description": "Commands executed after the security scan stage completes successfully.",
-          "$ref": "#/$defs/hookCommandList"
+          "$ref": "#/$defs/hookCommand"
         },
         "pre_container_scan": {
           "description": "Commands executed before the container scan.",
-          "$ref": "#/$defs/hookCommandList"
+          "$ref": "#/$defs/hookCommand"
         },
         "post_container_scan": {
           "description": "Commands executed after the container scan completes successfully.",
-          "$ref": "#/$defs/hookCommandList"
+          "$ref": "#/$defs/hookCommand"
         },
         "pre_test": {
           "description": "Commands executed before the test stage.",
-          "$ref": "#/$defs/hookCommandList"
+          "$ref": "#/$defs/hookCommand"
         },
         "post_test": {
           "description": "Commands executed after the test stage completes successfully.",
-          "$ref": "#/$defs/hookCommandList"
+          "$ref": "#/$defs/hookCommand"
         },
         "pre_package": {
           "description": "Commands executed before the package stage.",
-          "$ref": "#/$defs/hookCommandList"
+          "$ref": "#/$defs/hookCommand"
         },
         "post_package": {
           "description": "Commands executed after the package stage completes successfully.",
-          "$ref": "#/$defs/hookCommandList"
+          "$ref": "#/$defs/hookCommand"
         },
         "pre_deploy": {
           "description": "Commands executed before the deploy stage.",
-          "$ref": "#/$defs/hookCommandList"
+          "$ref": "#/$defs/hookCommand"
         },
         "post_deploy": {
           "description": "Commands executed after the deploy stage completes successfully.",
-          "$ref": "#/$defs/hookCommandList"
+          "$ref": "#/$defs/hookCommand"
         },
         "pre_notify": {
           "description": "Commands executed before the notify stage.",
-          "$ref": "#/$defs/hookCommandList"
+          "$ref": "#/$defs/hookCommand"
         },
         "post_notify": {
           "description": "Commands executed after the notify stage completes successfully.",
-          "$ref": "#/$defs/hookCommandList"
+          "$ref": "#/$defs/hookCommand"
         }
       }
     },
