@@ -1,0 +1,103 @@
+# `release` configuration
+
+> Schema source: [`brik.schema.json#$defs/release`](../../../schemas/config/v1/brik.schema.json)
+
+The `release` stage computes the application version from Git tags and,
+when the pipeline runs on a tag, optionally generates a changelog and
+records the release. The whole section is optional; defaults match a
+SemVer + Conventional Commits + `CHANGELOG.md` workflow.
+
+## Quick reference
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `release.strategy` | enum | `semver` | Versioning strategy: `semver`, `calver`, or `custom`. |
+| `release.tag_prefix` | string | `v` | Prefix prepended to release tags (e.g. `v1.2.3`). |
+| `release.changelog.enabled` | boolean | `true` | Whether to generate a changelog on release triggers. |
+| `release.changelog.format` | enum | `conventional` | Changelog format: `conventional` or `keep-a-changelog`. |
+| `release.changelog.file` | string | `CHANGELOG.md` | Path to the changelog file. Relative paths resolve to `BRIK_WORKSPACE`. |
+
+## Behaviour
+
+- **Always**: the release stage computes the current version from the
+  most recent Git tag matching `<tag_prefix>X.Y.Z` and exports it as
+  `BRIK_APP_VERSION`. Subsequent stages (build, package, publish) read
+  that variable.
+- **On a tag push**: in addition, the stage prepares the release. With
+  `changelog.enabled: true` the changelog is generated, prepended to
+  `release.changelog.file`, committed, and the tag is finalised.
+- **Off a tag push**: only the version computation runs. No changelog,
+  no commit, no tag.
+
+## Strategy semantics
+
+| Strategy | Status | Effect |
+|----------|--------|--------|
+| `semver` | implemented | Version is the latest `<tag_prefix>X.Y.Z` tag (e.g. `v1.4.2`). |
+| `calver` | accepted by schema, not yet wired | Treated as `semver` at runtime. |
+| `custom` | accepted by schema, not yet wired | Treated as `semver` at runtime. |
+
+`changelog.format: keep-a-changelog` is in the same situation: the
+field is accepted by the schema and exported, but the changelog
+generator currently emits the `conventional` format only.
+
+## Examples
+
+### Defaults (omit the section entirely)
+
+```yaml
+version: 1
+project:
+  name: my-app
+```
+
+Equivalent to: `strategy: semver`, `tag_prefix: v`, changelog enabled,
+written to `CHANGELOG.md`, format `conventional`.
+
+### Custom tag prefix
+
+```yaml
+version: 1
+project:
+  name: my-lib
+release:
+  tag_prefix: "release-"
+```
+
+Tags like `release-2.0.0` are recognised; tags like `v2.0.0` are
+ignored.
+
+### Disable changelog generation
+
+```yaml
+version: 1
+project:
+  name: nightly
+release:
+  changelog:
+    enabled: false
+```
+
+The release stage still computes the version on every run and still
+finalises the tag on a tag push, but no `CHANGELOG.md` is written or
+committed.
+
+### Relocate the changelog
+
+```yaml
+version: 1
+project:
+  name: my-app
+release:
+  changelog:
+    file: docs/CHANGELOG.md
+```
+
+The path is interpreted relative to the workspace root.
+
+## See also
+
+- [`reference/git.md`](git.md) - identity used to commit the changelog and push the tag
+- [`reference/build.md`](build.md) - how `BRIK_APP_VERSION` flows into build artifacts
+- [`reference/package.md`](package.md) - tagging Docker images with the computed version
+- [`overview.md`](../overview.md) - declarative model
