@@ -94,13 +94,13 @@
       "additionalProperties": false,
       "properties": {
         "strategy": {
-          "description": "Release strategy. Default is semver.",
+          "description": "Release strategy.",
           "type": "string",
           "enum": ["semver", "calver", "custom"],
           "default": "semver"
         },
         "tag_prefix": {
-          "description": "Prefix for release tags (e.g. 'v'). Default is 'v'.",
+          "description": "Prefix for release tags (e.g. 'v').",
           "type": "string",
           "default": "v"
         },
@@ -110,7 +110,7 @@
           "additionalProperties": false,
           "properties": {
             "enabled": {
-              "description": "Whether to generate a changelog on release. Default is true.",
+              "description": "Whether to generate a changelog on release.",
               "type": "boolean",
               "default": true
             },
@@ -121,7 +121,7 @@
               "default": "conventional"
             },
             "file": {
-              "description": "Path to the changelog file. Default is CHANGELOG.md.",
+              "description": "Path to the changelog file.",
               "type": "string",
               "default": "CHANGELOG.md"
             }
@@ -165,7 +165,7 @@
           "additionalProperties": false,
           "properties": {
             "threshold": {
-              "description": "Minimum coverage percentage required. Default is 80.",
+              "description": "Minimum coverage percentage required.",
               "type": "integer",
               "minimum": 0,
               "maximum": 100,
@@ -240,7 +240,7 @@
           "additionalProperties": false,
           "properties": {
             "enabled": {
-              "description": "Whether linting is active. Set to false to skip lint checks entirely. Default is true.",
+              "description": "Whether linting is active. Set to false to skip lint checks entirely.",
               "type": "boolean",
               "default": true
             },
@@ -260,7 +260,7 @@
               "minLength": 1
             },
             "fix": {
-              "description": "Whether to run the linter in auto-fix mode. Default is false.",
+              "description": "Whether to run the linter in auto-fix mode.",
               "type": "boolean",
               "default": false
             }
@@ -282,7 +282,7 @@
               "minLength": 1
             },
             "check": {
-              "description": "Whether to run the formatter in check mode (fail if files would be reformatted) rather than applying changes. Default is false.",
+              "description": "Whether to run the formatter in check mode (fail if files would be reformatted) rather than applying changes.",
               "type": "boolean",
               "default": false
             }
@@ -443,14 +443,16 @@
               "minLength": 1
             },
             "dockerfile": {
-              "description": "Path to the Dockerfile relative to the build context. Default is Dockerfile.",
+              "description": "Path to the Dockerfile relative to the build context.",
               "type": "string",
-              "minLength": 1
+              "minLength": 1,
+              "default": "Dockerfile"
             },
             "context": {
-              "description": "Docker build context path. Default is . (current directory).",
+              "description": "Docker build context path.",
               "type": "string",
-              "minLength": 1
+              "minLength": 1,
+              "default": "."
             },
             "platforms": {
               "description": "Target platforms for multi-arch builds (e.g. linux/amd64, linux/arm64).",
@@ -483,12 +485,13 @@
           "additionalProperties": false,
           "properties": {
             "registry": {
-              "description": "npm registry URL. Default is https://registry.npmjs.org.",
+              "description": "npm registry URL.",
               "type": "string",
-              "format": "uri"
+              "format": "uri",
+              "default": "https://registry.npmjs.org"
             },
             "tag": {
-              "description": "Distribution tag for the published package. Default is latest.",
+              "description": "Distribution tag for the published package.",
               "type": "string",
               "default": "latest"
             },
@@ -569,9 +572,10 @@
           "additionalProperties": false,
           "properties": {
             "repository": {
-              "description": "PyPI repository URL. Default is https://upload.pypi.org/legacy/.",
+              "description": "PyPI repository URL.",
               "type": "string",
-              "format": "uri"
+              "format": "uri",
+              "default": "https://upload.pypi.org/legacy/"
             },
             "token_var": {
               "description": "Name of the environment variable holding the PyPI API token.",
@@ -586,8 +590,9 @@
           "additionalProperties": false,
           "properties": {
             "registry": {
-              "description": "Cargo registry name. Default is crates-io.",
-              "type": "string"
+              "description": "Cargo registry name.",
+              "type": "string",
+              "default": "crates-io"
             },
             "index": {
               "description": "Sparse index URL for the registry (e.g. sparse+http://nexus:8081/repository/brik-cargo/). Required for private registries.",
@@ -606,9 +611,10 @@
           "additionalProperties": false,
           "properties": {
             "source": {
-              "description": "NuGet source URL. Default is https://api.nuget.org/v3/index.json.",
+              "description": "NuGet source URL.",
               "type": "string",
-              "format": "uri"
+              "format": "uri",
+              "default": "https://api.nuget.org/v3/index.json"
             },
             "token_var": {
               "description": "Name of the environment variable holding the NuGet token or API key.",
@@ -708,9 +714,10 @@
           "minLength": 1
         },
         "compose_file": {
-          "description": "Path to the Docker Compose file for the compose target. Default is docker-compose.yml.",
+          "description": "Path to the Docker Compose file for the compose target.",
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "default": "docker-compose.yml"
         },
         "remote_path": {
           "description": "Absolute path on the remote host where the application is deployed (ssh target).",
