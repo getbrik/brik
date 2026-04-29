@@ -29,94 +29,94 @@ This separation means:
 
 ## Publish credentials
 
-Publish credentials authenticate artifact uploads to package registries. They are
-configured under the `publish` section of `brik.yml` using `token_var`, `username_var`,
-and `password_var` keys.
+Publish credentials authenticate artifact uploads to package registries.
+**The variable name is yours to choose** -- declare it via `token_var`,
+`username_var`, or `password_var` in `brik.yml`, and Brik resolves the
+matching CI variable at publish time.
 
-For the full `publish` configuration reference, see [reference.md](reference.md#publish).
+For the full `publish` configuration reference, see
+[`config/reference/publish.md`](config/reference/publish.md).
 
-### npm
+### How the indirection works
+
+```yaml
+# brik.yml
+publish:
+  npm:
+    token_var: MY_NPM_TOKEN          # name of the CI variable (your choice)
+```
+
+```
+# CI platform
+MY_NPM_TOKEN = npm_aBcDeFgHiJkL...    # value
+```
+
+At publish time Brik:
+
+1. Reads `${MY_NPM_TOKEN}` from the environment.
+2. Copies the value into the env var the publishing tool expects (see
+   *Tool-internal variables* below) -- scoped to the publish step only.
+3. Runs the tool, then unsets the internal variable.
+
+You never have to name your CI variable `NPM_TOKEN`, `NUGET_API_KEY`,
+or anything specific. It is purely a value source.
+
+### Per-target field reference
+
+| Target | Required `*_var` field(s) |
+|--------|---------------------------|
+| `publish.npm` | `token_var` |
+| `publish.docker` | `username_var` + `password_var` |
+| `publish.maven` | `username_var` + `password_var` |
+| `publish.pypi` | `token_var` |
+| `publish.cargo` | `token_var` |
+| `publish.nuget` | `token_var` |
+
+Scoped npm packages also accept `publish.npm.access: public | restricted`.
+
+### Example (using conventional names)
+
+You may name your CI variables after the conventional ecosystem names
+if you prefer -- nothing in Brik enforces it, and it makes log lines
+slightly easier to read.
 
 ```yaml
 publish:
   npm:
-    registry: https://registry.npmjs.org   # optional, this is the default
     token_var: NPM_TOKEN
-```
-
-| CI variable | Description |
-|-------------|-------------|
-| `NPM_TOKEN` | npm authentication token (from `npm token create`) |
-
-### Docker
-
-```yaml
-publish:
   docker:
-    image: ghcr.io/my-org/my-app
+    image: ghcr.io/org/my-app
     registry: ghcr.io
-    username_var: DOCKER_USERNAME
-    password_var: DOCKER_PASSWORD
-```
-
-| CI variable | Description |
-|-------------|-------------|
-| `DOCKER_USERNAME` | Registry username |
-| `DOCKER_PASSWORD` | Registry password or personal access token |
-
-### Maven
-
-```yaml
-publish:
+    username_var: GHCR_USER
+    password_var: GHCR_TOKEN
   maven:
     repository: https://nexus.example.com/repository/maven-releases/
-    username_var: NEXUS_USERNAME
-    password_var: NEXUS_PASSWORD
-```
-
-| CI variable | Description |
-|-------------|-------------|
-| `NEXUS_USERNAME` | Repository username |
-| `NEXUS_PASSWORD` | Repository password |
-
-### PyPI
-
-```yaml
-publish:
+    username_var: MAVEN_USERNAME
+    password_var: MAVEN_PASSWORD
   pypi:
-    repository: https://upload.pypi.org/legacy/   # optional, this is the default
-    token_var: PYPI_TOKEN
-```
-
-| CI variable | Description |
-|-------------|-------------|
-| `PYPI_TOKEN` | PyPI API token (starts with `pypi-`) |
-
-### Cargo (crates.io)
-
-```yaml
-publish:
+    token_var: PYPI_API_TOKEN
   cargo:
-    registry: crates-io   # optional, this is the default
     token_var: CARGO_REGISTRY_TOKEN
-```
-
-| CI variable | Description |
-|-------------|-------------|
-| `CARGO_REGISTRY_TOKEN` | crates.io API token |
-
-### NuGet
-
-```yaml
-publish:
   nuget:
-    source: https://api.nuget.org/v3/index.json   # optional, this is the default
     token_var: NUGET_API_KEY
 ```
 
-| CI variable | Description |
-|-------------|-------------|
-| `NUGET_API_KEY` | NuGet API key |
+### Tool-internal variables
+
+For curiosity / log-reading: Brik copies the resolved credential into
+the env var the underlying tool natively reads, then unsets it. You do
+not need to set these yourself.
+
+| Tool | Internal env var |
+|------|-------------------|
+| npm CLI | `NPM_TOKEN` (used in a generated `.npmrc`) |
+| nuget CLI | `NUGET_API_KEY` |
+| twine (PyPI fallback) | `TWINE_USERNAME`, `TWINE_PASSWORD` |
+| uv (PyPI primary) | `UV_PUBLISH_TOKEN` |
+| poetry (PyPI) | `POETRY_PYPI_TOKEN_PYPI` |
+| maven CLI | written to a temporary `settings.xml` (chmod 600) |
+| docker CLI | injected into a temporary `DOCKER_CONFIG`, login via `--password-stdin` |
+| cargo CLI | passed via `CARGO_REGISTRIES_<NAME>_TOKEN` |
 
 ---
 
@@ -166,18 +166,23 @@ both cases transparently.
 
 ### GitOps config repo (gitops target)
 
-The `gitops` target clones a configuration repository, updates the image tag, and
-pushes the change. Authentication to the config repo depends on the protocol:
+The `gitops` target clones a configuration repository, updates the
+image tag, and pushes the change. The schema field
+`deploy.environments.<env>.repo` takes a clonable git URL; there is no
+separate token field today, so credentials must be embedded in the URL
+or provided via SSH.
 
-- **HTTPS**: Embed credentials in the repo URL using a CI variable
-  (e.g. `https://token:${GIT_TOKEN}@gitlab.example.com/org/infra.git`)
-- **SSH**: Provide `SSH_PRIVATE_KEY` with access to the config repo
+- **HTTPS**: embed credentials in the repo URL using a CI variable
+  (e.g. `repo: https://oauth2:${GIT_TOKEN}@gitlab.example.com/org/infra.git`)
+- **SSH**: use an SSH URL (`repo: git@github.com:org/infra.git`) and
+  provide `SSH_PRIVATE_KEY` with read/write access on the config repo
 
 ### Notifications
 
 | CI variable | Description |
 |-------------|-------------|
-| `SLACK_WEBHOOK_URL` | Slack Incoming Webhook URL (for `notify.slack`) |
+| `SLACK_WEBHOOK_URL` | Slack Incoming Webhook URL (default for `notify.slack`). Override the variable name via `BRIK_NOTIFY_SLACK_WEBHOOK_VAR=MY_SLACK_VAR`. |
+| `BRIK_NOTIFY_WEBHOOK_URL` | Default webhook URL for `notify.webhook`. Override via the `--url-var` flag when calling `notify.webhook` directly. |
 
 ---
 

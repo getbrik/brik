@@ -102,14 +102,16 @@ deploy:
     production:
       when: "tag =~ 'v*'"
       target: gitops
-      repo: org/infra-config
+      repo: https://oauth2:${GIT_TOKEN}@gitlab.example.com/org/infra.git
       path: services/api
       controller: argocd
       app_name: api-prod
 ```
 
-The deploy stage commits the new image tag to the GitOps config repo;
-ArgoCD reconciles the change.
+`repo` is a clonable git URL. Embed the auth token in the URL via a
+CI variable (here `$GIT_TOKEN`); there is no separate `token_var`
+field for the GitOps repo today. The deploy stage commits the new
+image tag to the config repo and ArgoCD reconciles the change.
 
 ### SSH to a single host
 
