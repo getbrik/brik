@@ -1,4 +1,4 @@
-.PHONY: help lint test test-quick coverage validate check clean install uninstall metrics
+.PHONY: help lint test test-quick coverage validate validate-docs check clean install uninstall metrics
 
 help: ## Show available targets
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F ':.*## ' '{printf "  %-14s %s\n", $$1, $$2}'
@@ -25,7 +25,10 @@ validate: ## Validate example brik.yml files
 	bin/brik validate --config examples/python-pytest/brik.yml
 	bin/brik validate --config examples/mono-dotnet/brik.yml
 
-check: lint coverage validate ## Full pre-commit gate (lint + coverage + validate)
+validate-docs: ## Validate every fenced ```yaml block in docs/config/**/*.md
+	./scripts/validate-docs.sh
+
+check: lint coverage validate validate-docs ## Full pre-commit gate (lint + coverage + validate + docs)
 
 install: ## Install brik symlink into /usr/local/bin (dev mode)
 	@if [ -f /usr/local/bin/brik ] && [ ! -L /usr/local/bin/brik ]; then \
