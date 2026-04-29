@@ -39,7 +39,7 @@ sections.
 | `target` | enum | -- | `ssh`, `compose`, `k8s`, `helm`, `gitops`. Required when the environment is not fully covered by a `workflow` profile. |
 | `when` | string | (always true) | Condition evaluated by the shared library: `branch == 'main'`, `tag =~ 'v*'`, `$CI_PIPELINE_SOURCE == 'merge_request_event'`. |
 | `env_file` | string | -- | Path to a `KEY=VALUE` env file sourced before the deploy. Brik fails if the file is declared but missing. CI environment variables take precedence over file entries. |
-| `strategy` | enum | -- | Rollout strategy where supported by the target: `rolling`, `blue-green`, `canary`. |
+| `strategy` | enum | -- | Rollout strategy: `rolling`, `blue-green`, `canary`. **Accepted by the schema but not yet wired into the deploy stage.** The `lib/rollout/strategy.sh` module exists but is not invoked automatically; setting this field has no runtime effect today. |
 
 ### Target-specific fields
 

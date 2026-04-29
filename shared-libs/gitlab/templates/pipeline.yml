@@ -13,7 +13,7 @@
 # Variables
 # ---------------------------------------------------------------------------
 variables:
-  BRIK_LIB_REF: "v0.1.0"
+  BRIK_LIB_REF: "v0.3.0"
   BRIK_REPO: "${CI_SERVER_URL}/brik/brik.git"
   BRIK_HOME: "/opt/brik"
   BRIK_LOG_LEVEL: "info"

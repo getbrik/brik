@@ -208,7 +208,7 @@ deploy:
     production:
       when: "tag =~ 'v*'"
       target: gitops
-      repo: org/infra
+      repo: https://oauth2:${GIT_TOKEN}@gitlab.example.com/org/infra.git
       path: apps/my-app/production
       controller: argocd
       app_name: my-app-prod
@@ -225,10 +225,8 @@ notify:
     on: [always]
 
 hooks:
-  pre_build:
-    - echo "preparing build environment"
-  post_deploy:
-    - ./scripts/smoke-test.sh
+  pre_build: echo "preparing build environment"
+  post_deploy: ./scripts/smoke-test.sh
 ```
 
 ---
@@ -249,6 +247,7 @@ hooks:
 | `project.stack` | string | no | auto-detected | Technology stack: `node`, `java`, `python`, `dotnet`, `rust`. |
 | `project.stack_version` | string | no | -- | Stack version for runner image selection (e.g. `"22"` for node, `"21"` for java). |
 | `project.root` | string | no | `.` | Relative path to service root (for monorepos). |
+| `project.env` | string | no | `brik.env` (auto-detected) | Path to a project-level env file (`KEY=VALUE` format), relative to the project root. CI environment variables take precedence over file entries. |
 
 ---
 
@@ -289,8 +288,8 @@ hooks:
 
 | Key | Type | Required | Default | Description |
 |-----|------|----------|---------|-------------|
-| `test.coverage.threshold` | integer | no | `80` | Minimum coverage percentage required (0-100). |
-| `test.coverage.report` | string | no | -- | Path to Cobertura XML coverage report. |
+| `test.coverage.threshold` | integer | no | `80` | Coverage threshold (0-100). Exported as `BRIK_TEST_COVERAGE_THRESHOLD` but **not yet enforced** -- the test stage does not fail on a low score today. |
+| `test.coverage.report` | string | no | -- | Path to Cobertura XML coverage report. Exported as `BRIK_TEST_COVERAGE_REPORT` but not yet consumed. |
 
 #### `test.reports`
 
@@ -329,7 +328,7 @@ only the schema and the dotenv exposure are wired up.
 | `quality.lint.command` | string | no | -- | Lint command override (Tier 1). |
 | `quality.lint.tool` | string | no | stack default | Lint tool (e.g. `eslint`, `checkstyle`, `ruff`, `clippy`). |
 | `quality.lint.config` | string | no | -- | Path to lint configuration file. Exported as `BRIK_QUALITY_LINT_CONFIG` but not yet consumed by the linter. |
-| `quality.lint.fix` | boolean | no | `false` | Run the linter in auto-fix mode. |
+| `quality.lint.fix` | boolean | no | `false` | Run the linter in auto-fix mode. Exported as `BRIK_QUALITY_LINT_FIX` but not yet consumed -- linters always run in check-only mode. |
 
 ##### Lint contract per tool
 
@@ -372,7 +371,7 @@ of five values:
 |-----|------|----------|---------|-------------|
 | `quality.format.command` | string | no | -- | Format command override (Tier 1). |
 | `quality.format.tool` | string | no | stack default | Formatter (e.g. `prettier`, `google-java-format`, `ruff format`, `rustfmt`). |
-| `quality.format.check` | boolean | no | `false` | Check mode only (fail if files would be reformatted). |
+| `quality.format.check` | boolean | no | `false` | Check mode only (fail if files would be reformatted). Exported as `BRIK_QUALITY_FORMAT_CHECK` but not yet consumed -- formatters always run in check mode. |
 
 #### `quality.type_check`
 
@@ -561,7 +560,7 @@ Each key under `environments` is an environment name (e.g. `staging`, `productio
 | `chart` | string | no | -- | Helm chart path or repository reference (for `helm` target). |
 | `release_name` | string | no | environment name | Helm release name (for `helm` target). |
 | `values` | string | no | -- | Path to Helm values file (for `helm` target). |
-| `repo` | string | no | -- | GitOps infrastructure repository (for `gitops` target). |
+| `repo` | string | no | -- | GitOps infrastructure repository as a clonable git URL (for `gitops` target). Embed credentials in the URL via a CI variable (e.g. `https://oauth2:${GIT_TOKEN}@host/path.git`); there is no separate token field. |
 | `path` | string | no | -- | Path within the GitOps repository for service manifests. |
 | `controller` | string | no | -- | GitOps controller: `argocd` (for `gitops` target). |
 | `app_name` | string | no | -- | Application name in the GitOps controller. |
