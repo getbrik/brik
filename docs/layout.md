@@ -192,5 +192,3 @@ Key relations:
 | A `brik <cmd>` CLI command                   | CLI (aux)                 |
 | A platform template or wrapper               | 1 (execution environment) |
 
-See [final-plan](../../refactoring/final-plan.md) §2 and §3 for the original
-design rationale and the Phase 3 mapping decisions.

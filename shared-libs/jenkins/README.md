@@ -168,6 +168,7 @@ When running without Docker agents (`useDockerAgent: false`), the Jenkins **agen
 - bash 4.0+
 - [yq](https://github.com/mikefarah/yq) (Go binary) for YAML parsing
 - [jq](https://jqlang.github.io/jq/) for JSON manipulation
+- [jv](https://github.com/santhosh-tekuri/jsonschema) (Go binary) for JSON Schema validation, or [check-jsonschema](https://check-jsonschema.readthedocs.io/) as fallback. Required by the init stage which validates `brik.yml`.
 - git
 - Tools required by your stack (node, npm, java, mvn, etc.)
 - Tools required by your stages (semgrep, grype, helm, etc.)
