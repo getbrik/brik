@@ -27,15 +27,47 @@
 
 <!-- END AUTO-GENERATED -->
 
+## Runtime status of each field
+
+Several fields above are accepted by the schema but are **not yet
+consumed** by the runtime. Setting them does not break validation, but
+it does not change pipeline behaviour either.
+
+| Field | Status |
+|-------|--------|
+| `test.command` | wired -- `eval`'d from `BRIK_WORKSPACE` |
+| `test.framework` | wired -- branched per stack (see *Supported framework values* below) |
+| `test.coverage.threshold` | **accepted, not enforced** -- exported but no gate fails the stage on a low coverage score today |
+| `test.coverage.report` | **accepted, not consumed** |
+| `test.reports.enabled` | wired -- master flag for coverage + JUnit emission |
+| `test.reports.coverage.enabled` | **decorative** -- flag is not read; coverage emission tracks `reports.enabled` |
+| `test.reports.coverage.format` | **decorative** -- the actual format is hardcoded per stack (see table below); setting `jacoco` on a Node project does not produce jacoco |
+| `test.reports.coverage.output_dir` | wired -- consumed by stack test commands |
+| `test.reports.junit.enabled` | **decorative** -- same as the coverage counterpart |
+| `test.reports.junit.output_path` | wired -- consumed by stack test commands |
+
+## Supported framework values
+
+Each stack accepts a closed set of framework names; setting any other
+value crashes the test stage with `unsupported test framework`.
+
+| Stack | Accepted `framework` values |
+|-------|------------------------------|
+| `node` | `jest`, `npm` (`vitest` and `mocha` are detected but the test command builder rejects them today) |
+| `python` | `pytest`, `unittest`, `tox` |
+| `java` | `junit`, `maven`, `gradle` (`junit` is treated as Maven) |
+| `rust` | `cargo` |
+| `dotnet` | `dotnet` (`xunit` and `nunit` are detected but the test command builder rejects them today) |
+
 ## Stack defaults
 
-| Stack | `test.framework` default | Coverage format default (`auto`) |
-|-------|-------------------------|----------------------------------|
-| `node` | `jest` | `lcov` |
+| Stack | `test.framework` default | Coverage format produced |
+|-------|-------------------------|--------------------------|
+| `node` | `jest` | `lcov` (cobertura on `reports.enabled: true`) |
 | `python` | `pytest` | `cobertura` |
-| `java` | `junit` | `jacoco` |
-| `rust` | `cargo test` | `lcov` |
-| `dotnet` | `xunit` | `cobertura` |
+| `java` | `junit` (Maven) | `jacoco` |
+| `rust` | `cargo` | `cobertura` (when `cargo-llvm-cov` is available) |
+| `dotnet` | `dotnet` | `cobertura` |
 
 ## Examples
 
@@ -73,7 +105,7 @@ test:
       output_path: target/junit.xml
 ```
 
-### Coverage threshold
+### Coverage threshold (advisory)
 
 ```yaml
 version: 1
@@ -85,8 +117,10 @@ test:
     threshold: 90
 ```
 
-When coverage drops below the threshold, the `test` stage fails with
-`BRIK_EXIT_CHECK_FAILED` (10).
+The schema accepts this value but the runtime does **not** currently
+fail the stage when measured coverage drops below the threshold. The
+field is exported as `BRIK_TEST_COVERAGE_THRESHOLD` and surfaced in
+logs/reports; enforcement is left to a future chantier.
 
 ## Tier semantics
 

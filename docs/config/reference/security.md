@@ -5,14 +5,12 @@
 The `security` section drives three CI-visible stages that run in
 parallel with `quality`:
 
-- **SAST** -- static application security testing.
+- **SAST** -- static application security testing, plus opt-in IaC
+  scanning when `security.iac` is set.
 - **Scan** -- dependency vulnerability scan + secret scan + license
   compliance.
 - **Container scan** -- image-level vulnerability scan, runs after
   `package`.
-
-A seventh sub-block, `iac`, is reserved for future Infrastructure-as-Code
-scanning.
 
 The whole section is optional. With no overrides, each stage applies a
 stack-aware default tool (e.g. `semgrep` for SAST, `osv-scanner` for

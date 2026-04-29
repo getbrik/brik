@@ -40,6 +40,24 @@ Tier 3 (stack default) pattern as `build` and `test`.
 The type-check sub-stage runs only when `quality.type_check.command` or
 `quality.type_check.tool` is set. There is no Tier 3 default for it.
 
+### Runtime status of each field
+
+A few fields are accepted by the schema but are **not yet consumed** by
+the runtime. They pass validation but do not change pipeline behaviour.
+
+| Field | Status |
+|-------|--------|
+| `quality.lint.enabled` | wired -- `false` skips the lint sub-stage |
+| `quality.lint.command` | wired (Tier 1) |
+| `quality.lint.tool` | wired (Tier 2) |
+| `quality.lint.config` | **accepted, not consumed** -- the linter discovers its own config file from disk |
+| `quality.lint.fix` | **accepted, not consumed** -- linters always run in check mode |
+| `quality.format.command` | wired (Tier 1) |
+| `quality.format.tool` | wired (Tier 2) |
+| `quality.format.check` | **accepted, not consumed** -- formatters always run in check mode anyway |
+| `quality.type_check.command` | wired (Tier 1) |
+| `quality.type_check.tool` | wired (Tier 2) |
+
 ## Stack defaults
 
 | Stack | Lint default | Format default |
