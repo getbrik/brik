@@ -202,7 +202,7 @@ Lint/SAST/Scan to succeed (or be skipped).
 | Lint | Code quality | Lint, format check, type checking |
 | SAST | Static analysis | SAST scan, plus license and IaC scans when configured |
 | Scan | Dependency scan | Dependency audit and secret scan |
-| Test | Test suite | Runs in parallel with Lint/SAST/Scan; emits JUnit + coverage reports when `quality.test.reports.enabled: true` |
+| Test | Test suite | Runs in parallel with Lint/SAST/Scan; emits JUnit + coverage reports when `test.reports.enabled: true` |
 | Package | Artifacts | Docker image build + artifact publishing (npm, maven, pypi, cargo, nuget) |
 | Container Scan | Image security | Scan built container images for vulnerabilities |
 | Deploy | Deployment | Multi-environment with Git workflow profiles, condition-based (branch/tag) |

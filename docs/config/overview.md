@@ -4,9 +4,11 @@
 
 `brik.yml` describes **what** the pipeline should produce, scan, and
 deploy. It does not describe **how** the pipeline runs. The fixed flow
-(`Init -> Release -> Build -> Quality | Security -> Test -> Package ->
-Deploy -> Notify`) is implemented by the platform-specific shared
-libraries; users configure the inputs to that flow, not the flow itself.
+(`Init -> Release -> Build -> Lint || SAST || Scan || Test -> Package
+-> Container Scan -> Deploy -> Notify`, with the four middle stages
+running in parallel after Build) is implemented by the platform-specific
+shared libraries; users configure the inputs to that flow, not the flow
+itself.
 
 Two consequences:
 
