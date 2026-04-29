@@ -9,33 +9,36 @@ Tier 3 (stack default) pattern as `build` and `test`.
 
 ## Quick reference
 
+<!-- BEGIN AUTO-GENERATED: quick-reference -->
 ### `quality.lint`
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `quality.lint.enabled` | boolean | `true` | Skip the lint sub-stage entirely when `false`. |
-| `quality.lint.command` | string | (tool-derived) | Explicit lint command (Tier 1). |
-| `quality.lint.tool` | string | (stack default) | Lint tool (Tier 2): `eslint`, `biome`, `oxlint`, `checkstyle`, `ruff`, `flake8`, `pylint`, `clippy`, `dotnet-format`, ... |
-| `quality.lint.config` | string | -- | Path to the linter's config file (e.g. `.eslintrc.yml`). |
-| `quality.lint.fix` | boolean | `false` | Run the linter in auto-fix mode. |
+| `quality.lint.enabled` | boolean | `true` | Whether linting is active. Set to false to skip lint checks entirely. |
+| `quality.lint.command` | string | -- | Lint command to execute. Overrides tool-based and stack-default lint commands (Tier 1). |
+| `quality.lint.tool` | string | -- | Lint tool to use (e.g. eslint, biome, oxlint, checkstyle, ruff, flake8, pylint, clippy, dotnet-format). Overrides the stack default (Tier 2). |
+| `quality.lint.config` | string | -- | Path to the lint configuration file (e.g. .eslintrc.yml). |
+| `quality.lint.fix` | boolean | `false` | Whether to run the linter in auto-fix mode. |
 
 ### `quality.format`
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `quality.format.command` | string | (tool-derived) | Explicit format command (Tier 1). |
-| `quality.format.tool` | string | (stack default) | Formatter (Tier 2): `prettier`, `biome`, `ruff format`, `black`, `rustfmt`, `dotnet-format`, ... |
-| `quality.format.check` | boolean | `false` | Check-only mode. Fails when files would be reformatted instead of rewriting them. |
+| `quality.format.command` | string | -- | Format check command to execute. Overrides tool-based and stack-default format commands (Tier 1). |
+| `quality.format.tool` | string | -- | Formatter to use (e.g. prettier, biome, ruff format, black, rustfmt, dotnet-format). Overrides the stack default (Tier 2). |
+| `quality.format.check` | boolean | `false` | Whether to run the formatter in check mode (fail if files would be reformatted) rather than applying changes. |
 
 ### `quality.type_check`
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `quality.type_check.command` | string | -- | Explicit type-check command (Tier 1). |
-| `quality.type_check.tool` | string | -- | Type checker (Tier 2): `tsc`, `mypy`, `pyright`, ... |
+| `quality.type_check.command` | string | -- | Type check command to execute. Overrides tool selection (Tier 1). |
+| `quality.type_check.tool` | string | -- | Type checker to use (e.g. tsc, mypy, pyright). Overrides auto-detection (Tier 2). |
+
+<!-- END AUTO-GENERATED -->
 
 The type-check sub-stage runs only when `quality.type_check.command` or
-`quality.type_check.tool` is set. There is no Tier 3 default.
+`quality.type_check.tool` is set. There is no Tier 3 default for it.
 
 ## Stack defaults
 

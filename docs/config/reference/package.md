@@ -12,15 +12,22 @@ notify) still runs.
 
 ## Quick reference
 
+<!-- BEGIN AUTO-GENERATED: quick-reference -->
 ### `package.docker`
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `package.docker.image` | string | -- | Full image name including registry and repository (e.g. `registry.example.com/my-service`). When unset the package stage is skipped. |
-| `package.docker.dockerfile` | string | `Dockerfile` | Path to the Dockerfile, relative to `BRIK_WORKSPACE`. |
-| `package.docker.context` | string | `.` (the workspace root) | Build context path. |
-| `package.docker.platforms` | array of strings | -- | Target platforms for multi-arch builds (e.g. `linux/amd64`, `linux/arm64`). Accepted by the schema but not yet consumed by the build wrapper. |
-| `package.docker.build_args` | object (string -> string) | -- | Build-time arguments passed as `--build-arg KEY=VALUE`. |
+| `package.docker.image` | string | -- | Full image name including registry and repository (e.g. registry.example.com/my-service). |
+| `package.docker.dockerfile` | string | `Dockerfile` | Path to the Dockerfile relative to the build context. |
+| `package.docker.context` | string | `.` | Docker build context path. |
+| `package.docker.platforms` | array of strings | -- | Target platforms for multi-arch builds (e.g. linux/amd64, linux/arm64). |
+| `package.docker.build_args` | object | -- | Docker build arguments passed as --build-arg. Keys and values must be strings. |
+
+<!-- END AUTO-GENERATED -->
+
+When `package.docker.image` is unset, the package stage is skipped
+(the pipeline still continues with deploy and notify). `platforms` is
+accepted by the schema today but not yet consumed by the build wrapper.
 
 ## Tagging
 

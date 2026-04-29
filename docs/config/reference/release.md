@@ -9,13 +9,24 @@ SemVer + Conventional Commits + `CHANGELOG.md` workflow.
 
 ## Quick reference
 
+<!-- BEGIN AUTO-GENERATED: quick-reference -->
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `release.strategy` | enum | `semver` | Versioning strategy: `semver`, `calver`, or `custom`. |
-| `release.tag_prefix` | string | `v` | Prefix prepended to release tags (e.g. `v1.2.3`). |
-| `release.changelog.enabled` | boolean | `true` | Whether to generate a changelog on release triggers. |
-| `release.changelog.format` | enum | `conventional` | Changelog format: `conventional` or `keep-a-changelog`. |
-| `release.changelog.file` | string | `CHANGELOG.md` | Path to the changelog file. Relative paths resolve to `BRIK_WORKSPACE`. |
+| `release.strategy` | enum (`semver`, `calver`, `custom`) | `semver` | Release strategy. |
+| `release.tag_prefix` | string | `v` | Prefix for release tags (e.g. 'v'). |
+
+### `release.changelog`
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `release.changelog.enabled` | boolean | `true` | Whether to generate a changelog on release. |
+| `release.changelog.format` | enum (`conventional`, `keep-a-changelog`) | `conventional` | Changelog format. |
+| `release.changelog.file` | string | `CHANGELOG.md` | Path to the changelog file. |
+
+<!-- END AUTO-GENERATED -->
+
+`release.changelog.file` is interpreted relative to `BRIK_WORKSPACE`
+when the path is not absolute.
 
 ## Behaviour
 

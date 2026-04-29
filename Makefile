@@ -1,4 +1,4 @@
-.PHONY: help lint test test-quick coverage validate validate-docs check clean install uninstall metrics
+.PHONY: help lint test test-quick coverage validate validate-docs regen-docs check-docs-drift check clean install uninstall metrics
 
 help: ## Show available targets
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F ':.*## ' '{printf "  %-14s %s\n", $$1, $$2}'
@@ -28,7 +28,13 @@ validate: ## Validate example brik.yml files
 validate-docs: ## Validate every fenced ```yaml block in docs/config/**/*.md
 	./scripts/validate-docs.sh
 
-check: lint coverage validate validate-docs ## Full pre-commit gate (lint + coverage + validate + docs)
+regen-docs: ## Regenerate the auto-managed Quick reference tables from the schema
+	./scripts/gen-config-reference.sh --apply --all
+
+check-docs-drift: ## Verify the auto-managed tables match the schema (CI gate)
+	./scripts/gen-config-reference.sh --check
+
+check: lint coverage validate validate-docs check-docs-drift ## Full pre-commit gate (lint + coverage + validate + docs + drift)
 
 install: ## Install brik symlink into /usr/local/bin (dev mode)
 	@if [ -f /usr/local/bin/brik ] && [ ! -L /usr/local/bin/brik ]; then \

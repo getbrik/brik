@@ -8,10 +8,17 @@ runs the stack's default build command.
 
 ## Quick reference
 
+<!-- BEGIN AUTO-GENERATED: quick-reference -->
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `build.command` | string | (stack-derived) | Explicit build command (Tier 1). Overrides `tool` and stack defaults. Run via `eval` from `BRIK_WORKSPACE`. |
-| `build.tool` | string | (auto-detected from lock/marker files) | Build tool selector (Tier 2). Ignored when `command` is set. |
+| `build.command` | string | -- | Build command to execute. Overrides both tool selection and stack defaults (Tier 1). |
+| `build.tool` | string | -- | Build tool to use (e.g. npm, yarn, pnpm, maven, gradle, poetry, uv, pip, pipenv, cargo, dotnet). Overrides auto-detection from lock/marker files (Tier 2). Ignored when command is set. |
+
+<!-- END AUTO-GENERATED -->
+
+`build.command` is `eval`-ed from `BRIK_WORKSPACE` (Tier 1). When unset
+the stack module derives a command from `build.tool` (Tier 2) or from
+lock/marker files (Tier 3).
 
 ## Three-tier resolution
 

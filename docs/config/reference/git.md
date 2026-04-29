@@ -12,10 +12,19 @@ this resolution exists at all.
 
 ## Quick reference
 
+<!-- BEGIN AUTO-GENERATED: quick-reference -->
+### `git.user`
+
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `git.user.email` | string (email) | (resolved -- see below) | `git config user.email`. |
-| `git.user.name` | string | (resolved -- see below) | `git config user.name`. |
+| `git.user.email` | string | -- | Git user.email. If absent, falls back to CI-platform vars (GITLAB_USER_EMAIL, CHANGE_AUTHOR_EMAIL) then to brik-ci@brik.local. |
+| `git.user.name` | string | -- | Git user.name. If absent, falls back to CI-platform vars then to 'Brik CI'. |
+
+<!-- END AUTO-GENERATED -->
+
+When the fields above are unset, Brik falls back to the CI platform
+variables and finally to the `brik-ci@brik.local` / `Brik CI` defaults.
+See *Resolution order* below.
 
 ## Resolution order
 

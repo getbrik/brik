@@ -4,18 +4,28 @@
 
 ## Quick reference
 
+<!-- BEGIN AUTO-GENERATED: quick-reference -->
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `test.command` | string | (stack-derived) | Single test command (Tier 1 override). |
-| `test.framework` | string | (stack default, see below) | Test framework (Tier 2). |
+| `test.command` | string | -- | Test command to execute. Overrides framework-derived and stack-default commands (Tier 1). |
+| `test.framework` | string | -- | Test framework to use. Overrides the stack default (e.g. jest for node, junit for java, pytest for python). |
+
+### `test.coverage`
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
 | `test.coverage.threshold` | integer | `80` | Minimum coverage percentage required. |
-| `test.coverage.report` | string | (none) | Path to a Cobertura coverage report file. |
-| `test.reports.enabled` | boolean | `false` | Generate test reports (coverage + JUnit). |
-| `test.reports.coverage.enabled` | boolean | `true` | Whether to emit coverage when reports are enabled. |
-| `test.reports.coverage.format` | enum | `auto` | `lcov`, `cobertura`, `jacoco`, or `auto`. |
-| `test.reports.coverage.output_dir` | string | `coverage` | Directory for the coverage report. |
-| `test.reports.junit.enabled` | boolean | `true` | Whether to emit JUnit XML when reports are enabled. |
-| `test.reports.junit.output_path` | string | `reports/junit.xml` | Path for the JUnit XML report. |
+| `test.coverage.report` | string | -- | Path to the coverage report file (Cobertura XML). |
+
+### `test.reports`
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `test.reports.enabled` | boolean | `false` | Whether to produce test reports. Default: false (test runner uses its native defaults). |
+| `test.reports.coverage` | object | -- | Coverage report configuration. |
+| `test.reports.junit` | object | -- | JUnit-compatible XML test report configuration. |
+
+<!-- END AUTO-GENERATED -->
 
 ## Stack defaults
 

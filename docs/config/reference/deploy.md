@@ -12,10 +12,17 @@ is skipped.
 
 ## Top-level shape
 
+<!-- BEGIN AUTO-GENERATED: quick-reference -->
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `deploy.workflow` | enum | -- | Git workflow profile: `trunk-based`, `git-flow`, `github-flow`. Loads built-in environment defaults that user environments override. |
-| `deploy.environments` | object (map) | -- | Named environments. At least one entry. Keys are environment names (e.g. `staging`, `production`). |
+| `deploy.workflow` | enum (`trunk-based`, `git-flow`, `github-flow`) | -- | Git workflow convention for automatic environment mapping. When set, Brik loads a built-in profile that pre-configures environments based on branch/tag patterns. User-defined environments override profile defaults. |
+| `deploy.environments` | object | -- | Named deployment environments. Each key is an environment name (e.g. staging, production). Each value defines the deployment condition and target. |
+
+<!-- END AUTO-GENERATED -->
+
+`deploy.environments` is a map: each key is an environment name and
+each value matches the [`deployEnvironment`](#environment-record)
+schema below.
 
 ## Environment record
 

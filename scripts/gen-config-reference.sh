@@ -1,16 +1,20 @@
 #!/usr/bin/env bash
 # @description Generate the Quick reference markdown table for a brik.yml
-#              section from the JSON Schema.
+#              section from the JSON Schema and splice it into the matching
+#              page under docs/config/reference/.
 #
-# v1 prints to stdout only. Future revisions will splice the output into
-# docs/config/reference/<section>.md between sentinel comments and add a
-# --check mode that diffs regenerated content against committed pages.
+# Pages must mark the auto-managed region with HTML sentinel comments:
+#
+#   <!-- BEGIN AUTO-GENERATED: quick-reference -->
+#   ...generator content...
+#   <!-- END AUTO-GENERATED -->
 #
 # Usage:
-#   ./scripts/gen-config-reference.sh project        # top-level inline
-#   ./scripts/gen-config-reference.sh release        # $defs/release
-#   ./scripts/gen-config-reference.sh quality        # walks sub-sections
-#   ./scripts/gen-config-reference.sh --list         # list known sections
+#   ./scripts/gen-config-reference.sh <section>           # print to stdout
+#   ./scripts/gen-config-reference.sh --apply <section>   # splice into page
+#   ./scripts/gen-config-reference.sh --apply --all       # splice all pages
+#   ./scripts/gen-config-reference.sh --check             # diff drift (CI)
+#   ./scripts/gen-config-reference.sh --list              # list sections
 
 set -euo pipefail
 
@@ -39,20 +43,32 @@ _resolve_path() {
 }
 
 # Render markdown rows for a JSON object of properties (read from stdin).
-# Format type, default, description for each property.
+# Format type, default, description for each property. The full schema is
+# passed via --argfile so $refs can be resolved.
 _render_rows() {
     local prefix="$1"
-    jq -r --arg prefix "$prefix" '
+    jq -r --arg prefix "$prefix" --argfile schema "${SCHEMA}" '
+        # Resolve a $ref like "#/$defs/notifyEventList" to its target schema.
+        def deref:
+            if .["$ref"] then
+                .["$ref"] as $r
+                | $r | sub("^#/\\$defs/"; "") as $name
+                | $schema["$defs"][$name]
+            else .
+            end;
         def fmt_type:
-            if .["$ref"] then "ref"
-            elif .enum then "enum"
-            elif .type == "array" then
-                if .items.type == "string" then "array of strings"
+            deref as $r
+            | if $r.enum then
+                "enum (\($r.enum | map("`\(.)`") | join(", ")))"
+              elif $r.type == "array" then
+                if $r.items.enum then
+                    "array of enum (\($r.items.enum | map("`\(.)`") | join(", ")))"
+                elif $r.items.type == "string" then "array of strings"
                 else "array"
                 end
-            elif .type == "object" then "object"
-            else (.type // "any")
-            end;
+              elif $r.type == "object" then "object"
+              else ($r.type // "any")
+              end;
         def fmt_default:
             if has("default") then "`\(.default | tostring)`"
             else "--"
@@ -95,7 +111,17 @@ gen_section() {
         # Single property like top-level `version`.
         _table_header
         jq -r --arg name "$section" '
-            "| `\($name)` | \(.type // "any") | \(if has("default") then "`\(.default | tostring)`" else "--" end) | \((.description // "") | gsub("\\n"; " ")) |"
+            def fmt_type:
+                if .const then "const (`\(.const)`)"
+                elif .enum then "enum (\(.enum | map("`\(.)`") | join(", ")))"
+                else (.type // "any")
+                end;
+            def fmt_default:
+                if has("default") then "`\(.default | tostring)`"
+                elif .const then "`\(.const)`"
+                else "--"
+                end;
+            "| `\($name)` | \(fmt_type) | \(fmt_default) | \((.description // "") | gsub("\\n"; " ")) |"
         ' <<< "$(jq "${jq_path}" "${SCHEMA}")"
         echo
         return 0
@@ -134,7 +160,26 @@ gen_section() {
     fi
 }
 
-# List known sections that the generator can render.
+# Sections that have a page under docs/config/reference/. Internal $defs
+# (deployEnvironment, hookCommand, notifyEventList) are not user-facing.
+_user_facing_sections() {
+    cat <<'EOF'
+project
+release
+git
+notify
+hooks
+build
+quality
+test
+package
+publish
+security
+deploy
+EOF
+}
+
+# List every section the generator could render (debugging aid).
 _list_sections() {
     {
         echo "project"
@@ -143,19 +188,122 @@ _list_sections() {
     } | sort -u
 }
 
+# Splice generated content into a markdown page between sentinels.
+# Returns 0 on success, 3 if sentinels are missing.
+SENTINEL_BEGIN='<!-- BEGIN AUTO-GENERATED: quick-reference -->'
+SENTINEL_END='<!-- END AUTO-GENERATED -->'
+
+_splice_page() {
+    local page="$1"
+    local section="$2"
+
+    if [[ ! -f "${page}" ]]; then
+        echo "[gen-config-reference] error: ${page} not found" >&2
+        return 2
+    fi
+    if ! grep -qF "${SENTINEL_BEGIN}" "${page}" \
+        || ! grep -qF "${SENTINEL_END}" "${page}"; then
+        echo "[gen-config-reference] error: sentinels missing in ${page}" >&2
+        echo "[gen-config-reference]   add the following pair around the Quick reference table:" >&2
+        echo "    ${SENTINEL_BEGIN}" >&2
+        echo "    ${SENTINEL_END}" >&2
+        return 3
+    fi
+
+    local body_file tmp
+    body_file="$(mktemp)"
+    tmp="$(mktemp)"
+    gen_section "${section}" > "${body_file}"
+
+    awk -v begin="${SENTINEL_BEGIN}" -v end="${SENTINEL_END}" \
+        -v body_file="${body_file}" '
+        BEGIN { in_block = 0 }
+        index($0, begin) {
+            print
+            while ((getline line < body_file) > 0) print line
+            close(body_file)
+            in_block = 1
+            next
+        }
+        index($0, end) { print; in_block = 0; next }
+        !in_block { print }
+    ' "${page}" > "${tmp}"
+
+    mv "${tmp}" "${page}"
+    rm -f "${body_file}"
+}
+
+_page_for_section() {
+    local section="$1"
+    echo "${REPO_ROOT}/docs/config/reference/${section}.md"
+}
+
+# Apply mode: rewrite one page or all pages.
+cmd_apply() {
+    local target="${1:-}"
+    if [[ "${target}" == "--all" || -z "${target}" ]]; then
+        local s
+        while IFS= read -r s; do
+            [[ -z "${s}" ]] && continue
+            local page
+            page="$(_page_for_section "${s}")"
+            _splice_page "${page}" "${s}" || return $?
+        done < <(_user_facing_sections)
+    else
+        local page
+        page="$(_page_for_section "${target}")"
+        _splice_page "${page}" "${target}"
+    fi
+}
+
+# Check mode: diff regenerated content against committed pages.
+# Exits 0 when in sync, 1 on drift.
+cmd_check() {
+    local drift=0
+    local s page tmp
+    while IFS= read -r s; do
+        [[ -z "${s}" ]] && continue
+        page="$(_page_for_section "${s}")"
+        tmp="$(mktemp)"
+        cp "${page}" "${tmp}"
+        if ! _splice_page "${tmp}" "${s}" >/dev/null 2>&1; then
+            echo "[gen-config-reference] DRIFT (sentinels missing): ${page}"
+            drift=1
+            continue
+        fi
+        if ! diff -u "${page}" "${tmp}" >/dev/null 2>&1; then
+            echo "[gen-config-reference] DRIFT: ${page}"
+            diff -u "${page}" "${tmp}" | sed 's/^/  /'
+            drift=1
+        fi
+    done < <(_user_facing_sections)
+
+    if [[ ${drift} -eq 0 ]]; then
+        echo "[gen-config-reference] OK -- all reference pages match the schema"
+        return 0
+    fi
+    return 1
+}
+
 # CLI dispatch
 if [[ $# -eq 0 ]]; then
-    echo "usage: $0 <section> | --list" >&2
+    cat >&2 <<'EOF'
+usage:
+  gen-config-reference.sh <section>            # print to stdout
+  gen-config-reference.sh --apply <section>    # splice one page
+  gen-config-reference.sh --apply --all        # splice all pages
+  gen-config-reference.sh --check              # CI drift detection
+  gen-config-reference.sh --list               # list known sections
+EOF
     exit 2
 fi
 
 case "$1" in
-    --list) _list_sections ;;
+    --list)  _list_sections ;;
+    --check) cmd_check ;;
+    --apply) shift; cmd_apply "${1:---all}" ;;
     -h|--help)
-        echo "usage: $0 <section> | --list"
-        echo
-        echo "Sections:"
-        _list_sections | sed 's/^/  /'
+        sed -n '/^# Usage:/,/^$/p' "$0" | sed 's/^# \{0,1\}//'
         ;;
     *) gen_section "$1" ;;
 esac

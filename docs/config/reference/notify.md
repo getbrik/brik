@@ -12,16 +12,31 @@ so secrets stay out of the source tree.
 
 ## Quick reference
 
+<!-- BEGIN AUTO-GENERATED: quick-reference -->
+### `notify.slack`
+
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `notify.slack.channel` | string | -- | Slack channel including the `#` prefix. Used as the display channel on the message. |
-| `notify.slack.on` | string array | -- | Events that trigger a Slack notification. |
-| `notify.email.to` | string | -- | Recipient address, or comma-separated list. |
-| `notify.email.on` | string array | -- | Events that trigger an email notification. |
-| `notify.webhook.url` | string (uri) | -- | Webhook endpoint URL. |
-| `notify.webhook.on` | string array | -- | Events that trigger a webhook call. |
+| `notify.slack.channel` | string | -- | Slack channel name including the # prefix (e.g. #deployments). |
+| `notify.slack.on` | array of enum (`failure`, `success`, `always`) | -- | Pipeline events that trigger a Slack notification. |
 
-The `on` arrays accept any non-empty unique combination of:
+### `notify.email`
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `notify.email.to` | string | -- | Recipient email address or comma-separated list of addresses. |
+| `notify.email.on` | array of enum (`failure`, `success`, `always`) | -- | Pipeline events that trigger an email notification. |
+
+### `notify.webhook`
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `notify.webhook.url` | string | -- | Webhook endpoint URL. |
+| `notify.webhook.on` | array of enum (`failure`, `success`, `always`) | -- | Pipeline events that trigger a webhook call. |
+
+<!-- END AUTO-GENERATED -->
+
+Each `*.on` array accepts a non-empty, unique combination of:
 
 | Event | Meaning |
 |-------|---------|

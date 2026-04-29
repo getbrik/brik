@@ -16,19 +16,33 @@ best-effort -- they cannot override the stage's exit code.
 Each hook value is a single inline shell command. Chain multiple
 commands with `&&` or `;`. Empty strings are rejected by the schema.
 
-| Field | Type | Default | Runs |
-|-------|------|---------|------|
-| `hooks.pre_init` / `hooks.post_init` | string | -- | around the init stage |
-| `hooks.pre_release` / `hooks.post_release` | string | -- | around the release stage |
-| `hooks.pre_build` / `hooks.post_build` | string | -- | around the build stage |
-| `hooks.pre_lint` / `hooks.post_lint` | string | -- | around the lint stage |
-| `hooks.pre_sast` / `hooks.post_sast` | string | -- | around the SAST stage |
-| `hooks.pre_scan` / `hooks.post_scan` | string | -- | around the dependency / secret scan stage |
-| `hooks.pre_container_scan` / `hooks.post_container_scan` | string | -- | around the container scan stage |
-| `hooks.pre_test` / `hooks.post_test` | string | -- | around the test stage |
-| `hooks.pre_package` / `hooks.post_package` | string | -- | around the package stage |
-| `hooks.pre_deploy` / `hooks.post_deploy` | string | -- | around the deploy stage |
-| `hooks.pre_notify` / `hooks.post_notify` | string | -- | around the notify stage |
+<!-- BEGIN AUTO-GENERATED: quick-reference -->
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `hooks.pre_init` | string | -- | Commands executed before the init stage. |
+| `hooks.post_init` | string | -- | Commands executed after the init stage completes successfully. |
+| `hooks.pre_release` | string | -- | Commands executed before the release stage. |
+| `hooks.post_release` | string | -- | Commands executed after the release stage completes successfully. |
+| `hooks.pre_build` | string | -- | Commands executed before the build stage. |
+| `hooks.post_build` | string | -- | Commands executed after the build stage completes successfully. |
+| `hooks.pre_lint` | string | -- | Commands executed before the lint stage. |
+| `hooks.post_lint` | string | -- | Commands executed after the lint stage completes successfully. |
+| `hooks.pre_sast` | string | -- | Commands executed before the SAST scan. |
+| `hooks.post_sast` | string | -- | Commands executed after the SAST scan completes successfully. |
+| `hooks.pre_scan` | string | -- | Commands executed before the security scan stage. |
+| `hooks.post_scan` | string | -- | Commands executed after the security scan stage completes successfully. |
+| `hooks.pre_container_scan` | string | -- | Commands executed before the container scan. |
+| `hooks.post_container_scan` | string | -- | Commands executed after the container scan completes successfully. |
+| `hooks.pre_test` | string | -- | Commands executed before the test stage. |
+| `hooks.post_test` | string | -- | Commands executed after the test stage completes successfully. |
+| `hooks.pre_package` | string | -- | Commands executed before the package stage. |
+| `hooks.post_package` | string | -- | Commands executed after the package stage completes successfully. |
+| `hooks.pre_deploy` | string | -- | Commands executed before the deploy stage. |
+| `hooks.post_deploy` | string | -- | Commands executed after the deploy stage completes successfully. |
+| `hooks.pre_notify` | string | -- | Commands executed before the notify stage. |
+| `hooks.post_notify` | string | -- | Commands executed after the notify stage completes successfully. |
+
+<!-- END AUTO-GENERATED -->
 
 ## Behaviour
 

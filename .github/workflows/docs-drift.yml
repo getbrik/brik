@@ -1,0 +1,45 @@
+name: Docs drift
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'schemas/config/**'
+      - 'docs/config/**'
+      - 'scripts/gen-config-reference.sh'
+      - 'scripts/validate-docs.sh'
+      - '.github/workflows/docs-drift.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'schemas/config/**'
+      - 'docs/config/**'
+      - 'scripts/gen-config-reference.sh'
+      - 'scripts/validate-docs.sh'
+      - '.github/workflows/docs-drift.yml'
+
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install jq + yq
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq
+          YQ_VERSION="v4.45.1"
+          sudo wget -qO /usr/local/bin/yq \
+            "https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_amd64"
+          sudo chmod +x /usr/local/bin/yq
+
+      - name: Install jv (JSON Schema validator)
+        run: |
+          go install github.com/santhosh-tekuri/jsonschema/cmd/jv@v6.0.2
+          echo "$HOME/go/bin" >> "$GITHUB_PATH"
+
+      - name: Validate inline YAML blocks in docs/config
+        run: make validate-docs
+
+      - name: Verify schema-doc tables are in sync
+        run: make check-docs-drift

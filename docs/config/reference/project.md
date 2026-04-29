@@ -7,13 +7,20 @@ required field in `brik.yml` apart from the top-level `version`.
 
 ## Quick reference
 
-| Field | Type | Required | Default | Description |
-|-------|------|----------|---------|-------------|
-| `project.name` | string | yes | -- | Project name. Used in logs, notifications, and artifact labels. Minimum length 1. |
-| `project.stack` | enum | no | auto-detected | Technology stack: `node`, `java`, `python`, `dotnet`, `rust`. |
-| `project.stack_version` | string | no | (image default) | Stack version selecting the `brik-runner-<stack>` image tag (e.g. `"22"` for node). |
-| `project.root` | string | no | `.` | Relative path to the service root. Used in monorepos where each service has its own `brik.yml`. |
-| `project.env` | string | no | `brik.env` (auto-detected) | Path to a project-level env file (`KEY=VALUE` format), relative to the project root. CI environment variables take precedence over file entries. |
+<!-- BEGIN AUTO-GENERATED: quick-reference -->
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `project.name` | string | -- | Project name. Used in logs, notifications, and artefact labels. |
+| `project.stack` | enum (`node`, `java`, `python`, `dotnet`, `rust`) | -- | Technology stack. Optional - Brik performs auto-detection from project files (package.json -> node, pom.xml -> java, etc.) when omitted. |
+| `project.stack_version` | string | -- | Stack version for runner image selection (e.g. '22' for node, '21' for java). When omitted, uses the default version. |
+| `project.root` | string | -- | Relative path to the service root directory. Used in monorepos where each service has its own brik.yml. |
+| `project.env` | string | -- | Path to the project-level env file (KEY=VALUE format), relative to the project root. Optional. When omitted, Brik auto-detects 'brik.env' at the repo root. Existing environment variables (CI secrets, etc.) take precedence over file entries. |
+
+<!-- END AUTO-GENERATED -->
+
+`project.name` is required (minimum length 1). `project.stack` is
+auto-detected from marker files when omitted (see below). `project.env`
+defaults to `brik.env` at the repo root when the file exists.
 
 ## Stack auto-detection
 

@@ -150,7 +150,7 @@
       "additionalProperties": false,
       "properties": {
         "command": {
-          "description": "Test command to execute. Overrides framework-derived and stack-default commands (Tier 1). For per-suite override, use commands.unit/integration/e2e instead.",
+          "description": "Test command to execute. Overrides framework-derived and stack-default commands (Tier 1).",
           "type": "string",
           "minLength": 1
         },

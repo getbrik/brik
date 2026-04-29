@@ -21,60 +21,60 @@ override) to decide what fails the build.
 
 ## Quick reference
 
+<!-- BEGIN AUTO-GENERATED: quick-reference -->
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `security.severity_threshold` | enum (`critical`, `high`, `medium`, `low`) | -- | Global minimum vulnerability severity that causes the security stage to fail. Vulnerabilities below this level are reported but do not block the pipeline. |
+
 ### `security.sast`
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `security.sast.command` | string | (tool-derived) | Explicit SAST command (Tier 1). |
-| `security.sast.tool` | string | `semgrep` | SAST tool (Tier 2): `semgrep`, `sonarqube`, `codeql`, ... |
-| `security.sast.ruleset` | string | `auto` | Ruleset or profile (e.g. `p/security-audit`). |
+| `security.sast.command` | string | -- | SAST command to execute. Overrides tool selection (Tier 1). |
+| `security.sast.tool` | string | -- | SAST tool to use (e.g. semgrep, sonarqube, codeql). Overrides auto-detection (Tier 2). |
+| `security.sast.ruleset` | string | -- | Ruleset or profile for the SAST tool (e.g. auto, p/security-audit). |
 
 ### `security.deps`
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `security.deps.command` | string | (tool-derived) | Explicit dependency scan command (Tier 1). |
-| `security.deps.tool` | string | `osv-scanner` (or stack default) | Dep scanner: `osv-scanner`, `npm-audit`, `pip-audit`, ... |
-| `security.deps.severity` | enum | (inherits `severity_threshold`) | Per-section threshold: `critical`, `high`, `medium`, `low`. |
+| `security.deps.command` | string | -- | Dependency scan command. Overrides tool-based scanning (Tier 1). |
+| `security.deps.severity` | enum (`critical`, `high`, `medium`, `low`) | -- | Minimum severity level that causes the dependency scan to fail. |
+| `security.deps.tool` | string | -- | Dependency scanning tool to use (e.g. npm-audit, pip-audit, osv-scanner). |
 
 ### `security.secrets`
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `security.secrets.command` | string | (tool-derived) | Explicit secret scan command (Tier 1). |
-| `security.secrets.tool` | string | `gitleaks` | Secret scanner: `gitleaks`, `trufflehog`, ... |
+| `security.secrets.command` | string | -- | Secret scan command to execute. |
+| `security.secrets.tool` | string | -- | Secret scanning tool to use (e.g. gitleaks, trufflehog). |
 
 ### `security.license`
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `security.license.allowed` | string | -- | Comma-separated allow-list (e.g. `MIT,Apache-2.0,BSD-3-Clause`). |
-| `security.license.denied` | string | -- | Comma-separated deny-list (e.g. `GPL-3.0,AGPL-3.0`). |
-
-When both are set, `denied` is checked first.
+| `security.license.allowed` | string | -- | Comma-separated list of allowed licenses. |
+| `security.license.denied` | string | -- | Comma-separated list of denied licenses. |
 
 ### `security.container`
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `security.container.image` | string | (falls back to `package.docker.image`) | Image to scan. |
-| `security.container.severity` | enum | (inherits `severity_threshold`) | Per-section threshold: `critical`, `high`, `medium`, `low`. |
+| `security.container.image` | string | -- | Container image to scan. |
+| `security.container.severity` | enum (`critical`, `high`, `medium`, `low`) | -- | Minimum severity level that causes the container scan to fail. |
 
 ### `security.iac`
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `security.iac.command` | string | -- | Explicit IaC scan command (Tier 1). |
-| `security.iac.tool` | string | -- | IaC scanner: `checkov`, `tfsec`, ... |
+| `security.iac.command` | string | -- | IaC scan command to execute. |
+| `security.iac.tool` | string | -- | IaC scanning tool to use (e.g. checkov, tfsec). |
 
-The IaC stage runs only when `security.iac.command` or
+<!-- END AUTO-GENERATED -->
+
+When both `license.allowed` and `license.denied` are set, `denied` is
+checked first. The IaC stage runs only when `security.iac.command` or
 `security.iac.tool` is set.
-
-### Global threshold
-
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `security.severity_threshold` | enum | `high` | Minimum vulnerability severity that fails the security stage. Lower-severity findings are reported but do not block. |
 
 ## Severity semantics
 
