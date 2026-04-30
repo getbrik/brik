@@ -11,6 +11,9 @@ brik-build:
   needs:
     - job: brik-init
       artifacts: true
+    - job: brik-release
+      artifacts: true
+      optional: true
   cache:
     key: "${BRIK_BUILD_STACK}-${CI_COMMIT_REF_SLUG}"
     paths:

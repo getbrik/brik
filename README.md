@@ -175,7 +175,7 @@ flowchart LR
     notify["Notify"]
 
     init --> release
-    init --> build
+    release --> build
     build --> lint
     build --> sast
     build --> scan
