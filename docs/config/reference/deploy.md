@@ -50,7 +50,7 @@ sections.
 | `compose` | `compose_file`, `source` |
 | `k8s` | `namespace`, `manifest` |
 | `helm` | `namespace`, `chart`, `release_name`, `values` |
-| `gitops` | `repo`, `path`, `controller`, `app_name`, `source` |
+| `gitops` | `repo`, `path`, `controller`, `app_name`, `source`, `git_token_var` |
 
 Targets ignore fields that don't apply to them; the schema rejects
 unknown keys via `additionalProperties: false`.
@@ -103,16 +103,19 @@ deploy:
     production:
       when: "tag =~ 'v*'"
       target: gitops
-      repo: https://oauth2:${GIT_TOKEN}@gitlab.example.com/org/infra.git
+      repo: https://gitlab.example.com/org/infra.git
       path: services/api
       controller: argocd
       app_name: api-prod
+      git_token_var: GIT_TOKEN
 ```
 
-`repo` is a clonable git URL. Embed the auth token in the URL via a
-CI variable (here `$GIT_TOKEN`); there is no separate `token_var`
-field for the GitOps repo today. The deploy stage commits the new
-image tag to the config repo and ArgoCD reconciles the change.
+`git_token_var` is the NAME of the CI variable that holds the token
+(here `GIT_TOKEN` resolves to the value of `$GIT_TOKEN` at deploy
+time). Brik embeds the token into the clone URL using HTTPS basic
+auth, so the `repo` field can stay credential-free. The deploy stage
+commits the new image tag to the config repo and ArgoCD reconciles
+the change.
 
 ### SSH to a single host
 

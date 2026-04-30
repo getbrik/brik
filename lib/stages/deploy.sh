@@ -53,6 +53,7 @@ stages.deploy() {
         local remote_path_var="BRIK_DEPLOY_${upper_env}_REMOTE_PATH"
         local source_var="BRIK_DEPLOY_${upper_env}_SOURCE"
         local restart_cmd_var="BRIK_DEPLOY_${upper_env}_RESTART_CMD"
+        local git_token_var_var="BRIK_DEPLOY_${upper_env}_GIT_TOKEN_VAR"
 
         # Load per-env env_file (brik.yml .deploy.environments.<env>.env_file) if set.
         # Existing env vars take precedence over file entries (CI precedence).
@@ -96,7 +97,8 @@ stages.deploy() {
         _v="$(transverse.env.resolve_indirect "$host_var")";         [[ -n "$_v" ]] && deploy_args+=(--host "$_v")
         _v="$(transverse.env.resolve_indirect "$compose_file_var")"; [[ -n "$_v" ]] && deploy_args+=(--file "$_v")
         _v="$(transverse.env.resolve_indirect "$remote_path_var")";  [[ -n "$_v" ]] && deploy_args+=(--path "$_v")
-        _v="$(transverse.env.resolve_indirect "$source_var")";       [[ -n "$_v" ]] && deploy_args+=(--source "$_v")
+        _v="$(transverse.env.resolve_indirect "$source_var")";        [[ -n "$_v" ]] && deploy_args+=(--source "$_v")
+        _v="$(transverse.env.resolve_indirect "$git_token_var_var")"; [[ -n "$_v" ]] && deploy_args+=(--git-token-var "$_v")
         _v="$(transverse.env.resolve_indirect "$restart_cmd_var")";  [[ -n "$_v" ]] && deploy_args+=(--restart-cmd "$_v")
 
         # Inline deploy dispatch: load deployments.<target> + call deploy.<target>.run.

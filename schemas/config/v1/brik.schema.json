@@ -674,7 +674,7 @@
           "minLength": 1
         },
         "repo": {
-          "description": "GitOps infrastructure repository as a clonable git URL (e.g. https://gitlab.example.com/org/infra.git or git@github.com:org/infra.git). Embed credentials in the URL using a CI variable (e.g. https://oauth2:${GIT_TOKEN}@host/path.git) since there is currently no separate token field.",
+          "description": "GitOps infrastructure repository as a clonable git URL (e.g. https://gitlab.example.com/org/infra.git or git@github.com:org/infra.git). Use `git_token_var` to authenticate without embedding credentials in the URL.",
           "type": "string",
           "minLength": 1
         },
@@ -690,6 +690,11 @@
         },
         "app_name": {
           "description": "Application name as known to the GitOps controller.",
+          "type": "string",
+          "minLength": 1
+        },
+        "git_token_var": {
+          "description": "Name of the environment variable that contains the token used to push to the `repo` GitOps repository (e.g. `GIT_TOKEN`). Brik resolves the value indirectly at deploy time and embeds it into the clone URL. Applies to `target: gitops` only.",
           "type": "string",
           "minLength": 1
         },

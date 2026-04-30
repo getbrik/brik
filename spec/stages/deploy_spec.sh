@@ -157,6 +157,42 @@ YAML
         The output should include "--target ssh"
       End
     End
+
+    Describe "with git_token_var"
+      setup_git_token_var_deploy() {
+        cat > "$BRIK_CONFIG_FILE" <<'YAML'
+version: 1
+project:
+  name: test
+  stack: node
+deploy:
+  environments:
+    staging:
+      target: gitops
+      repo: https://gitlab.example.com/org/infra.git
+      path: services/api
+      controller: argocd
+      app_name: api-staging
+      git_token_var: GITOPS_TOKEN
+YAML
+        config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
+      }
+      Before 'setup_git_token_var_deploy'
+
+      It "forwards --git-token-var to the gitops adapter"
+        run_deploy_git_token_var() {
+          brik.use() { :; }
+          deploy.gitops.run() { printf '%s ' "$@"; printf '\n'; return 0; }
+
+          local ctx
+          ctx="$(context.create "deploy")" 2>/dev/null || ctx="$(mktemp)"
+          stages.deploy "$ctx" 2>/dev/null
+        }
+        When call run_deploy_git_token_var
+        The output should include "--git-token-var GITOPS_TOKEN"
+        The output should include "--target gitops"
+      End
+    End
   End
 
   Describe "with deploy.environments[].strategy"

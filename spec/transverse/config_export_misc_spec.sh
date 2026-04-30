@@ -335,6 +335,34 @@ YAML
         The output should equal "./build/output"
       End
     End
+
+    Describe "with git_token_var"
+      setup_git_token_var() {
+        TEMP_CONFIG="$(mktemp)"
+        cat > "$TEMP_CONFIG" <<'YAML'
+version: 1
+deploy:
+  environments:
+    staging:
+      target: gitops
+      repo: https://gitlab.example.com/org/infra.git
+      path: services/api
+      controller: argocd
+      app_name: api-staging
+      git_token_var: GITOPS_TOKEN
+YAML
+        export BRIK_CONFIG_FILE="$TEMP_CONFIG"
+      }
+      cleanup_git_token_var() { rm -f "$TEMP_CONFIG"; }
+      Before 'setup_git_token_var'
+      After 'cleanup_git_token_var'
+
+      It "exports BRIK_DEPLOY_STAGING_GIT_TOKEN_VAR"
+        export_and_check() { config.export_deploy_vars; printf '%s' "${BRIK_DEPLOY_STAGING_GIT_TOKEN_VAR:-}"; }
+        When call export_and_check
+        The output should equal "GITOPS_TOKEN"
+      End
+    End
   End
 
   # =========================================================================
