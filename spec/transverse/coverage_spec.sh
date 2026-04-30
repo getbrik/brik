@@ -110,4 +110,206 @@ XML
       End
     End
   End
+
+  Describe "brik.coverage.gate"
+    Describe "case 1: empty or unset threshold"
+      It "returns 0 silently when threshold is empty string"
+        When call brik.coverage.gate ""
+        The status should be success
+        The output should equal ""
+        The stderr should equal ""
+      End
+
+      It "returns 0 silently when threshold arg is omitted"
+        When call brik.coverage.gate
+        The status should be success
+        The output should equal ""
+        The stderr should equal ""
+      End
+    End
+
+    Describe "case 2: non-numeric threshold"
+      # The validation happens before any file I/O, so no fixture dir needed.
+      # Pass a nonexistent path -- the threshold check fires first.
+      It "returns INVALID_INPUT (2) for alphabetic threshold"
+        When call brik.coverage.gate "abc" "/nonexistent/cov"
+        The status should equal 2
+        The stderr should include "invalid"
+      End
+
+      It "returns INVALID_INPUT (2) for mixed alphanumeric threshold"
+        When call brik.coverage.gate "12abc" "/nonexistent/cov"
+        The status should equal 2
+        The stderr should include "invalid"
+      End
+
+      It "returns INVALID_INPUT (2) for negative threshold"
+        When call brik.coverage.gate "-5" "/nonexistent/cov"
+        The status should equal 2
+        The stderr should include "invalid"
+      End
+    End
+
+    Describe "case 3: no coverage file present"
+      setup_no_file() {
+        TEST_DIR="$(mktemp -d)"
+        mkdir -p "${TEST_DIR}/coverage"
+      }
+      cleanup_no_file() { rm -rf "$TEST_DIR"; }
+      Before 'setup_no_file'
+      After 'cleanup_no_file'
+
+      It "returns 0 and warns when no report file exists"
+        When call brik.coverage.gate "80" "${TEST_DIR}/coverage"
+        The status should be success
+        The stderr should include "coverage gate skipped"
+        The stderr should include "no coverage report"
+      End
+    End
+
+    Describe "case 4: cobertura coverage >= threshold"
+      setup_cobertura_pass() {
+        TEST_DIR="$(mktemp -d)"
+        mkdir -p "${TEST_DIR}/coverage"
+        cat > "${TEST_DIR}/coverage/coverage.xml" <<'XML'
+<?xml version="1.0" ?>
+<coverage line-rate="0.8542" branch-rate="0.7" version="6.0">
+</coverage>
+XML
+      }
+      cleanup_cobertura_pass() { rm -rf "$TEST_DIR"; }
+      Before 'setup_cobertura_pass'
+      After 'cleanup_cobertura_pass'
+
+      It "returns 0 and logs info when coverage 85.42% >= threshold 80%"
+        When call brik.coverage.gate "80" "${TEST_DIR}/coverage"
+        The status should be success
+        The stderr should include "85.42%"
+        The stderr should include ">="
+        The stderr should include "80"
+      End
+
+      It "returns 0 when threshold equals integer part of coverage (boundary: 85)"
+        When call brik.coverage.gate "85" "${TEST_DIR}/coverage"
+        The status should be success
+        The stderr should include ">="
+      End
+    End
+
+    Describe "case 5: cobertura coverage < threshold"
+      setup_cobertura_fail() {
+        TEST_DIR="$(mktemp -d)"
+        mkdir -p "${TEST_DIR}/coverage"
+        cat > "${TEST_DIR}/coverage/coverage.xml" <<'XML'
+<?xml version="1.0" ?>
+<coverage line-rate="0.7200" branch-rate="0.6" version="6.0">
+</coverage>
+XML
+      }
+      cleanup_cobertura_fail() { rm -rf "$TEST_DIR"; }
+      Before 'setup_cobertura_fail'
+      After 'cleanup_cobertura_fail'
+
+      It "returns CHECK_FAILED (10) when coverage 72% < threshold 80%"
+        When call brik.coverage.gate "80" "${TEST_DIR}/coverage"
+        The status should equal 10
+        The stderr should include "72.00%"
+        The stderr should include "below"
+        The stderr should include "80"
+      End
+    End
+
+    Describe "case 6: jacoco coverage >= threshold"
+      setup_jacoco_pass() {
+        TEST_DIR="$(mktemp -d)"
+        mkdir -p "${TEST_DIR}/coverage"
+        cat > "${TEST_DIR}/coverage/jacoco.xml" <<'XML'
+<?xml version="1.0" encoding="UTF-8"?>
+<report name="t">
+  <counter type="INSTRUCTION" missed="10" covered="40"/>
+  <counter type="LINE" missed="15" covered="85"/>
+  <counter type="CLASS" missed="0" covered="1"/>
+</report>
+XML
+      }
+      cleanup_jacoco_pass() { rm -rf "$TEST_DIR"; }
+      Before 'setup_jacoco_pass'
+      After 'cleanup_jacoco_pass'
+
+      It "returns 0 when jacoco coverage 85/(85+15)=85% >= threshold 80%"
+        When call brik.coverage.gate "80" "${TEST_DIR}/coverage"
+        The status should be success
+        The stderr should include ">="
+      End
+    End
+
+    Describe "case 7: jacoco coverage < threshold"
+      setup_jacoco_fail() {
+        TEST_DIR="$(mktemp -d)"
+        mkdir -p "${TEST_DIR}/coverage"
+        cat > "${TEST_DIR}/coverage/jacoco.xml" <<'XML'
+<?xml version="1.0" encoding="UTF-8"?>
+<report name="t">
+  <counter type="INSTRUCTION" missed="10" covered="40"/>
+  <counter type="LINE" missed="42" covered="58"/>
+  <counter type="CLASS" missed="0" covered="1"/>
+</report>
+XML
+      }
+      cleanup_jacoco_fail() { rm -rf "$TEST_DIR"; }
+      Before 'setup_jacoco_fail'
+      After 'cleanup_jacoco_fail'
+
+      It "returns CHECK_FAILED (10) when jacoco coverage 58/(58+42)=58% < threshold 80%"
+        When call brik.coverage.gate "80" "${TEST_DIR}/coverage"
+        The status should equal 10
+        The stderr should include "below"
+      End
+    End
+
+    Describe "case 8: malformed XML file present"
+      setup_malformed_gate() {
+        TEST_DIR="$(mktemp -d)"
+        mkdir -p "${TEST_DIR}/coverage"
+        printf 'THIS IS NOT XML AT ALL\n' > "${TEST_DIR}/coverage/coverage.xml"
+      }
+      cleanup_malformed_gate() { rm -rf "$TEST_DIR"; }
+      Before 'setup_malformed_gate'
+      After 'cleanup_malformed_gate'
+
+      It "returns 0 and warns when coverage report cannot be parsed"
+        When call brik.coverage.gate "80" "${TEST_DIR}/coverage"
+        The status should be success
+        The stderr should include "coverage gate skipped"
+        The stderr should include "could not parse"
+      End
+    End
+
+    Describe "decimal threshold"
+      setup_decimal() {
+        TEST_DIR="$(mktemp -d)"
+        mkdir -p "${TEST_DIR}/coverage"
+        cat > "${TEST_DIR}/coverage/coverage.xml" <<'XML'
+<?xml version="1.0" ?>
+<coverage line-rate="0.8542" branch-rate="0.7" version="6.0">
+</coverage>
+XML
+      }
+      cleanup_decimal() { rm -rf "$TEST_DIR"; }
+      Before 'setup_decimal'
+      After 'cleanup_decimal'
+
+      It "accepts decimal threshold (85.5) and fails when coverage 85.42% < 85.5%"
+        When call brik.coverage.gate "85.5" "${TEST_DIR}/coverage"
+        The status should equal 10
+        The stderr should include "below"
+      End
+
+      It "accepts decimal threshold (85.4) and passes when coverage 85.42% >= 85.4%"
+        When call brik.coverage.gate "85.4" "${TEST_DIR}/coverage"
+        The status should be success
+        The stderr should include ">="
+      End
+    End
+  End
 End

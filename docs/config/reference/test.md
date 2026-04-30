@@ -37,7 +37,7 @@ it does not change pipeline behaviour either.
 |-------|--------|
 | `test.command` | wired -- `eval`'d from `BRIK_WORKSPACE` |
 | `test.framework` | wired -- branched per stack (see *Supported framework values* below) |
-| `test.coverage.threshold` | **accepted, not enforced** -- exported but no gate fails the stage on a low coverage score today |
+| `test.coverage.threshold` | wired -- when set, the Test stage exits with `BRIK_EXIT_CHECK_FAILED` (10) if measured coverage is below the threshold. Requires `test.reports.enabled: true` so a coverage report exists; missing or malformed reports never block the pipeline. |
 | `test.coverage.report` | **accepted, not consumed** |
 | `test.reports.enabled` | wired -- master flag for coverage + JUnit emission |
 | `test.reports.coverage.enabled` | **decorative** -- flag is not read; coverage emission tracks `reports.enabled` |
@@ -105,7 +105,7 @@ test:
       output_path: target/junit.xml
 ```
 
-### Coverage threshold (advisory)
+### Coverage threshold (enforced)
 
 ```yaml
 version: 1
@@ -113,14 +113,20 @@ project:
   name: my-app
   stack: node
 test:
+  reports:
+    enabled: true
   coverage:
     threshold: 90
 ```
 
-The schema accepts this value but the runtime does **not** currently
-fail the stage when measured coverage drops below the threshold. The
-field is exported as `BRIK_TEST_COVERAGE_THRESHOLD` and surfaced in
-logs/reports; enforcement is left to a future chantier.
+When set, the Test stage compares the parsed coverage percentage against
+this value after the test command runs. If the measured coverage is
+below the threshold, the stage exits with `BRIK_EXIT_CHECK_FAILED` (10).
+The gate runs only when `test.reports.enabled: true` so a coverage
+report exists; a missing or malformed report logs a warning and lets
+the pipeline continue. A passing-but-undercovered run is escalated to a
+failure; a failing test run keeps its own rc rather than being
+overwritten by the gate.
 
 ## Tier semantics
 

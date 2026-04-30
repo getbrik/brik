@@ -217,6 +217,133 @@ YAML
     When call run_test_unsupported_stack
     The output should equal "7"
   End
+
+  Describe "with BRIK_TEST_COVERAGE_THRESHOLD"
+    # These stubs cover both Tier-2 paths: with and without BRIK_TEST_FRAMEWORK.
+    # stacks.node.test_cmd is needed when BRIK_TEST_FRAMEWORK is set (jest default
+    # for the node stack). stacks.node.test is needed otherwise.
+    _stub_tier2_success_gate() {
+      brik.use() { :; }
+      stacks.detect_from_framework() { printf 'node'; return 0; }
+      stacks.detect() { printf 'node'; return 0; }
+      stacks.node.test_cmd() { printf 'true'; return 0; }
+      stacks.node.test() { printf 'true'; return 0; }
+      stacks.install_deps() { :; }
+    }
+
+    _stub_tier2_failure_gate() {
+      brik.use() { :; }
+      stacks.detect_from_framework() { printf 'node'; return 0; }
+      stacks.detect() { printf 'node'; return 0; }
+      stacks.node.test_cmd() { printf 'false'; return 0; }
+      stacks.node.test() { printf 'false'; return 0; }
+      stacks.install_deps() { :; }
+    }
+
+    It "(a) calls brik.coverage.gate with threshold when reports enabled and threshold set"
+      run_gate_called() {
+        _stub_tier2_success_gate
+        export BRIK_TEST_REPORTS_ENABLED="true"
+        export BRIK_TEST_COVERAGE_THRESHOLD="80"
+        # Use a sentinel file to communicate across the subshell boundary.
+        local sentinel
+        sentinel="$(mktemp)"
+        rm -f "$sentinel"
+        brik.coverage.summary() { :; }
+        brik.coverage.gate() { touch "$sentinel"; return 0; }
+        export -f brik.coverage.summary brik.coverage.gate
+        export sentinel
+        local ctx
+        ctx="$(context.create "test")" 2>/dev/null || ctx="$(mktemp)"
+        stages.test "$ctx" >/dev/null 2>&1
+        if [[ -f "$sentinel" ]]; then
+          printf '1'
+        else
+          printf '0'
+        fi
+        rm -f "$sentinel"
+      }
+      When call run_gate_called
+      The output should equal "1"
+    End
+
+    It "(b) does NOT call brik.coverage.gate when BRIK_TEST_COVERAGE_THRESHOLD is unset"
+      run_gate_not_called() {
+        _stub_tier2_success_gate
+        export BRIK_TEST_REPORTS_ENABLED="true"
+        unset BRIK_TEST_COVERAGE_THRESHOLD
+        local sentinel
+        sentinel="$(mktemp)"
+        rm -f "$sentinel"
+        brik.coverage.summary() { :; }
+        brik.coverage.gate() { touch "$sentinel"; return 0; }
+        export -f brik.coverage.summary brik.coverage.gate
+        export sentinel
+        local ctx
+        ctx="$(context.create "test")" 2>/dev/null || ctx="$(mktemp)"
+        stages.test "$ctx" >/dev/null 2>&1
+        if [[ -f "$sentinel" ]]; then
+          printf '1'
+        else
+          printf '0'
+        fi
+        rm -f "$sentinel"
+      }
+      When call run_gate_not_called
+      The output should equal "0"
+    End
+
+    It "(c) returns CHECK_FAILED (10) when tests pass but gate returns 10"
+      run_gate_blocks() {
+        _stub_tier2_success_gate
+        export BRIK_TEST_REPORTS_ENABLED="true"
+        export BRIK_TEST_COVERAGE_THRESHOLD="90"
+        brik.coverage.summary() { :; }
+        brik.coverage.gate() { return 10; }
+        export -f brik.coverage.summary brik.coverage.gate
+        local ctx
+        ctx="$(context.create "test")" 2>/dev/null || ctx="$(mktemp)"
+        stages.test "$ctx" >/dev/null 2>&1
+        printf '%s' "$?"
+      }
+      When call run_gate_blocks
+      The output should equal "10"
+    End
+
+    It "(d) preserves test failure rc when tests fail and gate also returns 10"
+      run_gate_no_override() {
+        _stub_tier2_failure_gate
+        export BRIK_TEST_REPORTS_ENABLED="true"
+        export BRIK_TEST_COVERAGE_THRESHOLD="90"
+        brik.coverage.summary() { :; }
+        brik.coverage.gate() { return 10; }
+        export -f brik.coverage.summary brik.coverage.gate
+        local ctx
+        ctx="$(context.create "test")" 2>/dev/null || ctx="$(mktemp)"
+        stages.test "$ctx" >/dev/null 2>&1
+        printf '%s' "$?"
+      }
+      When call run_gate_no_override
+      The output should equal "10"
+    End
+
+    It "(e) surfaces BRIK_EXIT_INVALID_INPUT directly when threshold is malformed"
+      run_gate_invalid_input() {
+        _stub_tier2_success_gate
+        export BRIK_TEST_REPORTS_ENABLED="true"
+        export BRIK_TEST_COVERAGE_THRESHOLD="abc"
+        brik.coverage.summary() { :; }
+        brik.coverage.gate() { return "$BRIK_EXIT_INVALID_INPUT"; }
+        export -f brik.coverage.summary brik.coverage.gate
+        local ctx
+        ctx="$(context.create "test")" 2>/dev/null || ctx="$(mktemp)"
+        stages.test "$ctx" >/dev/null 2>&1
+        printf '%s' "$?"
+      }
+      When call run_gate_invalid_input
+      The output should equal "$BRIK_EXIT_INVALID_INPUT"
+    End
+  End
 End
 
 Describe "stacks.install_deps (test mode)"

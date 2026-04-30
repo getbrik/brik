@@ -70,6 +70,18 @@ stages.test() {
     if [[ "${BRIK_TEST_REPORTS_ENABLED:-false}" == "true" ]]; then
         brik.use transverse.coverage
         (cd "${BRIK_WORKSPACE}" && brik.coverage.summary) || true
+        if [[ -n "${BRIK_TEST_COVERAGE_THRESHOLD:-}" ]]; then
+            local gate_rc=0
+            (cd "${BRIK_WORKSPACE}" && brik.coverage.gate "$BRIK_TEST_COVERAGE_THRESHOLD") || gate_rc=$?
+            # Config errors (invalid threshold string) surface directly so
+            # they are not squashed into the test-failure rc at the boundary.
+            if [[ "$gate_rc" -eq "$BRIK_EXIT_INVALID_INPUT" ]]; then
+                return "$gate_rc"
+            fi
+            if [[ "$gate_rc" -ne 0 && "$exit_code2" -eq 0 ]]; then
+                exit_code2=$gate_rc
+            fi
+        fi
     fi
 
     if [[ "$exit_code2" -ne 0 ]]; then
