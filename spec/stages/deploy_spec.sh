@@ -193,6 +193,42 @@ YAML
         The output should include "--target gitops"
       End
     End
+
+    Describe "with auth_token_var"
+      setup_auth_token_var_deploy() {
+        cat > "$BRIK_CONFIG_FILE" <<'YAML'
+version: 1
+project:
+  name: test
+  stack: node
+deploy:
+  environments:
+    production:
+      target: gitops
+      repo: https://gitlab.example.com/org/infra.git
+      path: services/api
+      controller: argocd
+      app_name: api-prod
+      auth_token_var: ARGOCD_TOKEN
+YAML
+        config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
+      }
+      Before 'setup_auth_token_var_deploy'
+
+      It "forwards --auth-token-var to the gitops adapter"
+        run_deploy_auth_token_var() {
+          brik.use() { :; }
+          deploy.gitops.run() { printf '%s ' "$@"; printf '\n'; return 0; }
+
+          local ctx
+          ctx="$(context.create "deploy")" 2>/dev/null || ctx="$(mktemp)"
+          stages.deploy "$ctx" 2>/dev/null
+        }
+        When call run_deploy_auth_token_var
+        The output should include "--auth-token-var ARGOCD_TOKEN"
+        The output should include "--target gitops"
+      End
+    End
   End
 
   Describe "with deploy.environments[].strategy"

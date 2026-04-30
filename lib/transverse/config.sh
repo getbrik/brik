@@ -510,6 +510,9 @@ _config._export_deploy_env_vars() {
         val="$(config.get ".deploy.environments.${env_name}.git_token_var" '')"
         [[ -n "$val" ]] && export "BRIK_DEPLOY_${upper_env}_GIT_TOKEN_VAR=$val"
 
+        val="$(config.get ".deploy.environments.${env_name}.auth_token_var" '')"
+        [[ -n "$val" ]] && export "BRIK_DEPLOY_${upper_env}_AUTH_TOKEN_VAR=$val"
+
         val="$(config.get ".deploy.environments.${env_name}.strategy" '')"
         [[ -n "$val" ]] && export "BRIK_DEPLOY_${upper_env}_STRATEGY=$val"
     done <<< "$env_keys"

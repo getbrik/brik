@@ -1613,6 +1613,91 @@ SCRIPT
         The status should be success
       End
     End
+
+    Describe "deploy.gitops.run with auth_token_var"
+      setup_auth_token_argocd() {
+        mock.setup
+        TEST_WS="$(mktemp -d)"
+        MOCK_LOG="${TEST_WS}/mock_git.log"
+        ARGOCD_LOG="${TEST_WS}/mock_argocd.log"
+        mkdir -p "${TEST_WS}/src"
+        cat > "${MOCK_BIN}/git" <<SCRIPT
+#!/bin/sh
+printf 'git %s\n' "\$*" >> "${MOCK_LOG}"
+if [ "\$1" = "clone" ]; then
+  dest="\$(echo "\$*" | rev | cut -d' ' -f1 | rev)"
+  mkdir -p "\$dest"
+fi
+exit 0
+SCRIPT
+        chmod +x "${MOCK_BIN}/git"
+        printf "#!/bin/sh\nprintf 'argocd %%s\\n' \"\$*\" >> \"%s\"\n" "$ARGOCD_LOG" > "${MOCK_BIN}/argocd"
+        chmod +x "${MOCK_BIN}/argocd"
+        mock.activate
+        # Export a test token so resolve_indirect can resolve it
+        export MY_ARGOCD_TOKEN="test-token-value"
+        unset BRIK_DRY_RUN BRIK_TAG BRIK_COMMIT_SHA 2>/dev/null
+        export BRIK_HOME
+      }
+      cleanup_auth_token_argocd() {
+        mock.cleanup
+        unset BRIK_DRY_RUN BRIK_TAG BRIK_COMMIT_SHA MY_ARGOCD_TOKEN 2>/dev/null
+        rm -rf "$TEST_WS"
+      }
+      Before 'setup_auth_token_argocd'
+      After 'cleanup_auth_token_argocd'
+
+      It "accepts --auth-token-var option without returning error"
+        invoke_accept_auth_token_var() {
+          deploy.gitops.run \
+            --repo "https://github.com/org/gitops.git" \
+            --source "${TEST_WS}/src" \
+            --auth-token-var MY_ARGOCD_TOKEN 2>/dev/null
+        }
+        When call invoke_accept_auth_token_var
+        The status should be success
+      End
+
+      It "forwards the resolved auth token to argocd sync when --auth-token-var is set"
+        invoke_sync_auth() {
+          deploy.gitops.run --repo "https://github.com/org/gitops.git" \
+            --source "${TEST_WS}/src" \
+            --controller argocd \
+            --app-name myapp \
+            --auth-token-var MY_ARGOCD_TOKEN 2>/dev/null || return 1
+          grep -qE 'app sync myapp .*--auth-token test-token-value' "$ARGOCD_LOG"
+        }
+        When call invoke_sync_auth
+        The status should be success
+      End
+
+      It "forwards the resolved auth token to argocd app wait when --auth-token-var is set"
+        invoke_wait_auth() {
+          deploy.gitops.run --repo "https://github.com/org/gitops.git" \
+            --source "${TEST_WS}/src" \
+            --controller argocd \
+            --app-name myapp \
+            --auth-token-var MY_ARGOCD_TOKEN 2>/dev/null || return 1
+          grep -qE 'app wait myapp .*--auth-token test-token-value' "$ARGOCD_LOG"
+        }
+        When call invoke_wait_auth
+        The status should be success
+      End
+
+      It "does not forward --auth-token when --auth-token-var is absent (fallback path preserved)"
+        invoke_no_auth() {
+          deploy.gitops.run --repo "https://github.com/org/gitops.git" \
+            --source "${TEST_WS}/src" \
+            --controller argocd \
+            --app-name myapp 2>/dev/null || return 1
+          # argocd sync called but no --auth-token in the captured invocation
+          grep -q "app sync" "$ARGOCD_LOG" && \
+          ! grep -q -- "--auth-token" "$ARGOCD_LOG"
+        }
+        When call invoke_no_auth
+        The status should be success
+      End
+    End
   End
 
   # =========================================================================

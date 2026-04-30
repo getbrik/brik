@@ -465,25 +465,26 @@ deploy.gitops.rollback() {
 # Usage: deploy.gitops.run --repo <url> [--branch <branch>] [--path <target>]
 #        [--source <local_path>] [--type <kustomize|helm_template|plain>]
 #        [--controller <argocd|fluxcd>] [--app-name <name>]
-#        [--git-token-var <VAR>] [--dry-run]
+#        [--git-token-var <VAR>] [--auth-token-var <VAR>] [--dry-run]
 deploy.gitops.run() {
     local repo="" branch="main" target_path="" source_dir="." render_type=""
-    local controller="" app_name="" git_token_var=""
+    local controller="" app_name="" git_token_var="" auth_token_var=""
     local dry_run="${BRIK_DRY_RUN:-}"
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
-            --repo)          repo="$2";          shift 2 ;;
-            --branch)        branch="$2";        shift 2 ;;
-            --path)          target_path="$2";   shift 2 ;;
-            --source)        source_dir="$2";    shift 2 ;;
-            --type)          render_type="$2";   shift 2 ;;
-            --controller)    controller="$2";    shift 2 ;;
-            --app-name)      app_name="$2";      shift 2 ;;
-            --git-token-var) git_token_var="$2"; shift 2 ;;
-            --dry-run)       dry_run="true";     shift ;;
+            --repo)           repo="$2";           shift 2 ;;
+            --branch)         branch="$2";         shift 2 ;;
+            --path)           target_path="$2";    shift 2 ;;
+            --source)         source_dir="$2";     shift 2 ;;
+            --type)           render_type="$2";    shift 2 ;;
+            --controller)     controller="$2";     shift 2 ;;
+            --app-name)       app_name="$2";       shift 2 ;;
+            --git-token-var)  git_token_var="$2";  shift 2 ;;
+            --auth-token-var) auth_token_var="$2"; shift 2 ;;
+            --dry-run)        dry_run="true";      shift ;;
             # Ignore deploy.run passthrough options
-            --target|--env)  shift 2 ;;
+            --target|--env)   shift 2 ;;
             *) log.error "unknown option: $1"; return "$BRIK_EXIT_INVALID_INPUT" ;;
         esac
     done
@@ -528,14 +529,16 @@ deploy.gitops.run() {
     # Step 3: Controller-specific sync
     if [[ "$controller" == "argocd" && -n "$app_name" ]]; then
         brik.use deployments.argocd
+        local -a argocd_args=(--app "$app_name")
+        [[ -n "$auth_token_var" ]] && argocd_args+=(--auth-token-var "$auth_token_var")
         if [[ "$dry_run" == "true" ]]; then
-            log.info "[dry-run] would call: deploy.argocd.sync --app ${app_name}"
+            log.info "[dry-run] would call: deploy.argocd.sync ${argocd_args[*]}"
         else
-            deploy.argocd.sync --app "$app_name" || {
+            deploy.argocd.sync "${argocd_args[@]}" || {
                 log.error "argocd sync failed for app: ${app_name}"
                 return "$BRIK_EXIT_EXTERNAL_FAIL"
             }
-            deploy.argocd.wait_healthy --app "$app_name" || {
+            deploy.argocd.wait_healthy "${argocd_args[@]}" || {
                 log.error "argocd app not healthy: ${app_name}"
                 return "$BRIK_EXIT_EXTERNAL_FAIL"
             }

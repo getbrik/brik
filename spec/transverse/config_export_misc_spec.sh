@@ -363,6 +363,37 @@ YAML
         The output should equal "GITOPS_TOKEN"
       End
     End
+
+    Describe "with auth_token_var"
+      setup_auth_token_var() {
+        TEMP_CONFIG="$(mktemp)"
+        cat > "$TEMP_CONFIG" <<'YAML'
+version: 1
+deploy:
+  environments:
+    production:
+      target: gitops
+      repo: https://gitlab.example.com/org/infra.git
+      path: services/api
+      controller: argocd
+      app_name: api-prod
+      auth_token_var: ARGOCD_TOKEN
+YAML
+        export BRIK_CONFIG_FILE="$TEMP_CONFIG"
+      }
+      cleanup_auth_token_var() { rm -f "$TEMP_CONFIG"; }
+      Before 'setup_auth_token_var'
+      After 'cleanup_auth_token_var'
+
+      It "exports BRIK_DEPLOY_PRODUCTION_AUTH_TOKEN_VAR"
+        export_and_check_auth() {
+          config.export_deploy_vars
+          printf '%s' "${BRIK_DEPLOY_PRODUCTION_AUTH_TOKEN_VAR:-}"
+        }
+        When call export_and_check_auth
+        The output should equal "ARGOCD_TOKEN"
+      End
+    End
   End
 
   # =========================================================================

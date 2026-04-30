@@ -50,7 +50,7 @@ sections.
 | `compose` | `compose_file`, `source` |
 | `k8s` | `namespace`, `manifest` |
 | `helm` | `namespace`, `chart`, `release_name`, `values` |
-| `gitops` | `repo`, `path`, `controller`, `app_name`, `source`, `git_token_var` |
+| `gitops` | `repo`, `path`, `controller`, `app_name`, `source`, `git_token_var`, `auth_token_var` |
 
 Targets ignore fields that don't apply to them; the schema rejects
 unknown keys via `additionalProperties: false`.
@@ -108,14 +108,21 @@ deploy:
       controller: argocd
       app_name: api-prod
       git_token_var: GIT_TOKEN
+      auth_token_var: ARGOCD_TOKEN
 ```
 
-`git_token_var` is the NAME of the CI variable that holds the token
-(here `GIT_TOKEN` resolves to the value of `$GIT_TOKEN` at deploy
-time). Brik embeds the token into the clone URL using HTTPS basic
-auth, so the `repo` field can stay credential-free. The deploy stage
-commits the new image tag to the config repo and ArgoCD reconciles
-the change.
+`git_token_var` and `auth_token_var` are NAMES of CI variables.
+`git_token_var` provides the token used to push the manifest update
+to the GitOps repo (here `GIT_TOKEN` resolves to `$GIT_TOKEN`). Brik
+embeds the token into the clone URL using HTTPS basic auth, so the
+`repo` field can stay credential-free.
+
+`auth_token_var` provides the token used by the GitOps controller
+(`ARGOCD_TOKEN` -> `$ARGOCD_TOKEN`) to authenticate against ArgoCD's
+API for the post-push sync. When `auth_token_var` is omitted, the
+argocd adapter falls back to the conventional `ARGOCD_AUTH_TOKEN` env
+var. The deploy stage commits the new image tag to the config repo and
+ArgoCD reconciles the change.
 
 ### SSH to a single host
 

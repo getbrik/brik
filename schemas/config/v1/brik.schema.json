@@ -698,6 +698,11 @@
           "type": "string",
           "minLength": 1
         },
+        "auth_token_var": {
+          "description": "Name of the environment variable that contains the auth token used to drive the GitOps `controller` (e.g. `ARGOCD_TOKEN`). Brik resolves the value indirectly at deploy time and passes it to the controller adapter. Falls back to the controller's default env var (`ARGOCD_AUTH_TOKEN` for argocd) when not set. Applies when `controller: argocd`.",
+          "type": "string",
+          "minLength": 1
+        },
         "chart": {
           "description": "Helm chart path or repository reference for the helm target (e.g. ./charts/myapp or oci://registry/chart).",
           "type": "string",
