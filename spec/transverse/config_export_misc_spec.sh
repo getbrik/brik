@@ -309,6 +309,32 @@ YAML
         The output should equal ""
       End
     End
+
+    Describe "with source"
+      setup_source() {
+        TEMP_CONFIG="$(mktemp)"
+        cat > "$TEMP_CONFIG" <<'YAML'
+version: 1
+deploy:
+  environments:
+    staging:
+      target: ssh
+      host: staging.example.com
+      remote_path: /srv/app
+      source: ./build/output
+YAML
+        export BRIK_CONFIG_FILE="$TEMP_CONFIG"
+      }
+      cleanup_source() { rm -f "$TEMP_CONFIG"; }
+      Before 'setup_source'
+      After 'cleanup_source'
+
+      It "exports BRIK_DEPLOY_STAGING_SOURCE"
+        export_and_check() { config.export_deploy_vars; printf '%s' "${BRIK_DEPLOY_STAGING_SOURCE:-}"; }
+        When call export_and_check
+        The output should equal "./build/output"
+      End
+    End
   End
 
   # =========================================================================

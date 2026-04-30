@@ -729,6 +729,11 @@
           "type": "string",
           "minLength": 1
         },
+        "source": {
+          "description": "Local path to the artifact directory uploaded by the `ssh` and `compose` targets, or to the rendered manifest tree pushed to the GitOps repo by the `gitops` target. Relative to the project root.",
+          "type": "string",
+          "minLength": 1
+        },
         "strategy": {
           "description": "Deployment strategy for targets that support it.",
           "type": "string",

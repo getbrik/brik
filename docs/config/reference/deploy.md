@@ -39,17 +39,18 @@ sections.
 | `target` | enum | -- | `ssh`, `compose`, `k8s`, `helm`, `gitops`. Required when the environment is not fully covered by a `workflow` profile. |
 | `when` | string | (always true) | Condition evaluated by the shared library: `branch == 'main'`, `tag =~ 'v*'`, `$CI_PIPELINE_SOURCE == 'merge_request_event'`. |
 | `env_file` | string | -- | Path to a `KEY=VALUE` env file sourced before the deploy. Brik fails if the file is declared but missing. CI environment variables take precedence over file entries. |
+| `source` | string | -- | Local path to the artifact directory uploaded by the `ssh` and `compose` targets, or to the rendered manifest tree pushed to the GitOps repo by the `gitops` target. Relative to the project root. |
 | `strategy` | enum | -- | Rollout strategy: `rolling`, `blue-green`, `canary`. Wired for `k8s` and `helm` targets - the deploy stage routes through `rollout.strategy.run` when set. `ssh` and `compose` targets ignore the field (no native primitive). Rollback callbacks are not yet implemented for `k8s` and `helm`, so `blue-green` and `canary` currently behave like `rolling` on deploy failure (no automatic switch-back); a follow-up chantier wires the rollback path. |
 
 ### Target-specific fields
 
 | Target | Fields |
 |--------|--------|
-| `ssh` | `host`, `remote_path`, `restart_cmd`, `compose_file` (when copying a compose stack) |
-| `compose` | `compose_file` |
+| `ssh` | `host`, `remote_path`, `restart_cmd`, `compose_file` (when copying a compose stack), `source` |
+| `compose` | `compose_file`, `source` |
 | `k8s` | `namespace`, `manifest` |
 | `helm` | `namespace`, `chart`, `release_name`, `values` |
-| `gitops` | `repo`, `path`, `controller`, `app_name` |
+| `gitops` | `repo`, `path`, `controller`, `app_name`, `source` |
 
 Targets ignore fields that don't apply to them; the schema rejects
 unknown keys via `additionalProperties: false`.

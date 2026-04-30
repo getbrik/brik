@@ -123,6 +123,40 @@ YAML
       When call run_deploy_log
       The error should include "deploying to staging"
     End
+
+    Describe "passes --source to deploy.run when source is set"
+      setup_source_deploy() {
+        cat > "$BRIK_CONFIG_FILE" <<'YAML'
+version: 1
+project:
+  name: test
+  stack: node
+deploy:
+  environments:
+    staging:
+      target: ssh
+      host: staging.example.com
+      remote_path: /srv/app
+      source: ./build/output
+YAML
+        config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
+      }
+      Before 'setup_source_deploy'
+
+      It "passes --source to deploy.run when source is set"
+        run_deploy_source() {
+          brik.use() { :; }
+          deploy.ssh.run() { printf '%s ' "$@"; printf '\n'; return 0; }
+
+          local ctx
+          ctx="$(context.create "deploy")" 2>/dev/null || ctx="$(mktemp)"
+          stages.deploy "$ctx" 2>/dev/null
+        }
+        When call run_deploy_source
+        The output should include "--source ./build/output"
+        The output should include "--target ssh"
+      End
+    End
   End
 
   Describe "with deploy.environments[].strategy"
