@@ -301,11 +301,9 @@ populated and surfaced as CI artefacts (GitLab `coverage_report` /
 
 | Key | Type | Required | Default | Description |
 |-----|------|----------|---------|-------------|
-| `test.reports.enabled` | boolean | no | `false` | Master switch. When false, the test runner uses its native defaults (no coverage, no JUnit). |
-| `test.reports.coverage.enabled` | boolean | no | `true` | Whether to produce a coverage report. Ignored when `reports.enabled=false`. |
+| `test.reports.enabled` | boolean | no | `false` | Single master switch for both coverage and JUnit emission. When false, the test runner uses its native defaults (no coverage, no JUnit). |
 | `test.reports.coverage.format` | enum | no | `auto` | One of `lcov`, `cobertura`, `jacoco`, `auto`. `auto` picks the native format per stack: lcov for node/rust, cobertura for python/dotnet, jacoco for java. |
 | `test.reports.coverage.output_dir` | string | no | `coverage` | Directory where the coverage report is written. |
-| `test.reports.junit.enabled` | boolean | no | `true` | Whether to produce a JUnit-compatible XML report. |
 | `test.reports.junit.output_path` | string | no | `reports/junit.xml` | Path where the JUnit XML file is written. |
 
 The configured paths are exposed to downstream stages via four

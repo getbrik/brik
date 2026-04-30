@@ -189,14 +189,10 @@
               "default": false
             },
             "coverage": {
-              "description": "Coverage report configuration.",
+              "description": "Coverage report configuration. Gated by the parent `reports.enabled` toggle.",
               "type": "object",
               "additionalProperties": false,
               "properties": {
-                "enabled": {
-                  "type": "boolean",
-                  "default": true
-                },
                 "format": {
                   "description": "Coverage report format. Stack defaults: lcov for node/rust, cobertura for python/dotnet, jacoco for java. Use 'auto' (default) to let Brik pick.",
                   "type": "string",
@@ -211,14 +207,10 @@
               }
             },
             "junit": {
-              "description": "JUnit-compatible XML test report configuration.",
+              "description": "JUnit-compatible XML test report configuration. Gated by the parent `reports.enabled` toggle.",
               "type": "object",
               "additionalProperties": false,
               "properties": {
-                "enabled": {
-                  "type": "boolean",
-                  "default": true
-                },
                 "output_path": {
                   "description": "Path where the JUnit XML report is written. Default: reports/junit.xml.",
                   "type": "string",

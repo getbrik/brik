@@ -1,0 +1,7 @@
+# _drift_allowlist.txt
+# Schema leaves with no direct lib/ consumer.
+# Format: one dot-path per line, alphabetical. Lines starting with '#' are comments.
+# Each entry MUST be followed by an inline comment explaining why no consumer exists.
+# Cap: 10 entries maximum. If more are needed, improve the detector first.
+
+.version  # const: 1, schema marker only -- validated by schema validator, not exported as a runtime var
