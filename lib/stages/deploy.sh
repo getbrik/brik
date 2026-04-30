@@ -11,6 +11,12 @@ stages.deploy() {
     # shellcheck disable=SC2034
     local context_file="$1"
 
+    # Wrapper for rollout.strategy.run; closes over _deploy_fn and deploy_args
+    # via dynamic scoping so rollout.strategy.run receives a no-arg function name.
+    _brik.deploy._strategy_wrapper() {
+        "$_deploy_fn" "${deploy_args[@]}" "$@"
+    }
+
     config.export_deploy_vars
 
     brik.use conditions
@@ -105,6 +111,26 @@ stages.deploy() {
             ((deploy_failed++))
             continue
         fi
+        local strategy_var="BRIK_DEPLOY_${upper_env}_STRATEGY"
+        local strategy
+        strategy="$(transverse.env.resolve_indirect "$strategy_var")"
+
+        if [[ -n "$strategy" ]]; then
+            case "$target" in
+                k8s|helm)
+                    brik.use rollout.strategy
+                    log.info "deploying $env_name with strategy: $strategy"
+                    rollout.strategy.run --type "$strategy" \
+                        --deploy-fn "_brik.deploy._strategy_wrapper" \
+                        || ((deploy_failed++))
+                    continue
+                    ;;
+                ssh|compose)
+                    log.debug "strategy '$strategy' ignored for target '$target' (no native primitive)"
+                    ;;
+            esac
+        fi
+
         log.info "deploying with target: $target"
         "$_deploy_fn" "${deploy_args[@]}" || ((deploy_failed++))
     done <<< "$BRIK_DEPLOY_ENVIRONMENTS"

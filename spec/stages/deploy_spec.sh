@@ -125,6 +125,228 @@ YAML
     End
   End
 
+  Describe "with deploy.environments[].strategy"
+    Include "$BRIK_HOME/lib/rollout/strategy.sh"
+
+    setup_strategy() {
+      cat > "$BRIK_CONFIG_FILE" <<'YAML'
+version: 1
+project:
+  name: test
+  stack: node
+deploy:
+  environments:
+    staging:
+      target: k8s
+      namespace: staging-ns
+      strategy: rolling
+YAML
+      config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
+    }
+    Before 'setup_strategy'
+
+    It "k8s + rolling -> rollout.strategy.run invoked with correct args"
+      run_k8s_rolling() {
+        local strategy_type_captured="" deploy_fn_captured=""
+        brik.use() { :; }
+        deploy.k8s.run() { return 0; }
+        rollout.strategy.run() {
+          while [[ $# -gt 0 ]]; do
+            case "$1" in
+              --type)      strategy_type_captured="$2"; shift 2 ;;
+              --deploy-fn) deploy_fn_captured="$2";     shift 2 ;;
+              *)           shift ;;
+            esac
+          done
+          printf 'strategy_type=%s deploy_fn=%s\n' "$strategy_type_captured" "$deploy_fn_captured"
+          return 0
+        }
+        local ctx
+        ctx="$(context.create "deploy")" 2>/dev/null || ctx="$(mktemp)"
+        stages.deploy "$ctx" 2>/dev/null
+      }
+      When call run_k8s_rolling
+      The output should include "strategy_type=rolling"
+      The output should include "deploy_fn=_brik.deploy._strategy_wrapper"
+    End
+
+    It "helm + blue-green -> rollout.strategy.run invoked with correct args"
+      run_helm_blue_green() {
+        cat > "$BRIK_CONFIG_FILE" <<'YAML'
+version: 1
+project:
+  name: test
+  stack: node
+deploy:
+  environments:
+    staging:
+      target: helm
+      namespace: staging-ns
+      strategy: blue-green
+YAML
+        config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
+        local strategy_type_captured="" deploy_fn_captured=""
+        brik.use() { :; }
+        deploy.helm.run() { return 0; }
+        rollout.strategy.run() {
+          while [[ $# -gt 0 ]]; do
+            case "$1" in
+              --type)      strategy_type_captured="$2"; shift 2 ;;
+              --deploy-fn) deploy_fn_captured="$2";     shift 2 ;;
+              *)           shift ;;
+            esac
+          done
+          printf 'strategy_type=%s deploy_fn=%s\n' "$strategy_type_captured" "$deploy_fn_captured"
+          return 0
+        }
+        local ctx
+        ctx="$(context.create "deploy")" 2>/dev/null || ctx="$(mktemp)"
+        stages.deploy "$ctx" 2>/dev/null
+      }
+      When call run_helm_blue_green
+      The output should include "strategy_type=blue-green"
+      The output should include "deploy_fn=_brik.deploy._strategy_wrapper"
+    End
+
+    It "ssh + rolling -> direct call (strategy logged at debug, rollout not invoked)"
+      run_ssh_rolling() {
+        cat > "$BRIK_CONFIG_FILE" <<'YAML'
+version: 1
+project:
+  name: test
+  stack: node
+deploy:
+  environments:
+    staging:
+      target: ssh
+      host: myhost
+      strategy: rolling
+YAML
+        config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
+        brik.use() { :; }
+        deploy.ssh.run() { printf 'DIRECT_CALL\n'; return 0; }
+        rollout.strategy.run() { printf 'STRATEGY_CALLED\n'; return 0; }
+        local ctx
+        ctx="$(context.create "deploy")" 2>/dev/null || ctx="$(mktemp)"
+        stages.deploy "$ctx" 2>/dev/null
+      }
+      When call run_ssh_rolling
+      The output should include "DIRECT_CALL"
+      The output should not include "STRATEGY_CALLED"
+    End
+
+    It "compose + canary -> direct call (strategy ignored, rollout not invoked)"
+      run_compose_canary() {
+        cat > "$BRIK_CONFIG_FILE" <<'YAML'
+version: 1
+project:
+  name: test
+  stack: node
+deploy:
+  environments:
+    staging:
+      target: compose
+      file: docker-compose.yml
+      strategy: canary
+YAML
+        config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
+        brik.use() { :; }
+        deploy.compose.run() { printf 'DIRECT_CALL\n'; return 0; }
+        rollout.strategy.run() { printf 'STRATEGY_CALLED\n'; return 0; }
+        local ctx
+        ctx="$(context.create "deploy")" 2>/dev/null || ctx="$(mktemp)"
+        stages.deploy "$ctx" 2>/dev/null
+      }
+      When call run_compose_canary
+      The output should include "DIRECT_CALL"
+      The output should not include "STRATEGY_CALLED"
+    End
+
+    It "k8s without strategy -> direct call preserved (regression guard)"
+      run_k8s_no_strategy() {
+        cat > "$BRIK_CONFIG_FILE" <<'YAML'
+version: 1
+project:
+  name: test
+  stack: node
+deploy:
+  environments:
+    staging:
+      target: k8s
+      namespace: staging-ns
+YAML
+        config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
+        brik.use() { :; }
+        deploy.k8s.run() { printf 'DIRECT_CALL\n'; return 0; }
+        rollout.strategy.run() { printf 'STRATEGY_CALLED\n'; return 0; }
+        local ctx
+        ctx="$(context.create "deploy")" 2>/dev/null || ctx="$(mktemp)"
+        stages.deploy "$ctx" 2>/dev/null
+      }
+      When call run_k8s_no_strategy
+      The output should include "DIRECT_CALL"
+      The output should not include "STRATEGY_CALLED"
+    End
+
+    It "k8s + rolling -> deploy_args correctly forwarded through wrapper"
+      run_k8s_rolling_args_forwarded() {
+        brik.use() { :; }
+        deploy.k8s.run() {
+          printf '%s\n' "$*"
+          return 0
+        }
+        # Spoof rollout.strategy.run: invoke wrapper directly to test forwarding
+        rollout.strategy.run() {
+          local deploy_fn_arg=""
+          while [[ $# -gt 0 ]]; do
+            case "$1" in
+              --deploy-fn) deploy_fn_arg="$2"; shift 2 ;;
+              *)           shift ;;
+            esac
+          done
+          # Call the wrapper with no extra args (simulates _exec_rolling with empty _cargs)
+          "$deploy_fn_arg"
+          return 0
+        }
+        local ctx
+        ctx="$(context.create "deploy")" 2>/dev/null || ctx="$(mktemp)"
+        stages.deploy "$ctx" 2>/dev/null
+      }
+      When call run_k8s_rolling_args_forwarded
+      The output should include "--target k8s"
+      The output should include "--env staging"
+      The output should include "--namespace staging-ns"
+    End
+
+    It "k8s + rolling -> deploy_args propagate through the REAL rollout.strategy.run (regression guard)"
+      run_k8s_rolling_real_strategy() {
+        # Source the real rollout.strategy.run instead of stubbing it.
+        # Guards against future re-introduction of the dynamic-scoping
+        # shadowing bug where a `local deploy_args` inside
+        # rollout.strategy.run would mask the outer one in stages.deploy
+        # and silently drop the actual deploy arguments.
+        unset _BRIK_ROLLOUT_STRATEGY_LOADED
+        brik.use() {
+          case "$1" in
+            rollout.strategy) . "$BRIK_HOME/lib/rollout/strategy.sh" ;;
+            *) : ;;
+          esac
+        }
+        deploy.k8s.run() {
+          printf '%s\n' "$*"
+          return 0
+        }
+        local ctx
+        ctx="$(context.create "deploy")" 2>/dev/null || ctx="$(mktemp)"
+        stages.deploy "$ctx" 2>/dev/null
+      }
+      When call run_k8s_rolling_real_strategy
+      The output should include "--target k8s"
+      The output should include "--env staging"
+      The output should include "--namespace staging-ns"
+    End
+  End
+
   Describe "with deploy condition (when)"
     setup_deploy_cond() {
       cat > "$BRIK_CONFIG_FILE" <<'YAML'

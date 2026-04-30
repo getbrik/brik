@@ -58,29 +58,32 @@ rollout.strategy.run() {
         return "$BRIK_EXIT_INVALID_INPUT"
     fi
 
-    # Parse deploy-fn string into array
-    local -a deploy_cmd
-    read -ra deploy_cmd <<< "$deploy_fn_str"
-    local deploy_fn_name="${deploy_cmd[0]}"
+    # Parse deploy-fn string into array. Locals are underscore-prefixed
+    # so they cannot shadow a caller's same-named variables under Bash
+    # dynamic scoping (a wrapper deploy-fn that reads its caller's
+    # `deploy_args` would otherwise see this empty array instead).
+    local -a _strategy_deploy_cmd
+    read -ra _strategy_deploy_cmd <<< "$deploy_fn_str"
+    local _strategy_deploy_fn_name="${_strategy_deploy_cmd[0]}"
     # shellcheck disable=SC2034
-    local -a deploy_args=("${deploy_cmd[@]:1}")
+    local -a _strategy_deploy_args=("${_strategy_deploy_cmd[@]:1}")
 
-    if ! declare -f "$deploy_fn_name" >/dev/null 2>&1; then
-        log.error "deploy-fn is not a declared function: $deploy_fn_name"
+    if ! declare -f "$_strategy_deploy_fn_name" >/dev/null 2>&1; then
+        log.error "deploy-fn is not a declared function: $_strategy_deploy_fn_name"
         return "$BRIK_EXIT_INVALID_INPUT"
     fi
 
     # Parse rollback-fn if provided
-    local -a rollback_cmd=()
-    local rollback_fn_name=""
-    local -a rollback_args=()
+    local -a _strategy_rollback_cmd=()
+    local _strategy_rollback_fn_name=""
+    local -a _strategy_rollback_args=()
     if [[ -n "$rollback_fn_str" ]]; then
-        read -ra rollback_cmd <<< "$rollback_fn_str"
-        rollback_fn_name="${rollback_cmd[0]}"
+        read -ra _strategy_rollback_cmd <<< "$rollback_fn_str"
+        _strategy_rollback_fn_name="${_strategy_rollback_cmd[0]}"
         # shellcheck disable=SC2034
-        rollback_args=("${rollback_cmd[@]:1}")
-        if ! declare -f "$rollback_fn_name" >/dev/null 2>&1; then
-            log.error "rollback-fn is not a declared function: $rollback_fn_name"
+        _strategy_rollback_args=("${_strategy_rollback_cmd[@]:1}")
+        if ! declare -f "$_strategy_rollback_fn_name" >/dev/null 2>&1; then
+            log.error "rollback-fn is not a declared function: $_strategy_rollback_fn_name"
             return "$BRIK_EXIT_INVALID_INPUT"
         fi
     fi
@@ -100,15 +103,18 @@ rollout.strategy.run() {
     case "$strategy_type" in
         rolling)
             _rollout.strategy._exec_rolling \
-                deploy_fn_name deploy_args rollback_fn_name rollback_args common_args
+                _strategy_deploy_fn_name _strategy_deploy_args \
+                _strategy_rollback_fn_name _strategy_rollback_args common_args
             ;;
         blue-green)
             _rollout.strategy._exec_blue_green \
-                deploy_fn_name deploy_args rollback_fn_name rollback_args common_args
+                _strategy_deploy_fn_name _strategy_deploy_args \
+                _strategy_rollback_fn_name _strategy_rollback_args common_args
             ;;
         canary)
             _rollout.strategy._exec_canary \
-                deploy_fn_name deploy_args rollback_fn_name rollback_args common_args
+                _strategy_deploy_fn_name _strategy_deploy_args \
+                _strategy_rollback_fn_name _strategy_rollback_args common_args
             ;;
     esac
 }
