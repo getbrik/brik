@@ -48,16 +48,16 @@ it does not change pipeline behaviour either.
 
 ## Supported framework values
 
-Each stack accepts a closed set of framework names; setting any other
-value crashes the test stage with `unsupported test framework`.
+Each stack accepts a closed set of framework names; the dispatcher
+rejects any other value before the test command is built.
 
 | Stack | Accepted `framework` values |
 |-------|------------------------------|
-| `node` | `jest`, `npm` (`vitest` and `mocha` are detected but the test command builder rejects them today) |
+| `node` | `jest`, `vitest`, `npm` |
 | `python` | `pytest`, `unittest`, `tox` |
 | `java` | `junit`, `maven`, `gradle` (`junit` is treated as Maven) |
 | `rust` | `cargo` |
-| `dotnet` | `dotnet` (`xunit` and `nunit` are detected but the test command builder rejects them today) |
+| `dotnet` | `dotnet`, `xunit`, `nunit` (aliases for the same `dotnet test` invocation; the runner is auto-detected from the project's `<PackageReference>`) |
 
 ## Stack defaults
 

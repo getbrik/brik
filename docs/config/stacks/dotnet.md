@@ -59,12 +59,10 @@ publish:
 - **`dotnet-format` covers lint AND format.** Brik wires the same tool
   into both sub-stages. Use `quality.lint.tool` / `quality.format.tool`
   if you want to swap one for an alternative analyzer.
-- **Only `framework: dotnet` works today.** The schema accepts any
-  string, and the framework dispatcher recognises `xunit` and `nunit`
-  as dotnet-stack values, but the test command builder only handles
-  `dotnet`. Setting `xunit` or `nunit` crashes the test stage with
-  `unsupported .NET test framework`. `dotnet test` picks up whatever
-  test framework the project file declares regardless.
+- **Supported frameworks: `dotnet`, `xunit`, `nunit`.** All three
+  emit the same `dotnet test` invocation -- the runner is auto-detected
+  from the `<PackageReference>` declared by the test project, so the
+  three values are aliases for the same command.
 - **`stack_version`** must be a string with the explicit minor
   (`"9.0"`, not `9.0` or `"9"`).
 

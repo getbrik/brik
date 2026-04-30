@@ -106,7 +106,7 @@ stacks.node.build() {
 
 # Build the test command for a given Node.js framework.
 # Usage: stacks.node.test_cmd <framework> <workspace> <report_dir>
-# Frameworks: jest, npm
+# Frameworks: jest, vitest, npm
 stacks.node.test_cmd() {
     local framework="$1" workspace="$2" report_dir="$3"
     local cmd=""
@@ -132,6 +132,16 @@ stacks.node.test_cmd() {
             elif [[ -n "$report_dir" ]]; then
                 # Legacy explicit report_dir argument (pre-test.reports.enabled).
                 cmd="$cmd --reporters=default --reporters=jest-junit"
+            fi
+            ;;
+        vitest)
+            cmd="npx vitest run"
+            if [[ "$reports_on" == "true" ]]; then
+                local cov_dir="${BRIK_TEST_COVERAGE_DIR:-coverage}"
+                local junit="${BRIK_TEST_JUNIT_PATH:-reports/junit.xml}"
+                cmd="${cmd} --reporter=default --reporter=junit --outputFile.junit='${junit}' --coverage --coverage.reporter=cobertura --coverage.reporter=text-summary --coverage.reportsDirectory='${cov_dir}'"
+                # Flatten cobertura output to the canonical coverage.xml location.
+                cmd="${cmd}; _rc=\$?; cp -f '${cov_dir}/cobertura-coverage.xml' '${cov_dir}/coverage.xml' 2>/dev/null || true; exit \$_rc"
             fi
             ;;
         npm)

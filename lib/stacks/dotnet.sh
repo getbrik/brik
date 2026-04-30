@@ -52,14 +52,14 @@ stacks.dotnet.build() {
 
 # Build the test command for a given .NET framework.
 # Usage: stacks.dotnet.test_cmd <framework> <workspace> <report_dir>
-# Frameworks: dotnet
+# Frameworks: dotnet, xunit, nunit
 stacks.dotnet.test_cmd() {
     local framework="$1"
     local cmd=""
     local reports_on="${BRIK_TEST_REPORTS_ENABLED:-false}"
 
     case "$framework" in
-        dotnet)
+        dotnet|xunit|nunit)
             cmd="dotnet test"
             if [[ "$reports_on" == "true" ]]; then
                 local cov_dir="${BRIK_TEST_COVERAGE_DIR:-coverage}"

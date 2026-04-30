@@ -46,7 +46,7 @@ stacks.detect() {
 # Returns 1 for unknown frameworks.
 stacks.detect_from_framework() {
     case "$1" in
-        jest|npm|vitest|mocha)      printf 'node' ;;
+        jest|npm|vitest)            printf 'node' ;;
         junit|maven|gradle)         printf 'java' ;;
         pytest|unittest|tox)        printf 'python' ;;
         cargo)                      printf 'rust' ;;

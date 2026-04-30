@@ -242,6 +242,11 @@ Describe "test/node.sh"
       The output should equal "npx jest --reporters=default --reporters=jest-junit"
     End
 
+    It "returns npx vitest run for vitest framework"
+      When call stacks.node.test_cmd "vitest" "/workspace" ""
+      The output should equal "npx vitest run"
+    End
+
     It "returns npm test for npm framework"
       When call stacks.node.test_cmd "npm" "/workspace" ""
       The output should equal "npm test"
@@ -299,6 +304,15 @@ Describe "test/node.sh"
       It "leaves npm framework untouched"
         When call stacks.node.test_cmd "npm" "/workspace" ""
         The output should equal "npm test"
+      End
+
+      It "injects coverage and junit flags for vitest with reports enabled"
+        When call stacks.node.test_cmd "vitest" "/workspace" ""
+        The output should include "npx vitest run"
+        The output should include "--reporter=junit"
+        The output should include "--coverage.reporter=cobertura"
+        The output should include "cp -f"
+        The output should include "exit \$_rc"
       End
     End
   End

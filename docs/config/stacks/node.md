@@ -70,13 +70,12 @@ publish:
 - **`npm test` vs `npx jest`.** When `scripts.test` is missing from
   `package.json`, Brik falls through to `npx jest` -- this fails
   silently if Jest is not installed.
-- **Only `framework: jest` and `framework: npm` work today.** The
-  framework dispatcher also recognises `vitest` and `mocha` as
-  Node-stack values, but the test command builder only handles `jest`
-  and `npm`. Setting `vitest` or `mocha` crashes the test stage with
-  `unsupported Node test framework`. To use a non-jest framework,
-  declare a `scripts.test` entry in `package.json` and set
-  `test.framework: npm`.
+- **Supported frameworks: `jest`, `vitest`, `npm`.** `vitest` emits
+  `npx vitest run` (with `--reporter=junit` and Cobertura coverage when
+  `test.reports.enabled: true`); `jest` emits `npx jest` with
+  `jest-junit`; `npm` defers to the `scripts.test` entry in
+  `package.json`. To use any other runner, declare a `scripts.test`
+  entry and set `test.framework: npm`.
 - **TypeScript type checking is opt-in.** Brik does not run `tsc`
   unless `quality.type_check.tool: tsc` is declared.
 - **`stack_version`** must be a string (`"22"`, not `22`). The schema

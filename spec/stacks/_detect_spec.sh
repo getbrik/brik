@@ -46,9 +46,10 @@ Describe "stacks/_detect.sh (stack detection primitives)"
       The output should equal "node"
     End
 
-    It "maps mocha to node"
+    It "returns failure for mocha (not supported)"
       When call stacks.detect_from_framework "mocha"
-      The output should equal "node"
+      The status should be failure
+      The output should equal ""
     End
 
     It "maps junit to java"

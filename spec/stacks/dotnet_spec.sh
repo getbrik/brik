@@ -159,6 +159,16 @@ Describe "test/dotnet.sh"
       The output should equal "dotnet test"
     End
 
+    It "emits dotnet test for xunit framework"
+      When call stacks.dotnet.test_cmd "xunit" "/workspace" ""
+      The output should equal "dotnet test"
+    End
+
+    It "emits dotnet test for nunit framework"
+      When call stacks.dotnet.test_cmd "nunit" "/workspace" ""
+      The output should equal "dotnet test"
+    End
+
     It "returns 7 for unsupported framework"
       When call stacks.dotnet.test_cmd "unknown" "/workspace" ""
       The status should equal 7
