@@ -10,6 +10,35 @@ _BRIK_STAGES_NOTIFY_LOADED=1
 # Private helpers
 # -----------------------------------------------------------------------------
 
+# Detect "CI aggregation mode" by looking for at least one valid fragment
+# file in <dir>. Per-stage fragments produced by report.write_fragment in
+# upstream stages have a stable signature (.stage + .schema_version).
+# pipeline-report.json (the aggregate target) is filtered out by basename so
+# a previous run does not re-trigger aggregation in local mode.
+#
+# Usage: _notify._is_ci_aggregation_mode <dir>
+# Returns: 0 if at least one fragment with the signature is present,
+#          1 otherwise (including missing or empty directory).
+_notify._is_ci_aggregation_mode() {
+    local dir="$1"
+    [[ -d "$dir" ]] || return 1
+    command -v jq >/dev/null 2>&1 || return 1
+
+    shopt -s nullglob
+    local f base
+    for f in "$dir"/*.json; do
+        base="$(basename "$f")"
+        [[ "$base" == "pipeline-report.json" ]] && continue
+        if jq -e 'type == "object" and has("stage") and has("schema_version")' \
+                "$f" >/dev/null 2>&1; then
+            shopt -u nullglob
+            return 0
+        fi
+    done
+    shopt -u nullglob
+    return 1
+}
+
 # Check if a notification should be sent based on the 'on' condition and
 # pipeline status.
 # Usage: _notify._should_send <on_condition> <pipeline_status>
@@ -266,6 +295,19 @@ stages.notify() {
     local _log_dir="${BRIK_LOG_DIR:-${BRIK_DEFAULT_LOG_DIR:-/tmp/brik/logs}}"
     local _report_md="${_log_dir}/pipeline-report.md"
     local _report_json="${_log_dir}/pipeline-report.json"
+
+    # CI mode: per-stage fragments shipped via job artifacts must be merged
+    # before the rest of stages.notify runs (cat, status derivation,
+    # workspace copy). report.aggregate_fragments writes the aggregated
+    # pipeline-report.{md,json} into BRIK_LOG_DIR. In local mode (no
+    # fragments to merge) this branch is a no-op and the existing
+    # pipeline.run-produced report is preserved.
+    local _ci_fragments_dir="${BRIK_WORKSPACE:-}/brik-artifacts"
+    if [[ -n "${BRIK_WORKSPACE:-}" ]] && \
+       _notify._is_ci_aggregation_mode "$_ci_fragments_dir"; then
+        report.aggregate_fragments "$_ci_fragments_dir" || \
+            log.warn "fragment aggregation failed (non-fatal)"
+    fi
 
     # Emit the rendered pipeline-report.md on stdout so the full stage table +
     # business section are visible in CI job logs. Falls back to a minimal
