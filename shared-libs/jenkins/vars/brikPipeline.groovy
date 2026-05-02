@@ -148,12 +148,24 @@ def call(Map params = [:]) {
                 // Java needs explicit overrides: JVM user.home ignores $HOME (uses getpwuid).
                 def javaEnvArgs = "-e MAVEN_OPTS=\"-Dmaven.repo.local=${env.WORKSPACE}/.m2/repository\" -e GRADLE_USER_HOME=${env.WORKSPACE}/.gradle"
                 def dockerArgs = "-e HOME=${env.WORKSPACE} ${javaEnvArgs} --memory=2g -v /var/run/docker.sock:/var/run/docker.sock ${networkArg} ${globalEnvArgs}"
+                // Stash the per-stage report fragment produced by
+                // report.write_fragment so the Notify stage can unstash all
+                // fragments and aggregate them via report.aggregate_fragments.
+                // allowEmpty:true keeps stages that did not emit a fragment
+                // (e.g. BRIK_DISABLE_REPORT_FRAGMENTS=1 or skipped stage)
+                // from breaking the pipeline.
+                def stashBrikArtifacts = { name ->
+                    stash includes: 'brik-artifacts/**',
+                          name: "brik-artifacts-${name}",
+                          allowEmpty: true
+                }
                 def runStage = { name ->
                     if (useDocker && resolvedImage) {
                         docker.image(resolvedImage).inside(dockerArgs) { brikStage(name, brikHome) }
                     } else {
                         brikStage(name, brikHome)
                     }
+                    stashBrikArtifacts(name)
                 }
                 def runInAnalysis = { name ->
                     if (useDocker) {
@@ -161,6 +173,7 @@ def call(Map params = [:]) {
                     } else {
                         brikStage(name, brikHome)
                     }
+                    stashBrikArtifacts(name)
                 }
                 def runInScanner = { name ->
                     if (useDocker) {
@@ -168,6 +181,7 @@ def call(Map params = [:]) {
                     } else {
                         brikStage(name, brikHome)
                     }
+                    stashBrikArtifacts(name)
                 }
                 // Deploy tools (ssh, rsync, helm, argocd CLI) read $HOME from
                 // /etc/passwd via getpwuid. brik-runner-deploy has no uid-1000
@@ -199,6 +213,7 @@ def call(Map params = [:]) {
                     } else {
                         brikStage(name, brikHome)
                     }
+                    stashBrikArtifacts(name)
                 }
 
                 runStageWithReporting('Release')        { runStage('release') }
@@ -234,6 +249,20 @@ def call(Map params = [:]) {
                 // webhook timeout) does not turn a SUCCESS into a FAILURE.
                 stage('Notify') {
                     try {
+                        // Unstash all per-stage fragments shipped by upstream
+                        // stages so report.aggregate_fragments (called from
+                        // stages.notify in CI mode) can merge them into the
+                        // pipeline-report. Missing stashes are expected when
+                        // a stage was skipped (e.g. release/package/deploy
+                        // gated by tag rules) - swallow the exception.
+                        ['init', 'release', 'build', 'lint', 'sast', 'scan',
+                         'test', 'package', 'container-scan', 'deploy'].each { s ->
+                            try {
+                                unstash "brik-artifacts-${s}"
+                            } catch (Exception ue) {
+                                echo "[brik] no stash for ${s} (likely skipped)"
+                            }
+                        }
                         brikStage('notify', brikHome)
                         archiveArtifacts artifacts: 'brik-artifacts/**/*',
                             allowEmptyArchive: true,
