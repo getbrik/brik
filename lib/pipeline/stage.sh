@@ -44,6 +44,25 @@ _stage._load_runtime() {
 
 _stage._load_runtime
 
+# Print the current Unix time in milliseconds as a 13-digit integer.
+# Uses bash 5+ EPOCHREALTIME (fork-free) when available; falls back to
+# date +%s * 1000 (second precision, last resort) otherwise. bin/brik
+# enforces bash 5+ so the fallback should be unreachable in practice.
+_helpers.epoch_ms() {
+    # EPOCHREALTIME format: "<seconds>.<microseconds>" (always 6 frac digits
+    # on bash 5+). Concatenate seconds with the first 3 fraction digits
+    # as plain text to avoid arithmetic interpretation of leading zeros
+    # (e.g. "012" being read as octal by printf %d). The dot check guards
+    # against an externally-set EPOCHREALTIME without the expected shape.
+    if [[ "${EPOCHREALTIME:-}" == *.* ]]; then
+        local s="${EPOCHREALTIME%.*}"
+        local f="${EPOCHREALTIME#*.}000"
+        printf '%s%s\n' "$s" "${f:0:3}"
+    else
+        printf '%s000\n' "$(date +%s)"
+    fi
+}
+
 # Create a log file for a stage. Prints the path on stdout.
 stage.create_log_file() {
     local stage_name="$1"
@@ -117,19 +136,19 @@ stage.cleanup() {
 #   - Fragment write failures are non-fatal (log.warn) and never override
 #     the stage exit code.
 #
-# Usage: _stage._finalize_fragment <stage_name> <exit_code> <stage_start_epoch>
+# Usage: _stage._finalize_fragment <stage_name> <exit_code> <stage_start_ms>
 _stage._finalize_fragment() {
     local stage_name="$1"
     local exit_code="$2"
-    local stage_start_epoch="$3"
+    local stage_start_ms="$3"
 
     local log_dir="${BRIK_LOG_DIR:-${BRIK_DEFAULT_LOG_DIR:-/tmp/brik/logs}}"
     local backend="${log_dir}/pipeline-report.json"
     [[ -f "$backend" ]] || return 0
 
-    local stage_end_epoch duration_ms
-    stage_end_epoch="$(date +%s)"
-    duration_ms=$(( (stage_end_epoch - stage_start_epoch) * 1000 ))
+    local stage_end_ms duration_ms
+    stage_end_ms="$(_helpers.epoch_ms)"
+    duration_ms=$(( stage_end_ms - stage_start_ms ))
 
     report.record "$stage_name" "tech" "duration_ms" "$duration_ms" 2>/dev/null || true
     report.record "$stage_name" "tech" "exit_code" "$exit_code" 2>/dev/null || true
@@ -158,8 +177,8 @@ stage.run() {
     local context_file=""
     local log_file=""
     local exit_code=0
-    local stage_start_epoch
-    stage_start_epoch="$(date +%s)"
+    local stage_start_ms
+    stage_start_ms="$(_helpers.epoch_ms)"
 
     banner.stage "$stage_name"
     log.info "starting stage: $stage_name"
@@ -175,7 +194,7 @@ stage.run() {
         log.warn "pre-stage hook failed with code $exit_code, aborting stage"
         # best-effort: finalization must not mask the pre-stage hook error
         summary.build "$stage_name" "$context_file" "$log_file" "$exit_code" || true
-        _stage._finalize_fragment "$stage_name" "$exit_code" "$stage_start_epoch" || true
+        _stage._finalize_fragment "$stage_name" "$exit_code" "$stage_start_ms" || true
         stage.cleanup "$context_file" "$log_file" || true
         return "$exit_code"
     }
@@ -223,7 +242,7 @@ stage.run() {
     hook.post_stage "$stage_name" "$context_file" "$log_file" "$exit_code" || true
 
     summary.build "$stage_name" "$context_file" "$log_file" "$exit_code" || true
-    _stage._finalize_fragment "$stage_name" "$exit_code" "$stage_start_epoch" || true
+    _stage._finalize_fragment "$stage_name" "$exit_code" "$stage_start_ms" || true
     stage.cleanup "$context_file" "$log_file" || true
 
     return "$exit_code"

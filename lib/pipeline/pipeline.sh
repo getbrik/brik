@@ -90,7 +90,7 @@ pipeline.run() {
 
     local -a stages=(init release build lint sast scan test package container-scan deploy notify)
     local had_failure=false
-    local stage stage_start stage_end duration_ms rc
+    local stage stage_start_ms stage_end_ms duration_ms rc
 
     for stage in "${stages[@]}"; do
         if _pipeline._should_skip "$stage" "$with_release" "$with_package" "$with_deploy"; then
@@ -102,11 +102,11 @@ pipeline.run() {
             continue
         fi
 
-        stage_start="$(date +%s)"
+        stage_start_ms="$(_helpers.epoch_ms)"
         stage.dispatch "$stage"
         rc=$?
-        stage_end="$(date +%s)"
-        duration_ms=$(( (stage_end - stage_start) * 1000 ))
+        stage_end_ms="$(_helpers.epoch_ms)"
+        duration_ms=$(( stage_end_ms - stage_start_ms ))
 
         report.record "$stage" "tech" "duration_ms" "$duration_ms" || true
         report.record "$stage" "tech" "exit_code" "$rc" || true

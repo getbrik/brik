@@ -151,6 +151,34 @@ Describe "stage.run wires report.write_fragment"
   End
 
   # ---------------------------------------------------------------------------
+  # Sub-second duration_ms precision
+  #
+  # Proves _stage._finalize_fragment uses a millisecond clock source. With
+  # the previous second-precision implementation (date +%s), durations were
+  # always multiples of 1000; with millisecond precision the recorded value
+  # exposes a non-thousand component. The assertion stays tolerant of slow
+  # CI by checking `duration_ms > 0 AND duration_ms % 1000 != 0` rather than
+  # an arbitrary wall-clock upper bound.
+  # ---------------------------------------------------------------------------
+  Describe "sub-second duration_ms"
+    Before 'setup_dirs'
+    After 'cleanup_dirs'
+
+    sleep_logic() { sleep 0.4; return 0; }
+
+    It "records duration_ms as a non-multiple of 1000 for a sub-second stage"
+      measure() {
+        stage.run "build" "sleep_logic" >/dev/null 2>&1
+        local d
+        d="$(jq '.duration_ms' "$SR_WORKSPACE/brik-artifacts/build.json")"
+        [[ "$d" -gt 0 && $((d % 1000)) -ne 0 ]]
+      }
+      When call measure
+      The status should be success
+    End
+  End
+
+  # ---------------------------------------------------------------------------
   # Pre-stage hook abort path also emits a fragment
   # ---------------------------------------------------------------------------
   Describe "pre-stage hook abort path"
