@@ -1,0 +1,158 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://brik.dev/schemas/report/v1/aggregate.schema.json",
+  "title": "Brik Pipeline Report Aggregate v1",
+  "description": "Cross-stage aggregated pipeline report. Built by stages.notify (in CI mode) by aggregating per-stage fragments produced by report.write_fragment, or directly by pipeline.run in local mode. Lives at ${BRIK_LOG_DIR}/pipeline-report.json and is uploaded to brik-artifacts/ for CI artifact retention. Acts as the audit-grade artefact of pipeline execution: provenance (commit, image), security (sast/scan/container-scan critical findings), test outcomes, deployment target.",
+  "type": "object",
+  "required": ["schema_version", "pipeline", "stages", "summary"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "description": "Aggregate schema version. Locked to '1.0' for v1.",
+      "type": "string",
+      "const": "1.0"
+    },
+    "pipeline": {
+      "description": "Pipeline-level metadata: identity, provenance, timing, overall status.",
+      "type": "object",
+      "required": ["id", "platform", "project", "started_at", "finished_at", "status"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "description": "CI pipeline identifier (string for portability across platforms).",
+          "type": "string"
+        },
+        "url": {
+          "description": "Direct URL to the pipeline view, when the platform exposes one.",
+          "type": "string"
+        },
+        "platform": {
+          "description": "CI platform that ran the pipeline.",
+          "type": "string",
+          "enum": ["gitlab", "jenkins", "local", "github"]
+        },
+        "project": {
+          "description": "Project name (from .project.name in brik.yml).",
+          "type": "string"
+        },
+        "commit": {
+          "description": "Git commit metadata. Optional in v1 because each enrichment subchantier writes its slice via init.business.commit.*.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "sha": { "type": "string" },
+            "short_sha": { "type": "string" },
+            "ref": { "type": "string" },
+            "branch": { "type": "string" },
+            "tag": { "type": "string" }
+          }
+        },
+        "started_at": {
+          "description": "ISO-8601 timestamp with timezone offset, recorded at pipeline start.",
+          "type": "string"
+        },
+        "finished_at": {
+          "description": "ISO-8601 timestamp with timezone offset, recorded by report.aggregate_fragments or report.render.",
+          "type": "string"
+        },
+        "duration_ms": {
+          "description": "Pipeline wall-clock duration in milliseconds.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "status": {
+          "description": "Overall pipeline status: 'failed' if any fragment has status=failed, 'skipped' if all stages were skipped, 'success' otherwise.",
+          "type": "string",
+          "enum": ["success", "failed", "skipped"]
+        },
+        "triggered_by": {
+          "description": "Origin of the pipeline run: a user identifier, 'push', 'schedule', 'manual', etc.",
+          "type": "string"
+        }
+      }
+    },
+    "stages": {
+      "description": "Array of per-stage fragments, one per executed stage. Order matches CI stage order. Each item validates against the fragment schema.",
+      "type": "array",
+      "items": {
+        "$ref": "https://brik.dev/schemas/report/v1/fragment.schema.json"
+      }
+    },
+    "summary": {
+      "description": "Cross-stage aggregated metrics. Open object: keys may be absent when a stage did not run, and additional keys may be added in subchantiers without bumping schema_version.",
+      "type": "object",
+      "required": ["stages"],
+      "additionalProperties": true,
+      "properties": {
+        "stages": {
+          "description": "Stage outcome counts.",
+          "type": "object",
+          "required": ["total", "passed", "failed", "skipped"],
+          "additionalProperties": false,
+          "properties": {
+            "total":   { "type": "integer", "minimum": 0 },
+            "passed":  { "type": "integer", "minimum": 0 },
+            "failed":  { "type": "integer", "minimum": 0 },
+            "skipped": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "security": {
+          "description": "Cross-stage security signal: critical findings per scanner and total vulnerabilities.",
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "critical_findings": {
+              "type": "object",
+              "additionalProperties": true,
+              "properties": {
+                "sast":           { "type": "integer", "minimum": 0 },
+                "scan_deps":      { "type": "integer", "minimum": 0 },
+                "container_scan": { "type": "integer", "minimum": 0 }
+              }
+            },
+            "total_vulnerabilities": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "test": {
+          "description": "Test summary projected from the test fragment's business payload.",
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "total":             { "type": "integer", "minimum": 0 },
+            "passed":            { "type": "integer", "minimum": 0 },
+            "failed":            { "type": "integer", "minimum": 0 },
+            "skipped":           { "type": "integer", "minimum": 0 },
+            "coverage_line_pct": { "type": "number" }
+          }
+        },
+        "artifacts": {
+          "description": "Build artefact summary projected from package and deploy fragments.",
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "image":        { "type": "string" },
+            "version":      { "type": "string" },
+            "deployed_to":  { "type": "string" }
+          }
+        }
+      }
+    },
+    "proof": {
+      "description": "Optional proof envelope: hash of the report itself, links to retained artefacts, signature flag. v1 always emits signed=false; supply-chain signing is a Phase 4 concern.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "report_sha256": { "type": "string" },
+        "artifact_urls": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "gitlab":  { "type": "string" },
+            "jenkins": { "type": "string" }
+          }
+        },
+        "signed": { "type": "boolean" }
+      }
+    }
+  }
+}

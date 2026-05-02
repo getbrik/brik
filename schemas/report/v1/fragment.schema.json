@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://brik.dev/schemas/report/v1/fragment.schema.json",
+  "title": "Brik Pipeline Report Fragment v1",
+  "description": "Per-stage report fragment emitted by stage.run after each stage completes. In multi-container CI (GitLab, Jenkins) each stage writes its fragment to brik-artifacts/<stage>.json; the notify stage aggregates all fragments via report.aggregate_fragments. Fragments are forward-compatible: the schema_version field is locked to '1.0' for v1 and consumers warn-and-skip on mismatch.",
+  "type": "object",
+  "required": ["schema_version", "stage", "timestamp", "rc", "status", "runner"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "description": "Fragment schema version. Locked to '1.0' for v1.",
+      "type": "string",
+      "const": "1.0"
+    },
+    "stage": {
+      "description": "Stage name (lower-case, kebab-case for multi-word names).",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$"
+    },
+    "timestamp": {
+      "description": "ISO-8601 timestamp with timezone offset, recorded when the fragment is written (after the stage logic returns).",
+      "type": "string"
+    },
+    "duration_ms": {
+      "description": "Stage wall-clock duration in milliseconds. Optional. Mirrors the value already recorded by summary.build.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "rc": {
+      "description": "Stage exit code. 0 = success or skipped, non-zero = failure.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "status": {
+      "description": "Stage status. 'skipped' covers config-skip cases (e.g. quality.lint.enabled=false) where rc=0 but the stage did not execute its full logic.",
+      "type": "string",
+      "enum": ["success", "failed", "skipped"]
+    },
+    "runner": {
+      "description": "Provenance of the execution environment.",
+      "type": "object",
+      "required": ["platform"],
+      "additionalProperties": false,
+      "properties": {
+        "platform": {
+          "description": "CI platform on which this stage ran.",
+          "type": "string",
+          "enum": ["gitlab", "jenkins", "local", "github"]
+        },
+        "image": {
+          "description": "Docker image reference of the runner container, when applicable.",
+          "type": "string"
+        },
+        "job_url": {
+          "description": "Direct URL to the CI job log, when the platform exposes one.",
+          "type": "string"
+        }
+      }
+    },
+    "tech": {
+      "description": "Technical traceability payload. Open object: per-stage sub-chantiers (Phase 3) populate stack-specific fields without bumping schema_version.",
+      "type": "object",
+      "additionalProperties": true
+    },
+    "business": {
+      "description": "Business outcome payload. Open object: per-stage sub-chantiers (Phase 3) populate domain-specific fields without bumping schema_version.",
+      "type": "object",
+      "additionalProperties": true
+    }
+  }
+}
