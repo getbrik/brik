@@ -189,10 +189,41 @@ stage.run("build", stages.build)
   ├─ hook.post_stage           # Post-stage hook (best effort)
   │
   ├─ summary.build             # Generate stage summary
+  ├─ _stage._finalize_fragment # Record tech.{duration_ms,exit_code,status}
+  │                            #   into pipeline-report.json + emit per-stage
+  │                            #   fragment to brik-artifacts/<stage>.json
+  │                            #   (skip when BRIK_DISABLE_REPORT_FRAGMENTS=1)
   ├─ stage.cleanup             # Remove temp files
   │
   └─ return exit_code
 ```
+
+### Pipeline report in CI mode
+
+The fragment / aggregate split makes `pipeline-report.{md,json}` work
+identically in local mode and multi-container CI:
+
+- **Local mode** (`brik run pipeline`). One process, one `$BRIK_LOG_DIR`.
+  `pipeline.run` calls `report.init`, every stage records into the same
+  `pipeline-report.json` backend, and `report.render` produces the final
+  Markdown / JSON pair. Each `stage.run` invocation also writes a
+  `brik-artifacts/<stage>.json` fragment (harmless side effect, used as
+  CI artifact when the same workspace is uploaded).
+- **CI mode** (GitLab, Jenkins). Each stage runs in its own container with
+  its own `$BRIK_LOG_DIR`. The runtime cannot share the JSON backend across
+  containers, so each stage ships `brik-artifacts/<stage>.json` as a job
+  artifact (GitLab `artifacts.paths`) or stash (Jenkins). The Notify job
+  declares `needs: artifacts: true` (or `unstash`-es each upstream stash),
+  invokes `stages.notify`, which detects "CI aggregation mode" by the
+  presence of valid fragments and calls `report.aggregate_fragments` to
+  merge them into the canonical `pipeline-report.{md,json}` before printing
+  / archiving.
+
+Fragments and aggregate are versioned. Both schemas live under
+`schemas/report/v1/` (`fragment.schema.json`, `aggregate.schema.json`),
+draft 2020-12, with `schema_version` const-locked to `"1.0"` for v1.
+Aggregator behavior on schema mismatch is **warn-and-skip** so a future
+`v2.0` fragment landing in a `v1.0` consumer does not abort the pipeline.
 
 Key decisions:
 - **Never `exit`**: stages return exit codes, they never call `exit` directly.
@@ -221,7 +252,8 @@ brik/
 │  │  ├─ loader.sh                 #   Module loader (brik.use, 3-level resolution)
 │  │  ├─ logging.sh                #   Structured logging (log.info, log.error, etc.)
 │  │  ├─ context.sh                #   Lifecycle-only context (create, _context._* privates)
-│  │  ├─ report.sh                 #   Pipeline report (report.record / render)
+│  │  ├─ report.sh                 #   Pipeline report (report.record / render
+│  │  │                             #     + report.write_fragment / aggregate_fragments)
 │  │  ├─ hooks.sh                  #   Pre/post stage hooks
 │  │  ├─ error.sh                  #   Exit codes and error handling
 │  │  ├─ summary.sh                #   Stage summary generation
