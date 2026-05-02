@@ -43,6 +43,22 @@ stages.package() {
 
     log.info "building image: ${BRIK_PACKAGE_DOCKER_IMAGE}:${_app_tag}"
 
+    # Pipeline-report enrichment (chantier 20260502 L2.C.4). business.registry.*,
+    # business.signature.* (cosign, F.1), and business.sbom.* (CycloneDX, F.2)
+    # are deferred. business.publish.targets is also deferred.
+    report.record "package" "tech" "packager" "docker" 2>/dev/null || true
+    if [[ -n "${BRIK_PACKAGE_DOCKER_DOCKERFILE:-}" ]]; then
+        report.record "package" "tech" "dockerfile" "$BRIK_PACKAGE_DOCKER_DOCKERFILE" 2>/dev/null || true
+    fi
+    if command -v jq >/dev/null 2>&1; then
+        local _img_obj
+        _img_obj="$(jq -nc \
+            --arg name "$BRIK_PACKAGE_DOCKER_IMAGE" \
+            --arg tag  "$_app_tag" \
+            '{name: $name, tag: $tag, full_name: ($name + ":" + $tag)}')"
+        report.record_object "package" "business" "image" "$_img_obj" 2>/dev/null || true
+    fi
+
     stacks.docker.build "${docker_args[@]}"
     result=$?
 

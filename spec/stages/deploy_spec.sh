@@ -36,10 +36,47 @@ Describe "stages.deploy"
       "$BRIK_LOG_DIR/pipeline-report.json" 2>/dev/null
   }
 
+  read_deploy_tech_json() {
+    local key="$1"
+    jq -c --arg k "$key" \
+      '.stages[] | select(.name == "deploy") | .tech[$k] // empty' \
+      "$BRIK_LOG_DIR/pipeline-report.json" 2>/dev/null
+  }
+
   It "is callable as a function"
     callable_check() { declare -f stages.deploy >/dev/null; }
     When call callable_check
     The status should be success
+  End
+
+  It "records deploy.tech.environments as an array of configured env names"
+    run_deploy_envs() {
+      cat > "$BRIK_CONFIG_FILE" <<'YAML'
+version: 1
+project:
+  name: test
+  stack: node
+deploy:
+  environments:
+    staging:
+      target: k8s
+      namespace: stg
+      when: branch == 'main'
+    prod:
+      target: k8s
+      namespace: prd
+      when: tag =~ 'v*'
+YAML
+      config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
+      brik.use() { :; }
+      conditions.eval() { return 1; }  # block actual deploys
+      local ctx
+      ctx="$(context.create "deploy")" 2>/dev/null || ctx="$(mktemp)"
+      stages.deploy "$ctx" >/dev/null 2>&1
+      read_deploy_tech_json "environments"
+    }
+    When call run_deploy_envs
+    The output should equal '["staging","prod"]'
   End
 
   It "records status skipped in the pipeline report when no environments"

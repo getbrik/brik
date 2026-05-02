@@ -34,10 +34,80 @@ Describe "stages.package"
       "$BRIK_LOG_DIR/pipeline-report.json" 2>/dev/null
   }
 
+  read_package_tech() {
+    local key="$1"
+    jq -r --arg k "$key" \
+      '.stages[] | select(.name == "package") | .tech[$k] // empty' \
+      "$BRIK_LOG_DIR/pipeline-report.json" 2>/dev/null
+  }
+
+  read_package_business_json() {
+    local key="$1"
+    jq -c --arg k "$key" \
+      '.stages[] | select(.name == "package") | .business[$k] // empty' \
+      "$BRIK_LOG_DIR/pipeline-report.json" 2>/dev/null
+  }
+
   It "is callable as a function"
     callable_check() { declare -f stages.package >/dev/null; }
     When call callable_check
     The status should be success
+  End
+
+  Describe "C.4 enrichment with docker image configured"
+    setup_pkg_full() {
+      cat > "$BRIK_CONFIG_FILE" <<'YAML'
+version: 1
+project:
+  name: test
+  stack: node
+package:
+  docker:
+    image: registry.example.com/myapp
+    dockerfile: deploy/Dockerfile
+YAML
+      config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
+    }
+    Before 'setup_pkg_full'
+
+    It "records package.tech.packager as docker"
+      run_pkg_packager() {
+        brik.use() { :; }
+        stacks.docker.build() { return 0; }
+        local ctx
+        ctx="$(context.create "package")" 2>/dev/null || ctx="$(mktemp)"
+        stages.package "$ctx" >/dev/null 2>&1
+        read_package_tech "packager"
+      }
+      When call run_pkg_packager
+      The output should equal "docker"
+    End
+
+    It "records package.tech.dockerfile from .package.docker.dockerfile"
+      run_pkg_dockerfile() {
+        brik.use() { :; }
+        stacks.docker.build() { return 0; }
+        local ctx
+        ctx="$(context.create "package")" 2>/dev/null || ctx="$(mktemp)"
+        stages.package "$ctx" >/dev/null 2>&1
+        read_package_tech "dockerfile"
+      }
+      When call run_pkg_dockerfile
+      The output should equal "deploy/Dockerfile"
+    End
+
+    It "records package.business.image as a nested object {name, tag, full_name}"
+      run_pkg_image_obj() {
+        brik.use() { :; }
+        stacks.docker.build() { return 0; }
+        local ctx
+        ctx="$(context.create "package")" 2>/dev/null || ctx="$(mktemp)"
+        stages.package "$ctx" >/dev/null 2>&1
+        read_package_business_json "image"
+      }
+      When call run_pkg_image_obj
+      The output should equal '{"name":"registry.example.com/myapp","tag":"1.0.0","full_name":"registry.example.com/myapp:1.0.0"}'
+    End
   End
 
   It "records status skipped in the pipeline report when no docker image"

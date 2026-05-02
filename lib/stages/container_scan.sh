@@ -45,6 +45,12 @@ stages.container_scan() {
         brik.use verify.scan.scan
     fi
 
+    # Pipeline-report enrichment (chantier 20260502 L2.C.4). business.{vulnerabilities,
+    # distro, base_image} and tech.target_digest are deferred (need scanner JSON
+    # parsing + docker inspect, addressed by F.2 SARIF/CycloneDX).
+    report.record "container-scan" "tech" "tool" "${BRIK_SECURITY_CONTAINER_TOOL:-auto}" 2>/dev/null || true
+    report.record "container-scan" "tech" "target_image" "$image" 2>/dev/null || true
+
     # pipeline.run records tech.status from our rc (see commit cf719f5).
     verify.scan.run "${BRIK_WORKSPACE}" --scans "container" --image "$image" --severity "$severity"
 }

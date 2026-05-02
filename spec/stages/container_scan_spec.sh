@@ -128,5 +128,55 @@ Describe "stages/container_scan.sh"
         The status should equal 10
       End
     End
+
+    Describe "C.4 enrichment with image configured"
+      setup_c4() {
+        export BRIK_CONFIG_FILE
+        BRIK_CONFIG_FILE="$(mktemp)"
+        printf 'version: 1\nproject:\n  name: test\n  stack: node\nsecurity:\n  container:\n    image: myapp:1.0.0\n' > "$BRIK_CONFIG_FILE"
+        CTX_FILE="$(mktemp)"
+        export BRIK_WORKSPACE
+        BRIK_WORKSPACE="$(mktemp -d)"
+        export BRIK_LOG_DIR
+        BRIK_LOG_DIR="$(mktemp -d)"
+        export BRIK_RUN_ID="cs-c4-fixture"
+        report.init >/dev/null 2>&1 || true
+        verify.scan.container.run() { return 0; }
+        verify.scan.run() { return 0; }
+      }
+      cleanup_c4() {
+        rm -f "$BRIK_CONFIG_FILE" "$CTX_FILE"
+        rm -rf "$BRIK_WORKSPACE" "$BRIK_LOG_DIR"
+        unset -f verify.scan.container.run verify.scan.run 2>/dev/null || true
+        unset BRIK_RUN_ID 2>/dev/null || true
+      }
+      Before 'setup_c4'
+      After 'cleanup_c4'
+
+      read_cs_tech() {
+        local key="$1"
+        jq -r --arg k "$key" \
+          '.stages[] | select(.name == "container-scan") | .tech[$k] // empty' \
+          "$BRIK_LOG_DIR/pipeline-report.json" 2>/dev/null
+      }
+
+      It "records container-scan.tech.target_image"
+        invoke_target() {
+          stages.container_scan "$CTX_FILE" >/dev/null 2>&1
+          read_cs_tech "target_image"
+        }
+        When call invoke_target
+        The output should equal "myapp:1.0.0"
+      End
+
+      It "records container-scan.tech.tool defaulting when no override"
+        invoke_tool() {
+          stages.container_scan "$CTX_FILE" >/dev/null 2>&1
+          read_cs_tech "tool"
+        }
+        When call invoke_tool
+        The output should equal "auto"
+      End
+    End
   End
 End

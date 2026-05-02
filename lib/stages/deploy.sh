@@ -30,6 +30,17 @@ stages.deploy() {
         return 0
     fi
 
+    # Pipeline-report enrichment (chantier 20260502 L2.C.4). Per-env details
+    # (target/strategy/namespace/url, image.deployed/digest, replicas, rollback,
+    # gitops.*) are deferred -- they require post-deploy state queries
+    # (kubectl, argocd, etc.) that are out of scope for this slice.
+    if command -v jq >/dev/null 2>&1; then
+        local _envs_arr
+        _envs_arr="$(printf '%s' "${BRIK_DEPLOY_ENVIRONMENTS}" \
+            | jq -Rsc 'split("\n") | map(select(length > 0))')"
+        report.record_object "deploy" "tech" "environments" "$_envs_arr" 2>/dev/null || true
+    fi
+
     local env_name upper_env
     local deploy_failed=0
 
