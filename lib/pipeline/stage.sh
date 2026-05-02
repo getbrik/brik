@@ -104,6 +104,49 @@ stage.cleanup() {
     return 0
 }
 
+# Record the stage's terminal tech.* fields into the pipeline-report backend
+# and emit the per-stage fragment for CI artifact aggregation. Idempotent
+# when called repeatedly (report.record upserts).
+#
+# Behavior:
+#   - No-op when the backend pipeline-report.json is absent (legacy callers
+#     that bypass pipeline.run / stage.dispatch).
+#   - Records tech.duration_ms, tech.exit_code, and tech.status (when not
+#     already set by the stage itself, e.g. config-skip pattern).
+#   - Calls report.write_fragment unless BRIK_DISABLE_REPORT_FRAGMENTS=1.
+#   - Fragment write failures are non-fatal (log.warn) and never override
+#     the stage exit code.
+#
+# Usage: _stage._finalize_fragment <stage_name> <exit_code> <stage_start_epoch>
+_stage._finalize_fragment() {
+    local stage_name="$1"
+    local exit_code="$2"
+    local stage_start_epoch="$3"
+
+    local log_dir="${BRIK_LOG_DIR:-${BRIK_DEFAULT_LOG_DIR:-/tmp/brik/logs}}"
+    local backend="${log_dir}/pipeline-report.json"
+    [[ -f "$backend" ]] || return 0
+
+    local stage_end_epoch duration_ms
+    stage_end_epoch="$(date +%s)"
+    duration_ms=$(( (stage_end_epoch - stage_start_epoch) * 1000 ))
+
+    report.record "$stage_name" "tech" "duration_ms" "$duration_ms" 2>/dev/null || true
+    report.record "$stage_name" "tech" "exit_code" "$exit_code" 2>/dev/null || true
+    if ! report.has_status "$stage_name"; then
+        if [[ "$exit_code" -eq 0 ]]; then
+            report.record "$stage_name" "tech" "status" "success" 2>/dev/null || true
+        else
+            report.record "$stage_name" "tech" "status" "failed" 2>/dev/null || true
+        fi
+    fi
+
+    [[ "${BRIK_DISABLE_REPORT_FRAGMENTS:-}" == "1" ]] && return 0
+    report.write_fragment "$stage_name" 2>/dev/null || \
+        log.warn "fragment write failed for stage ${stage_name} (non-fatal)"
+    return 0
+}
+
 # Main entry point for stage execution.
 # Usage: stage.run <stage_name> <logic_function> [args...]
 stage.run() {
@@ -115,6 +158,8 @@ stage.run() {
     local context_file=""
     local log_file=""
     local exit_code=0
+    local stage_start_epoch
+    stage_start_epoch="$(date +%s)"
 
     banner.stage "$stage_name"
     log.info "starting stage: $stage_name"
@@ -130,6 +175,7 @@ stage.run() {
         log.warn "pre-stage hook failed with code $exit_code, aborting stage"
         # best-effort: finalization must not mask the pre-stage hook error
         summary.build "$stage_name" "$context_file" "$log_file" "$exit_code" || true
+        _stage._finalize_fragment "$stage_name" "$exit_code" "$stage_start_epoch" || true
         stage.cleanup "$context_file" "$log_file" || true
         return "$exit_code"
     }
@@ -177,6 +223,7 @@ stage.run() {
     hook.post_stage "$stage_name" "$context_file" "$log_file" "$exit_code" || true
 
     summary.build "$stage_name" "$context_file" "$log_file" "$exit_code" || true
+    _stage._finalize_fragment "$stage_name" "$exit_code" "$stage_start_epoch" || true
     stage.cleanup "$context_file" "$log_file" || true
 
     return "$exit_code"

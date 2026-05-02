@@ -78,6 +78,16 @@ pipeline.run() {
 
     report.init || return "$?"
 
+    # Local mode treats per-stage fragments as a CI-only mechanism: pipeline.run
+    # produces the canonical pipeline-report.{md,json} directly via report.render
+    # below. Emitting fragments here would populate ${BRIK_WORKSPACE}/brik-artifacts/
+    # and trigger _notify._is_ci_aggregation_mode in stages.notify, which would
+    # overwrite the canonical report with an aggregate that lacks pipeline.id /
+    # url / commit metadata. Disable fragment emission for the duration of this
+    # function. The :- default lets an explicit caller override stay in effect
+    # (set BRIK_DISABLE_REPORT_FRAGMENTS=0 to opt back in for debugging).
+    export BRIK_DISABLE_REPORT_FRAGMENTS="${BRIK_DISABLE_REPORT_FRAGMENTS:-1}"
+
     local -a stages=(init release build lint sast scan test package container-scan deploy notify)
     local had_failure=false
     local stage stage_start stage_end duration_ms rc

@@ -166,6 +166,338 @@ _report._append_json() {
     return 0
 }
 
+# Write a per-stage report fragment to brik-artifacts/<stage>.json so CI
+# platforms (GitLab, Jenkins) can ship it as a job artifact and notify can
+# aggregate fragments back into a single pipeline-report at the end.
+#
+# The fragment is a snapshot of the backend pipeline-report.json entry for
+# this stage, wrapped in the v1 fragment envelope (schema_version, stage,
+# timestamp, rc, status, runner). When the backend has no entry for this
+# stage, the fragment is a stub with status=skipped, rc=0.
+#
+# Output path:
+#   - ${BRIK_WORKSPACE}/brik-artifacts/<stage>.json when BRIK_WORKSPACE is set
+#   - ${BRIK_LOG_DIR}/brik-artifacts/<stage>.json otherwise (local fallback)
+#
+# Runner provenance:
+#   - platform := BRIK_PLATFORM (default: local)
+#   - image    := BRIK_RUNNER_IMAGE (omitted when unset)
+#   - job_url  := CI_JOB_URL (GitLab) or BUILD_URL (Jenkins), omitted when unset
+#
+# Usage: report.write_fragment <stage_name>
+# Returns: 0 on success, BRIK_EXIT_INVALID_INPUT on bad args,
+#          BRIK_EXIT_MISSING_DEP if jq is absent, BRIK_EXIT_IO_FAILURE on
+#          backend missing or write failure.
+#
+# Note: the parameter is named `stage_name` rather than `stage` to avoid
+# dynamic-scope shadowing of any caller's `stage` local variable (Bash
+# locals are visible to callees through dynamic scope).
+report.write_fragment() {
+    if [[ $# -ne 1 ]]; then
+        error.raise "$BRIK_EXIT_INVALID_INPUT" \
+            "report.write_fragment expects 1 argument: stage (got $#)"
+        return "$?"
+    fi
+    local stage_name="$1"
+    if [[ -z "$stage_name" ]]; then
+        error.raise "$BRIK_EXIT_INVALID_INPUT" \
+            "report.write_fragment: stage name must not be empty"
+        return "$?"
+    fi
+
+    _report._require_jq || return "$?"
+
+    local backend
+    backend="$(_report._backend_path)"
+    [[ -f "$backend" ]] || {
+        log.error "report not initialized: $backend (call report.init first)"
+        return "$BRIK_EXIT_IO_FAILURE"
+    }
+
+    local fragment_dir="${BRIK_WORKSPACE:-${BRIK_LOG_DIR:-${BRIK_DEFAULT_LOG_DIR:-/tmp/brik/logs}}}/brik-artifacts"
+    mkdir -p "$fragment_dir" || {
+        log.error "cannot create fragment directory: $fragment_dir"
+        return "$BRIK_EXIT_IO_FAILURE"
+    }
+
+    local fragment_path="${fragment_dir}/${stage_name}.json"
+    local timestamp
+    timestamp="$(date +"%Y-%m-%dT%H:%M:%S%z")"
+    local platform="${BRIK_PLATFORM:-local}"
+    local image="${BRIK_RUNNER_IMAGE:-}"
+    local job_url="${CI_JOB_URL:-${BUILD_URL:-}}"
+
+    local tmp
+    tmp="$(mktemp "${fragment_path}.XXXXXX")" || {
+        log.error "cannot create temp fragment file"
+        return "$BRIK_EXIT_IO_FAILURE"
+    }
+
+    # KCOV_EXCL_START  -- jq script body is not bash code
+    jq \
+        --arg stage_name "$stage_name" \
+        --arg timestamp "$timestamp" \
+        --arg platform "$platform" \
+        --arg image "$image" \
+        --arg job_url "$job_url" \
+        '
+        ( [ .stages[] | select(.name == $stage_name) ][0] // {} ) as $entry
+        | ( $entry.tech     // {} ) as $tech
+        | ( $entry.business // {} ) as $business
+        | ( $tech.status    // "skipped" ) as $status
+        | ( ($tech.exit_code // 0) | tonumber? // 0 ) as $rc
+        | ( $tech.duration_ms ) as $duration_raw
+        | ( {
+            schema_version: "1.0",
+            stage: $stage_name,
+            timestamp: $timestamp,
+            rc: $rc,
+            status: $status,
+            runner: ( { platform: $platform }
+                      + ( if $image   != "" then { image:   $image   } else {} end )
+                      + ( if $job_url != "" then { job_url: $job_url } else {} end ) ),
+            tech: $tech,
+            business: $business
+          }
+          + ( if $duration_raw == null or $duration_raw == "" then {}
+              else { duration_ms: ($duration_raw | tonumber? // 0) } end ) )
+        ' "$backend" > "$tmp" || {
+        rm -f "$tmp"
+        log.error "cannot build fragment for stage: $stage_name"
+        return "$BRIK_EXIT_IO_FAILURE"
+    }
+    # KCOV_EXCL_STOP
+
+    mv "$tmp" "$fragment_path" || {
+        rm -f "$tmp"
+        log.error "cannot write fragment: $fragment_path"
+        return "$BRIK_EXIT_IO_FAILURE"
+    }
+
+    log.debug "fragment written: $fragment_path"
+    return 0
+}
+
+# Aggregate per-stage fragment files into a single pipeline-report.{md,json}
+# under $BRIK_LOG_DIR. Used by stages.notify in CI mode where each upstream
+# stage runs in its own container and ships its fragment as a job artifact.
+# In local mode this function is not called (pipeline.run already produces
+# the aggregate directly via report.record + report.render).
+#
+# Filtering rules:
+#   - <dir>/pipeline-report.json is ignored (it is the aggregate target).
+#   - Files that are not valid JSON are silently skipped.
+#   - Files lacking the fragment signature (.stage and .schema_version) are
+#     silently skipped (forward-compat with arbitrary brik-artifacts/ content).
+#   - Files with schema_version != "1.0" are warn-and-skipped (decision 7:
+#     forward-compat with future v2 fragments).
+#
+# Pipeline metadata sources (decision 5: env-first in v1):
+#   - pipeline.id        := BRIK_RUN_ID
+#   - pipeline.platform  := BRIK_PLATFORM (default "local")
+#   - pipeline.project   := BRIK_PROJECT_NAME (default "unnamed")
+#   - pipeline.started_at:= earliest fragment timestamp, or now when none
+#   - pipeline.finished_at:= now
+#   - pipeline.status    := "failed" if any stage failed, else "success"
+#
+# Usage: report.aggregate_fragments <dir>
+# Returns: 0 on success, BRIK_EXIT_INVALID_INPUT on bad args,
+#          BRIK_EXIT_MISSING_DEP if jq is absent, BRIK_EXIT_IO_FAILURE on
+#          missing dir or write failure.
+report.aggregate_fragments() {
+    if [[ $# -ne 1 ]]; then
+        if [[ $# -eq 0 ]]; then
+            error.raise "$BRIK_EXIT_INVALID_INPUT" \
+                "report.aggregate_fragments expects 1 argument: directory (got 0)"
+        else
+            error.raise "$BRIK_EXIT_INVALID_INPUT" \
+                "report.aggregate_fragments expects 1 argument: directory (got $#)"
+        fi
+        return "$?"
+    fi
+    local fragment_dir="$1"
+    if [[ ! -d "$fragment_dir" ]]; then
+        log.error "fragment directory not found: $fragment_dir"
+        return "$BRIK_EXIT_IO_FAILURE"
+    fi
+
+    _report._require_jq || return "$?"
+
+    local log_dir="${BRIK_LOG_DIR:-${BRIK_DEFAULT_LOG_DIR:-/tmp/brik/logs}}"
+    mkdir -p "$log_dir" || {
+        log.error "cannot create log directory: $log_dir"
+        return "$BRIK_EXIT_IO_FAILURE"
+    }
+
+    # Collect valid fragment paths into a tmp index file.
+    local valid_list
+    valid_list="$(mktemp)" || {
+        log.error "cannot create temp index"
+        return "$BRIK_EXIT_IO_FAILURE"
+    }
+
+    shopt -s nullglob
+    local f base
+    for f in "$fragment_dir"/*.json; do
+        base="$(basename "$f")"
+        # Ignore the aggregate output if it lives in the same directory.
+        [[ "$base" == "pipeline-report.json" ]] && continue
+        # Must be valid JSON object with the fragment signature.
+        if ! jq -e 'type == "object" and has("stage") and has("schema_version")' \
+                "$f" >/dev/null 2>&1; then
+            continue
+        fi
+        # Schema version gate: warn-and-skip on mismatch.
+        local sv
+        sv="$(jq -r '.schema_version' "$f" 2>/dev/null)"
+        if [[ "$sv" != "1.0" ]]; then
+            log.warn "fragment ${base}: unsupported schema_version '${sv}' (expected '1.0'), skipping"
+            continue
+        fi
+        printf '%s\n' "$f" >> "$valid_list"
+    done
+    shopt -u nullglob
+
+    local pipeline_id="${BRIK_RUN_ID:-$(date +%s)-$$}"
+    local platform="${BRIK_PLATFORM:-local}"
+    local project="${BRIK_PROJECT_NAME:-unnamed}"
+    local finished_at
+    finished_at="$(date +"%Y-%m-%dT%H:%M:%S%z")"
+
+    local backend="${log_dir}/pipeline-report.json"
+    local tmp
+    tmp="$(mktemp "${backend}.XXXXXX")" || {
+        rm -f "$valid_list"
+        log.error "cannot create temp aggregate file"
+        return "$BRIK_EXIT_IO_FAILURE"
+    }
+
+    # Build a JSON array of valid fragments. Read paths into an array so
+    # word-splitting is explicit (filenames with spaces stay safe) and the
+    # static analyser stays quiet.
+    local frags_json
+    local -a frag_paths=()
+    if [[ -s "$valid_list" ]]; then
+        local _line
+        while IFS= read -r _line; do
+            [[ -n "$_line" ]] && frag_paths+=("$_line")
+        done < "$valid_list"
+    fi
+    rm -f "$valid_list"
+
+    if (( ${#frag_paths[@]} > 0 )); then
+        frags_json="$(jq -s '.' "${frag_paths[@]}")" || {
+            rm -f "$tmp"
+            log.error "cannot read valid fragments"
+            return "$BRIK_EXIT_IO_FAILURE"
+        }
+    else
+        frags_json='[]'
+    fi
+
+    # KCOV_EXCL_START  -- jq script body is not bash code
+    jq -n \
+        --arg pid "$pipeline_id" \
+        --arg platform "$platform" \
+        --arg project "$project" \
+        --arg finished_at "$finished_at" \
+        --argjson frags "$frags_json" \
+        '
+        ( $frags
+          | map(.timestamp // null)
+          | map(select(. != null))
+          | sort
+          | .[0] // $finished_at ) as $started
+        | ( $frags | map(.status)
+          | { total: length,
+              passed:  map(select(. == "success")) | length,
+              failed:  map(select(. == "failed"))  | length,
+              skipped: map(select(. == "skipped")) | length } ) as $counts
+        | ( if ($counts.failed // 0) > 0 then "failed" else "success" end ) as $pstatus
+        | {
+            schema_version: "1.0",
+            pipeline: {
+              id: $pid,
+              platform: $platform,
+              project: $project,
+              started_at: $started,
+              finished_at: $finished_at,
+              status: $pstatus
+            },
+            stages: $frags,
+            summary: {
+              stages: $counts
+            }
+          }
+        ' > "$tmp" || {
+        rm -f "$tmp"
+        log.error "cannot build aggregate JSON"
+        return "$BRIK_EXIT_IO_FAILURE"
+    }
+    # KCOV_EXCL_STOP
+
+    mv "$tmp" "$backend" || {
+        rm -f "$tmp"
+        log.error "cannot write aggregate report: $backend"
+        return "$BRIK_EXIT_IO_FAILURE"
+    }
+
+    # Render the markdown alongside the JSON. Use the aggregate-shape
+    # renderer because the aggregate document differs from the local
+    # backend (.pipeline.id vs .pipeline_id, .stages[].stage vs .name,
+    # status/rc at fragment level vs nested under tech).
+    _report._render_aggregate_md "$backend" > "${log_dir}/pipeline-report.md" 2>/dev/null || \
+        log.warn "could not render pipeline-report.md (non-fatal)"
+
+    log.debug "aggregate report written: $backend"
+    return 0
+}
+
+# Render the v1 aggregate JSON as Markdown on stdout. Distinct from
+# _report._render_md, which targets the local backend shape (pipeline_id,
+# stages[].name, tech.status). The aggregate produced by
+# report.aggregate_fragments has pipeline.id, stages[].stage, fragment-level
+# status/rc -- selectors here mirror schemas/report/v1/aggregate.schema.json.
+_report._render_aggregate_md() {
+    local backend="$1"
+    # KCOV_EXCL_START  -- jq script body is not bash code
+    jq -r '
+        "# Pipeline Report",
+        "",
+        "- **Pipeline ID:** \(.pipeline.id // "-")",
+        "- **Project:** \(.pipeline.project // "-")",
+        "- **Platform:** \(.pipeline.platform // "-")",
+        "- **Status:** \(.pipeline.status // "-")",
+        "- **Started:** \(.pipeline.started_at // "-")",
+        "- **Finished:** \(.pipeline.finished_at // "-")",
+        "",
+        "## Stages",
+        "",
+        "| Stage | Status | Duration (ms) | Exit code |",
+        "|---|---|---|---|",
+        (.stages[] | "| \(.stage // "-") | \(.status // "-") | \(.duration_ms // "-") | \(.rc // "-") |"),
+        "",
+        "## Summary",
+        "",
+        "- **Total stages:** \(.summary.stages.total // 0)",
+        "- **Passed:** \(.summary.stages.passed // 0)",
+        "- **Failed:** \(.summary.stages.failed // 0)",
+        "- **Skipped:** \(.summary.stages.skipped // 0)",
+        "",
+        "## Business",
+        "",
+        (
+          .stages[]
+          | select(.business != null and (.business | length) > 0)
+          | ("### \(.stage)",
+             "",
+             (.business | to_entries[] | "- **\(.key):** \(.value)"),
+             "")
+        )
+    ' "$backend"
+    # KCOV_EXCL_STOP
+}
+
 # Render the pipeline report. Default writes both pipeline-report.md and
 # pipeline-report.json into $BRIK_LOG_DIR. --format md|json restricts output.
 # --output <path> redirects the chosen format to a custom path.
