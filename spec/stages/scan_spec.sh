@@ -1,6 +1,7 @@
 Describe "stages.scan"
   Include "$BRIK_HOME/lib/pipeline/stage.sh"
   Include "$BRIK_HOME/lib/pipeline/loader.sh"
+  Include "$BRIK_HOME/lib/pipeline/report.sh"
   Include "$BRIK_HOME/lib/transverse/config.sh"
   Include "$BRIK_HOME/lib/stages/verify/scan/scan.sh"
   Include "$BRIK_HOME/lib/stages/scan.sh"
@@ -11,17 +12,35 @@ Describe "stages.scan"
     printf 'version: 1\nproject:\n  name: test\n  stack: node\n' > "$BRIK_CONFIG_FILE"
     export BRIK_WORKSPACE
     BRIK_WORKSPACE="$(mktemp -d)"
+    export BRIK_LOG_DIR
+    BRIK_LOG_DIR="$(mktemp -d)"
     export BRIK_PROJECT_DIR="$BRIK_WORKSPACE"
     export BRIK_PLATFORM="gitlab"
+    export BRIK_RUN_ID="scan-spec-fixture"
     config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
+    report.init >/dev/null 2>&1 || true
   }
   cleanup_env() {
     rm -f "$BRIK_CONFIG_FILE"
-    rm -rf "$BRIK_WORKSPACE"
+    rm -rf "$BRIK_WORKSPACE" "$BRIK_LOG_DIR"
     unset BRIK_SECURITY_DEPS_TOOL BRIK_SECURITY_DEPS_COMMAND \
           BRIK_SECURITY_DEPS_SEVERITY BRIK_SECURITY_SECRETS_TOOL \
           BRIK_SECURITY_SECRETS_COMMAND BRIK_SECURITY_SEVERITY_THRESHOLD \
-          2>/dev/null || true
+          BRIK_RUN_ID 2>/dev/null || true
+  }
+
+  read_scan_tech() {
+    local key="$1"
+    jq -r --arg k "$key" \
+      '.stages[] | select(.name == "scan") | .tech[$k] // empty' \
+      "$BRIK_LOG_DIR/pipeline-report.json" 2>/dev/null
+  }
+
+  read_scan_tech_json() {
+    local key="$1"
+    jq -c --arg k "$key" \
+      '.stages[] | select(.name == "scan") | .tech[$k] // empty' \
+      "$BRIK_LOG_DIR/pipeline-report.json" 2>/dev/null
   }
   Before 'setup_env'
   After 'cleanup_env'
@@ -30,6 +49,72 @@ Describe "stages.scan"
     callable_check() { declare -f stages.scan >/dev/null; }
     When call callable_check
     The status should be success
+  End
+
+  It "records scan.tech.deps as a nested object with the deps tool"
+    run_scan_deps_object() {
+      verify.scan.run() { return 0; }
+      brik.use() { :; }
+      stacks.install_deps() { :; }
+      local ctx
+      ctx="$(context.create "scan")" 2>/dev/null || ctx="$(mktemp)"
+      stages.scan "$ctx" >/dev/null 2>&1
+      read_scan_tech_json "deps"
+    }
+    When call run_scan_deps_object
+    The output should equal '{"tool":"osv-scanner"}'
+  End
+
+  It "records scan.tech.secret as a nested object with the secrets tool"
+    run_scan_secret_object() {
+      verify.scan.run() { return 0; }
+      brik.use() { :; }
+      stacks.install_deps() { :; }
+      local ctx
+      ctx="$(context.create "scan")" 2>/dev/null || ctx="$(mktemp)"
+      stages.scan "$ctx" >/dev/null 2>&1
+      read_scan_tech_json "secret"
+    }
+    When call run_scan_secret_object
+    The output should equal '{"tool":"gitleaks"}'
+  End
+
+  It "records scan.tech.severity_threshold from default 'high'"
+    run_scan_severity() {
+      verify.scan.run() { return 0; }
+      brik.use() { :; }
+      stacks.install_deps() { :; }
+      local ctx
+      ctx="$(context.create "scan")" 2>/dev/null || ctx="$(mktemp)"
+      stages.scan "$ctx" >/dev/null 2>&1
+      read_scan_tech "severity_threshold"
+    }
+    When call run_scan_severity
+    The output should equal "high"
+  End
+
+  It "records scan.tech.severity_threshold from .security.deps.severity when set"
+    run_scan_severity_custom() {
+      cat > "$BRIK_CONFIG_FILE" <<'YAML'
+version: 1
+project:
+  name: test
+  stack: node
+security:
+  deps:
+    severity: critical
+YAML
+      config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
+      verify.scan.run() { return 0; }
+      brik.use() { :; }
+      stacks.install_deps() { :; }
+      local ctx
+      ctx="$(context.create "scan")" 2>/dev/null || ctx="$(mktemp)"
+      stages.scan "$ctx" >/dev/null 2>&1
+      read_scan_tech "severity_threshold"
+    }
+    When call run_scan_severity_custom
+    The output should equal "critical"
   End
 
   Describe "with default tools (no explicit security config)"

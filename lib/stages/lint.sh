@@ -50,6 +50,37 @@ stages.lint() {
     local checks_csv
     checks_csv="$(IFS=','; printf '%s' "${checks[*]}")"
 
+    # Pipeline-report enrichment (chantier 20260502 L2.C.3). business.violations
+    # parsing and report_path/fix_applied fields require runner-output parsing
+    # and are deferred to a follow-up.
+    if command -v jq >/dev/null 2>&1; then
+        local _checks_arr _tools_obj _commands_obj
+        _checks_arr="$(printf '%s\n' "${checks[@]}" | jq -Rsc 'split("\n") | map(select(length > 0))')"
+        _tools_obj="$(jq -nc \
+            --arg lint        "${BRIK_QUALITY_LINT_TOOL:-}" \
+            --arg format      "${BRIK_QUALITY_FORMAT_TOOL:-}" \
+            --arg type_check  "${BRIK_QUALITY_TYPE_CHECK_TOOL:-}" \
+            '{}
+             + ( if $lint       != "" then { lint:       $lint }       else {} end )
+             + ( if $format     != "" then { format:     $format }     else {} end )
+             + ( if $type_check != "" then { type_check: $type_check } else {} end )')"
+        _commands_obj="$(jq -nc \
+            --arg lint        "${BRIK_QUALITY_LINT_COMMAND:-}" \
+            --arg format      "${BRIK_QUALITY_FORMAT_COMMAND:-}" \
+            --arg type_check  "${BRIK_QUALITY_TYPE_CHECK_COMMAND:-}" \
+            '{}
+             + ( if $lint       != "" then { lint:       $lint }       else {} end )
+             + ( if $format     != "" then { format:     $format }     else {} end )
+             + ( if $type_check != "" then { type_check: $type_check } else {} end )')"
+        report.record_object "lint" "tech" "checks" "$_checks_arr" 2>/dev/null || true
+        if [[ "$_tools_obj" != "{}" ]]; then
+            report.record_object "lint" "tech" "tools" "$_tools_obj" 2>/dev/null || true
+        fi
+        if [[ "$_commands_obj" != "{}" ]]; then
+            report.record_object "lint" "tech" "commands" "$_commands_obj" 2>/dev/null || true
+        fi
+    fi
+
     # pipeline.run records tech.status from our rc (see commit cf719f5).
     verify.run "${BRIK_WORKSPACE}" --checks "$checks_csv"
 }

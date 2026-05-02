@@ -40,10 +40,78 @@ Describe "stages.lint"
       "$BRIK_LOG_DIR/pipeline-report.json" 2>/dev/null
   }
 
+  read_lint_tech_json() {
+    local key="$1"
+    jq -c --arg k "$key" \
+      '.stages[] | select(.name == "lint") | .tech[$k] // empty' \
+      "$BRIK_LOG_DIR/pipeline-report.json" 2>/dev/null
+  }
+
   It "is callable as a function"
     callable_check() { declare -f stages.lint >/dev/null; }
     When call callable_check
     The status should be success
+  End
+
+  Describe "C.3 enrichment with multiple checks configured"
+    setup_lint_full() {
+      cat > "$BRIK_CONFIG_FILE" <<'YAML'
+version: 1
+project:
+  name: test
+  stack: node
+quality:
+  lint:
+    enabled: true
+    tool: eslint
+    command: "eslint --max-warnings 0"
+  format:
+    tool: prettier
+  type_check:
+    command: "tsc --noEmit"
+YAML
+      config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
+    }
+    Before 'setup_lint_full'
+
+    It "records lint.tech.checks as an array of configured check names"
+      run_lint_checks() {
+        brik.use() { :; }
+        verify.run() { return 0; }
+        local ctx
+        ctx="$(context.create "lint")" 2>/dev/null || ctx="$(mktemp)"
+        stages.lint "$ctx" >/dev/null 2>&1
+        read_lint_tech_json "checks"
+      }
+      When call run_lint_checks
+      The output should equal '["lint","format","type_check"]'
+    End
+
+    It "records lint.tech.tools as an object keyed by check"
+      run_lint_tools() {
+        brik.use() { :; }
+        verify.run() { return 0; }
+        local ctx
+        ctx="$(context.create "lint")" 2>/dev/null || ctx="$(mktemp)"
+        stages.lint "$ctx" >/dev/null 2>&1
+        read_lint_tech_json "tools"
+      }
+      When call run_lint_tools
+      The output should equal '{"lint":"eslint","format":"prettier"}'
+    End
+
+    It "records lint.tech.commands as an object keyed by check"
+      run_lint_commands() {
+        brik.use() { :; }
+        verify.run() { return 0; }
+        local ctx
+        ctx="$(context.create "lint")" 2>/dev/null || ctx="$(mktemp)"
+        stages.lint "$ctx" >/dev/null 2>&1
+        read_lint_tech_json "commands"
+      }
+      When call run_lint_commands
+      The output should equal '{"lint":"eslint --max-warnings 0","type_check":"tsc --noEmit"}'
+    End
   End
 
   Describe "with no lint checks configured"

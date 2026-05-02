@@ -29,6 +29,18 @@ stages.scan() {
         brik.use verify.scan.scan
     fi
 
+    # Pipeline-report enrichment (chantier 20260502 L2.C.3). business.deps.*
+    # and business.secret.* parsing (osv-scanner JSON, gitleaks JSON, SBOM)
+    # is deferred to a follow-up that needs runner-output parsing.
+    if command -v jq >/dev/null 2>&1; then
+        local _deps_obj _secret_obj
+        _deps_obj="$(jq -nc --arg tool "$BRIK_SECURITY_DEPS_TOOL" '{tool: $tool}')"
+        _secret_obj="$(jq -nc --arg tool "$BRIK_SECURITY_SECRETS_TOOL" '{tool: $tool}')"
+        report.record_object "scan" "tech" "deps"   "$_deps_obj"   2>/dev/null || true
+        report.record_object "scan" "tech" "secret" "$_secret_obj" 2>/dev/null || true
+    fi
+    report.record "scan" "tech" "severity_threshold" "$severity" 2>/dev/null || true
+
     # pipeline.run records tech.status from our rc (see commit cf719f5).
     verify.scan.run "${BRIK_WORKSPACE}" --scans "deps,secret" --severity "$severity"
 }

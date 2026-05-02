@@ -1,6 +1,7 @@
 Describe "stages.sast"
   Include "$BRIK_HOME/lib/pipeline/stage.sh"
   Include "$BRIK_HOME/lib/pipeline/loader.sh"
+  Include "$BRIK_HOME/lib/pipeline/report.sh"
   Include "$BRIK_HOME/lib/transverse/config.sh"
   Include "$BRIK_HOME/lib/stages/verify/scan/scan.sh"
   Include "$BRIK_HOME/lib/stages/sast.sh"
@@ -11,18 +12,29 @@ Describe "stages.sast"
     printf 'version: 1\nproject:\n  name: test\n  stack: node\n' > "$BRIK_CONFIG_FILE"
     export BRIK_WORKSPACE
     BRIK_WORKSPACE="$(mktemp -d)"
+    export BRIK_LOG_DIR
+    BRIK_LOG_DIR="$(mktemp -d)"
     export BRIK_PROJECT_DIR="$BRIK_WORKSPACE"
     export BRIK_PLATFORM="gitlab"
+    export BRIK_RUN_ID="sast-spec-fixture"
     config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
+    report.init >/dev/null 2>&1 || true
   }
   cleanup_env() {
     rm -f "$BRIK_CONFIG_FILE"
-    rm -rf "$BRIK_WORKSPACE"
+    rm -rf "$BRIK_WORKSPACE" "$BRIK_LOG_DIR"
     unset BRIK_SECURITY_SAST_TOOL BRIK_SECURITY_SAST_COMMAND \
           BRIK_SECURITY_SAST_RULESET BRIK_SECURITY_LICENSE_ALLOWED \
           BRIK_SECURITY_LICENSE_DENIED BRIK_SECURITY_IAC_TOOL \
           BRIK_SECURITY_IAC_COMMAND BRIK_SECURITY_SEVERITY_THRESHOLD \
-          2>/dev/null || true
+          BRIK_RUN_ID 2>/dev/null || true
+  }
+
+  read_sast_tech() {
+    local key="$1"
+    jq -r --arg k "$key" \
+      '.stages[] | select(.name == "sast") | .tech[$k] // empty' \
+      "$BRIK_LOG_DIR/pipeline-report.json" 2>/dev/null
   }
   Before 'setup_env'
   After 'cleanup_env'
@@ -31,6 +43,65 @@ Describe "stages.sast"
     callable_check() { declare -f stages.sast >/dev/null; }
     When call callable_check
     The status should be success
+  End
+
+  It "records sast.tech.tool defaulting to semgrep"
+    run_sast_default_tool() {
+      verify.scan.run() { return 0; }
+      brik.use() { :; }
+      local ctx
+      ctx="$(context.create "sast")" 2>/dev/null || ctx="$(mktemp)"
+      stages.sast "$ctx" >/dev/null 2>&1
+      read_sast_tech "tool"
+    }
+    When call run_sast_default_tool
+    The output should equal "semgrep"
+  End
+
+  It "records sast.tech.tool from .security.sast.tool when set"
+    run_sast_custom_tool() {
+      cat > "$BRIK_CONFIG_FILE" <<'YAML'
+version: 1
+project:
+  name: test
+  stack: node
+security:
+  sast:
+    tool: bandit
+YAML
+      config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
+      verify.scan.run() { return 0; }
+      brik.use() { :; }
+      local ctx
+      ctx="$(context.create "sast")" 2>/dev/null || ctx="$(mktemp)"
+      stages.sast "$ctx" >/dev/null 2>&1
+      read_sast_tech "tool"
+    }
+    When call run_sast_custom_tool
+    The output should equal "bandit"
+  End
+
+  It "records sast.tech.ruleset from .security.sast.ruleset when set"
+    run_sast_ruleset() {
+      cat > "$BRIK_CONFIG_FILE" <<'YAML'
+version: 1
+project:
+  name: test
+  stack: node
+security:
+  sast:
+    ruleset: "p/owasp-top-ten"
+YAML
+      config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
+      verify.scan.run() { return 0; }
+      brik.use() { :; }
+      local ctx
+      ctx="$(context.create "sast")" 2>/dev/null || ctx="$(mktemp)"
+      stages.sast "$ctx" >/dev/null 2>&1
+      read_sast_tech "ruleset"
+    }
+    When call run_sast_ruleset
+    The output should equal "p/owasp-top-ten"
   End
 
   Describe "with default tools (no explicit security config)"

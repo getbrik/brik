@@ -35,6 +35,14 @@ stages.sast() {
         brik.use verify.scan.scan
     fi
 
+    # Pipeline-report enrichment (chantier 20260502 L2.C.3). business.findings
+    # parsing (semgrep JSON, etc.) is deferred to a follow-up that needs
+    # runner-output parsing.
+    report.record "sast" "tech" "tool" "$BRIK_SECURITY_SAST_TOOL" 2>/dev/null || true
+    if [[ -n "${BRIK_SECURITY_SAST_RULESET:-}" ]]; then
+        report.record "sast" "tech" "ruleset" "$BRIK_SECURITY_SAST_RULESET" 2>/dev/null || true
+    fi
+
     # pipeline.run records tech.status from our rc (see commit cf719f5).
     verify.scan.run "${BRIK_WORKSPACE}" --scans "$scans"
 }
