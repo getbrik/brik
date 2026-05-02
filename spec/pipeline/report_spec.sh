@@ -161,6 +161,87 @@ Describe "report.sh"
     End
   End
 
+  # ---------------------------------------------------------------------------
+  # report.record_object - record a JSON object/array under tech|business
+  #
+  # Companion to report.record for nested structures (commit, changelog, tag,
+  # ...). Stores via jq --argjson so nesting is preserved instead of being
+  # collapsed into a JSON-encoded string.
+  # ---------------------------------------------------------------------------
+  Describe "report.record_object"
+    Before 'setup_report_dir'
+    After 'cleanup_report_dir'
+
+    It "records a nested object preserving its structure"
+      record_object_nested() {
+        report.init || return 1
+        report.record_object "init" "business" "commit" '{"sha":"abc","short_sha":"abc12345"}' || return 1
+        jq -r '.stages[0].business.commit.sha' "$REPORT_LOG_DIR/pipeline-report.json"
+      }
+      When call record_object_nested
+      The output should equal "abc"
+    End
+
+    It "preserves all keys of the nested object"
+      record_object_keys() {
+        report.init || return 1
+        report.record_object "init" "business" "commit" '{"sha":"abc","ref":"main","tag":null}' || return 1
+        jq -c '.stages[0].business.commit | keys' "$REPORT_LOG_DIR/pipeline-report.json"
+      }
+      When call record_object_keys
+      The output should equal '["ref","sha","tag"]'
+    End
+
+    It "records an array value"
+      record_object_array() {
+        report.init || return 1
+        report.record_object "test" "business" "flaky" '["foo","bar"]' || return 1
+        jq -c '.stages[0].business.flaky' "$REPORT_LOG_DIR/pipeline-report.json"
+      }
+      When call record_object_array
+      The output should equal '["foo","bar"]'
+    End
+
+    It "records a JSON boolean"
+      record_object_bool() {
+        report.init || return 1
+        report.record_object "init" "tech" "config_valid" 'true' || return 1
+        jq -c '.stages[0].tech.config_valid' "$REPORT_LOG_DIR/pipeline-report.json"
+      }
+      When call record_object_bool
+      The output should equal "true"
+    End
+
+    It "coexists with report.record on the same stage"
+      record_mixed() {
+        report.init || return 1
+        report.record "init" "business" "project_name" "myapp" || return 1
+        report.record_object "init" "business" "commit" '{"sha":"abc"}' || return 1
+        jq -c '.stages[0].business' "$REPORT_LOG_DIR/pipeline-report.json"
+      }
+      When call record_mixed
+      The output should equal '{"project_name":"myapp","commit":{"sha":"abc"}}'
+    End
+
+    It "rejects malformed JSON"
+      When call report.record_object "init" "business" "commit" '{not json}'
+      The status should equal "$BRIK_EXIT_INVALID_INPUT"
+      The error should be present
+    End
+
+    It "rejects an invalid category"
+      When call report.record_object "init" "invalid" "key" '{}'
+      The status should equal "$BRIK_EXIT_INVALID_INPUT"
+      The error should be present
+    End
+
+    It "rejects a missing value argument"
+      When call report.record_object "init" "business" "commit"
+      The status should equal "$BRIK_EXIT_INVALID_INPUT"
+      The error should be present
+    End
+  End
+
   Describe "report.render"
     Before 'setup_report_dir'
     After 'cleanup_report_dir'

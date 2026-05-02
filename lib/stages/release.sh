@@ -23,6 +23,12 @@ stages.release() {
 
     log.info "release strategy: $strategy, tag prefix: $tag_prefix"
 
+    report.record "release" "tech" "strategy" "$strategy" 2>/dev/null || true
+    report.record "release" "tech" "tag_prefix" "$tag_prefix" 2>/dev/null || true
+    local _dry_run_bool="false"
+    [[ "${BRIK_DRY_RUN:-}" == "true" ]] && _dry_run_bool="true"
+    report.record_object "release" "tech" "dry_run" "$_dry_run_bool" 2>/dev/null || true
+
     local current_version
     current_version="$(version.current --from-git-tag --prefix "$tag_prefix")" || {
         log.info "no git tag found, using 0.0.0"
@@ -31,7 +37,15 @@ stages.release() {
 
     log.info "current version: $current_version"
     export BRIK_APP_VERSION="$current_version"
-    report.record "release" "business" "app_version" "$current_version" 2>/dev/null || true
+    # No bump engine yet; previous_version and new_version stay equal until
+    # a real version.next call lands. bump_type captures whether a release
+    # was driven by an explicit BRIK_TAG or no bump at all (chantier
+    # 20260502 L2.C.1, open question 2).
+    report.record "release" "business" "previous_version" "$current_version" 2>/dev/null || true
+    report.record "release" "business" "new_version" "$current_version" 2>/dev/null || true
+    local _bump_type="none"
+    [[ -n "${BRIK_TAG:-}" ]] && _bump_type="explicit"
+    report.record "release" "business" "bump_type" "$_bump_type" 2>/dev/null || true
     pipeline.env.set "BRIK_APP_VERSION" "$current_version"
 
     # If on a tag (release trigger), prepare and finalize. A failure in either
@@ -139,9 +153,32 @@ _stages.release._finalize() {
 
     local tag_name="${tag_prefix}${version}"
     local -a tag_args=("$tag_name" --message "Release $version")
-    [[ "${BRIK_DRY_RUN:-}" == "true" ]] && tag_args+=(--dry-run)
+    local _is_dry_run="false"
+    if [[ "${BRIK_DRY_RUN:-}" == "true" ]]; then
+        tag_args+=(--dry-run)
+        _is_dry_run="true"
+    fi
 
     git.tag "${tag_args[@]}" || return $?
+
+    # Record the tag's audit-grade metadata. In dry-run the tag is not
+    # actually created so sha is null; otherwise resolve it from the
+    # local repo. annotated is always true (we use --message).
+    local _tag_sha_json="null"
+    if [[ "$_is_dry_run" != "true" ]] && command -v git >/dev/null 2>&1; then
+        local _sha
+        _sha="$(git -C "${BRIK_WORKSPACE:-.}" rev-parse "refs/tags/${tag_name}^{commit}" 2>/dev/null)" || _sha=""
+        [[ -n "$_sha" ]] && _tag_sha_json="\"$_sha\""
+    fi
+    if command -v jq >/dev/null 2>&1; then
+        local _tag_obj
+        _tag_obj="$(jq -nc \
+            --arg name "$tag_name" \
+            --argjson sha "$_tag_sha_json" \
+            --argjson dry_run "$_is_dry_run" \
+            '{name: $name, sha: $sha, annotated: true, dry_run: $dry_run}')"
+        report.record_object "release" "business" "tag" "$_tag_obj" 2>/dev/null || true
+    fi
 
     log.info "release finalized: $tag_name"
     return 0

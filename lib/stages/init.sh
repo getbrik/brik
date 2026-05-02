@@ -37,7 +37,13 @@ stages.init() {
         log.info "configured stack: $stack"
     fi
 
-    report.record "init" "business" "stack" "$stack" 2>/dev/null || true
+    report.record "init" "tech" "stack" "$stack" 2>/dev/null || true
+    report.record "init" "tech" "stack_version" \
+        "$(config.get '.project.stack_version' '')" 2>/dev/null || true
+    report.record "init" "tech" "config_file" "${BRIK_CONFIG_FILE}" 2>/dev/null || true
+    report.record_object "init" "tech" "config_valid" "true" 2>/dev/null || true
+    report.record_object "init" "tech" "prereqs_present" \
+        "$(_stages.init._collect_prereqs)" 2>/dev/null || true
 
     # Export config and override stack with the runtime-resolved value.
     # config.export_build_vars re-reads .project.stack from brik.yml, which may
@@ -59,6 +65,26 @@ stages.init() {
     log.info "project: $project_name"
     log.info "workspace: ${BRIK_WORKSPACE}"
     log.info "platform: ${BRIK_PLATFORM:-unknown}"
+
+    # Provenance & identity. Provenance fields are sourced from BRIK_*
+    # populated by _pipeline.detect_metadata (lib/pipeline/stage.sh) at
+    # stage.dispatch entry. Empty fields are skipped so the aggregate
+    # omits them rather than emitting empty strings.
+    report.record "init" "business" "project_name" "$project_name" 2>/dev/null || true
+    report.record "init" "business" "platform" "${BRIK_PLATFORM:-unknown}" 2>/dev/null || true
+    local _commit_obj
+    _commit_obj="$(_stages.init._build_commit_object)"
+    if [[ "$_commit_obj" != "{}" ]]; then
+        report.record_object "init" "business" "commit" "$_commit_obj" 2>/dev/null || true
+    fi
+    local _pipeline_obj
+    _pipeline_obj="$(_stages.init._build_pipeline_ref_object)"
+    if [[ "$_pipeline_obj" != "{}" ]]; then
+        report.record_object "init" "business" "pipeline" "$_pipeline_obj" 2>/dev/null || true
+    fi
+    if [[ -n "${BRIK_TRIGGERED_BY:-}" ]]; then
+        report.record "init" "business" "triggered_by" "$BRIK_TRIGGERED_BY" 2>/dev/null || true
+    fi
 
     # Verify required tools
     if ! command -v yq >/dev/null 2>&1; then
@@ -117,6 +143,56 @@ _stages.init._resolve_runner_image() {
         }
     fi
     printf 'ghcr.io/getbrik/brik-runner-base:latest'
+}
+
+# Emit a JSON object listing prerequisite tools and their availability.
+# Schema: {"yq": bool, "jq": bool, "jv": bool}. Used by stages.init for
+# tech.prereqs_present so DSI can audit the runner's toolchain at a
+# glance. Locals are prefixed _p_ to avoid dynamic-scope shadowing of
+# variables declared by report.record / _report._append_json_object.
+_stages.init._collect_prereqs() {
+    local _p_yq _p_jq _p_jv
+    command -v yq >/dev/null 2>&1 && _p_yq=true || _p_yq=false
+    command -v jq >/dev/null 2>&1 && _p_jq=true || _p_jq=false
+    command -v jv >/dev/null 2>&1 && _p_jv=true || _p_jv=false
+    printf '{"yq":%s,"jq":%s,"jv":%s}' "$_p_yq" "$_p_jq" "$_p_jv"
+}
+
+# Build a JSON object of the populated BRIK_COMMIT_* fields. Returns
+# "{}" when no commit metadata is set so the caller can omit the
+# business.commit key entirely.
+_stages.init._build_commit_object() {
+    local _p_obj="{}"
+    if command -v jq >/dev/null 2>&1; then
+        _p_obj="$(jq -nc \
+            --arg sha       "${BRIK_COMMIT_SHA:-}" \
+            --arg short_sha "${BRIK_COMMIT_SHORT_SHA:-}" \
+            --arg ref       "${BRIK_COMMIT_REF:-}" \
+            --arg branch    "${BRIK_COMMIT_BRANCH:-}" \
+            --arg tag       "${BRIK_COMMIT_TAG:-}" \
+            '{}
+             + ( if $sha       != "" then { sha:       $sha }       else {} end )
+             + ( if $short_sha != "" then { short_sha: $short_sha } else {} end )
+             + ( if $ref       != "" then { ref:       $ref }       else {} end )
+             + ( if $branch    != "" then { branch:    $branch }    else {} end )
+             + ( if $tag       != "" then { tag:       $tag }       else {} end )')"
+    fi
+    printf '%s' "$_p_obj"
+}
+
+# Build a JSON object of the populated BRIK_PIPELINE_* fields. Returns
+# "{}" when no pipeline reference is set.
+_stages.init._build_pipeline_ref_object() {
+    local _p_obj="{}"
+    if command -v jq >/dev/null 2>&1; then
+        _p_obj="$(jq -nc \
+            --arg id  "${BRIK_PIPELINE_ID:-}" \
+            --arg url "${BRIK_PIPELINE_URL:-}" \
+            '{}
+             + ( if $id  != "" then { id:  $id }  else {} end )
+             + ( if $url != "" then { url: $url } else {} end )')"
+    fi
+    printf '%s' "$_p_obj"
 }
 
 # Detect whether a top-level brik.yml block exists (e.g. .package, .deploy).

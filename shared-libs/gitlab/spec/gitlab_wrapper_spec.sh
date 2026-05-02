@@ -310,13 +310,13 @@ Describe "gitlab-wrapper.sh"
       The output should equal "summary_exists"
     End
 
-    It "runs init stage and records business.stack in the pipeline report"
+    It "runs init stage and records tech.stack in the pipeline report"
       run_init_check_report() {
         brik.gitlab.run_stage "init" >/dev/null 2>&1
         local status=$?
         local report="${BRIK_LOG_DIR}/pipeline-report.json"
         if [[ -f "$report" ]]; then
-          jq -r '.stages[] | select(.name == "init") | .business.stack // empty' "$report"
+          jq -r '.stages[] | select(.name == "init") | .tech.stack // empty' "$report"
         else
           echo "no_report"
         fi
@@ -463,13 +463,13 @@ Describe "gitlab-wrapper.sh"
 
     # --- Release stage ---
 
-    It "runs release stage and records app_version in the pipeline report"
+    It "runs release stage and records new_version in the pipeline report"
       run_release_check() {
         brik.gitlab.run_stage "release" >/dev/null 2>&1
         local report="${BRIK_LOG_DIR}/pipeline-report.json"
         if [[ -f "$report" ]]; then
           local version
-          version="$(jq -r '.stages[] | select(.name == "release") | .business.app_version // empty' "$report")"
+          version="$(jq -r '.stages[] | select(.name == "release") | .business.new_version // empty' "$report")"
           if [[ -n "$version" ]]; then echo "has_version"; else echo "no_version"; fi
         else
           echo "no_report"

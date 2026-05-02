@@ -25,8 +25,22 @@ Describe "stages.release"
     unset BRIK_RUN_ID 2>/dev/null || true
   }
 
-  read_release_app_version() {
-    jq -r '.stages[] | select(.name == "release") | .business.app_version // empty' \
+  read_release_new_version() {
+    jq -r '.stages[] | select(.name == "release") | .business.new_version // empty' \
+      "$BRIK_LOG_DIR/pipeline-report.json" 2>/dev/null
+  }
+
+  read_release_tech() {
+    local key="$1"
+    jq -r --arg k "$key" \
+      '.stages[] | select(.name == "release") | .tech[$k] // empty' \
+      "$BRIK_LOG_DIR/pipeline-report.json" 2>/dev/null
+  }
+
+  read_release_business() {
+    local key="$1"
+    jq -r --arg k "$key" \
+      '.stages[] | select(.name == "release") | .business[$k] // empty' \
       "$BRIK_LOG_DIR/pipeline-report.json" 2>/dev/null
   }
   Before 'setup_env'
@@ -48,17 +62,90 @@ Describe "stages.release"
     The status should be success
   End
 
-  It "records app_version in the pipeline report business section"
+  It "records new_version in the pipeline report business section"
     run_release_check() {
       local ctx
       ctx="$(context.create "release")" 2>/dev/null || ctx="$(mktemp)"
       stages.release "$ctx" >/dev/null 2>&1
       local version
-      version="$(read_release_app_version)"
+      version="$(read_release_new_version)"
       if [[ -n "$version" ]]; then echo "has_version"; else echo "no_version"; fi
     }
     When call run_release_check
     The output should equal "has_version"
+  End
+
+  It "records release.tech.strategy"
+    run_release_strategy_record() {
+      local ctx
+      ctx="$(context.create "release")" 2>/dev/null || ctx="$(mktemp)"
+      stages.release "$ctx" >/dev/null 2>&1
+      read_release_tech "strategy"
+    }
+    When call run_release_strategy_record
+    The output should equal "semver"
+  End
+
+  It "records release.tech.tag_prefix"
+    run_release_prefix_record() {
+      local ctx
+      ctx="$(context.create "release")" 2>/dev/null || ctx="$(mktemp)"
+      stages.release "$ctx" >/dev/null 2>&1
+      read_release_tech "tag_prefix"
+    }
+    When call run_release_prefix_record
+    The output should equal "v"
+  End
+
+  It "records release.tech.dry_run as JSON boolean false by default"
+    run_release_dryrun_record() {
+      local ctx
+      ctx="$(context.create "release")" 2>/dev/null || ctx="$(mktemp)"
+      stages.release "$ctx" >/dev/null 2>&1
+      jq -c '.stages[] | select(.name == "release") | .tech.dry_run' \
+        "$BRIK_LOG_DIR/pipeline-report.json"
+    }
+    When call run_release_dryrun_record
+    The output should equal "false"
+  End
+
+  It "records release.tech.dry_run as JSON boolean true when BRIK_DRY_RUN=true"
+    run_release_dryrun_true() {
+      export BRIK_DRY_RUN="true"
+      local ctx
+      ctx="$(context.create "release")" 2>/dev/null || ctx="$(mktemp)"
+      stages.release "$ctx" >/dev/null 2>&1
+      jq -c '.stages[] | select(.name == "release") | .tech.dry_run' \
+        "$BRIK_LOG_DIR/pipeline-report.json"
+      unset BRIK_DRY_RUN
+    }
+    When call run_release_dryrun_true
+    The output should equal "true"
+  End
+
+  It "records release.business.previous_version and new_version equal when no bump engine"
+    run_release_versions() {
+      local ctx
+      ctx="$(context.create "release")" 2>/dev/null || ctx="$(mktemp)"
+      stages.release "$ctx" >/dev/null 2>&1
+      local prev new
+      prev="$(read_release_business 'previous_version')"
+      new="$(read_release_business 'new_version')"
+      [[ -n "$prev" && "$prev" == "$new" ]] && echo "equal" || echo "diff:$prev|$new"
+    }
+    When call run_release_versions
+    The output should equal "equal"
+  End
+
+  It "records release.business.bump_type as 'none' without BRIK_TAG"
+    run_release_bump_none() {
+      local ctx
+      ctx="$(context.create "release")" 2>/dev/null || ctx="$(mktemp)"
+      stages.release "$ctx" >/dev/null 2>&1
+      read_release_business "bump_type"
+    }
+    When call run_release_bump_none
+    The output should equal "none"
   End
 
   It "exports BRIK_RELEASE_STRATEGY from config"
@@ -144,6 +231,34 @@ YAML
       }
       When call run_release_tag
       The status should be success
+    End
+
+    It "records release.business.bump_type as 'explicit' when BRIK_TAG is set"
+      run_release_bump_explicit() {
+        _stages.release._prepare()  { return 0; }
+        _stages.release._finalize() { return 0; }
+        local ctx
+        ctx="$(context.create "release")" 2>/dev/null || ctx="$(mktemp)"
+        stages.release "$ctx" >/dev/null 2>&1
+        read_release_business "bump_type"
+      }
+      When call run_release_bump_explicit
+      The output should equal "explicit"
+    End
+
+    It "records release.business.tag as a nested object on dry-run finalize"
+      run_release_tag_object() {
+        export BRIK_DRY_RUN="true"
+        _stages.release._prepare() { return 0; }
+        local ctx
+        ctx="$(context.create "release")" 2>/dev/null || ctx="$(mktemp)"
+        stages.release "$ctx" >/dev/null 2>&1
+        jq -c '.stages[] | select(.name == "release") | .business.tag | {name, dry_run}' \
+          "$BRIK_LOG_DIR/pipeline-report.json"
+        unset BRIK_DRY_RUN
+      }
+      When call run_release_tag_object
+      The output should equal '{"name":"v1.2.3","dry_run":true}'
     End
 
     It "handles changelog disabled"

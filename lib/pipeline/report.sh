@@ -96,6 +96,47 @@ report.record() {
     _report._append_json "$backend" "$stage" "$category" "$key" "$value"
 }
 
+# Companion to report.record for nested JSON values (objects, arrays,
+# booleans, numbers). value MUST be valid JSON; report.record stores
+# values as JSON strings via --arg, which collapses nesting -- this
+# helper uses --argjson so the structure is preserved.
+#
+# Usage: report.record_object <stage> <category> <key> <json_value>
+report.record_object() {
+    [[ $# -eq 4 ]] || {
+        error.raise "$BRIK_EXIT_INVALID_INPUT" \
+            "report.record_object expects 4 arguments: stage category key json_value (got $#)"
+        return "$?"
+    }
+    local stage="$1" category="$2" key="$3" value="$4"
+
+    case "$category" in
+        tech|business) ;;
+        *)
+            error.raise "$BRIK_EXIT_INVALID_INPUT" \
+                "report.record_object: invalid category '$category' (expected tech|business)"
+            return "$?"
+            ;;
+    esac
+
+    _report._require_jq || return "$?"
+
+    if ! jq . >/dev/null 2>&1 <<<"$value"; then
+        error.raise "$BRIK_EXIT_INVALID_INPUT" \
+            "report.record_object: invalid JSON value for ${stage}.${category}.${key}"
+        return "$?"
+    fi
+
+    local backend
+    backend="$(_report._backend_path)"
+    [[ -f "$backend" ]] || {
+        log.error "report not initialized: $backend (call report.init first)"
+        return "$BRIK_EXIT_IO_FAILURE"
+    }
+
+    _report._append_json_object "$backend" "$stage" "$category" "$key" "$value"
+}
+
 # Check whether a stage already has a tech.status recorded in the report.
 # Used by pipeline.run to avoid overwriting a status that a stage set itself
 # (e.g. a config-skipped stage that records status=skipped before returning 0).
@@ -155,6 +196,50 @@ _report._append_json() {
         ' "$backend" > "$tmp" || {
         rm -f "$tmp"
         log.error "cannot append to report: $backend"
+        return "$BRIK_EXIT_IO_FAILURE"
+    }
+    # KCOV_EXCL_STOP
+
+    mv "$tmp" "$backend" || {
+        rm -f "$tmp"
+        return "$BRIK_EXIT_IO_FAILURE"
+    }
+    return 0
+}
+
+# Atomic read-modify-write variant of _report._append_json that stores
+# the value as a JSON-typed term (object, array, scalar) via --argjson
+# instead of a JSON-encoded string. Caller must have validated the JSON.
+_report._append_json_object() {
+    local backend="$1" stage="$2" category="$3" key="$4" value="$5"
+
+    local tmp
+    tmp="$(mktemp "${backend}.XXXXXX")" || {
+        log.error "cannot create temp file for report"
+        return "$BRIK_EXIT_IO_FAILURE"
+    }
+
+    # KCOV_EXCL_START  -- jq script body is not bash code
+    jq \
+        --arg stage "$stage" \
+        --arg category "$category" \
+        --arg key "$key" \
+        --argjson value "$value" \
+        '
+        def ensure_stage(s):
+          if any(.stages[]; .name == s) then .
+          else .stages += [{ name: s, tech: {}, business: {} }]
+          end;
+        ensure_stage($stage)
+        | .stages |= map(
+            if .name == $stage then
+              .[$category][$key] = $value
+            else .
+            end
+          )
+        ' "$backend" > "$tmp" || {
+        rm -f "$tmp"
+        log.error "cannot append object to report: $backend"
         return "$BRIK_EXIT_IO_FAILURE"
     }
     # KCOV_EXCL_STOP

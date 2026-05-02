@@ -35,7 +35,27 @@ Describe "stages.init"
   jv_missing() { ! command -v jv >/dev/null 2>&1; }
 
   read_init_stack() {
-    jq -r '.stages[] | select(.name == "init") | .business.stack // empty' \
+    jq -r '.stages[] | select(.name == "init") | .tech.stack // empty' \
+      "$BRIK_LOG_DIR/pipeline-report.json" 2>/dev/null
+  }
+
+  read_init_tech() {
+    local key="$1"
+    jq -r --arg k "$key" \
+      '.stages[] | select(.name == "init") | .tech[$k] // empty' \
+      "$BRIK_LOG_DIR/pipeline-report.json" 2>/dev/null
+  }
+
+  read_init_business() {
+    local key="$1"
+    jq -r --arg k "$key" \
+      '.stages[] | select(.name == "init") | .business[$k] // empty' \
+      "$BRIK_LOG_DIR/pipeline-report.json" 2>/dev/null
+  }
+
+  read_init_business_path() {
+    local path="$1"
+    jq -r ".stages[] | select(.name == \"init\") | .business${path} // empty" \
       "$BRIK_LOG_DIR/pipeline-report.json" 2>/dev/null
   }
   Before 'setup_env'
@@ -57,7 +77,7 @@ Describe "stages.init"
     The status should be success
   End
 
-  It "records init.business.stack in the pipeline report"
+  It "records init.tech.stack in the pipeline report"
     run_init_check() {
       local ctx
       ctx="$(context.create "init")" 2>/dev/null || ctx="$(mktemp)"
@@ -66,6 +86,118 @@ Describe "stages.init"
     }
     When call run_init_check
     The output should equal "node"
+  End
+
+  It "records init.tech.stack_version from .project.stack_version"
+    run_init_stack_version() {
+      printf 'version: 1\nproject:\n  name: t\n  stack: node\n  stack_version: "20"\n' > "$BRIK_CONFIG_FILE"
+      config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
+      local ctx
+      ctx="$(context.create "init")" 2>/dev/null || ctx="$(mktemp)"
+      stages.init "$ctx" >/dev/null 2>&1 || return $?
+      read_init_tech "stack_version"
+    }
+    When call run_init_stack_version
+    The output should equal "20"
+  End
+
+  It "records init.tech.config_file with the active config path"
+    run_init_config_file() {
+      local ctx
+      ctx="$(context.create "init")" 2>/dev/null || ctx="$(mktemp)"
+      stages.init "$ctx" >/dev/null 2>&1 || return $?
+      read_init_tech "config_file"
+    }
+    When call run_init_config_file
+    The output should equal "$BRIK_CONFIG_FILE"
+  End
+
+  It "records init.tech.config_valid as a JSON boolean true"
+    run_init_config_valid() {
+      local ctx
+      ctx="$(context.create "init")" 2>/dev/null || ctx="$(mktemp)"
+      stages.init "$ctx" >/dev/null 2>&1 || return $?
+      jq -c '.stages[] | select(.name == "init") | .tech.config_valid' \
+        "$BRIK_LOG_DIR/pipeline-report.json"
+    }
+    When call run_init_config_valid
+    The output should equal "true"
+  End
+
+  It "records init.tech.prereqs_present with yq and jq booleans"
+    run_init_prereqs() {
+      local ctx
+      ctx="$(context.create "init")" 2>/dev/null || ctx="$(mktemp)"
+      stages.init "$ctx" >/dev/null 2>&1 || return $?
+      jq -c '.stages[] | select(.name == "init") | .tech.prereqs_present | {yq, jq}' \
+        "$BRIK_LOG_DIR/pipeline-report.json"
+    }
+    When call run_init_prereqs
+    The output should equal '{"yq":true,"jq":true}'
+  End
+
+  It "records init.business.project_name from .project.name"
+    run_init_project_name() {
+      local ctx
+      ctx="$(context.create "init")" 2>/dev/null || ctx="$(mktemp)"
+      stages.init "$ctx" >/dev/null 2>&1 || return $?
+      read_init_business "project_name"
+    }
+    When call run_init_project_name
+    The output should equal "test-project"
+  End
+
+  It "records init.business.platform from BRIK_PLATFORM"
+    run_init_business_platform() {
+      local ctx
+      ctx="$(context.create "init")" 2>/dev/null || ctx="$(mktemp)"
+      stages.init "$ctx" >/dev/null 2>&1 || return $?
+      read_init_business "platform"
+    }
+    When call run_init_business_platform
+    The output should equal "gitlab"
+  End
+
+  It "records init.business.commit as a nested object from BRIK_COMMIT_*"
+    run_init_commit() {
+      export BRIK_COMMIT_SHA="abcdef0123456789abcdef0123456789abcdef01"
+      export BRIK_COMMIT_SHORT_SHA="abcdef01"
+      export BRIK_COMMIT_REF="main"
+      export BRIK_COMMIT_BRANCH="main"
+      local ctx
+      ctx="$(context.create "init")" 2>/dev/null || ctx="$(mktemp)"
+      stages.init "$ctx" >/dev/null 2>&1 || return $?
+      jq -c '.stages[] | select(.name == "init") | .business.commit' \
+        "$BRIK_LOG_DIR/pipeline-report.json"
+    }
+    When call run_init_commit
+    The output should equal '{"sha":"abcdef0123456789abcdef0123456789abcdef01","short_sha":"abcdef01","ref":"main","branch":"main"}'
+  End
+
+  It "records init.business.pipeline as a nested object from BRIK_PIPELINE_*"
+    run_init_pipeline_ref() {
+      export BRIK_PIPELINE_ID="42"
+      export BRIK_PIPELINE_URL="https://gitlab.example.com/p/-/pipelines/42"
+      local ctx
+      ctx="$(context.create "init")" 2>/dev/null || ctx="$(mktemp)"
+      stages.init "$ctx" >/dev/null 2>&1 || return $?
+      jq -c '.stages[] | select(.name == "init") | .business.pipeline' \
+        "$BRIK_LOG_DIR/pipeline-report.json"
+    }
+    When call run_init_pipeline_ref
+    The output should equal '{"id":"42","url":"https://gitlab.example.com/p/-/pipelines/42"}'
+  End
+
+  It "records init.business.triggered_by from BRIK_TRIGGERED_BY"
+    run_init_triggered() {
+      export BRIK_TRIGGERED_BY="alice"
+      local ctx
+      ctx="$(context.create "init")" 2>/dev/null || ctx="$(mktemp)"
+      stages.init "$ctx" >/dev/null 2>&1 || return $?
+      read_init_business "triggered_by"
+    }
+    When call run_init_triggered
+    The output should equal "alice"
   End
 
   It "returns 7 when brik.yml is missing"

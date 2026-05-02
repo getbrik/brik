@@ -436,13 +436,13 @@ Describe "local-wrapper.sh"
       The error should be present
     End
 
-    It "runs release stage and records app_version in the pipeline report"
+    It "runs release stage and records new_version in the pipeline report"
       run_release() {
         brik.local.run_stage "release" >/dev/null 2>&1
         local report="${BRIK_LOG_DIR}/pipeline-report.json"
         if [[ -f "$report" ]]; then
           local version
-          version="$(jq -r '.stages[] | select(.name == "release") | .business.app_version // empty' "$report")"
+          version="$(jq -r '.stages[] | select(.name == "release") | .business.new_version // empty' "$report")"
           if [[ -n "$version" ]]; then echo "has_version"; else echo "no_version"; fi
         else
           echo "no_report"
