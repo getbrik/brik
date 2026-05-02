@@ -20,6 +20,19 @@ stages.test() {
 
     log.info "running tests"
 
+    # Pipeline-report enrichment (chantier 20260502 L2.C.2). Test counts and
+    # business.coverage.branch_pct are deferred to a follow-up that needs
+    # runner-output parsing and a coverage parser extension.
+    if [[ -n "${BRIK_TEST_FRAMEWORK:-}" ]]; then
+        report.record "test" "tech" "framework" "$BRIK_TEST_FRAMEWORK" 2>/dev/null || true
+    fi
+    if [[ -n "${BRIK_TEST_TOOL:-}" ]]; then
+        report.record "test" "tech" "tool" "$BRIK_TEST_TOOL" 2>/dev/null || true
+    fi
+    if [[ -n "${BRIK_TEST_COVERAGE_FORMAT:-}" ]]; then
+        report.record "test" "tech" "coverage_tool" "$BRIK_TEST_COVERAGE_FORMAT" 2>/dev/null || true
+    fi
+
     # Tier 1: explicit test command override bypasses stack resolution.
     if [[ -n "${BRIK_TEST_COMMAND:-}" ]]; then
         log.info "running tests (command override): $BRIK_TEST_COMMAND"
@@ -70,6 +83,18 @@ stages.test() {
     if [[ "${BRIK_TEST_REPORTS_ENABLED:-false}" == "true" ]]; then
         brik.use transverse.coverage
         (cd "${BRIK_WORKSPACE}" && brik.coverage.summary) || true
+        # Record coverage in business section so consumers don't need to
+        # re-parse the report file. line_pct only for now; branch_pct is
+        # deferred (chantier 20260502 L2.C.2 follow-up).
+        local _cov_dir="${BRIK_TEST_COVERAGE_DIR:-coverage}"
+        [[ "$_cov_dir" != /* ]] && _cov_dir="${BRIK_WORKSPACE:-.}/${_cov_dir}"
+        local _cov_pct
+        _cov_pct="$(_brik.coverage._parse_pct "$_cov_dir")"
+        if [[ -n "$_cov_pct" ]] && command -v jq >/dev/null 2>&1; then
+            local _cov_obj
+            _cov_obj="$(jq -nc --arg pct "$_cov_pct" '{line_pct: $pct}')"
+            report.record_object "test" "business" "coverage" "$_cov_obj" 2>/dev/null || true
+        fi
         if [[ -n "${BRIK_TEST_COVERAGE_THRESHOLD:-}" ]]; then
             local gate_rc=0
             (cd "${BRIK_WORKSPACE}" && brik.coverage.gate "$BRIK_TEST_COVERAGE_THRESHOLD") || gate_rc=$?

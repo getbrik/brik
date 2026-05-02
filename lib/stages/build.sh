@@ -25,6 +25,17 @@ stages.build() {
 
     log.info "running build (stack=$stack)"
 
+    # Pipeline-report enrichment (chantier 20260502 L2.C.2). cache_hit and
+    # business.artifact.* are deferred to a follow-up that requires stack
+    # module hooks.
+    report.record "build" "tech" "stack" "$stack" 2>/dev/null || true
+    report.record "build" "tech" "tool" "${BRIK_BUILD_TOOL:-auto}" 2>/dev/null || true
+    if [[ -n "${BRIK_BUILD_COMMAND:-}" ]]; then
+        report.record "build" "tech" "command" "$BRIK_BUILD_COMMAND" 2>/dev/null || true
+    else
+        report.record "build" "tech" "command" "<stack-default>" 2>/dev/null || true
+    fi
+
     # Custom build command override bypasses the stack module.
     if [[ -n "${BRIK_BUILD_COMMAND:-}" ]]; then
         log.info "using custom build command: $BRIK_BUILD_COMMAND"

@@ -12,13 +12,30 @@ Describe "stages.test"
     printf 'version: 1\nproject:\n  name: test\n  stack: node\n' > "$BRIK_CONFIG_FILE"
     export BRIK_WORKSPACE
     BRIK_WORKSPACE="$(mktemp -d)"
+    export BRIK_LOG_DIR
+    BRIK_LOG_DIR="$(mktemp -d)"
     export BRIK_PROJECT_DIR="$BRIK_WORKSPACE"
     export BRIK_PLATFORM="gitlab"
+    export BRIK_RUN_ID="test-spec-fixture"
     config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
+    report.init >/dev/null 2>&1 || true
   }
   cleanup_env() {
     rm -f "$BRIK_CONFIG_FILE"
-    rm -rf "$BRIK_WORKSPACE"
+    rm -rf "$BRIK_WORKSPACE" "$BRIK_LOG_DIR"
+    unset BRIK_RUN_ID 2>/dev/null || true
+  }
+
+  read_test_tech() {
+    local key="$1"
+    jq -r --arg k "$key" \
+      '.stages[] | select(.name == "test") | .tech[$k] // empty' \
+      "$BRIK_LOG_DIR/pipeline-report.json" 2>/dev/null
+  }
+
+  read_test_coverage_pct() {
+    jq -r '.stages[] | select(.name == "test") | .business.coverage.line_pct // empty' \
+      "$BRIK_LOG_DIR/pipeline-report.json" 2>/dev/null
   }
   Before 'setup_env'
   After 'cleanup_env'
@@ -79,6 +96,71 @@ Describe "stages.test"
     }
     When call run_test_framework
     The output should equal "jest"
+  End
+
+  It "records test.tech.framework from .test.framework"
+    run_test_records_framework() {
+      printf 'version: 1\nproject:\n  name: test\n  stack: node\ntest:\n  framework: pytest\n' \
+        > "$BRIK_CONFIG_FILE"
+      config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
+      _stub_leaf_success
+      local ctx
+      ctx="$(context.create "test")" 2>/dev/null || ctx="$(mktemp)"
+      stages.test "$ctx" >/dev/null 2>&1
+      read_test_tech "framework"
+    }
+    When call run_test_records_framework
+    The output should equal "pytest"
+  End
+
+  It "records test.tech.tool from BRIK_TEST_TOOL when set"
+    run_test_records_tool() {
+      export BRIK_TEST_TOOL="vitest"
+      _stub_leaf_success
+      local ctx
+      ctx="$(context.create "test")" 2>/dev/null || ctx="$(mktemp)"
+      stages.test "$ctx" >/dev/null 2>&1
+      read_test_tech "tool"
+      unset BRIK_TEST_TOOL
+    }
+    When call run_test_records_tool
+    The output should equal "vitest"
+  End
+
+  It "records test.tech.coverage_tool from BRIK_TEST_COVERAGE_FORMAT"
+    run_test_records_coverage_tool() {
+      export BRIK_TEST_COVERAGE_FORMAT="cobertura"
+      _stub_leaf_success
+      local ctx
+      ctx="$(context.create "test")" 2>/dev/null || ctx="$(mktemp)"
+      stages.test "$ctx" >/dev/null 2>&1
+      read_test_tech "coverage_tool"
+      unset BRIK_TEST_COVERAGE_FORMAT
+    }
+    When call run_test_records_coverage_tool
+    The output should equal "cobertura"
+  End
+
+  It "records test.business.coverage.line_pct from a Cobertura report when reports.enabled=true"
+    run_test_records_coverage() {
+      export BRIK_TEST_REPORTS_ENABLED="true"
+      export BRIK_TEST_COVERAGE_DIR="$BRIK_WORKSPACE/coverage"
+      mkdir -p "$BRIK_TEST_COVERAGE_DIR"
+      printf '<?xml version="1.0"?>\n<coverage line-rate="0.8542" />\n' \
+        > "$BRIK_TEST_COVERAGE_DIR/coverage.xml"
+      # Source coverage helpers explicitly: _stub_leaf_success neutralizes
+      # brik.use, so stages.test cannot lazy-load transverse.coverage.
+      # shellcheck source=/dev/null
+      . "$BRIK_HOME/lib/transverse/coverage.sh" 2>/dev/null || true
+      _stub_leaf_success
+      local ctx
+      ctx="$(context.create "test")" 2>/dev/null || ctx="$(mktemp)"
+      stages.test "$ctx" >/dev/null 2>&1
+      read_test_coverage_pct
+      unset BRIK_TEST_REPORTS_ENABLED BRIK_TEST_COVERAGE_DIR
+    }
+    When call run_test_records_coverage
+    The output should equal "85.42"
   End
 
   It "runs BRIK_TEST_COMMAND override when set"
