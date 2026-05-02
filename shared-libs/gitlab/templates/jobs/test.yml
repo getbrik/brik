@@ -48,4 +48,5 @@ brik-test:
       - ${BRIK_TEST_COVERAGE_DIR:-coverage}/
       - ${BRIK_TEST_JUNIT_PATH:-reports/junit.xml}
       - reports/
+      - brik-artifacts/
     expire_in: 1 week

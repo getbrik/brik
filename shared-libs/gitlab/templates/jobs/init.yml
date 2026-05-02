@@ -6,11 +6,13 @@ brik-init:
   script:
     - bash -c '. /tmp/brik-bootstrap.sh && brik.gitlab.run_stage init'
   artifacts:
+    when: always
     paths:
       - .brik-logs/pipeline.env
+      - brik-artifacts/
     reports:
       dotenv: brik-init.env
-    expire_in: 1 hour
+    expire_in: 1 week
   after_script:
     # brik-init.env is now produced by stages.init itself (single source of
     # truth, see _stages.init._write_dotenv). after_script just echoes the

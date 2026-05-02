@@ -26,6 +26,11 @@ brik-lint:
     policy: pull
   script:
     - bash -c '. /tmp/brik-bootstrap.sh && brik.gitlab.run_stage lint'
+  artifacts:
+    when: always
+    expire_in: 1 week
+    paths:
+      - brik-artifacts/
   rules:
     - if: '$BRIK_LINT_ENABLED == "false"'
       when: never

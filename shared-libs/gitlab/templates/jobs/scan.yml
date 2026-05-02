@@ -27,3 +27,8 @@ brik-scan:
     policy: pull
   script:
     - bash -c '. /tmp/brik-bootstrap.sh && brik.gitlab.run_stage scan'
+  artifacts:
+    when: always
+    expire_in: 1 week
+    paths:
+      - brik-artifacts/

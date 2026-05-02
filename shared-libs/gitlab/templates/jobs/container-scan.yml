@@ -10,6 +10,11 @@ brik-container-scan:
       artifacts: true
   script:
     - bash -c '. /tmp/brik-bootstrap.sh && brik.gitlab.run_stage container-scan'
+  artifacts:
+    when: always
+    expire_in: 1 week
+    paths:
+      - brik-artifacts/
   rules:
     - if: '$BRIK_CONTAINER_SCAN_ENABLED == "true"'
       when: on_success
