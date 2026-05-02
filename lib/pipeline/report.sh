@@ -358,11 +358,22 @@ report.aggregate_fragments() {
     done
     shopt -u nullglob
 
-    local pipeline_id="${BRIK_RUN_ID:-$(date +%s)-$$}"
+    local pipeline_id="${BRIK_PIPELINE_ID:-${BRIK_RUN_ID:-$(date +%s)-$$}}"
     local platform="${BRIK_PLATFORM:-local}"
     local project="${BRIK_PROJECT_NAME:-unnamed}"
     local finished_at
     finished_at="$(date +"%Y-%m-%dT%H:%M:%S%z")"
+
+    # Optional pipeline metadata: surface only when the source variable is
+    # set, so the aggregate omits absent fields rather than emitting empty
+    # strings (matches schema 'optional' semantics).
+    local pipeline_url="${BRIK_PIPELINE_URL:-}"
+    local commit_sha="${BRIK_COMMIT_SHA:-}"
+    local commit_short_sha="${BRIK_COMMIT_SHORT_SHA:-}"
+    local commit_ref="${BRIK_COMMIT_REF:-}"
+    local commit_branch="${BRIK_COMMIT_BRANCH:-}"
+    local commit_tag="${BRIK_COMMIT_TAG:-}"
+    local triggered_by="${BRIK_TRIGGERED_BY:-}"
 
     local backend="${log_dir}/pipeline-report.json"
     local tmp
@@ -401,6 +412,13 @@ report.aggregate_fragments() {
         --arg platform "$platform" \
         --arg project "$project" \
         --arg finished_at "$finished_at" \
+        --arg pipeline_url "$pipeline_url" \
+        --arg commit_sha "$commit_sha" \
+        --arg commit_short_sha "$commit_short_sha" \
+        --arg commit_ref "$commit_ref" \
+        --arg commit_branch "$commit_branch" \
+        --arg commit_tag "$commit_tag" \
+        --arg triggered_by "$triggered_by" \
         --argjson frags "$frags_json" \
         '
         ( $frags
@@ -414,16 +432,28 @@ report.aggregate_fragments() {
               failed:  map(select(. == "failed"))  | length,
               skipped: map(select(. == "skipped")) | length } ) as $counts
         | ( if ($counts.failed // 0) > 0 then "failed" else "success" end ) as $pstatus
-        | {
-            schema_version: "1.0",
-            pipeline: {
+        | ( {}
+            + ( if $commit_sha       != "" then { sha:       $commit_sha       } else {} end )
+            + ( if $commit_short_sha != "" then { short_sha: $commit_short_sha } else {} end )
+            + ( if $commit_ref       != "" then { ref:       $commit_ref       } else {} end )
+            + ( if $commit_branch    != "" then { branch:    $commit_branch    } else {} end )
+            + ( if $commit_tag       != "" then { tag:       $commit_tag       } else {} end )
+          ) as $commit
+        | ( {
               id: $pid,
               platform: $platform,
               project: $project,
               started_at: $started,
               finished_at: $finished_at,
               status: $pstatus
-            },
+            }
+            + ( if $pipeline_url != "" then { url:          $pipeline_url } else {} end )
+            + ( if ($commit | length) > 0 then { commit:    $commit       } else {} end )
+            + ( if $triggered_by != "" then { triggered_by: $triggered_by } else {} end )
+          ) as $pipeline
+        | {
+            schema_version: "1.0",
+            pipeline: $pipeline,
             stages: $frags,
             summary: {
               stages: $counts

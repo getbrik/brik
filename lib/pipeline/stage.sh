@@ -63,6 +63,71 @@ _helpers.epoch_ms() {
     fi
 }
 
+# Export the named variable to the first non-empty candidate iff the
+# variable is currently unset or empty. Leaves the variable untouched
+# (still unset) when no candidate matches, so consumers can distinguish
+# absent-from-environment ("omit field") from empty-string.
+# Usage: _helpers.set_if_unset <var_name> <candidate1> [<candidate2>...]
+_helpers.set_if_unset() {
+    local var="$1"; shift
+    [[ -n "${!var:-}" ]] && return 0
+    local cand
+    for cand in "$@"; do
+        if [[ -n "$cand" ]]; then
+            export "$var=$cand"
+            return 0
+        fi
+    done
+    return 0
+}
+
+# Detect CI metadata from the runtime environment and export normalized
+# BRIK_PIPELINE_*/BRIK_COMMIT_*/BRIK_TRIGGERED_BY variables. Pre-set BRIK_*
+# wins, so wrappers can override before detection runs.
+#
+# Sources by platform:
+#   GitLab : CI_PIPELINE_ID, CI_PIPELINE_URL, CI_COMMIT_SHA,
+#            CI_COMMIT_SHORT_SHA, CI_COMMIT_REF_NAME, CI_COMMIT_BRANCH,
+#            CI_COMMIT_TAG, GITLAB_USER_LOGIN, CI_PIPELINE_SOURCE
+#   Jenkins: BUILD_TAG, BUILD_NUMBER, BUILD_URL, GIT_COMMIT,
+#            GIT_BRANCH (origin/-stripped), GIT_TAG, BUILD_USER_ID,
+#            BUILD_CAUSE
+#
+# Lives in stage.sh (rather than pipeline.sh) so stage.dispatch can call
+# it on every stage entry, covering both pipeline.run (multi-stage) and
+# the CI single-job path.
+_pipeline.detect_metadata() {
+    # TODO: extend with BRIK_PROJECT_NAME from CI_PROJECT_NAME (GitLab) /
+    # JOB_NAME (Jenkins). Currently sourced from .project.name in brik.yml
+    # only (lib/transverse/config.sh). Tracked under chantier
+    # 20260502_pipeline-report-followups Phase B.3 audit.
+    _helpers.set_if_unset BRIK_PIPELINE_ID    "${CI_PIPELINE_ID:-}"   "${BUILD_TAG:-}"  "${BUILD_NUMBER:-}"
+    _helpers.set_if_unset BRIK_PIPELINE_URL   "${CI_PIPELINE_URL:-}"  "${BUILD_URL:-}"
+    _helpers.set_if_unset BRIK_COMMIT_SHA     "${CI_COMMIT_SHA:-}"    "${GIT_COMMIT:-}"
+
+    # short_sha derives from BRIK_COMMIT_SHA when no native short var is set.
+    # The set_if_unset call above runs export in the current shell, so
+    # BRIK_COMMIT_SHA is already populated here when CI_COMMIT_SHA or
+    # GIT_COMMIT was non-empty. Do not reorder these blocks without
+    # preserving that read-after-export contract.
+    local _short_fallback=""
+    [[ -n "${BRIK_COMMIT_SHA:-}" ]] && _short_fallback="${BRIK_COMMIT_SHA:0:8}"
+    _helpers.set_if_unset BRIK_COMMIT_SHORT_SHA "${CI_COMMIT_SHORT_SHA:-}" "$_short_fallback"
+
+    _helpers.set_if_unset BRIK_COMMIT_REF     "${CI_COMMIT_REF_NAME:-}"
+
+    # Jenkins GIT_BRANCH commonly carries an "origin/" prefix; strip it for
+    # consistency with the GitLab CI_COMMIT_BRANCH form.
+    local _branch="${CI_COMMIT_BRANCH:-${GIT_BRANCH:-}}"
+    _branch="${_branch#origin/}"
+    _helpers.set_if_unset BRIK_COMMIT_BRANCH  "$_branch"
+
+    _helpers.set_if_unset BRIK_COMMIT_TAG     "${CI_COMMIT_TAG:-}"    "${GIT_TAG:-}"
+    _helpers.set_if_unset BRIK_TRIGGERED_BY   "${GITLAB_USER_LOGIN:-}" "${BUILD_USER_ID:-}" "${CI_PIPELINE_SOURCE:-}" "${BUILD_CAUSE:-}"
+
+    return 0
+}
+
 # Create a log file for a stage. Prints the path on stdout.
 stage.create_log_file() {
     local stage_name="$1"
@@ -265,6 +330,12 @@ stage.dispatch() {
         log.error "stage name is required"
         return "$BRIK_EXIT_INVALID_INPUT"
     fi
+
+    # Normalize CI metadata (BRIK_PIPELINE_*/BRIK_COMMIT_*/BRIK_TRIGGERED_BY)
+    # before any stage logic runs so report.aggregate_fragments and any other
+    # consumer reads from a single, populated source. Idempotent (pre-set
+    # BRIK_* wins) so repeated dispatches in the same shell are safe.
+    _pipeline.detect_metadata
 
     # Show the Brik logo once, before the first stage.
     if [[ "$stage_name" == "init" ]]; then

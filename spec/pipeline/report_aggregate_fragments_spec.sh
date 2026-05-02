@@ -379,6 +379,175 @@ Describe "report.aggregate_fragments"
   End
 
   # ---------------------------------------------------------------------------
+  # Extended pipeline metadata: url, commit.*, triggered_by
+  #
+  # Aggregator reads BRIK_PIPELINE_URL, BRIK_COMMIT_*, BRIK_TRIGGERED_BY and
+  # surfaces them under .pipeline.{url, commit, triggered_by}. Optional fields
+  # are absent when their source variable is unset (no empty-string emission).
+  # ---------------------------------------------------------------------------
+  Describe "extended pipeline metadata"
+    extended_setup() {
+      AGG_LOG_DIR="$(mktemp -d)"
+      FRAG_DIR="$(mktemp -d)"
+      export BRIK_LOG_DIR="$AGG_LOG_DIR"
+      export BRIK_RUN_ID="run-fixture-99"
+      unset BRIK_PLATFORM BRIK_PROJECT_NAME CI_PIPELINE_URL BRIK_STARTED_AT
+      unset BRIK_PIPELINE_ID BRIK_PIPELINE_URL
+      unset BRIK_COMMIT_SHA BRIK_COMMIT_SHORT_SHA BRIK_COMMIT_REF
+      unset BRIK_COMMIT_BRANCH BRIK_COMMIT_TAG
+      unset BRIK_TRIGGERED_BY
+    }
+    extended_cleanup() {
+      rm -rf "$AGG_LOG_DIR" "$FRAG_DIR"
+      unset BRIK_LOG_DIR BRIK_RUN_ID
+      unset BRIK_PLATFORM BRIK_PROJECT_NAME CI_PIPELINE_URL BRIK_STARTED_AT
+      unset BRIK_PIPELINE_ID BRIK_PIPELINE_URL
+      unset BRIK_COMMIT_SHA BRIK_COMMIT_SHORT_SHA BRIK_COMMIT_REF
+      unset BRIK_COMMIT_BRANCH BRIK_COMMIT_TAG
+      unset BRIK_TRIGGERED_BY
+    }
+    Before 'extended_setup'
+    After 'extended_cleanup'
+
+    It "prefers BRIK_PIPELINE_ID over BRIK_RUN_ID for pipeline.id"
+      read_id() {
+        export BRIK_PIPELINE_ID="42"
+        write_fragment_file "init" "success" 0
+        report.aggregate_fragments "$FRAG_DIR" >/dev/null 2>&1 || return 1
+        jq -r '.pipeline.id' "$AGG_LOG_DIR/pipeline-report.json"
+      }
+      When call read_id
+      The output should equal "42"
+    End
+
+    It "exposes BRIK_PIPELINE_URL as pipeline.url"
+      read_url() {
+        export BRIK_PIPELINE_URL="https://gitlab.example.com/group/project/-/pipelines/42"
+        write_fragment_file "init" "success" 0
+        report.aggregate_fragments "$FRAG_DIR" >/dev/null 2>&1 || return 1
+        jq -r '.pipeline.url' "$AGG_LOG_DIR/pipeline-report.json"
+      }
+      When call read_url
+      The output should equal "https://gitlab.example.com/group/project/-/pipelines/42"
+    End
+
+    It "omits pipeline.url when BRIK_PIPELINE_URL is unset"
+      read_url() {
+        write_fragment_file "init" "success" 0
+        report.aggregate_fragments "$FRAG_DIR" >/dev/null 2>&1 || return 1
+        jq '.pipeline | has("url")' "$AGG_LOG_DIR/pipeline-report.json"
+      }
+      When call read_url
+      The output should equal "false"
+    End
+
+    It "exposes BRIK_COMMIT_SHA under pipeline.commit.sha"
+      read_sha() {
+        export BRIK_COMMIT_SHA="abcdef0123456789abcdef0123456789abcdef01"
+        write_fragment_file "init" "success" 0
+        report.aggregate_fragments "$FRAG_DIR" >/dev/null 2>&1 || return 1
+        jq -r '.pipeline.commit.sha' "$AGG_LOG_DIR/pipeline-report.json"
+      }
+      When call read_sha
+      The output should equal "abcdef0123456789abcdef0123456789abcdef01"
+    End
+
+    It "exposes BRIK_COMMIT_SHORT_SHA under pipeline.commit.short_sha"
+      read_short() {
+        export BRIK_COMMIT_SHORT_SHA="abcdef01"
+        write_fragment_file "init" "success" 0
+        report.aggregate_fragments "$FRAG_DIR" >/dev/null 2>&1 || return 1
+        jq -r '.pipeline.commit.short_sha' "$AGG_LOG_DIR/pipeline-report.json"
+      }
+      When call read_short
+      The output should equal "abcdef01"
+    End
+
+    It "exposes BRIK_COMMIT_REF under pipeline.commit.ref"
+      read_ref() {
+        export BRIK_COMMIT_REF="feature/x"
+        write_fragment_file "init" "success" 0
+        report.aggregate_fragments "$FRAG_DIR" >/dev/null 2>&1 || return 1
+        jq -r '.pipeline.commit.ref' "$AGG_LOG_DIR/pipeline-report.json"
+      }
+      When call read_ref
+      The output should equal "feature/x"
+    End
+
+    It "exposes BRIK_COMMIT_BRANCH under pipeline.commit.branch"
+      read_branch() {
+        export BRIK_COMMIT_BRANCH="main"
+        write_fragment_file "init" "success" 0
+        report.aggregate_fragments "$FRAG_DIR" >/dev/null 2>&1 || return 1
+        jq -r '.pipeline.commit.branch' "$AGG_LOG_DIR/pipeline-report.json"
+      }
+      When call read_branch
+      The output should equal "main"
+    End
+
+    It "exposes BRIK_COMMIT_TAG under pipeline.commit.tag"
+      read_tag() {
+        export BRIK_COMMIT_TAG="v1.2.3"
+        write_fragment_file "init" "success" 0
+        report.aggregate_fragments "$FRAG_DIR" >/dev/null 2>&1 || return 1
+        jq -r '.pipeline.commit.tag' "$AGG_LOG_DIR/pipeline-report.json"
+      }
+      When call read_tag
+      The output should equal "v1.2.3"
+    End
+
+    It "omits pipeline.commit when no BRIK_COMMIT_* is set"
+      read_commit() {
+        write_fragment_file "init" "success" 0
+        report.aggregate_fragments "$FRAG_DIR" >/dev/null 2>&1 || return 1
+        jq '.pipeline | has("commit")' "$AGG_LOG_DIR/pipeline-report.json"
+      }
+      When call read_commit
+      The output should equal "false"
+    End
+
+    It "exposes BRIK_TRIGGERED_BY as pipeline.triggered_by"
+      read_trigger() {
+        export BRIK_TRIGGERED_BY="alice"
+        write_fragment_file "init" "success" 0
+        report.aggregate_fragments "$FRAG_DIR" >/dev/null 2>&1 || return 1
+        jq -r '.pipeline.triggered_by' "$AGG_LOG_DIR/pipeline-report.json"
+      }
+      When call read_trigger
+      The output should equal "alice"
+    End
+
+    It "omits pipeline.triggered_by when BRIK_TRIGGERED_BY is unset"
+      read_trigger() {
+        write_fragment_file "init" "success" 0
+        report.aggregate_fragments "$FRAG_DIR" >/dev/null 2>&1 || return 1
+        jq '.pipeline | has("triggered_by")' "$AGG_LOG_DIR/pipeline-report.json"
+      }
+      When call read_trigger
+      The output should equal "false"
+    End
+
+    It "validates against the aggregate schema with all metadata populated"
+      Skip if "jv not installed" jv_missing
+      validate_full() {
+        export BRIK_PIPELINE_ID="42"
+        export BRIK_PIPELINE_URL="https://gitlab.example.com/p/-/pipelines/42"
+        export BRIK_COMMIT_SHA="abcdef0123456789abcdef0123456789abcdef01"
+        export BRIK_COMMIT_SHORT_SHA="abcdef01"
+        export BRIK_COMMIT_REF="feature/x"
+        export BRIK_COMMIT_BRANCH="feature/x"
+        export BRIK_COMMIT_TAG="v1.2.3"
+        export BRIK_TRIGGERED_BY="alice"
+        write_fragment_file "init" "success" 0
+        report.aggregate_fragments "$FRAG_DIR" >/dev/null 2>&1 || return 1
+        validate_aggregate_file "$AGG_LOG_DIR/pipeline-report.json"
+      }
+      When call validate_full
+      The status should be success
+    End
+  End
+
+  # ---------------------------------------------------------------------------
   # Markdown rendering side-effect
   # ---------------------------------------------------------------------------
   Describe "markdown side-effect"
