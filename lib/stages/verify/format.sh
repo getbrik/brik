@@ -57,12 +57,18 @@ verify.format.run() {
     case "$tool" in
         prettier)
             if command -v npx >/dev/null 2>&1; then
-                # --ignore-pattern '.cache/**' avoids scanning the Brik
-                # cache directory (grype DB, pip wheels, etc.) which lives
-                # in the workspace alongside source on platforms with a
-                # shared workspace (Jenkins). On GitLab the pattern is a
-                # no-op because each job has an isolated workspace.
-                fmt_cmd="npx prettier --check . --ignore-pattern '.cache/**'"
+                # Make prettier ignore the Brik cache directory (grype DB,
+                # pip wheels, etc.). On Jenkins the workspace is shared
+                # across stages, so the parallel scan stage's cache lands
+                # next to the source and breaks `prettier --check .` on
+                # binary files. Prettier has no inline ignore flag; the
+                # supported channel is .prettierignore, which we append
+                # idempotently here while preserving any user patterns.
+                local _prettier_ignore="${BRIK_WORKSPACE:-.}/.prettierignore"
+                if ! grep -qF '.cache/' "$_prettier_ignore" 2>/dev/null; then
+                    printf '.cache/\n' >> "$_prettier_ignore"
+                fi
+                fmt_cmd="npx prettier --check ."
             else
                 log.error "npx not found for prettier"
                 return "$BRIK_EXIT_MISSING_DEP"
