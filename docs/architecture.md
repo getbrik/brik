@@ -117,7 +117,9 @@ depends on Layer 0 for logging and context but has no knowledge of any CI platfo
 Thin adapters that bridge CI platforms to the Bash layers. The GitLab shared library
 (`shared-libs/gitlab/`) maps the fixed flow to GitLab CI stages and jobs. Jenkins
 and GitHub Actions adapters follow the same pattern. Shared libraries read `brik.yml`,
-extract configuration, and call `stage.run` for each stage.
+extract configuration, and call `stage.run` for each stage. See [Platform Stage
+Mapping](#platform-stage-mapping) for the per-stage runner image table and the
+Jenkins-specific helper layout.
 
 **Layer 3 -- brik.yml** (`schemas/config/v1/brik.schema.json`).
 The user-facing configuration file. Validated against a JSON Schema. Defines project
@@ -160,6 +162,53 @@ and for Lint/SAST/Scan to succeed (quality gate).
 
 Lint, SAST, Scan, and Test run in parallel on GitLab CI (same `verify` stage).
 On other platforms that support parallelism, the same pattern applies.
+
+---
+
+## Platform Stage Mapping
+
+Every stage runs inside a brik-runner Docker image. The platform adapter
+selects which image, the stage business logic is identical.
+
+| Stage | Image | Notes |
+|-------|-------|-------|
+| Init | `brik-runner-base` | Reads `brik.yml`, validates schema, emits `brik-init.env` (BRIK_CI_IMAGE = stack image for downstream stages) |
+| Release | `brik-runner-<stack>` | Stack tools needed (npm version, mvn versions, cargo set-version, ...) |
+| Build | `brik-runner-<stack>` | |
+| Lint | `brik-runner-<stack>` | Stack-native linters (eslint, ruff, checkstyle, clippy, ...) |
+| SAST | `brik-runner-analysis` | semgrep, checkov, scancode, license_finder |
+| Scan | `brik-runner-scanner` | grype, syft, osv-scanner, gitleaks, trufflehog |
+| Test | `brik-runner-<stack>` | |
+| Package | `brik-runner-<stack>` | Builds the deliverable (npm pack, mvn package, docker build) |
+| Container Scan | `brik-runner-scanner` | hadolint, dockle on the package output |
+| Deploy | `brik-runner-deploy` | helm, kubectl, argocd, docker compose, ssh, rsync. Runs as root because brik-runner-deploy lacks a uid-1000 user. |
+| Notify | `brik-runner-base` | Aggregates per-stage fragments, posts webhooks |
+
+### GitLab adapter
+
+`shared-libs/gitlab/templates/pipeline.yml` declares one job per stage with
+the relevant `image:` directive. The Init job emits `brik-init.env` as a
+`reports: dotenv:` artifact, so downstream jobs receive `BRIK_CI_IMAGE`
+(the resolved `brik-runner-<stack>:<version>` for that project) and other
+gating flags.
+
+### Jenkins adapter
+
+`shared-libs/jenkins/vars/` defines six small variables:
+
+| Var | Responsibility |
+|-----|---------------|
+| `brikPipeline` | Entry point. Declares the `node {}`, runs SCM checkout, sets up helpers, runs the fixed flow + Notify finally. |
+| `brikStage` | Sources `jenkins-wrapper.sh` and dispatches to a portable Bash stage via `brik.jenkins.run_stage`. |
+| `brikRunStage` | Wraps `docker.image(image).inside(args) { brikStage(name, brikHome) }` and injects `-e BRIK_RUNNER_IMAGE` so each stage's report fragment records its actual execution image. |
+| `brikResolveHome` | Locates the Brik shared library inside `${WORKSPACE}@libs/`. |
+| `brikDockerArgs` | Builds `dockerArgs` and `deployDockerArgs` (HOME redirection, JVM cache paths, memory cap, network attachment, `--env-file` for NEXUS_/BRIK_/REGISTRY_/ARGOCD_/CARGO_/SSH_ vars). |
+| `brikReadDotenv` | Parses `brik-init.env` so the master can extract `BRIK_CI_IMAGE` for the resolved stack image, mirroring GitLab's dotenv contract. |
+
+`brikPipeline` exposes five per-image stage helpers - `runInBase`,
+`runStage`, `runInAnalysis`, `runInScanner`, `runInDeploy` - all routed
+through `brikRunStage`. The Jenkins agent only handles SCM checkout,
+stash/unstash, archiveArtifacts, and the Notify finally orchestration.
 
 ---
 
