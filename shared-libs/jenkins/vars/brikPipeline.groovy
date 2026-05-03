@@ -110,94 +110,98 @@ def call(Map params = [:]) {
                 }
             }
 
+            // Build dockerArgs first so all stage helpers (including
+            // runInBase for init and notify) share the same Docker
+            // invocation contract: workspace mount, env-file, network,
+            // memory cap. Defined outside the try{} block so the Notify
+            // stage in finally{} can also use runInBase.
+            def dockerNetwork = params.dockerNetwork ?: sh(
+                script: '''CID=$(grep -oP 'containers/\\K[a-f0-9]+' /proc/self/mountinfo 2>/dev/null | head -1)
+                    [ -n "$CID" ] && docker inspect "$CID" --format '{{range .NetworkSettings.Networks}}{{.NetworkID}}{{end}}' 2>/dev/null | head -1 || echo ''
+                ''',
+                returnStdout: true
+            ).trim()
+            def networkArg = dockerNetwork ? "--network ${dockerNetwork}" : ''
+            // Export global node env vars to a file so Docker containers
+            // can access them via --env-file. The file lives outside the
+            // workspace because it contains tokens (ARGOCD_AUTH_TOKEN,
+            // ...) that secret scanners would otherwise flag.
+            def envFile = "/tmp/brik-env-${env.BUILD_TAG}"
+            sh """env | grep -E '^(NEXUS_|BRIK_|REGISTRY_|ARGOCD_|CARGO_|SSH_)' > '${envFile}' 2>/dev/null || true"""
+            def globalEnvArgs = fileExists(envFile) && readFile(envFile).trim() ? "--env-file ${envFile}" : ''
+            // HOME=$WORKSPACE redirects npm, pip, cargo, nuget caches into workspace.
+            // Java needs explicit overrides: JVM user.home ignores $HOME (uses getpwuid).
+            def javaEnvArgs = "-e MAVEN_OPTS=\"-Dmaven.repo.local=${env.WORKSPACE}/.m2/repository\" -e GRADLE_USER_HOME=${env.WORKSPACE}/.gradle"
+            def dockerArgs = "-e HOME=${env.WORKSPACE} ${javaEnvArgs} --memory=2g -v /var/run/docker.sock:/var/run/docker.sock ${networkArg} ${globalEnvArgs}"
+            // Deploy tools (ssh, rsync, helm, argocd CLI) read $HOME from
+            // /etc/passwd via getpwuid. brik-runner-deploy has no uid-1000
+            // user, so Jenkins's default "-u <jenkinsUid>:<gid>" launch
+            // breaks ssh with "No user exists for uid 1000". Run the
+            // deploy container as root to keep those tools happy.
+            def deployDockerArgs = "-u 0:0 ${dockerArgs}"
+
+            // Stash the per-stage report fragment produced by
+            // report.write_fragment so the Notify stage can unstash all
+            // fragments and aggregate them via report.aggregate_fragments.
+            // allowEmpty:true keeps stages that did not emit a fragment
+            // (e.g. BRIK_DISABLE_REPORT_FRAGMENTS=1 or skipped stage)
+            // from breaking the pipeline.
+            def stashBrikArtifacts = { name ->
+                stash includes: 'brik-artifacts/**',
+                      name: "brik-artifacts-${name}",
+                      allowEmpty: true
+            }
+
+            // Per-image stage helpers. Every stage runs inside its
+            // dedicated brik-runner image; the only variation is the
+            // image (and deploy's root override + chown). runInBase
+            // covers init and notify (both run in brik-runner-base, the
+            // same minimal Alpine + bash + yq + jq + jv + curl image).
+            def runInBase = { name ->
+                brikRunStage(image: baseImage, stageName: name,
+                             brikHome: brikHome, dockerArgs: dockerArgs)
+                stashBrikArtifacts(name)
+            }
+            def runStage = { name ->
+                brikRunStage(image: resolvedImage, stageName: name,
+                             brikHome: brikHome, dockerArgs: dockerArgs)
+                stashBrikArtifacts(name)
+            }
+            def runInAnalysis = { name ->
+                brikRunStage(image: analysisImage, stageName: name,
+                             brikHome: brikHome, dockerArgs: dockerArgs)
+                stashBrikArtifacts(name)
+            }
+            def runInScanner = { name ->
+                brikRunStage(image: scannerImage, stageName: name,
+                             brikHome: brikHome, dockerArgs: dockerArgs)
+                stashBrikArtifacts(name)
+            }
+            def runInDeploy = { name ->
+                try {
+                    brikRunStage(image: deployImage, stageName: name,
+                                 brikHome: brikHome, dockerArgs: deployDockerArgs)
+                } finally {
+                    // The deploy container ran as root and may have
+                    // created root-owned files in the workspace
+                    // (.ssh/id_rsa, .kube/config). Jenkins (uid 1000)
+                    // cannot cleanWs them on the next build. Chown
+                    // back to the Jenkins uid using a one-shot root
+                    // container.
+                    def jenkinsUid = sh(script: 'id -u', returnStdout: true).trim()
+                    def jenkinsGid = sh(script: 'id -g', returnStdout: true).trim()
+                    sh """
+                        docker run --rm -u 0:0 \
+                            -v "\${WORKSPACE}:/ws" \
+                            alpine:latest \
+                            sh -c 'chown -R ${jenkinsUid}:${jenkinsGid} /ws/.ssh /ws/.kube 2>/dev/null || true' \
+                            || true
+                    """
+                }
+                stashBrikArtifacts(name)
+            }
+
             try {
-                // Build dockerArgs first so all stage helpers (including
-                // runInBase for init) share the same Docker invocation
-                // contract: workspace mount, env-file, network, memory cap.
-                def dockerNetwork = params.dockerNetwork ?: sh(
-                    script: '''CID=$(grep -oP 'containers/\\K[a-f0-9]+' /proc/self/mountinfo 2>/dev/null | head -1)
-                        [ -n "$CID" ] && docker inspect "$CID" --format '{{range .NetworkSettings.Networks}}{{.NetworkID}}{{end}}' 2>/dev/null | head -1 || echo ''
-                    ''',
-                    returnStdout: true
-                ).trim()
-                def networkArg = dockerNetwork ? "--network ${dockerNetwork}" : ''
-                // Export global node env vars to a file so Docker containers
-                // can access them via --env-file. The file lives outside the
-                // workspace because it contains tokens (ARGOCD_AUTH_TOKEN,
-                // ...) that secret scanners would otherwise flag.
-                def envFile = "/tmp/brik-env-${env.BUILD_TAG}"
-                sh """env | grep -E '^(NEXUS_|BRIK_|REGISTRY_|ARGOCD_|CARGO_|SSH_)' > '${envFile}' 2>/dev/null || true"""
-                def globalEnvArgs = fileExists(envFile) && readFile(envFile).trim() ? "--env-file ${envFile}" : ''
-                // HOME=$WORKSPACE redirects npm, pip, cargo, nuget caches into workspace.
-                // Java needs explicit overrides: JVM user.home ignores $HOME (uses getpwuid).
-                def javaEnvArgs = "-e MAVEN_OPTS=\"-Dmaven.repo.local=${env.WORKSPACE}/.m2/repository\" -e GRADLE_USER_HOME=${env.WORKSPACE}/.gradle"
-                def dockerArgs = "-e HOME=${env.WORKSPACE} ${javaEnvArgs} --memory=2g -v /var/run/docker.sock:/var/run/docker.sock ${networkArg} ${globalEnvArgs}"
-                // Deploy tools (ssh, rsync, helm, argocd CLI) read $HOME from
-                // /etc/passwd via getpwuid. brik-runner-deploy has no uid-1000
-                // user, so Jenkins's default "-u <jenkinsUid>:<gid>" launch
-                // breaks ssh with "No user exists for uid 1000". Run the
-                // deploy container as root to keep those tools happy.
-                def deployDockerArgs = "-u 0:0 ${dockerArgs}"
-
-                // Stash the per-stage report fragment produced by
-                // report.write_fragment so the Notify stage can unstash all
-                // fragments and aggregate them via report.aggregate_fragments.
-                // allowEmpty:true keeps stages that did not emit a fragment
-                // (e.g. BRIK_DISABLE_REPORT_FRAGMENTS=1 or skipped stage)
-                // from breaking the pipeline.
-                def stashBrikArtifacts = { name ->
-                    stash includes: 'brik-artifacts/**',
-                          name: "brik-artifacts-${name}",
-                          allowEmpty: true
-                }
-
-                // Per-image stage helpers. Every stage runs inside its
-                // dedicated brik-runner image; the only variation is the
-                // image (and deploy's root override + chown).
-                def runInBase = { name ->
-                    brikRunStage(image: baseImage, stageName: name,
-                                 brikHome: brikHome, dockerArgs: dockerArgs)
-                    stashBrikArtifacts(name)
-                }
-                def runStage = { name ->
-                    brikRunStage(image: resolvedImage, stageName: name,
-                                 brikHome: brikHome, dockerArgs: dockerArgs)
-                    stashBrikArtifacts(name)
-                }
-                def runInAnalysis = { name ->
-                    brikRunStage(image: analysisImage, stageName: name,
-                                 brikHome: brikHome, dockerArgs: dockerArgs)
-                    stashBrikArtifacts(name)
-                }
-                def runInScanner = { name ->
-                    brikRunStage(image: scannerImage, stageName: name,
-                                 brikHome: brikHome, dockerArgs: dockerArgs)
-                    stashBrikArtifacts(name)
-                }
-                def runInDeploy = { name ->
-                    try {
-                        brikRunStage(image: deployImage, stageName: name,
-                                     brikHome: brikHome, dockerArgs: deployDockerArgs)
-                    } finally {
-                        // The deploy container ran as root and may have
-                        // created root-owned files in the workspace
-                        // (.ssh/id_rsa, .kube/config). Jenkins (uid 1000)
-                        // cannot cleanWs them on the next build. Chown
-                        // back to the Jenkins uid using a one-shot root
-                        // container.
-                        def jenkinsUid = sh(script: 'id -u', returnStdout: true).trim()
-                        def jenkinsGid = sh(script: 'id -g', returnStdout: true).trim()
-                        sh """
-                            docker run --rm -u 0:0 \
-                                -v "\${WORKSPACE}:/ws" \
-                                alpine:latest \
-                                sh -c 'chown -R ${jenkinsUid}:${jenkinsGid} /ws/.ssh /ws/.kube 2>/dev/null || true' \
-                                || true
-                        """
-                    }
-                    stashBrikArtifacts(name)
-                }
-
                 // Init runs in brik-runner-base (same image as GitLab's
                 // default). It writes brik-init.env in the workspace, which
                 // we read back to resolve the stack-specific runner image
@@ -259,7 +263,11 @@ def call(Map params = [:]) {
                                 echo "[brik] no stash for ${s} (likely skipped)"
                             }
                         }
-                        brikStage('notify', brikHome)
+                        // Notify runs in brik-runner-base, same as init.
+                        // The master no longer carries stack-specific tools
+                        // so bootstrap.prepare_env on master would log
+                        // [ERROR] when trying to apt-get install nodejs etc.
+                        runInBase('notify')
                         archiveArtifacts artifacts: 'brik-artifacts/**/*',
                             allowEmptyArchive: true,
                             fingerprint: false
