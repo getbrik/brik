@@ -57,7 +57,12 @@ verify.format.run() {
     case "$tool" in
         prettier)
             if command -v npx >/dev/null 2>&1; then
-                fmt_cmd="npx prettier --check ."
+                # --ignore-pattern '.cache/**' avoids scanning the Brik
+                # cache directory (grype DB, pip wheels, etc.) which lives
+                # in the workspace alongside source on platforms with a
+                # shared workspace (Jenkins). On GitLab the pattern is a
+                # no-op because each job has an isolated workspace.
+                fmt_cmd="npx prettier --check . --ignore-pattern '.cache/**'"
             else
                 log.error "npx not found for prettier"
                 return "$BRIK_EXIT_MISSING_DEP"
