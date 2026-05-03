@@ -188,6 +188,37 @@ stage.cleanup() {
     return 0
 }
 
+# Skip the current stage with a user-visible warning. Used when a stage
+# is desactivable by config and the user has chosen to disable it
+# outside a release context. Records tech.status=skipped, tech.warning=true,
+# tech.warning_reason on the report backend so report.aggregate_fragments
+# can surface the entry under summary.warnings. Returns
+# BRIK_EXIT_SKIP_WITH_WARNING (99) so the platform wrapper can map it to
+# allow_failure (GitLab) or unstable() (Jenkins).
+#
+# Usage: stage.skip_with_warning <stage_name> <reason>
+stage.skip_with_warning() {
+    if [[ $# -ne 2 ]]; then
+        error.raise "$BRIK_EXIT_INVALID_INPUT" \
+            "stage.skip_with_warning expects 2 arguments: stage reason (got $#)"
+        return "$?"
+    fi
+    local stage_name="$1"
+    local reason="$2"
+    if [[ -z "$stage_name" || -z "$reason" ]]; then
+        error.raise "$BRIK_EXIT_INVALID_INPUT" \
+            "stage.skip_with_warning: stage and reason must not be empty"
+        return "$?"
+    fi
+
+    log.warn "stage '${stage_name}' skipped with warning: ${reason}"
+    report.record "$stage_name" "tech" "status"         "skipped" 2>/dev/null || true
+    report.record "$stage_name" "tech" "warning"        "true"    2>/dev/null || true
+    report.record "$stage_name" "tech" "warning_reason" "$reason" 2>/dev/null || true
+
+    return "$BRIK_EXIT_SKIP_WITH_WARNING"
+}
+
 # Record the stage's terminal tech.* fields into the pipeline-report backend
 # and emit the per-stage fragment for CI artifact aggregation. Idempotent
 # when called repeatedly (report.record upserts).

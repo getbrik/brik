@@ -529,6 +529,9 @@ report.aggregate_fragments() {
               passed:  map(select(. == "success")) | length,
               failed:  map(select(. == "failed"))  | length,
               skipped: map(select(. == "skipped")) | length } ) as $counts
+        | ( $frags
+          | map(select((.tech.warning // false) == true)
+                | { stage: .stage, reason: (.tech.warning_reason // "") }) ) as $warnings
         | ( if ($counts.failed // 0) > 0 then "failed" else "success" end ) as $pstatus
         | ( {}
             + ( if $commit_sha       != "" then { sha:       $commit_sha       } else {} end )
@@ -554,7 +557,8 @@ report.aggregate_fragments() {
             pipeline: $pipeline,
             stages: $frags,
             summary: {
-              stages: $counts
+              stages: $counts,
+              warnings: $warnings
             }
           }
         ' > "$tmp" || {

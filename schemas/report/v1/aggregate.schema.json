@@ -96,6 +96,19 @@
             "skipped": { "type": "integer", "minimum": 0 }
           }
         },
+        "warnings": {
+          "description": "User-disabled stages outside a release context. One entry per fragment with tech.warning=true. Empty array when no stage was skipped with a warning.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["stage", "reason"],
+            "additionalProperties": false,
+            "properties": {
+              "stage":  { "type": "string" },
+              "reason": { "type": "string" }
+            }
+          }
+        },
         "security": {
           "description": "Cross-stage security signal: critical findings per scanner and total vulnerabilities.",
           "type": "object",

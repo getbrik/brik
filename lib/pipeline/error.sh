@@ -29,6 +29,10 @@ export BRIK_DEFAULT_LOG_DIR="/tmp/brik/logs"
 #  8  TIMEOUT         - operation exceeded its time limit (reserved for runtime)
 #  9  INTERRUPTED     - operation cancelled by signal or user (reserved for runtime)
 # 10  CHECK_FAILED    - quality or security check did not meet threshold
+# 99  SKIP_WITH_WARNING - stage skipped at user request outside release.
+#                        Platform wrappers map this to a visible warning
+#                        (GitLab allow_failure.exit_codes, Jenkins
+#                        unstable()) without failing the pipeline.
 readonly BRIK_EXIT_OK=0
 readonly BRIK_EXIT_FAILURE=1
 readonly BRIK_EXIT_INVALID_INPUT=2
@@ -40,9 +44,11 @@ readonly BRIK_EXIT_CONFIG_ERROR=7
 readonly BRIK_EXIT_TIMEOUT=8
 readonly BRIK_EXIT_INTERRUPTED=9
 readonly BRIK_EXIT_CHECK_FAILED=10
+readonly BRIK_EXIT_SKIP_WITH_WARNING=99
 export BRIK_EXIT_OK BRIK_EXIT_FAILURE BRIK_EXIT_INVALID_INPUT BRIK_EXIT_MISSING_DEP
 export BRIK_EXIT_INVALID_ENV BRIK_EXIT_EXTERNAL_FAIL BRIK_EXIT_IO_FAILURE BRIK_EXIT_CONFIG_ERROR
 export BRIK_EXIT_TIMEOUT BRIK_EXIT_INTERRUPTED BRIK_EXIT_CHECK_FAILED
+export BRIK_EXIT_SKIP_WITH_WARNING
 
 # Emit an error log and return the given code.
 # Usage: error.raise <code> <message>
