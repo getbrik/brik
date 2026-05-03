@@ -35,10 +35,15 @@ stages.container_scan() {
     # fragment, no warning).
     local image_built="false" image_ref=""
     if command -v jq >/dev/null 2>&1; then
-        local _backend="${BRIK_LOG_DIR:-${BRIK_DEFAULT_LOG_DIR:-/tmp/brik/logs}}/pipeline-report.json"
-        if [[ -f "$_backend" ]]; then
-            image_built="$(jq -r '.stages[]? | select(.name == "package") | .tech.image_built // "false"' "$_backend" 2>/dev/null || printf 'false')"
-            image_ref="$(jq -r '.stages[]? | select(.name == "package") | .tech.image_ref // ""' "$_backend" 2>/dev/null || printf '')"
+        # Read the package stage fragment directly. On GitLab each job has
+        # an isolated backend, but brik-artifacts/package.json travels as
+        # an artifact (declared in package.yml + pulled via needs.artifacts
+        # by the container-scan job). On Jenkins the workspace is shared,
+        # so the same path is also visible. Single source of truth.
+        local _pkg_fragment="${BRIK_WORKSPACE:-.}/brik-artifacts/package.json"
+        if [[ -f "$_pkg_fragment" ]]; then
+            image_built="$(jq -r '.tech.image_built // "false"' "$_pkg_fragment" 2>/dev/null || printf 'false')"
+            image_ref="$(jq -r '.tech.image_ref // ""' "$_pkg_fragment" 2>/dev/null || printf '')"
         fi
     fi
 
