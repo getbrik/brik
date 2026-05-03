@@ -46,7 +46,7 @@ def call(Map config = [:]) {
     def envFileArg = fileExists(envFile) && readFile(envFile).trim() ? "--env-file ${envFile}" : ''
 
     def javaEnvArgs = "-e MAVEN_OPTS=\"-Dmaven.repo.local=${env.WORKSPACE}/.m2/repository\" -e GRADLE_USER_HOME=${env.WORKSPACE}/.gradle"
-    def dockerArgs = "-e HOME=${env.WORKSPACE} ${javaEnvArgs} --memory=2g -v /var/run/docker.sock:/var/run/docker.sock ${networkArg} ${envFileArg}"
+    def dockerArgs = "-e HOME=${env.WORKSPACE} ${javaEnvArgs} --memory=4g -v /var/run/docker.sock:/var/run/docker.sock ${networkArg} ${envFileArg}"
 
     return [
         dockerArgs:       dockerArgs,
