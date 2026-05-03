@@ -343,7 +343,7 @@ Describe "gitlab-wrapper.sh"
 
     # --- Lint stage: verify side effects ---
 
-    It "runs lint stage and records status=disabled in the pipeline report"
+    It "runs lint stage and records tech.status=skipped with warning"
       run_lint_check_report() {
         brik.gitlab.run_stage "lint" >/dev/null 2>&1
         local report="${BRIK_LOG_DIR}/pipeline-report.json"
@@ -354,12 +354,14 @@ Describe "gitlab-wrapper.sh"
         fi
       }
       When call run_lint_check_report
-      The output should equal "disabled"
+      The output should equal "skipped"
     End
 
     It "runs lint stage and logs message"
+      # Fixture sets quality.lint.enabled=false outside a release, so lint
+      # skips with warning (exit 99) instead of running.
       When call brik.gitlab.run_stage "lint"
-      The status should be success
+      The status should equal 99
       The output should include "lint"
       The error should be present
     End

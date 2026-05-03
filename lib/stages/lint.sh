@@ -16,16 +16,26 @@ stages.lint() {
     config.export_quality_vars
 
     # Status semantics in pipeline-report.json:
-    #   - disabled       : explicit opt-out via quality.lint.enabled=false
+    #   - skipped        : tool configured but expected config absent (set
+    #                      by verify.lint.run on Tier 3 fall-through), or
+    #                      user opted out outside a release context (in
+    #                      that case tech.warning=true is also set, see
+    #                      stage.skip_with_warning).
     #   - not-applicable : no lint/format/type_check tool configured, no
     #                      auto-detect trigger fires either
-    #   - skipped        : tool configured but expected config absent (set
-    #                      by verify.lint.run on Tier 3 fall-through)
     #   - passed/failed  : recorded by pipeline.run from the verify.run rc
+    #
+    # Shift-left contract: lint is mandatory on a release build. A user-set
+    # quality.lint.enabled=false is honored only when the build is not on
+    # a tag; on a tag it is forced and a log.info traces the override.
     if [[ "${BRIK_LINT_ENABLED:-true}" != "true" ]]; then
-        log.info "lint disabled (quality.lint.enabled=false) - skipping"
-        report.record "lint" "tech" "status" "disabled" 2>/dev/null || true
-        return 0
+        if [[ -n "${BRIK_COMMIT_TAG:-}" ]]; then
+            log.info "lint disabled by config but forced on release (BRIK_COMMIT_TAG=${BRIK_COMMIT_TAG})"
+        else
+            stage.skip_with_warning "lint" \
+                "lint disabled by user (quality.lint.enabled=false) outside release context"
+            return $?
+        fi
     fi
 
     brik.use verify.verify

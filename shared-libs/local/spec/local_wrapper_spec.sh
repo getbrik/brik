@@ -408,9 +408,11 @@ Describe "local-wrapper.sh"
       The error should be present
     End
 
-    It "runs lint stage successfully"
+    It "runs lint stage (skipped with warning by fixture)"
+      # Fixture sets quality.lint.enabled=false outside a release, so lint
+      # skips with warning (exit 99) instead of running.
       When call brik.local.run_stage "lint"
-      The status should be success
+      The status should equal 99
       The output should include "lint"
       The error should be present
     End
@@ -423,8 +425,10 @@ Describe "local-wrapper.sh"
     End
 
     It "dispatches quality to lint (backward compat)"
+      # Fixture sets quality.lint.enabled=false outside a release, so lint
+      # skips with warning (exit 99) instead of running.
       When call brik.local.run_stage "quality"
-      The status should be success
+      The status should equal 99
       The output should include "lint"
       The error should be present
     End
@@ -551,11 +555,13 @@ MOCKEOF
       The error should include "unknown flag"
     End
 
-    It "runs default pipeline and prints summary"
+    It "runs default pipeline and prints summary (lint disabled -> exit 99)"
+      # Fixture sets quality.lint.enabled=false outside a release, so lint
+      # exits 99 (skip-with-warning) and the pipeline propagates that rc.
+      # The Pipeline Summary header remains because Notify always runs.
       When call brik.local.run_pipeline
-      The status should be success
+      The status should equal 99
       The output should include "Pipeline Summary"
-      The output should include "PASS"
       The output should include "SKIP"
       The error should be present
     End

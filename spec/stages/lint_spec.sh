@@ -198,7 +198,7 @@ YAML
     End
   End
 
-  Describe "with lint disabled"
+  Describe "with lint disabled outside release"
     setup_disabled() {
       cat > "$BRIK_CONFIG_FILE" <<'YAML'
 version: 1
@@ -210,29 +210,77 @@ quality:
     enabled: false
 YAML
       config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
+      unset BRIK_COMMIT_TAG
     }
     Before 'setup_disabled'
 
-    It "skips when lint is disabled and records status disabled"
+    It "skips with warning and records tech.status=skipped"
       run_lint_disabled() {
         local ctx
         ctx="$(context.create "lint")" 2>/dev/null || ctx="$(mktemp)"
-        stages.lint "$ctx" >/dev/null 2>&1 || return $?
+        stages.lint "$ctx" >/dev/null 2>&1
+        local rc=$?
         read_lint_status
+        return $rc
       }
       When call run_lint_disabled
-      The status should be success
-      The output should equal "disabled"
+      The status should equal 99
+      The output should equal "skipped"
     End
 
-    It "logs that lint is disabled"
+    It "records tech.warning=true on the backend"
+      run_lint_disabled_warning() {
+        local ctx
+        ctx="$(context.create "lint")" 2>/dev/null || ctx="$(mktemp)"
+        stages.lint "$ctx" >/dev/null 2>&1 || true
+        jq -r '.stages[] | select(.name=="lint") | .tech.warning' \
+            "$BRIK_LOG_DIR/pipeline-report.json"
+      }
+      When call run_lint_disabled_warning
+      The output should equal "true"
+    End
+
+    It "logs a warn about lint being disabled outside release"
       run_lint_disabled_log() {
         local ctx
         ctx="$(context.create "lint")" 2>/dev/null || ctx="$(mktemp)"
         stages.lint "$ctx"
       }
       When call run_lint_disabled_log
-      The error should include "lint disabled"
+      The status should equal 99
+      The error should include "lint"
+      The error should include "outside release"
+    End
+  End
+
+  Describe "with lint disabled but on a release tag"
+    setup_disabled_on_tag() {
+      cat > "$BRIK_CONFIG_FILE" <<'YAML'
+version: 1
+project:
+  name: test
+  stack: node
+quality:
+  lint:
+    enabled: false
+YAML
+      config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
+      export BRIK_COMMIT_TAG="v1.0.0"
+    }
+    cleanup_disabled_on_tag() {
+      unset BRIK_COMMIT_TAG
+    }
+    Before 'setup_disabled_on_tag'
+    After 'cleanup_disabled_on_tag'
+
+    It "ignores enabled=false when running on a tag (forces lint)"
+      run_lint_force_on_tag() {
+        local ctx
+        ctx="$(context.create "lint")" 2>/dev/null || ctx="$(mktemp)"
+        stages.lint "$ctx"
+      }
+      When call run_lint_force_on_tag
+      The error should include "forced on release"
     End
   End
 

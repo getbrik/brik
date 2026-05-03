@@ -23,11 +23,13 @@ Describe "brik run pipeline"
     Before 'setup'
     After 'cleanup'
 
-    It "executes the full default pipeline"
+    It "executes the full default pipeline (lint disabled -> exit 99)"
+      # Fixture sets quality.lint.enabled=false outside a release, so lint
+      # exits 99 (skip-with-warning) and the pipeline propagates the same
+      # rc. The Pipeline Summary header remains because Notify always runs.
       When run script "$BRIK_BIN" run pipeline --workspace "$WORKSPACE" --config "$CONFIG"
-      The status should be success
+      The status should equal 99
       The stdout should include "Pipeline Summary"
-      The stdout should include "PASS"
       The stderr should be present
     End
 

@@ -31,7 +31,8 @@ brik-lint:
     expire_in: 1 week
     paths:
       - brik-artifacts/
-  rules:
-    - if: '$BRIK_LINT_ENABLED == "false"'
-      when: never
-    - when: on_success
+  # exit 99 = stage.skip_with_warning (Brik): user disabled lint outside
+  # a release context. Surfaced as "passed with warnings" in the GitLab UI.
+  allow_failure:
+    exit_codes:
+      - 99

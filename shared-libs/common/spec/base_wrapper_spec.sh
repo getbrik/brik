@@ -361,8 +361,10 @@ Describe "base-wrapper.sh"
     End
 
     It "dispatches quality to lint (backward compat)"
+      # Fixture sets quality.lint.enabled=false outside a release, so lint
+      # skips with warning (exit 99) instead of running.
       When call brik.wrapper.run_stage "quality"
-      The status should be success
+      The status should equal 99
       The output should include "lint"
       The error should be present
     End
@@ -374,7 +376,7 @@ Describe "base-wrapper.sh"
       The error should be present
     End
 
-    It "runs lint stage and records status=disabled in the pipeline report"
+    It "runs lint stage and records tech.status=skipped with warning"
       run_lint_check_report() {
         brik.wrapper.run_stage "lint" >/dev/null 2>&1
         local report="${BRIK_LOG_DIR}/pipeline-report.json"
@@ -385,7 +387,7 @@ Describe "base-wrapper.sh"
         fi
       }
       When call run_lint_check_report
-      The output should equal "disabled"
+      The output should equal "skipped"
     End
 
     It "loads pipeline env variables before running stage"

@@ -149,11 +149,11 @@ Describe "brik run"
     Before 'setup'
     After 'cleanup'
 
-    It "executes lint stage successfully (disabled)"
+    It "executes lint stage with skip-with-warning (disabled outside release)"
       When run script "$BRIK_BIN" run stage lint --workspace "$WORKSPACE" --config "$CONFIG"
-      The status should be success
-      The stdout should include "lint disabled"
-      The stderr should include "stage lint skipped"
+      The status should equal 99
+      The stdout should include "lint"
+      The stderr should include "exit code 99"
     End
   End
 

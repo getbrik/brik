@@ -13,6 +13,19 @@ stages.sast() {
 
     config.export_security_vars
 
+    # Shift-left contract: sast is mandatory on a release build. A user-set
+    # security.sast.enabled=false is honored only when the build is not on
+    # a tag; on a tag it is forced and a log.info traces the override.
+    if [[ "${BRIK_SAST_ENABLED:-true}" != "true" ]]; then
+        if [[ -n "${BRIK_COMMIT_TAG:-}" ]]; then
+            log.info "sast disabled by config but forced on release (BRIK_COMMIT_TAG=${BRIK_COMMIT_TAG})"
+        else
+            stage.skip_with_warning "sast" \
+                "sast disabled by user (security.sast.enabled=false) outside release context"
+            return $?
+        fi
+    fi
+
     log.info "sast stage - running static analysis scans"
 
     # Set tool defaults

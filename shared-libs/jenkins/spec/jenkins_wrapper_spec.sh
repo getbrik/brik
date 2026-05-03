@@ -365,7 +365,7 @@ Describe "jenkins-wrapper.sh"
 
     # --- Lint stage ---
 
-    It "runs lint stage and records status=disabled in the pipeline report"
+    It "runs lint stage and records tech.status=skipped with warning"
       run_lint_check_report() {
         brik.jenkins.run_stage "lint" >/dev/null 2>&1
         local report="${BRIK_LOG_DIR}/pipeline-report.json"
@@ -376,7 +376,7 @@ Describe "jenkins-wrapper.sh"
         fi
       }
       When call run_lint_check_report
-      The output should equal "disabled"
+      The output should equal "skipped"
     End
 
     # --- Scan stage ---
@@ -397,8 +397,10 @@ Describe "jenkins-wrapper.sh"
     # --- Backward compat ---
 
     It "dispatches quality to lint (backward compat)"
+      # Fixture sets quality.lint.enabled=false outside a release, so lint
+      # skips with warning (exit 99) instead of running.
       When call brik.jenkins.run_stage "quality"
-      The status should be success
+      The status should equal 99
       The output should include "lint"
       The error should be present
     End

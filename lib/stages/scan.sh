@@ -15,6 +15,19 @@ stages.scan() {
 
     config.export_security_vars
 
+    # Shift-left contract: scan is mandatory on a release build. A user-set
+    # security.scan.enabled=false is honored only when the build is not on
+    # a tag; on a tag it is forced and a log.info traces the override.
+    if [[ "${BRIK_SCAN_ENABLED:-true}" != "true" ]]; then
+        if [[ -n "${BRIK_COMMIT_TAG:-}" ]]; then
+            log.info "scan disabled by config but forced on release (BRIK_COMMIT_TAG=${BRIK_COMMIT_TAG})"
+        else
+            stage.skip_with_warning "scan" \
+                "scan disabled by user (security.scan.enabled=false) outside release context"
+            return $?
+        fi
+    fi
+
     log.info "scan stage - running dependency and secret scans"
 
     # Set tool defaults

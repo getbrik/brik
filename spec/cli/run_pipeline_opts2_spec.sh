@@ -25,14 +25,14 @@ Describe "brik run pipeline optional flags (deploy, continue-on-error)"
 
     It "accepts --with-deploy flag"
       When run script "$BRIK_BIN" run pipeline --workspace "$WORKSPACE" --config "$CONFIG" --with-deploy
-      The status should be success
+      The status should equal 99
       The stdout should include "Pipeline Summary"
       The stderr should be present
     End
 
     It "accepts --continue-on-error flag"
       When run script "$BRIK_BIN" run pipeline --workspace "$WORKSPACE" --config "$CONFIG" --continue-on-error
-      The status should be success
+      The status should equal 99
       The stdout should include "Pipeline Summary"
       The stderr should be present
     End

@@ -32,4 +32,9 @@ brik-sast:
     expire_in: 1 week
     paths:
       - brik-artifacts/
-  # No rules: SAST is non-negotiable (always runs with defaults)
+  # exit 99 = stage.skip_with_warning (Brik): user disabled sast outside
+  # a release context. Surfaced as "passed with warnings" in the GitLab UI.
+  # SAST always runs on a release tag regardless of the user flag.
+  allow_failure:
+    exit_codes:
+      - 99
