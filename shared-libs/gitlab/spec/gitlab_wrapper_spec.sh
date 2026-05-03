@@ -433,7 +433,7 @@ Describe "gitlab-wrapper.sh"
 
     # --- Deploy stub ---
 
-    It "runs deploy stub and records status skipped in the pipeline report"
+    It "runs deploy stub and silent-skips when no environments configured"
       run_deploy_check() {
         brik.gitlab.run_stage "deploy" >/dev/null 2>&1
         local report="${BRIK_LOG_DIR}/pipeline-report.json"
@@ -444,7 +444,10 @@ Describe "gitlab-wrapper.sh"
         fi
       }
       When call run_deploy_check
-      The output should equal "skipped"
+      # Silent skip: stages.deploy returns 0 without recording a status, so
+      # pipeline.run's default success-on-rc=0 path applies. No warning,
+      # no fragment-side enrichment.
+      The output should equal "success"
     End
 
     # --- Notify stage: verify output content ---

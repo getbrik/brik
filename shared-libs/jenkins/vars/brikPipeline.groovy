@@ -173,7 +173,13 @@ def call(Map params = [:]) {
                     docker.image(resolvedImage).pull()
                 }
 
-                runStageWithReporting('Release')        { runStage('release') }
+                // release: gate-at-platform on tag presence. Multibranch
+                // sets env.TAG_NAME on tag-scan builds. Skipping at this
+                // level avoids pulling the stack runner just to short-
+                // circuit in stages.release.
+                if (env.TAG_NAME?.trim()) {
+                    runStageWithReporting('Release') { runStage('release') }
+                }
                 runStageWithReporting('Build')          { runStage('build') }
                 runStageWithReporting('Verify') {
                     parallel(

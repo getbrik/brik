@@ -470,7 +470,7 @@ Describe "local-wrapper.sh"
       The output should equal "skipped"
     End
 
-    It "runs deploy stage and records status skipped in the pipeline report"
+    It "runs deploy stage and silent-skips when no environments configured"
       run_deploy() {
         brik.local.run_stage "deploy" >/dev/null 2>&1
         local report="${BRIK_LOG_DIR}/pipeline-report.json"
@@ -481,7 +481,10 @@ Describe "local-wrapper.sh"
         fi
       }
       When call run_deploy
-      The output should equal "skipped"
+      # Silent skip: stages.deploy returns 0 without recording a status, so
+      # pipeline.run's default success-on-rc=0 path applies. No warning,
+      # no fragment-side enrichment.
+      The output should equal "success"
     End
 
     It "runs notify stage and prints summary"

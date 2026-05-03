@@ -25,8 +25,10 @@ stages.deploy() {
     log.info "deploy stage"
 
     if [[ -z "${BRIK_DEPLOY_ENVIRONMENTS:-}" ]]; then
-        log.info "no deploy environments configured"
-        report.record "deploy" "tech" "status" "skipped" 2>/dev/null || true
+        # Silent skip: deploy is gated by the .deploy block presence; when
+        # absent, no fragment is emitted so the aggregate keeps no
+        # stages[name=deploy] entry.
+        log.info "no deploy environments configured - skipping deploy silently"
         return 0
     fi
 

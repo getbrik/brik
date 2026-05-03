@@ -56,7 +56,6 @@ brik-package:
       - brik-artifacts/
     when: always
     expire_in: 1 week
-  rules:
-    - if: '$CI_COMMIT_TAG'
-      when: on_success
-    - when: never
+  # No tag-only gate: producing a package on every commit is the
+  # essence of CI. The bash short-circuits silently when no
+  # package.docker.image is configured (image_built=false).

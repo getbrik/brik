@@ -79,7 +79,7 @@ YAML
     The output should equal '["staging","prod"]'
   End
 
-  It "records status skipped in the pipeline report when no environments"
+  It "skips silently when no environments are configured"
     run_deploy_skip() {
       brik.use() { :; }
       local ctx
@@ -88,7 +88,8 @@ YAML
       read_deploy_status
     }
     When call run_deploy_skip
-    The output should equal "skipped"
+    # Silent skip: no fragment recorded, .tech.status is absent.
+    The output should equal ""
   End
 
   Describe "with deploy environments"
