@@ -35,14 +35,17 @@ Describe "stages/container_scan.sh"
       Before 'setup_no_image'
       After 'cleanup_no_image'
 
-      It "skips and records status skipped in the report"
+      It "skips silently when neither the package fragment nor a user override provides an image"
         invoke_skip() {
-          stages.container_scan "$CTX_FILE" 2>/dev/null || return $?
+          stages.container_scan "$CTX_FILE" 2>/dev/null
+          local rc=$?
           read_container_scan_status
+          return $rc
         }
         When call invoke_skip
         The status should be success
-        The output should equal "skipped"
+        # Silent skip: no fragment recorded, .tech.status is absent.
+        The output should equal ""
       End
     End
 

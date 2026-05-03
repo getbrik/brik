@@ -20,7 +20,8 @@ stages.package() {
 
     if [[ -z "${BRIK_PACKAGE_DOCKER_IMAGE:-}" ]]; then
         log.warn "no docker image configured, skipping package stage"
-        report.record "package" "tech" "status" "skipped" 2>/dev/null || true
+        report.record "package" "tech" "status"      "skipped" 2>/dev/null || true
+        report.record "package" "tech" "image_built" "false"   2>/dev/null || true
         return 0
     fi
 
@@ -65,6 +66,11 @@ stages.package() {
     if [[ $result -ne 0 ]]; then
         return "$result"
     fi
+
+    # Source of truth consumed by stages.container_scan: the image was
+    # actually produced and is available locally for scanning.
+    report.record "package" "tech" "image_built" "true" 2>/dev/null || true
+    report.record "package" "tech" "image_ref"   "${BRIK_PACKAGE_DOCKER_IMAGE}:${_app_tag}" 2>/dev/null || true
 
     # Publish configured targets
     config.export_publish_vars

@@ -29,7 +29,47 @@ stages.container_scan() {
 
     config.export_security_vars
 
-    local image="${BRIK_SECURITY_CONTAINER_IMAGE:-}"
+    # Source of truth: the package stage reports tech.image_built when
+    # it actually produced a Docker image (lib/stages/package.sh). When
+    # absent or false, container-scan does not apply (silent skip, no
+    # fragment, no warning).
+    local image_built="false" image_ref=""
+    if command -v jq >/dev/null 2>&1; then
+        local _backend="${BRIK_LOG_DIR:-${BRIK_DEFAULT_LOG_DIR:-/tmp/brik/logs}}/pipeline-report.json"
+        if [[ -f "$_backend" ]]; then
+            image_built="$(jq -r '.stages[]? | select(.name == "package") | .tech.image_built // "false"' "$_backend" 2>/dev/null || printf 'false')"
+            image_ref="$(jq -r '.stages[]? | select(.name == "package") | .tech.image_ref // ""' "$_backend" 2>/dev/null || printf '')"
+        fi
+    fi
+
+    # Explicit user override: a non-empty security.container.image takes
+    # precedence over the package fragment inference (the user knows
+    # which image to scan, e.g. a vendored release tarball).
+    if [[ -n "${BRIK_SECURITY_CONTAINER_IMAGE:-}" ]]; then
+        image_built="true"
+        image_ref="${BRIK_SECURITY_CONTAINER_IMAGE}"
+    fi
+
+    if [[ "$image_built" != "true" ]]; then
+        log.info "no container image produced by package stage - skipping container scan silently"
+        return 0
+    fi
+
+    # Shift-left contract: container-scan is mandatory on a release build
+    # whenever a Docker image was produced. A user-set
+    # security.container_scan.enabled=false is honored only when the build
+    # is not on a tag; on a tag it is forced and a log.info traces the override.
+    if [[ "${BRIK_CONTAINER_SCAN_ENABLED:-true}" != "true" ]]; then
+        if [[ -n "${BRIK_COMMIT_TAG:-}" ]]; then
+            log.info "container-scan disabled by config but forced on release (BRIK_COMMIT_TAG=${BRIK_COMMIT_TAG})"
+        else
+            stage.skip_with_warning "container-scan" \
+                "container-scan disabled by user (security.container_scan.enabled=false) outside release context"
+            return $?
+        fi
+    fi
+
+    local image="${BRIK_SECURITY_CONTAINER_IMAGE:-${image_ref}}"
 
     if [[ -z "$image" ]]; then
         log.info "no container image configured - skipping container scan"

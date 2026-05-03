@@ -15,7 +15,10 @@ brik-container-scan:
     expire_in: 1 week
     paths:
       - brik-artifacts/
-  rules:
-    - if: '$BRIK_CONTAINER_SCAN_ENABLED == "true"'
-      when: on_success
-    - when: never
+  # exit 99 = stage.skip_with_warning (Brik): user disabled container-scan
+  # outside a release context. Surfaced as "passed with warnings" in the
+  # GitLab UI. The bash also performs a silent skip (return 0, no
+  # fragment) when the package stage did not produce a Docker image.
+  allow_failure:
+    exit_codes:
+      - 99
