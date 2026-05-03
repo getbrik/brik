@@ -676,7 +676,17 @@ config.export_publish_vars() {
 
 # Export runner image variable from stack + version.
 # Sets: BRIK_RUNNER_IMAGE
+#
+# Respects a wrapper-supplied value (Jenkins injects the per-stage image
+# via `-e BRIK_RUNNER_IMAGE=...`, GitLab can derive it from CI_JOB_IMAGE)
+# so report.write_fragment records the actual execution image, not the
+# project's stack default. Falls back to stack-derived resolution only
+# when no explicit image was injected.
 config.export_runner_vars() {
+    if [[ -n "${BRIK_RUNNER_IMAGE:-}" ]]; then
+        return 0
+    fi
+
     local stack="${BRIK_BUILD_STACK:-auto}"
     local version="${BRIK_BUILD_STACK_VERSION:-}"
 

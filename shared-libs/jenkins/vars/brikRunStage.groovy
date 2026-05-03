@@ -16,6 +16,9 @@ def call(Map config) {
     def image = config.image      ?: error('brikRunStage: image is required')
     def name  = config.stageName  ?: error('brikRunStage: stageName is required')
     def home  = config.brikHome   ?: error('brikRunStage: brikHome is required')
-    def args  = config.dockerArgs ?: ''
+    // Inject the actual execution image so report.write_fragment records
+    // it as runner.image, instead of the stack-derived default computed
+    // by config.export_runner_vars.
+    def args  = "-e BRIK_RUNNER_IMAGE=${image} ${config.dockerArgs ?: ''}"
     docker.image(image).inside(args) { brikStage(name, home) }
 }
