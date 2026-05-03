@@ -9,7 +9,6 @@
  *   brikHome        - Override path to Brik shared library (default: auto-detected)
  *   nodeLabel       - Jenkins agent label to run on (default: empty = any agent)
  *   timeoutMin      - Pipeline timeout in minutes (default: 60)
- *   useDockerAgent  - Run stages in resolved brik-runner Docker container (default: true)
  *   dockerNetwork   - Docker network for runner containers (default: auto-detected from Jenkins container)
  *
  * The fixed flow:
@@ -21,7 +20,6 @@
 def call(Map params = [:]) {
     def label = params.nodeLabel ?: ''
     def timeoutMinutes = params.timeoutMin ?: 60
-    def useDocker = params.useDockerAgent != null ? params.useDockerAgent : true
 
     node(label) {
         // Register job parameters that the shared library interprets.
@@ -85,7 +83,10 @@ def call(Map params = [:]) {
                 returnStdout: true
             ).trim()
 
-            // Resolve runner images after init
+            // Stage runner images. baseImage runs init; resolvedImage is
+            // assigned after init from brik-init.env (BRIK_CI_IMAGE) and
+            // covers stack-specific stages (build/lint/test/package/release/notify).
+            def baseImage = 'ghcr.io/getbrik/brik-runner-base:latest'
             def resolvedImage = ''
             def analysisImage = 'ghcr.io/getbrik/brik-runner-analysis:latest'
             def scannerImage = 'ghcr.io/getbrik/brik-runner-scanner:latest'
@@ -110,26 +111,9 @@ def call(Map params = [:]) {
             }
 
             try {
-                // Init stage always runs on the Jenkins agent (needs brik.yml)
-                runStageWithReporting('Init') { brikStage('init', brikHome) }
-
-                if (useDocker) {
-                    resolvedImage = sh(
-                        script: """#!/bin/bash
-                            . "${brikHome}/lib/pipeline/runner-images.sh"
-                            STACK=\$(yq '.project.stack // "auto"' brik.yml 2>/dev/null || echo "auto")
-                            VERSION=\$(yq '.project.stack_version // ""' brik.yml 2>/dev/null || echo "")
-                            runner.resolve_image "\$STACK" "\$VERSION" 2>/dev/null || echo ""
-                        """,
-                        returnStdout: true
-                    ).trim()
-
-                    if (resolvedImage) {
-                        docker.image(resolvedImage).pull()
-                    }
-                }
-
-                // Helper closure: run stage in Docker container or directly
+                // Build dockerArgs first so all stage helpers (including
+                // runInBase for init) share the same Docker invocation
+                // contract: workspace mount, env-file, network, memory cap.
                 def dockerNetwork = params.dockerNetwork ?: sh(
                     script: '''CID=$(grep -oP 'containers/\\K[a-f0-9]+' /proc/self/mountinfo 2>/dev/null | head -1)
                         [ -n "$CID" ] && docker inspect "$CID" --format '{{range .NetworkSettings.Networks}}{{.NetworkID}}{{end}}' 2>/dev/null | head -1 || echo ''
@@ -148,6 +132,13 @@ def call(Map params = [:]) {
                 // Java needs explicit overrides: JVM user.home ignores $HOME (uses getpwuid).
                 def javaEnvArgs = "-e MAVEN_OPTS=\"-Dmaven.repo.local=${env.WORKSPACE}/.m2/repository\" -e GRADLE_USER_HOME=${env.WORKSPACE}/.gradle"
                 def dockerArgs = "-e HOME=${env.WORKSPACE} ${javaEnvArgs} --memory=2g -v /var/run/docker.sock:/var/run/docker.sock ${networkArg} ${globalEnvArgs}"
+                // Deploy tools (ssh, rsync, helm, argocd CLI) read $HOME from
+                // /etc/passwd via getpwuid. brik-runner-deploy has no uid-1000
+                // user, so Jenkins's default "-u <jenkinsUid>:<gid>" launch
+                // breaks ssh with "No user exists for uid 1000". Run the
+                // deploy container as root to keep those tools happy.
+                def deployDockerArgs = "-u 0:0 ${dockerArgs}"
+
                 // Stash the per-stage report fragment produced by
                 // report.write_fragment so the Notify stage can unstash all
                 // fragments and aggregate them via report.aggregate_fragments.
@@ -159,61 +150,66 @@ def call(Map params = [:]) {
                           name: "brik-artifacts-${name}",
                           allowEmpty: true
                 }
+
+                // Per-image stage helpers. Every stage runs inside its
+                // dedicated brik-runner image; the only variation is the
+                // image (and deploy's root override + chown).
+                def runInBase = { name ->
+                    brikRunStage(image: baseImage, stageName: name,
+                                 brikHome: brikHome, dockerArgs: dockerArgs)
+                    stashBrikArtifacts(name)
+                }
                 def runStage = { name ->
-                    if (useDocker && resolvedImage) {
-                        docker.image(resolvedImage).inside(dockerArgs) { brikStage(name, brikHome) }
-                    } else {
-                        brikStage(name, brikHome)
-                    }
+                    brikRunStage(image: resolvedImage, stageName: name,
+                                 brikHome: brikHome, dockerArgs: dockerArgs)
                     stashBrikArtifacts(name)
                 }
                 def runInAnalysis = { name ->
-                    if (useDocker) {
-                        docker.image(analysisImage).inside(dockerArgs) { brikStage(name, brikHome) }
-                    } else {
-                        brikStage(name, brikHome)
-                    }
+                    brikRunStage(image: analysisImage, stageName: name,
+                                 brikHome: brikHome, dockerArgs: dockerArgs)
                     stashBrikArtifacts(name)
                 }
                 def runInScanner = { name ->
-                    if (useDocker) {
-                        docker.image(scannerImage).inside(dockerArgs) { brikStage(name, brikHome) }
-                    } else {
-                        brikStage(name, brikHome)
+                    brikRunStage(image: scannerImage, stageName: name,
+                                 brikHome: brikHome, dockerArgs: dockerArgs)
+                    stashBrikArtifacts(name)
+                }
+                def runInDeploy = { name ->
+                    try {
+                        brikRunStage(image: deployImage, stageName: name,
+                                     brikHome: brikHome, dockerArgs: deployDockerArgs)
+                    } finally {
+                        // The deploy container ran as root and may have
+                        // created root-owned files in the workspace
+                        // (.ssh/id_rsa, .kube/config). Jenkins (uid 1000)
+                        // cannot cleanWs them on the next build. Chown
+                        // back to the Jenkins uid using a one-shot root
+                        // container.
+                        def jenkinsUid = sh(script: 'id -u', returnStdout: true).trim()
+                        def jenkinsGid = sh(script: 'id -g', returnStdout: true).trim()
+                        sh """
+                            docker run --rm -u 0:0 \
+                                -v "\${WORKSPACE}:/ws" \
+                                alpine:latest \
+                                sh -c 'chown -R ${jenkinsUid}:${jenkinsGid} /ws/.ssh /ws/.kube 2>/dev/null || true' \
+                                || true
+                        """
                     }
                     stashBrikArtifacts(name)
                 }
-                // Deploy tools (ssh, rsync, helm, argocd CLI) read $HOME from
-                // /etc/passwd via getpwuid. brik-runner-deploy has no uid-1000
-                // user, so Jenkins's default "-u <jenkinsUid>:<gid>" launch
-                // breaks ssh with "No user exists for uid 1000". Run the
-                // deploy container as root to keep those tools happy.
-                def deployDockerArgs = "-u 0:0 ${dockerArgs}"
-                def runInDeploy = { name ->
-                    if (useDocker) {
-                        try {
-                            docker.image(deployImage).inside(deployDockerArgs) { brikStage(name, brikHome) }
-                        } finally {
-                            // The deploy container ran as root and may have
-                            // created root-owned files in the workspace
-                            // (.ssh/id_rsa, .kube/config). Jenkins (uid 1000)
-                            // cannot cleanWs them on the next build. Chown
-                            // back to the Jenkins uid using a one-shot root
-                            // container.
-                            def jenkinsUid = sh(script: 'id -u', returnStdout: true).trim()
-                            def jenkinsGid = sh(script: 'id -g', returnStdout: true).trim()
-                            sh """
-                                docker run --rm -u 0:0 \
-                                    -v "\${WORKSPACE}:/ws" \
-                                    alpine:latest \
-                                    sh -c 'chown -R ${jenkinsUid}:${jenkinsGid} /ws/.ssh /ws/.kube 2>/dev/null || true' \
-                                    || true
-                            """
-                        }
-                    } else {
-                        brikStage(name, brikHome)
-                    }
-                    stashBrikArtifacts(name)
+
+                // Init runs in brik-runner-base (same image as GitLab's
+                // default). It writes brik-init.env in the workspace, which
+                // we read back to resolve the stack-specific runner image
+                // (BRIK_CI_IMAGE) for the rest of the pipeline. This mirrors
+                // GitLab's artifacts.reports.dotenv contract and removes the
+                // need for yq on the master.
+                runStageWithReporting('Init') { runInBase('init') }
+
+                def initEnv = brikReadDotenv("${env.WORKSPACE}/brik-init.env")
+                resolvedImage = initEnv['BRIK_CI_IMAGE'] ?: ''
+                if (resolvedImage) {
+                    docker.image(resolvedImage).pull()
                 }
 
                 runStageWithReporting('Release')        { runStage('release') }
