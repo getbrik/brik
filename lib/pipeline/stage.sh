@@ -122,7 +122,7 @@ _pipeline.detect_metadata() {
     _branch="${_branch#origin/}"
     _helpers.set_if_unset BRIK_COMMIT_BRANCH  "$_branch"
 
-    _helpers.set_if_unset BRIK_COMMIT_TAG     "${CI_COMMIT_TAG:-}"    "${GIT_TAG:-}"
+    _helpers.set_if_unset BRIK_COMMIT_TAG     "${CI_COMMIT_TAG:-}"    "${GIT_TAG:-}"   "${BRIK_TAG:-}"
     _helpers.set_if_unset BRIK_TRIGGERED_BY   "${GITLAB_USER_LOGIN:-}" "${BUILD_USER_ID:-}" "${CI_PIPELINE_SOURCE:-}" "${BUILD_CAUSE:-}"
 
     return 0

@@ -40,6 +40,13 @@ brik.jenkins.setup() {
     export BRIK_BRANCH="${raw_branch#origin/}"
 
     export BRIK_TAG="${TAG_NAME:-}"
+    # Multibranch only sets TAG_NAME on tag-scan builds; branch builds with
+    # HEAD on a tag (e.g. push of v0.1.0 to main) leave it empty. Recover
+    # from git so release/notify see the same tag GitLab does.
+    if [[ -z "$BRIK_TAG" ]] && command -v git >/dev/null 2>&1; then
+        BRIK_TAG="$(git -C "$BRIK_PROJECT_DIR" describe --tags --exact-match HEAD 2>/dev/null || echo "")"
+        export BRIK_TAG
+    fi
     export BRIK_COMMIT_SHA="${GIT_COMMIT:-}"
     export BRIK_COMMIT_SHORT_SHA="${GIT_COMMIT:+${GIT_COMMIT:0:7}}"
 

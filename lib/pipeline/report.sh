@@ -175,35 +175,43 @@ _report._append_json() {
         return "$BRIK_EXIT_IO_FAILURE"
     }
 
-    # KCOV_EXCL_START  -- jq script body is not bash code
-    jq \
-        --arg stage "$stage" \
-        --arg category "$category" \
-        --arg key "$key" \
-        --arg value "$value" \
-        '
-        def ensure_stage(s):
-          if any(.stages[]; .name == s) then .
-          else .stages += [{ name: s, tech: {}, business: {} }]
-          end;
-        ensure_stage($stage)
-        | .stages |= map(
-            if .name == $stage then
-              .[$category][$key] = $value
-            else .
-            end
-          )
-        ' "$backend" > "$tmp" || {
+    # The jq read + mv must be atomic vs concurrent writers (Jenkins parallel
+    # verify: lint/sast/scan/test share the same backend). Without the lock,
+    # last-writer-wins discards updates whose read happened before our mv.
+    local lock_file="${backend}.lock"
+    local rc=0
+    {
+        if command -v flock >/dev/null 2>&1; then
+            flock -x 9 || { log.error "cannot acquire report lock"; return "$BRIK_EXIT_IO_FAILURE"; }
+        fi
+        # KCOV_EXCL_START  -- jq script body is not bash code
+        jq \
+            --arg stage "$stage" \
+            --arg category "$category" \
+            --arg key "$key" \
+            --arg value "$value" \
+            '
+            def ensure_stage(s):
+              if any(.stages[]; .name == s) then .
+              else .stages += [{ name: s, tech: {}, business: {} }]
+              end;
+            ensure_stage($stage)
+            | .stages |= map(
+                if .name == $stage then
+                  .[$category][$key] = $value
+                else .
+                end
+              )
+            ' "$backend" > "$tmp" && mv "$tmp" "$backend"
+        rc=$?
+        # KCOV_EXCL_STOP
+    } 9>>"$lock_file"
+
+    if [[ $rc -ne 0 ]]; then
         rm -f "$tmp"
         log.error "cannot append to report: $backend"
         return "$BRIK_EXIT_IO_FAILURE"
-    }
-    # KCOV_EXCL_STOP
-
-    mv "$tmp" "$backend" || {
-        rm -f "$tmp"
-        return "$BRIK_EXIT_IO_FAILURE"
-    }
+    fi
     return 0
 }
 
@@ -219,35 +227,40 @@ _report._append_json_object() {
         return "$BRIK_EXIT_IO_FAILURE"
     }
 
-    # KCOV_EXCL_START  -- jq script body is not bash code
-    jq \
-        --arg stage "$stage" \
-        --arg category "$category" \
-        --arg key "$key" \
-        --argjson value "$value" \
-        '
-        def ensure_stage(s):
-          if any(.stages[]; .name == s) then .
-          else .stages += [{ name: s, tech: {}, business: {} }]
-          end;
-        ensure_stage($stage)
-        | .stages |= map(
-            if .name == $stage then
-              .[$category][$key] = $value
-            else .
-            end
-          )
-        ' "$backend" > "$tmp" || {
+    local lock_file="${backend}.lock"
+    local rc=0
+    {
+        if command -v flock >/dev/null 2>&1; then
+            flock -x 9 || { log.error "cannot acquire report lock"; return "$BRIK_EXIT_IO_FAILURE"; }
+        fi
+        # KCOV_EXCL_START  -- jq script body is not bash code
+        jq \
+            --arg stage "$stage" \
+            --arg category "$category" \
+            --arg key "$key" \
+            --argjson value "$value" \
+            '
+            def ensure_stage(s):
+              if any(.stages[]; .name == s) then .
+              else .stages += [{ name: s, tech: {}, business: {} }]
+              end;
+            ensure_stage($stage)
+            | .stages |= map(
+                if .name == $stage then
+                  .[$category][$key] = $value
+                else .
+                end
+              )
+            ' "$backend" > "$tmp" && mv "$tmp" "$backend"
+        rc=$?
+        # KCOV_EXCL_STOP
+    } 9>>"$lock_file"
+
+    if [[ $rc -ne 0 ]]; then
         rm -f "$tmp"
         log.error "cannot append object to report: $backend"
         return "$BRIK_EXIT_IO_FAILURE"
-    }
-    # KCOV_EXCL_STOP
-
-    mv "$tmp" "$backend" || {
-        rm -f "$tmp"
-        return "$BRIK_EXIT_IO_FAILURE"
-    }
+    fi
     return 0
 }
 
