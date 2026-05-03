@@ -58,11 +58,20 @@ def call(Map params = [:]) {
             )
             def scmVars = checkout scm
 
-            // Propagate SCM variables via withEnv so they reach the
-            // docker.image().inside() containers.
+            // Pick the most specific build cause (userId for manual trigger,
+            // shortDescription for SCM/timer/upstream/remote triggers) and
+            // expose it as BRIK_TRIGGERED_BY. _pipeline.detect_metadata
+            // honors the pre-set value via set_if_unset.
+            def triggeredBy = currentBuild.getBuildCauses().collect { c ->
+                c.userId ?: c.shortDescription ?: ''
+            }.findAll { it }.join(' / ')
+
+            // Propagate SCM and trigger metadata via withEnv so they reach
+            // the docker.image().inside() containers.
             def scmEnv = [
                 "GIT_BRANCH=${scmVars.GIT_BRANCH ?: ''}",
                 "GIT_COMMIT=${scmVars.GIT_COMMIT ?: ''}",
+                "BRIK_TRIGGERED_BY=${triggeredBy}",
             ]
 
             withEnv(scmEnv) {
