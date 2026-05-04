@@ -227,3 +227,88 @@ sarif.from_prettier() {
               }
         ' > "$_out"
 }
+
+# sarif.from_tsc <input_text> <output_sarif>
+# Convert raw `tsc --noEmit` stderr/stdout into a minimal valid SARIF 2.1.0
+# document. Each line shaped `<file>(<line>,<col>): <severity> TSnnnn: <msg>`
+# becomes one result with ruleId="TSnnnn", level mapped from the diagnostic
+# severity (error->error, warning->warning, message->note).
+sarif.from_tsc() {
+    if [[ $# -lt 2 ]]; then
+        printf 'sarif.from_tsc: missing input/output arguments\n' >&2
+        return 2
+    fi
+    local _in="$1" _out="$2"
+    if [[ ! -f "$_in" ]]; then
+        printf 'sarif.from_tsc: input does not exist: %s\n' "$_in" >&2
+        return 1
+    fi
+
+    # Stream of tab-separated tuples: file<TAB>line<TAB>col<TAB>sev<TAB>code<TAB>message.
+    # Uses bash regex (BASH_REMATCH) for portability across BSD awk on macOS
+    # which lacks the match($0, re, arr) gawk extension.
+    local _re='^([^(]+)\(([0-9]+),([0-9]+)\): (error|warning|message) (TS[0-9]+): (.*)$'
+    _sarif._parse_tsc_lines() {
+        local _line _msg
+        while IFS= read -r _line || [[ -n "$_line" ]]; do
+            if [[ "$_line" =~ $_re ]]; then
+                _msg="${BASH_REMATCH[6]//$'\t'/ }"
+                printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
+                    "${BASH_REMATCH[1]}" \
+                    "${BASH_REMATCH[2]}" \
+                    "${BASH_REMATCH[3]}" \
+                    "${BASH_REMATCH[4]}" \
+                    "${BASH_REMATCH[5]}" \
+                    "$_msg"
+            fi
+        done
+    }
+    _sarif._parse_tsc_lines < "$_in" \
+      | jq -R -s --arg tool "tsc" '
+          def to_level(s):
+            if s == "error" then "error"
+            elif s == "warning" then "warning"
+            else "note"
+            end;
+
+          (split("\n") | map(select(length > 0))) as $lines
+          | ($lines | map(split("\t") | {
+              file: .[0], line: (.[1]|tonumber), col: (.[2]|tonumber),
+              sev: .[3], code: .[4], msg: .[5]
+            })) as $diags
+          | {
+              "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+              "version": "2.1.0",
+              "runs": [
+                {
+                  "tool": {
+                    "driver": {
+                      "name": $tool,
+                      "rules": (
+                        $diags
+                        | map(.code)
+                        | unique
+                        | map({ "id": ., "shortDescription": { "text": ("TypeScript diagnostic " + .) } })
+                      )
+                    }
+                  },
+                  "results": (
+                    $diags | map({
+                      "ruleId": .code,
+                      "level": to_level(.sev),
+                      "message": { "text": .msg },
+                      "locations": [
+                        {
+                          "physicalLocation": {
+                            "artifactLocation": { "uri": .file },
+                            "region": { "startLine": .line, "startColumn": .col }
+                          }
+                        }
+                      ]
+                    })
+                  )
+                }
+              ]
+            }
+        ' > "$_out"
+}

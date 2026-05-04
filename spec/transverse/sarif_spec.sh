@@ -282,4 +282,99 @@ TXT
       The stderr should include "does not exist"
     End
   End
+
+  Describe "sarif.from_tsc"
+    setup_tsc() { TSC_DIR="$(mktemp -d)"; }
+    cleanup_tsc() { rm -rf "$TSC_DIR"; }
+    Before 'setup_tsc'
+    After 'cleanup_tsc'
+
+    It "produces a valid SARIF 2.1.0 document from the tsc fixture"
+      run_valid() {
+        sarif.from_tsc "${RAW}/tsc.txt" "${TSC_DIR}/out.sarif"
+        sarif.is_valid "${TSC_DIR}/out.sarif"
+      }
+      When call run_valid
+      The status should be success
+    End
+
+    It "produces tool driver name = tsc"
+      run_tool() {
+        sarif.from_tsc "${RAW}/tsc.txt" "${TSC_DIR}/out.sarif"
+        sarif.tool_name "${TSC_DIR}/out.sarif"
+      }
+      When call run_tool
+      The output should equal "tsc"
+    End
+
+    It "yields 2 results for the fixture (TS2322 + TS2304)"
+      run_count() {
+        sarif.from_tsc "${RAW}/tsc.txt" "${TSC_DIR}/out.sarif"
+        sarif.count_total "${TSC_DIR}/out.sarif"
+      }
+      When call run_count
+      The output should equal "2"
+    End
+
+    It "extracts ruleIds TS2322 and TS2304 sorted"
+      run_rules() {
+        sarif.from_tsc "${RAW}/tsc.txt" "${TSC_DIR}/out.sarif"
+        jq -c '.runs[0].results | map(.ruleId) | sort' "${TSC_DIR}/out.sarif"
+      }
+      When call run_rules
+      The output should equal '["TS2304","TS2322"]'
+    End
+
+    It "places the 2 errors under high (level=error per Brik mapping)"
+      run_sev() {
+        sarif.from_tsc "${RAW}/tsc.txt" "${TSC_DIR}/out.sarif"
+        sarif.count_by_severity "${TSC_DIR}/out.sarif"
+      }
+      When call run_sev
+      The output should equal '{"critical":0,"high":2,"medium":0,"low":0,"info":0}'
+    End
+
+    It "preserves the file uri and line/column from the diagnostic"
+      run_loc() {
+        sarif.from_tsc "${RAW}/tsc.txt" "${TSC_DIR}/out.sarif"
+        jq -c '.runs[0].results[0].locations[0].physicalLocation' "${TSC_DIR}/out.sarif"
+      }
+      When call run_loc
+      The output should equal '{"artifactLocation":{"uri":"src/bad.ts"},"region":{"startLine":1,"startColumn":7}}'
+    End
+
+    It "maps tsc warning severity to SARIF level=warning"
+      run_warn() {
+        printf 'src/x.ts(2,3): warning TS9999: deprecated.\n' > "${TSC_DIR}/in.txt"
+        sarif.from_tsc "${TSC_DIR}/in.txt" "${TSC_DIR}/out.sarif"
+        sarif.count_by_severity "${TSC_DIR}/out.sarif"
+      }
+      When call run_warn
+      The output should equal '{"critical":0,"high":0,"medium":1,"low":0,"info":0}'
+    End
+
+    It "produces an empty valid SARIF when no diagnostics are present"
+      run_empty() {
+        echo "" > "${TSC_DIR}/empty.txt"
+        sarif.from_tsc "${TSC_DIR}/empty.txt" "${TSC_DIR}/out.sarif"
+        sarif.is_valid "${TSC_DIR}/out.sarif" \
+          && sarif.count_total "${TSC_DIR}/out.sarif"
+      }
+      When call run_empty
+      The output should equal "0"
+      The status should be success
+    End
+
+    It "fails with rc=2 when arguments are missing"
+      When call sarif.from_tsc
+      The status should equal 2
+      The stderr should include "missing"
+    End
+
+    It "fails with rc=1 when input does not exist"
+      When call sarif.from_tsc "${TSC_DIR}/missing.txt" "${TSC_DIR}/out.sarif"
+      The status should equal 1
+      The stderr should include "does not exist"
+    End
+  End
 End
