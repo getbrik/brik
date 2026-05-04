@@ -135,13 +135,13 @@ YAML
       The output should match pattern "[0-9]*"
     End
 
-    It "records package.business.image.digest when docker buildx imagetools inspect returns one"
+    It "records package.business.image.digest from docker inspect RepoDigests"
       run_pkg_digest() {
         brik.use() { :; }
         stacks.docker.build() { return 0; }
         docker() {
-          if [[ "$1" == "buildx" && "$2" == "imagetools" ]]; then
-            printf 'sha256:abc123def4567890abc123def4567890abc123def4567890abc123def4567890\n'
+          if [[ "$1" == "inspect" ]]; then
+            printf 'registry.example.com/myapp@sha256:abc123def4567890abc123def4567890abc123def4567890abc123def4567890\n'
             return 0
           fi
           return 0
@@ -158,12 +158,12 @@ YAML
       The output should equal "sha256:abc123def4567890abc123def4567890abc123def4567890abc123def4567890"
     End
 
-    It "omits package.business.image.digest when docker buildx imagetools inspect fails"
+    It "omits package.business.image.digest when docker inspect has no RepoDigests"
       run_pkg_no_digest() {
         brik.use() { :; }
         stacks.docker.build() { return 0; }
         docker() {
-          if [[ "$1" == "buildx" && "$2" == "imagetools" ]]; then
+          if [[ "$1" == "inspect" ]]; then
             return 1
           fi
           return 0
@@ -219,6 +219,11 @@ YAML
     It "treats a single-segment image as docker.io/library/<image>"
       When call parse_registry "redis"
       The output should equal '{"host":"docker.io","namespace":"library","repository":"redis"}'
+    End
+
+    It "preserves :port in the host when the image is configured with a port"
+      When call parse_registry "nexus.briklab.test:8082/brik/node-complete"
+      The output should equal '{"host":"nexus.briklab.test:8082","namespace":"brik","repository":"node-complete"}'
     End
   End
 

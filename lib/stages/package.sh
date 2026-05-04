@@ -79,14 +79,16 @@ stages.package() {
     report.record "package" "tech" "image_built" "true" 2>/dev/null || true
     report.record "package" "tech" "image_ref"   "${BRIK_PACKAGE_DOCKER_IMAGE}:${_app_tag}" 2>/dev/null || true
 
-    # Capture the manifest digest. buildx imagetools inspect returns the
-    # canonical digest that container-scan will scan; silent fallback
-    # when not available (local-only builds in dev) so digest stays
-    # absent rather than mis-reported.
+    # Capture the manifest digest from RepoDigests after push. docker
+    # inspect on a pushed image yields entries like
+    # "<image>@sha256:<hash>" -- we keep the sha256 part as the canonical
+    # digest container-scan will scan. Silent fallback when no RepoDigests
+    # exist (local-only builds in dev or buildx-pushed images that the
+    # daemon hasn't recorded) so digest stays absent rather than mis-reported.
     local _digest_raw _digest
-    _digest_raw="$(docker buildx imagetools inspect "${BRIK_PACKAGE_DOCKER_IMAGE}:${_app_tag}" \
-                    --format '{{json .Manifest.Digest}}' 2>/dev/null || true)"
-    _digest="$(printf '%s' "$_digest_raw" | tr -d '"' | tr -d '\n')"
+    _digest_raw="$(docker inspect --format='{{index .RepoDigests 0}}' \
+                    "${BRIK_PACKAGE_DOCKER_IMAGE}:${_app_tag}" 2>/dev/null || true)"
+    _digest="${_digest_raw##*@}"
     if [[ "$_digest" =~ ^sha256: ]] && command -v jq >/dev/null 2>&1; then
         local _img_with_digest
         _img_with_digest="$(jq -nc \
@@ -166,7 +168,16 @@ _stages.package._parse_registry() {
     command -v jq >/dev/null 2>&1 || return 0
 
     # Strip an optional ":tag" so registry parsing only sees the path.
-    local _path="${_ref%%:*}"
+    # A tag is the substring after the LAST ":" iff there is no "/" after
+    # it (otherwise that ":" is a host port). Without this guard, refs like
+    # "nexus.host:8082/brik/app" would lose their port.
+    local _path="$_ref"
+    if [[ "$_ref" == *":"* ]]; then
+        local _tail="${_ref##*:}"
+        if [[ "$_tail" != *"/"* ]]; then
+            _path="${_ref%:*}"
+        fi
+    fi
 
     local _host="" _namespace="" _repo=""
     local _first="${_path%%/*}"
