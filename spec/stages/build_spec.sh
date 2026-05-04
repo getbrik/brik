@@ -4,6 +4,7 @@ Describe "stages.build"
   Include "$BRIK_HOME/lib/pipeline/stage.sh"
   Include "$BRIK_HOME/lib/pipeline/loader.sh"
   Include "$BRIK_HOME/lib/transverse/config.sh"
+  Include "$BRIK_HOME/lib/transverse/artifact.sh"
   Include "$BRIK_HOME/lib/stages/build.sh"
 
   setup_env() {
@@ -300,6 +301,159 @@ YAML
       }
       When call run_build_java
       The output should include "stacks.java"
+    End
+  End
+
+  Describe "business.artifact recording"
+    It "records build.business.artifact when dist/ exists after build"
+      run_build_artifact_dist() {
+        mkdir -p "$BRIK_WORKSPACE/dist"
+        printf 'console.log(1)\n' > "$BRIK_WORKSPACE/dist/main.js"
+        brik.use() { :; }
+        stacks.node.build() { return 0; }
+        local ctx
+        ctx="$(context.create "build")" 2>/dev/null || ctx="$(mktemp)"
+        stages.build "$ctx" >/dev/null 2>&1
+        jq -r '.stages[] | select(.name == "build") | .business.artifact.name // "<missing>"' \
+          "$BRIK_LOG_DIR/pipeline-report.json"
+      }
+      When call run_build_artifact_dist
+      The output should equal "dist"
+    End
+
+    It "records build.business.artifact.type as directory for dist/"
+      run_build_artifact_type() {
+        mkdir -p "$BRIK_WORKSPACE/dist"
+        printf 'x\n' > "$BRIK_WORKSPACE/dist/file.txt"
+        brik.use() { :; }
+        stacks.node.build() { return 0; }
+        local ctx
+        ctx="$(context.create "build")" 2>/dev/null || ctx="$(mktemp)"
+        stages.build "$ctx" >/dev/null 2>&1
+        jq -r '.stages[] | select(.name == "build") | .business.artifact.type // "<missing>"' \
+          "$BRIK_LOG_DIR/pipeline-report.json"
+      }
+      When call run_build_artifact_type
+      The output should equal "directory"
+    End
+
+    It "records build.business.artifact.sha256 as a 64-char hex string"
+      run_build_artifact_sha() {
+        mkdir -p "$BRIK_WORKSPACE/dist"
+        printf 'a\n' > "$BRIK_WORKSPACE/dist/main.js"
+        brik.use() { :; }
+        stacks.node.build() { return 0; }
+        local ctx
+        ctx="$(context.create "build")" 2>/dev/null || ctx="$(mktemp)"
+        stages.build "$ctx" >/dev/null 2>&1
+        jq -r '.stages[] | select(.name == "build") | .business.artifact.sha256 // "<missing>"' \
+          "$BRIK_LOG_DIR/pipeline-report.json"
+      }
+      When call run_build_artifact_sha
+      The output should match pattern '[a-f0-9]*'
+      The length of output should equal 64
+    End
+
+    It "prefers target/ when dist/ is absent (Java convention)"
+      run_build_artifact_target() {
+        mkdir -p "$BRIK_WORKSPACE/target"
+        printf 'binary\n' > "$BRIK_WORKSPACE/target/app.jar"
+        brik.use() { :; }
+        stacks.java.build() { return 0; }
+        cat > "$BRIK_CONFIG_FILE" <<'YAML'
+version: 1
+project:
+  name: test
+  stack: java
+YAML
+        config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
+        local ctx
+        ctx="$(context.create "build")" 2>/dev/null || ctx="$(mktemp)"
+        stages.build "$ctx" >/dev/null 2>&1
+        jq -r '.stages[] | select(.name == "build") | .business.artifact.name // "<missing>"' \
+          "$BRIK_LOG_DIR/pipeline-report.json"
+      }
+      When call run_build_artifact_target
+      The output should equal "target"
+    End
+
+    It "omits build.business.artifact when no conventional dir exists"
+      run_build_artifact_omit() {
+        brik.use() { :; }
+        stacks.node.build() { return 0; }
+        local ctx
+        ctx="$(context.create "build")" 2>/dev/null || ctx="$(mktemp)"
+        stages.build "$ctx" >/dev/null 2>&1
+        jq -r '[.stages[] | select(.name == "build") | .business.artifact // null | select(. != null)] | length' \
+          "$BRIK_LOG_DIR/pipeline-report.json"
+      }
+      When call run_build_artifact_omit
+      The output should equal "0"
+    End
+
+    It "omits build.business.artifact when stack build fn fails"
+      run_build_artifact_skip_on_fail() {
+        mkdir -p "$BRIK_WORKSPACE/dist"
+        printf 'x\n' > "$BRIK_WORKSPACE/dist/file.txt"
+        brik.use() { :; }
+        stacks.node.build() { return 1; }
+        local ctx
+        ctx="$(context.create "build")" 2>/dev/null || ctx="$(mktemp)"
+        stages.build "$ctx" >/dev/null 2>&1
+        jq -r '[.stages[] | select(.name == "build") | .business.artifact // null | select(. != null)] | length' \
+          "$BRIK_LOG_DIR/pipeline-report.json"
+      }
+      When call run_build_artifact_skip_on_fail
+      The output should equal "0"
+    End
+  End
+
+  Describe "tech.cache_hit recording"
+    It "records build.tech.cache_hit as JSON true when BRIK_BUILD_CACHE_HIT=true"
+      run_build_cache_hit_true() {
+        export BRIK_BUILD_CACHE_HIT="true"
+        brik.use() { :; }
+        stacks.node.build() { return 0; }
+        local ctx
+        ctx="$(context.create "build")" 2>/dev/null || ctx="$(mktemp)"
+        stages.build "$ctx" >/dev/null 2>&1
+        unset BRIK_BUILD_CACHE_HIT
+        jq -c '.stages[] | select(.name == "build") | .tech.cache_hit' \
+          "$BRIK_LOG_DIR/pipeline-report.json"
+      }
+      When call run_build_cache_hit_true
+      The output should equal "true"
+    End
+
+    It "records build.tech.cache_hit as JSON false when BRIK_BUILD_CACHE_HIT=false"
+      run_build_cache_hit_false() {
+        export BRIK_BUILD_CACHE_HIT="false"
+        brik.use() { :; }
+        stacks.node.build() { return 0; }
+        local ctx
+        ctx="$(context.create "build")" 2>/dev/null || ctx="$(mktemp)"
+        stages.build "$ctx" >/dev/null 2>&1
+        unset BRIK_BUILD_CACHE_HIT
+        jq -c '.stages[] | select(.name == "build") | .tech.cache_hit' \
+          "$BRIK_LOG_DIR/pipeline-report.json"
+      }
+      When call run_build_cache_hit_false
+      The output should equal "false"
+    End
+
+    It "omits build.tech.cache_hit when BRIK_BUILD_CACHE_HIT is unset"
+      run_build_cache_hit_omit() {
+        unset BRIK_BUILD_CACHE_HIT
+        brik.use() { :; }
+        stacks.node.build() { return 0; }
+        local ctx
+        ctx="$(context.create "build")" 2>/dev/null || ctx="$(mktemp)"
+        stages.build "$ctx" >/dev/null 2>&1
+        jq -r '.stages[] | select(.name == "build") | .tech | has("cache_hit")' \
+          "$BRIK_LOG_DIR/pipeline-report.json"
+      }
+      When call run_build_cache_hit_omit
+      The output should equal "false"
     End
   End
 End

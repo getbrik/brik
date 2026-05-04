@@ -25,9 +25,6 @@ stages.build() {
 
     log.info "running build (stack=$stack)"
 
-    # Pipeline-report enrichment (chantier 20260502 L2.C.2). cache_hit and
-    # business.artifact.* are deferred to a follow-up that requires stack
-    # module hooks.
     report.record "build" "tech" "stack" "$stack" 2>/dev/null || true
     report.record "build" "tech" "tool" "${BRIK_BUILD_TOOL:-auto}" 2>/dev/null || true
     if [[ -n "${BRIK_BUILD_COMMAND:-}" ]]; then
@@ -36,10 +33,22 @@ stages.build() {
         report.record "build" "tech" "command" "<stack-default>" 2>/dev/null || true
     fi
 
+    # cache_hit is opportunistic: stack modules (or the wrapper) export
+    # BRIK_BUILD_CACHE_HIT when a cache restore was used. Coerce truthy
+    # strings to JSON booleans; omit otherwise so an absent signal is
+    # never confused with a cold build.
+    case "${BRIK_BUILD_CACHE_HIT:-}" in
+        true|1|yes)  report.record_object "build" "tech" "cache_hit" "true"  2>/dev/null || true ;;
+        false|0|no)  report.record_object "build" "tech" "cache_hit" "false" 2>/dev/null || true ;;
+    esac
+
     # Custom build command override bypasses the stack module.
     if [[ -n "${BRIK_BUILD_COMMAND:-}" ]]; then
         log.info "using custom build command: $BRIK_BUILD_COMMAND"
         (cd "${BRIK_WORKSPACE}" && eval "$BRIK_BUILD_COMMAND") || result=$?
+        if [[ "$result" -eq 0 ]]; then
+            _stages.build._record_artifact "${BRIK_WORKSPACE}"
+        fi
         return "$result"
     fi
 
@@ -61,6 +70,42 @@ stages.build() {
         tool_args=(--tool "$BRIK_BUILD_TOOL")
     fi
 
-    # pipeline.run records tech.status from our rc (see commit cf719f5).
     "$build_fn" "${BRIK_WORKSPACE}" "${tool_args[@]}"
+    result=$?
+
+    if [[ "$result" -eq 0 ]]; then
+        _stages.build._record_artifact "${BRIK_WORKSPACE}"
+    fi
+    return "$result"
+}
+
+# Locate the conventional build artifact directory and record its summary
+# under business.artifact. Skipped silently when no recognized output
+# directory exists (libraries, source-only repos, custom output paths).
+# Probe order favours JS/Python first ("dist"), then JVM ("target",
+# "build/libs"), then Rust ("target/release"), then .NET ("bin/Release").
+_stages.build._record_artifact() {
+    local _ws="$1"
+    local _candidates=(
+        "dist"
+        "target/release"
+        "target"
+        "build/libs"
+        "build"
+        "bin/Release"
+        "out"
+    )
+    local _c _abs
+    for _c in "${_candidates[@]}"; do
+        _abs="${_ws}/${_c}"
+        if [[ -d "$_abs" ]]; then
+            brik.use transverse.artifact 2>/dev/null || return 0
+            local _summary
+            _summary="$(artifact.summarize "$_abs" 2>/dev/null)" || return 0
+            [[ -z "$_summary" ]] && return 0
+            report.record_object "build" "business" "artifact" "$_summary" 2>/dev/null || true
+            return 0
+        fi
+    done
+    return 0
 }
