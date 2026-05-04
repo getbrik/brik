@@ -1,9 +1,12 @@
+#shellcheck shell=bash disable=SC2148,SC2317,SC2329
+
 Describe "stages.lint"
   Include "$BRIK_HOME/lib/pipeline/stage.sh"
   Include "$BRIK_HOME/lib/pipeline/loader.sh"
   Include "$BRIK_HOME/lib/pipeline/report.sh"
   Include "$BRIK_HOME/lib/transverse/config.sh"
   Include "$BRIK_HOME/lib/transverse/csv.sh"
+  Include "$BRIK_HOME/lib/transverse/sarif.sh"
   Include "$BRIK_HOME/lib/stages/verify/verify.sh"
   Include "$BRIK_HOME/lib/stages/lint.sh"
 
@@ -388,6 +391,138 @@ YAML
       When call run_multi_fail
       The status should equal 10
       The error should be present
+    End
+  End
+
+  Describe "business.* aggregation from target/<check>.sarif"
+    read_lint_business_json() {
+      local key="$1"
+      jq -c --arg k "$key" \
+        '.stages[] | select(.name == "lint") | .business[$k] // empty' \
+        "$BRIK_LOG_DIR/pipeline-report.json" 2>/dev/null
+    }
+
+    setup_lint_with_sarif() {
+      cat > "$BRIK_CONFIG_FILE" <<'YAML'
+version: 1
+project:
+  name: test
+  stack: node
+quality:
+  lint:
+    enabled: true
+    tool: eslint
+    command: "true"
+  format:
+    tool: prettier
+    command: "true"
+YAML
+      config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
+      mkdir -p "$BRIK_WORKSPACE/target"
+    }
+    Before 'setup_lint_with_sarif'
+
+    It "records business.violations.total summed across present per-check files"
+      run_total() {
+        cp "${BRIK_HOME}/spec/fixtures/sarif/eslint.sarif"   "$BRIK_WORKSPACE/target/lint.sarif"
+        cp "${BRIK_HOME}/spec/fixtures/sarif/eslint.sarif"   "$BRIK_WORKSPACE/target/format.sarif"
+        brik.use() { :; }
+        verify.run() { return 0; }
+        local ctx
+        ctx="$(context.create "lint")" 2>/dev/null || ctx="$(mktemp)"
+        stages.lint "$ctx" >/dev/null 2>&1
+        read_lint_business_json "violations" | jq -r '.total'
+      }
+      When call run_total
+      The output should equal "10"
+    End
+
+    It "records business.violations.by_severity summed across files"
+      run_sev() {
+        cp "${BRIK_HOME}/spec/fixtures/sarif/eslint.sarif" "$BRIK_WORKSPACE/target/lint.sarif"
+        brik.use() { :; }
+        verify.run() { return 0; }
+        local ctx
+        ctx="$(context.create "lint")" 2>/dev/null || ctx="$(mktemp)"
+        stages.lint "$ctx" >/dev/null 2>&1
+        read_lint_business_json "violations" | jq -c '.by_severity'
+      }
+      When call run_sev
+      The output should equal '{"critical":0,"high":3,"medium":2,"low":0,"info":0}'
+    End
+
+    It "records business.violations.by_check keyed by configured checks"
+      run_by_check() {
+        cp "${BRIK_HOME}/spec/fixtures/sarif/eslint.sarif" "$BRIK_WORKSPACE/target/lint.sarif"
+        cp "${BRIK_HOME}/spec/fixtures/sarif/ruff.sarif"   "$BRIK_WORKSPACE/target/format.sarif"
+        brik.use() { :; }
+        verify.run() { return 0; }
+        local ctx
+        ctx="$(context.create "lint")" 2>/dev/null || ctx="$(mktemp)"
+        stages.lint "$ctx" >/dev/null 2>&1
+        read_lint_business_json "violations" | jq -c '.by_check'
+      }
+      When call run_by_check
+      The output should equal '{"lint":5,"format":6}'
+    End
+
+    It "records business.report = {format, path}"
+      run_report() {
+        cp "${BRIK_HOME}/spec/fixtures/sarif/eslint.sarif" "$BRIK_WORKSPACE/target/lint.sarif"
+        brik.use() { :; }
+        verify.run() { return 0; }
+        local ctx
+        ctx="$(context.create "lint")" 2>/dev/null || ctx="$(mktemp)"
+        stages.lint "$ctx" >/dev/null 2>&1
+        read_lint_business_json "report"
+      }
+      When call run_report
+      The output should equal '{"format":"sarif","path":"target/lint.sarif"}'
+    End
+
+    It "records business.fix_applied=false by default"
+      run_fix_default() {
+        cp "${BRIK_HOME}/spec/fixtures/sarif/eslint.sarif" "$BRIK_WORKSPACE/target/lint.sarif"
+        brik.use() { :; }
+        verify.run() { return 0; }
+        local ctx
+        ctx="$(context.create "lint")" 2>/dev/null || ctx="$(mktemp)"
+        stages.lint "$ctx" >/dev/null 2>&1
+        jq -r '.stages[] | select(.name == "lint") | (.business.fix_applied | tostring)' \
+          "$BRIK_LOG_DIR/pipeline-report.json" 2>/dev/null
+      }
+      When call run_fix_default
+      The output should equal "false"
+    End
+
+    It "records business.fix_applied=true when BRIK_QUALITY_LINT_FIX=true"
+      run_fix_set() {
+        export BRIK_QUALITY_LINT_FIX=true
+        cp "${BRIK_HOME}/spec/fixtures/sarif/eslint.sarif" "$BRIK_WORKSPACE/target/lint.sarif"
+        brik.use() { :; }
+        verify.run() { return 0; }
+        local ctx
+        ctx="$(context.create "lint")" 2>/dev/null || ctx="$(mktemp)"
+        stages.lint "$ctx" >/dev/null 2>&1
+        jq -r '.stages[] | select(.name == "lint") | (.business.fix_applied | tostring)' \
+          "$BRIK_LOG_DIR/pipeline-report.json" 2>/dev/null
+      }
+      When call run_fix_set
+      The output should equal "true"
+    End
+
+    It "omits business.* entirely when no SARIF outputs were produced"
+      run_no_sarif() {
+        brik.use() { :; }
+        verify.run() { return 0; }
+        local ctx
+        ctx="$(context.create "lint")" 2>/dev/null || ctx="$(mktemp)"
+        stages.lint "$ctx" >/dev/null 2>&1
+        jq -c '.stages[] | select(.name == "lint") | .business // {}' \
+          "$BRIK_LOG_DIR/pipeline-report.json" 2>/dev/null
+      }
+      When call run_no_sarif
+      The output should equal "{}"
     End
   End
 End

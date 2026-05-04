@@ -93,4 +93,85 @@ stages.lint() {
 
     # pipeline.run records tech.status from our rc (see commit cf719f5).
     verify.run "${BRIK_WORKSPACE}" --checks "$checks_csv"
+    local _verify_rc=$?
+
+    # Pipeline-report business.* enrichment (chantier 20260502 L2.C.3 absorbed
+    # into L4): aggregate any per-check SARIF outputs the verify helpers
+    # produced under ${BRIK_WORKSPACE}/target/<check>.sarif into the canonical
+    # business.violations.{total, by_severity, by_check} object.
+    _lint._record_business "${checks[@]}" 2>/dev/null || true
+
+    return "$_verify_rc"
+}
+
+# Aggregate per-check SARIF outputs into business.violations + business.report
+# + business.fix_applied. No-op when the sarif transverse module is missing,
+# jq is missing, or no per-check SARIF files exist under ${BRIK_WORKSPACE}/
+# target/.
+_lint._record_business() {
+    local _checks=( "$@" )
+    [[ ${#_checks[@]} -gt 0 ]] || return 0
+    command -v jq >/dev/null 2>&1 || return 0
+
+    local _target_dir="${BRIK_WORKSPACE:-.}/target"
+    [[ -d "$_target_dir" ]] || return 0
+
+    if ! declare -f sarif.count_total >/dev/null 2>&1; then
+        brik.use transverse.sarif 2>/dev/null || return 0
+    fi
+
+    local _check _file _present_checks=() _present_files=()
+    for _check in "${_checks[@]}"; do
+        _file="${_target_dir}/${_check}.sarif"
+        if [[ -f "$_file" ]]; then
+            _present_checks+=( "$_check" )
+            _present_files+=( "$_file" )
+        fi
+    done
+
+    [[ ${#_present_files[@]} -gt 0 ]] || return 0
+
+    local _by_check_json='{}'
+    local _total=0 _i=0
+    while [[ $_i -lt ${#_present_files[@]} ]]; do
+        local _c _t
+        _c="${_present_checks[$_i]}"
+        _t="$(sarif.count_total "${_present_files[$_i]}" 2>/dev/null || echo 0)"
+        _total=$(( _total + _t ))
+        _by_check_json="$(jq -nc --argjson acc "$_by_check_json" --arg k "$_c" --argjson v "$_t" \
+            '$acc + {($k): $v}')"
+        _i=$(( _i + 1 ))
+    done
+
+    local _by_severity_json
+    _by_severity_json="$(
+        for _file in "${_present_files[@]}"; do
+            sarif.count_by_severity "$_file" 2>/dev/null
+        done | jq -sc 'reduce .[] as $sev (
+            {critical:0, high:0, medium:0, low:0, info:0};
+            .critical += ($sev.critical // 0)
+          | .high     += ($sev.high     // 0)
+          | .medium   += ($sev.medium   // 0)
+          | .low      += ($sev.low      // 0)
+          | .info     += ($sev.info     // 0)
+        )'
+    )"
+
+    local _violations_obj
+    _violations_obj="$(jq -nc \
+        --argjson total       "$_total" \
+        --argjson by_severity "$_by_severity_json" \
+        --argjson by_check    "$_by_check_json" \
+        '{total: $total, by_severity: $by_severity, by_check: $by_check}')"
+    report.record_object "lint" "business" "violations" "$_violations_obj" 2>/dev/null || true
+
+    report.record_object "lint" "business" "report" \
+        '{"format":"sarif","path":"target/lint.sarif"}' 2>/dev/null || true
+
+    local _fix
+    case "${BRIK_QUALITY_LINT_FIX:-false}" in
+        true|1|yes) _fix=true ;;
+        *)          _fix=false ;;
+    esac
+    report.record_object "lint" "business" "fix_applied" "$_fix" 2>/dev/null || true
 }
