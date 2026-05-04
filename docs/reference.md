@@ -635,6 +635,139 @@ Bash Runtime (Layer 0) independently of the `hooks` section in `brik.yml`.
 
 ---
 
+## Pipeline Report Fields
+
+Every pipeline run produces `pipeline-report.json` (and a Markdown rendering)
+under `${BRIK_LOG_DIR}` (local mode) or `${BRIK_WORKSPACE}/brik-artifacts/`
+(CI mode). The aggregator schema is locked at `schema_version: "1.0"` and
+opens both `tech` and `business` to `additionalProperties: true`, so the
+fields below extend without breaking older consumers. Consumers should match
+on `^1\.` to accept future minor 1.x evolutions.
+
+### Top-level `pipeline.commit`
+
+Carries the commit identity for at-a-glance auditing. Mirrors the fields
+recorded under `init.business.commit` so dashboards can lift them without
+walking the stages array.
+
+| Field | Source | Notes |
+|---|---|---|
+| `sha` | `BRIK_COMMIT_SHA` (from `CI_COMMIT_SHA` / `GIT_COMMIT`) | 40-char hex |
+| `short_sha` | `BRIK_COMMIT_SHORT_SHA` | 7- or 8-char prefix |
+| `ref` | `BRIK_COMMIT_REF` | branch or tag name (CI-platform native) |
+| `branch` | `BRIK_COMMIT_BRANCH` | empty on tag-only builds |
+| `tag` | `BRIK_COMMIT_TAG` | absent on branch builds |
+| `author` | `CI_COMMIT_AUTHOR` parsed (`Name <email>`) or `git log -1 --format=%an` | author name only |
+| `author_email` | parsed from `CI_COMMIT_AUTHOR` or `git log -1 --format=%ae` | -- |
+| `timestamp` | `CI_COMMIT_TIMESTAMP` or `git log -1 --format=%aI` | ISO-8601 strict |
+| `message_subject` | `CI_COMMIT_TITLE` or `git log -1 --format=%s` | first line only |
+
+### Per-stage fields
+
+Each entry in `stages[]` carries its own `tech` (machine-targeted) and
+`business` (persona-targeted) sub-objects in addition to the runtime
+fields (`stage`, `status`, `rc`, `runner`, `duration_ms`, `timestamp`).
+
+#### `init`
+
+| Field | Type | Source |
+|---|---|---|
+| `tech.stack` | string | `.project.stack` (resolved) |
+| `tech.stack_version` | string | `.project.stack_version` |
+| `tech.config_file` | string | path to active `brik.yml` |
+| `tech.config_valid` | bool | JSON Schema validation result |
+| `tech.prereqs_present` | object | `{yq, jq, jv}` booleans |
+| `business.project_name` | string | `.project.name` |
+| `business.platform` | string | `gitlab` / `jenkins` / `local` |
+| `business.commit.*` | object | same shape as `pipeline.commit` |
+| `business.pipeline.{id, url}` | object | CI native pipeline reference |
+| `business.triggered_by` | string | user login or trigger source |
+
+#### `release`
+
+| Field | Type | Source |
+|---|---|---|
+| `tech.strategy` | string | `.release.strategy` (semver / calver) |
+| `tech.tag_prefix` | string | `.release.tag_prefix` |
+| `tech.dry_run` | bool | `BRIK_DRY_RUN` |
+| `business.previous_version` | string | last tag matching `tag_prefix` |
+| `business.new_version` | string | computed or `BRIK_TAG`-derived |
+| `business.bump_type` | string | `none` / `explicit` |
+| `business.tag.{name, sha, annotated, dry_run}` | object | created tag metadata |
+| `business.changelog.{path, entries_count, generated_at}` | object | omitted on idempotent re-runs (tag already at HEAD) |
+
+#### `build`
+
+| Field | Type | Source |
+|---|---|---|
+| `tech.stack` | string | resolved stack |
+| `tech.tool` | string | `.build.tool` or `auto` |
+| `tech.command` | string | `.build.command` or `<stack-default>` |
+| `tech.cache_hit` | bool | `BRIK_BUILD_CACHE_HIT` (when set by stack module / wrapper) |
+| `business.artifact.{type, name, size_bytes, sha256, path}` | object | first existing of `dist/`, `target/release`, `target`, `build/libs`, `build`, `bin/Release`, `out` |
+
+#### `test`
+
+| Field | Type | Source |
+|---|---|---|
+| `tech.framework` | string | `.test.framework` |
+| `tech.tool` | string | `BRIK_TEST_TOOL` or `BRIK_TEST_FRAMEWORK` fallback |
+| `tech.coverage_tool` | string | `BRIK_TEST_COVERAGE_FORMAT` |
+| `business.tests.{total, passed, failed, skipped, duration_ms}` | object | parsed from `BRIK_TEST_JUNIT_PATH` (JUnit XML) when present |
+| `business.coverage.line_pct` | string | from Cobertura `coverage.xml` or Jacoco `jacoco.xml` |
+| `business.coverage.branch_pct` | string | omitted when the report has no branch metric |
+
+#### `lint` / `sast` / `scan`
+
+`tech.{tool, checks, severity_threshold}` only in v1.0. The `business.*`
+counts (violations / findings / vulnerabilities by severity, CWE, SBOM
+path) require SARIF / CycloneDX export and are not populated yet.
+
+#### `package`
+
+| Field | Type | Source |
+|---|---|---|
+| `tech.packager` | string | `docker` |
+| `tech.dockerfile` | string | `.package.docker.dockerfile` |
+| `tech.image_built` | bool string | `true` once `stacks.docker.build` succeeded |
+| `tech.image_ref` | string | `<image>:<tag>` |
+| `tech.build_duration_ms` | int string | wraps `stacks.docker.build` |
+| `business.image.{name, tag, full_name, digest}` | object | `digest` from `docker inspect --format='{{index .RepoDigests 0}}'` post-push |
+| `business.registry.{host, namespace, repository}` | object | parsed from the configured image reference (preserves `:port` in host) |
+
+#### `container-scan`
+
+| Field | Type | Source |
+|---|---|---|
+| `tech.tool` | string | `BRIK_SECURITY_CONTAINER_TOOL` or `auto` |
+| `tech.target_image` | string | mirror of `package.tech.image_ref` |
+| `tech.target_digest` | string | mirror of `package.business.image.digest` (cross-stage consistency: the scanner sees what was packaged) |
+| `tech.scan_duration_ms` | int string | wraps `verify.scan.run` |
+
+#### `deploy`
+
+| Field | Type | Source |
+|---|---|---|
+| `tech.environments` | array | env names (configured) |
+| `business.environments[].name` | string | env name |
+| `business.environments[].target` | string | k8s / helm / compose / ssh / gitops / argocd |
+| `business.environments[].namespace` | string or null | configured namespace |
+| `business.environments[].strategy` | string | rollout strategy (omitted when not configured) |
+
+Skipped envs (failing `when` condition, missing target) are excluded from
+`business.environments[]` so the array reflects only the work that
+actually executed.
+
+#### `notify`
+
+`notify` is a meta-stage that produces the report itself; its content is
+intentionally excluded from `pipeline-report.json` to avoid a double-pass
+aggregation. The notify job's own job log (Slack / email / webhook
+delivery confirmations) remains the source of truth for notification
+outcomes.
+
+---
+
 ## Configuration Resolution
 
 When a value is not set in `brik.yml`, Brik resolves it through a three-tier hierarchy:
