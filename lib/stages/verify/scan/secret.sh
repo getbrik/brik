@@ -11,10 +11,12 @@ _BRIK_VERIFY_SCAN_SECRET_LOADED=1
 brik.use transverse.tools
 brik.use verify.scan._scan
 
-# Register security secret scanners. The {platform} placeholder is filled
-# at exec time so gitleaks emits links to the right SCM in its findings
-# instead of warning "Unknown SCM platform".
-transverse.tools.register sec_secret gitleaks  gitleaks  "gitleaks detect --source . --platform {platform}"  10
+# Register security secret scanners. The {platform}, {sarif}, and
+# {sarif_dir} placeholders are filled at exec time. gitleaks 8.30+ ships
+# native SARIF 2.1.0 output; the L4 lib/stages/scan.sh aggregator reads
+# the file to populate business.secret.{findings_count, report}.
+# --exit-code 1 preserves the previous failure semantics on findings.
+transverse.tools.register sec_secret gitleaks  gitleaks  "mkdir -p {sarif_dir} && gitleaks detect --source . --platform {platform} --report-format sarif --report-path {sarif} --exit-code 1"  10
 transverse.tools.register sec_secret trufflehog trufflehog "trufflehog filesystem ."   20
 
 # Resolve the gitleaks --platform value from BRIK_PLATFORM. Jenkins
@@ -70,10 +72,13 @@ verify.scan.secret.run() {
     fi
 
     log.info "security secret scan with $resolved"
-    local platform
+    local platform sarif sarif_dir
     platform="$(_verify.scan.secret._gitleaks_platform)"
+    sarif="${BRIK_SECURITY_SECRETS_OUTPUT_PATH:-target/secret.sarif}"
+    sarif_dir="$(dirname "$sarif")"
     (cd "$workspace" && transverse.tools.exec sec_secret "$resolved" \
-        workspace="$workspace" platform="$platform") || {
+        workspace="$workspace" platform="$platform" \
+        sarif="$sarif" sarif_dir="$sarif_dir") || {
         log.error "security secret scan findings detected"
         return "$BRIK_EXIT_CHECK_FAILED"
     }
