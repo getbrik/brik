@@ -301,6 +301,137 @@ YAML
     The output should equal "7"
   End
 
+  Describe "business.coverage.branch_pct recording"
+    _stub_test_with_cov() {
+      # shellcheck source=/dev/null
+      . "$BRIK_HOME/lib/transverse/coverage.sh" 2>/dev/null || true
+      brik.use() { :; }
+      stacks.detect_from_framework() { printf 'node'; return 0; }
+      stacks.detect() { printf 'node'; return 0; }
+      stacks.node.test_cmd() { printf 'true'; return 0; }
+      stacks.node.test() { printf 'true'; return 0; }
+      stacks.install_deps() { :; }
+      brik.coverage.summary() { :; }
+    }
+
+    _write_cobertura_with_branch() {
+      mkdir -p "$BRIK_WORKSPACE/coverage"
+      cat > "$BRIK_WORKSPACE/coverage/coverage.xml" <<'XML'
+<?xml version="1.0" ?>
+<coverage line-rate="0.8542" branch-rate="0.72" version="6.0">
+</coverage>
+XML
+    }
+
+    It "records business.coverage.branch_pct when cobertura branch-rate is present"
+      run_branch() {
+        _stub_test_with_cov
+        _write_cobertura_with_branch
+        export BRIK_TEST_REPORTS_ENABLED="true"
+        local ctx
+        ctx="$(context.create "test")" 2>/dev/null || ctx="$(mktemp)"
+        stages.test "$ctx" >/dev/null 2>&1
+        jq -r '.stages[] | select(.name == "test") | .business.coverage.branch_pct // "<missing>"' \
+          "$BRIK_LOG_DIR/pipeline-report.json"
+      }
+      When call run_branch
+      The output should equal "72.00"
+    End
+
+    It "still records line_pct when cobertura has both rates"
+      run_both() {
+        _stub_test_with_cov
+        _write_cobertura_with_branch
+        export BRIK_TEST_REPORTS_ENABLED="true"
+        local ctx
+        ctx="$(context.create "test")" 2>/dev/null || ctx="$(mktemp)"
+        stages.test "$ctx" >/dev/null 2>&1
+        jq -r '.stages[] | select(.name == "test") | .business.coverage.line_pct // "<missing>"' \
+          "$BRIK_LOG_DIR/pipeline-report.json"
+      }
+      When call run_both
+      The output should equal "85.42"
+    End
+
+    It "omits branch_pct when cobertura lacks branch-rate"
+      run_no_branch() {
+        _stub_test_with_cov
+        mkdir -p "$BRIK_WORKSPACE/coverage"
+        cat > "$BRIK_WORKSPACE/coverage/coverage.xml" <<'XML'
+<?xml version="1.0" ?>
+<coverage line-rate="0.8542" version="6.0">
+</coverage>
+XML
+        export BRIK_TEST_REPORTS_ENABLED="true"
+        local ctx
+        ctx="$(context.create "test")" 2>/dev/null || ctx="$(mktemp)"
+        stages.test "$ctx" >/dev/null 2>&1
+        jq -r '.stages[] | select(.name == "test") | .business.coverage | has("branch_pct")' \
+          "$BRIK_LOG_DIR/pipeline-report.json"
+      }
+      When call run_no_branch
+      The output should equal "false"
+    End
+  End
+
+  Describe "tech.tool fallback"
+    _stub_with_framework() {
+      brik.use() { :; }
+      stacks.detect_from_framework() { printf 'node'; return 0; }
+      stacks.detect() { printf 'node'; return 0; }
+      stacks.node.test_cmd() { printf 'true'; return 0; }
+      stacks.node.test() { printf 'true'; return 0; }
+      stacks.install_deps() { :; }
+    }
+
+    It "records tech.tool from BRIK_TEST_TOOL when set"
+      run_tool_explicit() {
+        _stub_with_framework
+        export BRIK_TEST_TOOL="vitest"
+        local ctx
+        ctx="$(context.create "test")" 2>/dev/null || ctx="$(mktemp)"
+        stages.test "$ctx" >/dev/null 2>&1
+        unset BRIK_TEST_TOOL
+        jq -r '.stages[] | select(.name == "test") | .tech.tool // "<missing>"' \
+          "$BRIK_LOG_DIR/pipeline-report.json"
+      }
+      When call run_tool_explicit
+      The output should equal "vitest"
+    End
+
+    It "falls back tech.tool to BRIK_TEST_FRAMEWORK when BRIK_TEST_TOOL is empty"
+      run_tool_fallback_framework() {
+        _stub_with_framework
+        unset BRIK_TEST_TOOL
+        export BRIK_TEST_FRAMEWORK="jest"
+        local ctx
+        ctx="$(context.create "test")" 2>/dev/null || ctx="$(mktemp)"
+        stages.test "$ctx" >/dev/null 2>&1
+        unset BRIK_TEST_FRAMEWORK
+        jq -r '.stages[] | select(.name == "test") | .tech.tool // "<missing>"' \
+          "$BRIK_LOG_DIR/pipeline-report.json"
+      }
+      When call run_tool_fallback_framework
+      The output should equal "jest"
+    End
+
+    It "prefers BRIK_TEST_TOOL over BRIK_TEST_FRAMEWORK when both are set"
+      run_tool_priority() {
+        _stub_with_framework
+        export BRIK_TEST_TOOL="vitest"
+        export BRIK_TEST_FRAMEWORK="jest"
+        local ctx
+        ctx="$(context.create "test")" 2>/dev/null || ctx="$(mktemp)"
+        stages.test "$ctx" >/dev/null 2>&1
+        unset BRIK_TEST_TOOL BRIK_TEST_FRAMEWORK
+        jq -r '.stages[] | select(.name == "test") | .tech.tool // "<missing>"' \
+          "$BRIK_LOG_DIR/pipeline-report.json"
+      }
+      When call run_tool_priority
+      The output should equal "vitest"
+    End
+  End
+
   Describe "business.tests recording from JUnit XML"
     _stub_test_success() {
       brik.use() { :; }

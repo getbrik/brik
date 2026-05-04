@@ -23,8 +23,13 @@ stages.test() {
     if [[ -n "${BRIK_TEST_FRAMEWORK:-}" ]]; then
         report.record "test" "tech" "framework" "$BRIK_TEST_FRAMEWORK" 2>/dev/null || true
     fi
+    # tool prefers the explicit BRIK_TEST_TOOL; falls back to the framework
+    # name so the report still names a runner when the user does not declare
+    # one. Stays absent only when both are empty.
     if [[ -n "${BRIK_TEST_TOOL:-}" ]]; then
         report.record "test" "tech" "tool" "$BRIK_TEST_TOOL" 2>/dev/null || true
+    elif [[ -n "${BRIK_TEST_FRAMEWORK:-}" ]]; then
+        report.record "test" "tech" "tool" "$BRIK_TEST_FRAMEWORK" 2>/dev/null || true
     fi
     if [[ -n "${BRIK_TEST_COVERAGE_FORMAT:-}" ]]; then
         report.record "test" "tech" "coverage_tool" "$BRIK_TEST_COVERAGE_FORMAT" 2>/dev/null || true
@@ -85,11 +90,16 @@ stages.test() {
         # deferred (chantier 20260502 L2.C.2 follow-up).
         local _cov_dir="${BRIK_TEST_COVERAGE_DIR:-coverage}"
         [[ "$_cov_dir" != /* ]] && _cov_dir="${BRIK_WORKSPACE:-.}/${_cov_dir}"
-        local _cov_pct
+        local _cov_pct _cov_branch
         _cov_pct="$(_brik.coverage._parse_pct "$_cov_dir")"
+        _cov_branch="$(_brik.coverage._parse_branch_pct "$_cov_dir" 2>/dev/null || true)"
         if [[ -n "$_cov_pct" ]] && command -v jq >/dev/null 2>&1; then
             local _cov_obj
-            _cov_obj="$(jq -nc --arg pct "$_cov_pct" '{line_pct: $pct}')"
+            _cov_obj="$(jq -nc \
+                --arg pct    "$_cov_pct" \
+                --arg branch "$_cov_branch" \
+                '{line_pct: $pct}
+                 + ( if $branch != "" then { branch_pct: $branch } else {} end )')"
             report.record_object "test" "business" "coverage" "$_cov_obj" 2>/dev/null || true
         fi
         if [[ -n "${BRIK_TEST_COVERAGE_THRESHOLD:-}" ]]; then

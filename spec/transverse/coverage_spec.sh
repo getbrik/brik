@@ -312,4 +312,113 @@ XML
       End
     End
   End
+
+  Describe "_brik.coverage._parse_branch_pct"
+    Describe "with cobertura branch-rate"
+      setup_cob_branch() {
+        TEST_DIR="$(mktemp -d)"
+        mkdir -p "${TEST_DIR}/coverage"
+        cat > "${TEST_DIR}/coverage/coverage.xml" <<'XML'
+<?xml version="1.0" ?>
+<coverage line-rate="0.8542" branch-rate="0.72" version="6.0">
+</coverage>
+XML
+      }
+      cleanup_cob_branch() { rm -rf "$TEST_DIR"; }
+      Before 'setup_cob_branch'
+      After 'cleanup_cob_branch'
+
+      It "emits the branch-rate as a percentage with two decimals"
+        When call _brik.coverage._parse_branch_pct "${TEST_DIR}/coverage"
+        The output should equal "72.00"
+        The status should be success
+      End
+    End
+
+    Describe "with jacoco BRANCH counter"
+      setup_jacoco_branch() {
+        TEST_DIR="$(mktemp -d)"
+        mkdir -p "${TEST_DIR}/coverage"
+        cat > "${TEST_DIR}/coverage/jacoco.xml" <<'XML'
+<?xml version="1.0" encoding="UTF-8"?>
+<report name="t">
+  <package name="x">
+    <counter type="BRANCH" missed="3" covered="7"/>
+  </package>
+  <counter type="LINE" missed="42" covered="158"/>
+  <counter type="BRANCH" missed="20" covered="80"/>
+  <counter type="CLASS" missed="0" covered="1"/>
+</report>
+XML
+      }
+      cleanup_jacoco_branch() { rm -rf "$TEST_DIR"; }
+      Before 'setup_jacoco_branch'
+      After 'cleanup_jacoco_branch'
+
+      It "aggregates from the last BRANCH counter (80 / (80 + 20) = 80%)"
+        When call _brik.coverage._parse_branch_pct "${TEST_DIR}/coverage"
+        The output should equal "80.00"
+        The status should be success
+      End
+    End
+
+    Describe "with cobertura missing branch-rate"
+      setup_cob_no_branch() {
+        TEST_DIR="$(mktemp -d)"
+        mkdir -p "${TEST_DIR}/coverage"
+        cat > "${TEST_DIR}/coverage/coverage.xml" <<'XML'
+<?xml version="1.0" ?>
+<coverage line-rate="0.8542" version="6.0">
+</coverage>
+XML
+      }
+      cleanup_cob_no_branch() { rm -rf "$TEST_DIR"; }
+      Before 'setup_cob_no_branch'
+      After 'cleanup_cob_no_branch'
+
+      It "produces empty output when branch-rate is absent"
+        When call _brik.coverage._parse_branch_pct "${TEST_DIR}/coverage"
+        The output should equal ""
+        The status should be success
+      End
+    End
+
+    Describe "with jacoco missing BRANCH counter"
+      setup_jacoco_no_branch() {
+        TEST_DIR="$(mktemp -d)"
+        mkdir -p "${TEST_DIR}/coverage"
+        cat > "${TEST_DIR}/coverage/jacoco.xml" <<'XML'
+<?xml version="1.0" encoding="UTF-8"?>
+<report name="t">
+  <counter type="LINE" missed="42" covered="158"/>
+</report>
+XML
+      }
+      cleanup_jacoco_no_branch() { rm -rf "$TEST_DIR"; }
+      Before 'setup_jacoco_no_branch'
+      After 'cleanup_jacoco_no_branch'
+
+      It "produces empty output when BRANCH counter is absent"
+        When call _brik.coverage._parse_branch_pct "${TEST_DIR}/coverage"
+        The output should equal ""
+        The status should be success
+      End
+    End
+
+    Describe "with no report file"
+      setup_empty_branch() {
+        TEST_DIR="$(mktemp -d)"
+        mkdir -p "${TEST_DIR}/coverage"
+      }
+      cleanup_empty_branch() { rm -rf "$TEST_DIR"; }
+      Before 'setup_empty_branch'
+      After 'cleanup_empty_branch'
+
+      It "produces empty output and returns 0"
+        When call _brik.coverage._parse_branch_pct "${TEST_DIR}/coverage"
+        The output should equal ""
+        The status should be success
+      End
+    End
+  End
 End

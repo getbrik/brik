@@ -49,6 +49,43 @@ _brik.coverage._parse_pct() {
 }
 
 # ---------------------------------------------------------------------------
+# Private: parse branch coverage percentage from report files in <cov_dir>.
+# Mirrors _parse_pct but reads branch-rate / BRANCH counter instead.
+#
+#   - ${cov_dir}/coverage.xml  (Cobertura: <coverage branch-rate="..."/>)
+#   - ${cov_dir}/jacoco.xml    (Jacoco: aggregated <counter type="BRANCH"/>)
+#
+# Prints the percentage string (e.g. "72.00") on stdout, or nothing when
+# the metric is absent or unparseable. Always returns 0.
+#
+# Usage: _brik.coverage._parse_branch_pct <cov_dir>
+_brik.coverage._parse_branch_pct() {
+    local cov_dir="$1"
+    local pct=""
+
+    if [[ -f "${cov_dir}/coverage.xml" ]]; then
+        local rate
+        rate=$(grep -oE 'branch-rate="[0-9.]+"' "${cov_dir}/coverage.xml" | head -1 | sed -E 's/branch-rate="([0-9.]+)"/\1/')
+        if [[ -n "$rate" ]]; then
+            pct=$(awk -v r="$rate" 'BEGIN { printf "%.2f", r * 100 }')
+        fi
+    elif [[ -f "${cov_dir}/jacoco.xml" ]]; then
+        local last_counter missed covered
+        last_counter=$(grep -oE '<counter type="BRANCH"[^/]*/>' "${cov_dir}/jacoco.xml" | tail -1)
+        missed=$(printf '%s' "$last_counter" | grep -oE 'missed="[0-9]+"' | sed -E 's/missed="([0-9]+)"/\1/')
+        covered=$(printf '%s' "$last_counter" | grep -oE 'covered="[0-9]+"' | sed -E 's/covered="([0-9]+)"/\1/')
+        if [[ -n "$missed" && -n "$covered" && $((missed + covered)) -gt 0 ]]; then
+            pct=$(awk -v m="$missed" -v c="$covered" 'BEGIN { printf "%.2f", c / (c + m) * 100 }')
+        fi
+    fi
+
+    if [[ -n "$pct" ]]; then
+        printf '%s' "$pct"
+    fi
+    return 0
+}
+
+# ---------------------------------------------------------------------------
 # Print "[brik] coverage: XX.XX%" parsed from the standard report files.
 # Output: one line on stdout when a value is found; nothing otherwise.
 # Always returns 0 -- this is informational, never a gate.
