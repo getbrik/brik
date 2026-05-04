@@ -820,6 +820,10 @@ MOCKEOF
       When call brik.local.run_pipeline --with-deploy
       The output should be present
       The error should include "review target environment before running"
+      # brik.local.run_pipeline returns the pipeline.run rc, which is 99
+      # (BRIK_EXIT_SKIP_WITH_WARNING) when stages skip with warning. Assert
+      # the failure status so shellspec stops WARNING about un-asserted exit.
+      The status should be failure
     End
 
     It "returns exit code 1 when pipeline has failure"

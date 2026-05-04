@@ -284,6 +284,11 @@ YAML
       }
       When call run_lint_force_on_tag
       The error should include "forced on release"
+      # The forced lint actually runs prettier here and exits non-zero with
+      # a prettier stdout summary because no real eslint config is wired
+      # in this fixture; assert both side-effects so shellspec stops WARNING.
+      The output should be present
+      The status should be failure
     End
   End
 

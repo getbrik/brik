@@ -30,6 +30,7 @@ Describe "stage.skip_with_warning + summary.warnings"
       }
       When call wrong_arity
       The status should equal "$BRIK_EXIT_INVALID_INPUT"
+      The stderr should include "expects 2 arguments"
     End
 
     It "returns BRIK_EXIT_SKIP_WITH_WARNING (99) on valid call"
@@ -40,6 +41,7 @@ Describe "stage.skip_with_warning + summary.warnings"
       When call skip_lint
       The status should equal 99
       The status should equal "$BRIK_EXIT_SKIP_WITH_WARNING"
+      The stderr should include "skipped with warning"
     End
 
     It "logs a warn with the reason"
@@ -48,6 +50,7 @@ Describe "stage.skip_with_warning + summary.warnings"
         stage.skip_with_warning "lint" "user disabled outside release"
       }
       When call skip_with_log
+      The status should equal "$BRIK_EXIT_SKIP_WITH_WARNING"
       The stderr should include "lint"
       The stderr should include "user disabled outside release"
     End
