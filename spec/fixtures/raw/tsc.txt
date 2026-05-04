@@ -1,0 +1,3 @@
+npm warn exec The following package was not found and will be installed: typescript@6.0.3
+src/bad.ts(1,7): error TS2322: Type 'string' is not assignable to type 'number'.
+src/bad.ts(1,37): error TS2304: Cannot find name 'unused'.

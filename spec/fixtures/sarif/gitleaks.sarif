@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "gitleaks",
+          "semanticVersion": "v8.0.0",
+          "informationUri": "https://github.com/gitleaks/gitleaks",
+          "rules": [
+            {
+              "id": "private-key",
+              "shortDescription": {
+                "text": "Identified a Private Key, which may compromise cryptographic security and sensitive data encryption."
+              }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "message": {
+            "text": "private-key has detected secret for file /src/spec/transverse/ssh_spec.sh."
+          },
+          "ruleId": "private-key",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/src/spec/transverse/ssh_spec.sh"
+                },
+                "region": {
+                  "startLine": 44,
+                  "startColumn": 34,
+                  "endLine": 77,
+                  "endColumn": 55,
+                  "snippet": {
+                    "text": "-----BEGIN RSA PRIVATE KEY-----\nFAKEKEYDATA\n-----END RSA PRIVATE KEY-----\"\n        # ssh-add -l must fail (no identities) so setup continues\n        cat > \"${MOCK_BIN}/ssh-add\" <<'SCRIPT'\n#!/bin/sh\nif [ \"$1\" = \"-l\" ]; then exit 1; fi\nexit 0\nSCRIPT\n        chmod +x \"${MOCK_BIN}/ssh-add\"\n        mock.create_exit \"ssh-agent\" 0\n        mock.activate\n        export SSH_AUTH_SOCK=\"/tmp/fake-ssh-agent.sock\"\n      }\n      cleanup_inline_key() {\n        mock.cleanup\n        unset SSH_PRIVATE_KEY SSH_AUTH_SOCK 2>/dev/null\n        rm -rf \"$TEST_WS\"\n      }\n      Before 'setup_inline_key'\n      After 'cleanup_inline_key'\n\n      It \"loads inline key via ssh-add stdin\"\n        When call transverse.ssh.setup_agent\n        The status should be success\n        The stderr should include \"SSH key loaded\"\n      End\n    End\n\n    Describe \"file key loading\"\n      setup_file_key() {\n        mock.setup\n        TEST_WS=\"$(mktemp -d)\"\n        printf '%s\\n' \"-----BEGIN RSA PRIVATE KEY-----"
+                  }
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "commitSha": "",
+            "email": "",
+            "author": "",
+            "date": "",
+            "commitMessage": ""
+          },
+          "properties": {
+            "tags": []
+          }
+        }
+      ]
+    }
+  ]
+}

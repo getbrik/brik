@@ -1,0 +1,22 @@
+[
+ {
+  "RuleID": "private-key",
+  "Description": "Identified a Private Key, which may compromise cryptographic security and sensitive data encryption.",
+  "StartLine": 44,
+  "EndLine": 77,
+  "StartColumn": 34,
+  "EndColumn": 55,
+  "Match": "-----BEGIN RSA PRIVATE KEY-----\nFAKEKEYDATA\n-----END RSA PRIVATE KEY-----\"\n        # ssh-add -l must fail (no identities) so setup continues\n        cat \u003e \"${MOCK_BIN}/ssh-add\" \u003c\u003c'SCRIPT'\n#!/bin/sh\nif [ \"$1\" = \"-l\" ]; then exit 1; fi\nexit 0\nSCRIPT\n        chmod +x \"${MOCK_BIN}/ssh-add\"\n        mock.create_exit \"ssh-agent\" 0\n        mock.activate\n        export SSH_AUTH_SOCK=\"/tmp/fake-ssh-agent.sock\"\n      }\n      cleanup_inline_key() {\n        mock.cleanup\n        unset SSH_PRIVATE_KEY SSH_AUTH_SOCK 2\u003e/dev/null\n        rm -rf \"$TEST_WS\"\n      }\n      Before 'setup_inline_key'\n      After 'cleanup_inline_key'\n\n      It \"loads inline key via ssh-add stdin\"\n        When call transverse.ssh.setup_agent\n        The status should be success\n        The stderr should include \"SSH key loaded\"\n      End\n    End\n\n    Describe \"file key loading\"\n      setup_file_key() {\n        mock.setup\n        TEST_WS=\"$(mktemp -d)\"\n        printf '%s\\n' \"-----BEGIN RSA PRIVATE KEY-----",
+  "Secret": "-----BEGIN RSA PRIVATE KEY-----\nFAKEKEYDATA\n-----END RSA PRIVATE KEY-----\"\n        # ssh-add -l must fail (no identities) so setup continues\n        cat \u003e \"${MOCK_BIN}/ssh-add\" \u003c\u003c'SCRIPT'\n#!/bin/sh\nif [ \"$1\" = \"-l\" ]; then exit 1; fi\nexit 0\nSCRIPT\n        chmod +x \"${MOCK_BIN}/ssh-add\"\n        mock.create_exit \"ssh-agent\" 0\n        mock.activate\n        export SSH_AUTH_SOCK=\"/tmp/fake-ssh-agent.sock\"\n      }\n      cleanup_inline_key() {\n        mock.cleanup\n        unset SSH_PRIVATE_KEY SSH_AUTH_SOCK 2\u003e/dev/null\n        rm -rf \"$TEST_WS\"\n      }\n      Before 'setup_inline_key'\n      After 'cleanup_inline_key'\n\n      It \"loads inline key via ssh-add stdin\"\n        When call transverse.ssh.setup_agent\n        The status should be success\n        The stderr should include \"SSH key loaded\"\n      End\n    End\n\n    Describe \"file key loading\"\n      setup_file_key() {\n        mock.setup\n        TEST_WS=\"$(mktemp -d)\"\n        printf '%s\\n' \"-----BEGIN RSA PRIVATE KEY-----",
+  "File": "/src/spec/transverse/ssh_spec.sh",
+  "SymlinkFile": "",
+  "Commit": "",
+  "Entropy": 4.8885756,
+  "Author": "",
+  "Email": "",
+  "Date": "",
+  "Message": "",
+  "Tags": [],
+  "Fingerprint": "/src/spec/transverse/ssh_spec.sh:private-key:44"
+ }
+]

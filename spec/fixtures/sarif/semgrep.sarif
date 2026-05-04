@@ -1,0 +1,579 @@
+{
+  "version": "2.1.0",
+  "runs": [
+    {
+      "invocations": [
+        {
+          "executionSuccessful": true,
+          "toolExecutionNotifications": [
+            {
+              "descriptor": {
+                "id": "Syntax error"
+              },
+              "level": "warning",
+              "message": {
+                "text": "Syntax error at line lib/package-managers/maven.sh:69:\n `_XML` was unexpected"
+              }
+            },
+            {
+              "descriptor": {
+                "id": "Syntax error"
+              },
+              "level": "warning",
+              "message": {
+                "text": "Syntax error at line lib/pipeline/summary.sh:43:\n `* 1000` was unexpected"
+              }
+            },
+            {
+              "descriptor": {
+                "id": "Syntax error"
+              },
+              "level": "warning",
+              "message": {
+                "text": "Syntax error at line lib/transverse/config.sh:731:\n `<unset>` was unexpected"
+              }
+            },
+            {
+              "descriptor": {
+                "id": "Syntax error"
+              },
+              "level": "warning",
+              "message": {
+                "text": "Syntax error at line lib/transverse/tools.sh:34:\n `|*` was unexpected"
+              }
+            },
+            {
+              "descriptor": {
+                "id": "Syntax error"
+              },
+              "level": "warning",
+              "message": {
+                "text": "Syntax error at line spec/pipeline/pipeline_detect_metadata_spec.sh:108:\n `<unset>` was unexpected"
+              }
+            },
+            {
+              "descriptor": {
+                "id": "Syntax error"
+              },
+              "level": "warning",
+              "message": {
+                "text": "Syntax error at line spec/stages/release_spec.sh:375:\n `/dev/null` was unexpected"
+              }
+            },
+            {
+              "descriptor": {
+                "id": "Syntax error"
+              },
+              "level": "warning",
+              "message": {
+                "text": "Syntax error at line spec/transverse/_drift_helpers.sh:15:\n `drift.walk_leaves() {\n  local schema_path=\"$1\"\n  if [[ -z \"$schema_path\" || ! -f \"$schema_path\" ]]; then\n    printf 'drift.walk_leaves: schema file not found: %s\\n' \"$schema_path\" >&2\n    return 1\n  fi\n\n  jq -r '\n    . as $root |\n    ($root[\"$defs\"] // {}) as $defs |\n\n    # Resolve a $ref string of the form \"#/$defs/X\" to the actual def schema.\n    # Uses . as the ref string input (single-arg form avoids jq 1.6 scoping issues).\n    def resolve_ref:\n      . as $r | ($defs[ $r | ltrimstr(\"#/$defs/\") ]) // {};\n\n    # True if the current node is a scalar leaf with no child properties.\n    def is_scalar:\n      (type == \"object\") and (\n        has(\"enum\") or has(\"const\") or\n        (\n          has(\"type\") and\n          (.type | (. == \"string\" or . == \"integer\" or . == \"boolean\" or . == \"number\")) and\n          (has(\"properties\") | not) and\n          (has(\"additionalProperties\") | not) and\n          (has(\"items\") | not)\n        )\n      );\n\n    # Walk the schema tree rooted at . building dot-paths via the path argument.\n    # Single-arg recursion (path string accumulator) avoids jq 1.6 two-arg\n    # scoping issues where node argument would shadow outer bindings.\n    def walk(path):\n      if type != \"object\" then\n        # Primitive JSON value at top level - emit path as leaf\n        path\n      elif has(\"$ref\") then\n        # Resolve $ref and continue walking the resolved schema\n        .[\"$ref\"] | resolve_ref | walk(path)\n      elif is_scalar then\n        # Leaf node: emit the accumulated path\n        path\n      elif has(\"properties\") then\n        # Object with named properties: recurse into each, capturing key first\n        .properties | to_entries[] | (.key as $k | .value | walk(path + \".\" + $k))\n      elif has(\"additionalProperties\") and\n           ((.additionalProperties | type) == \"object\") and\n           ((.additionalProperties | has(\"type\")) or\n            (.additionalProperties | has(\"$ref\")) or\n            (.additionalProperties | has(\"properties\"))) then\n        # Wildcard object: use <key> placeholder and rec... (truncated 6352 more characters)"
+              }
+            }
+          ]
+        }
+      ],
+      "results": [
+        {
+          "fingerprints": {
+            "matchBasedId/v1": "requires login"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "lib/package-managers/docker.sh",
+                  "uriBaseId": "%SRCROOT%"
+                },
+                "region": {
+                  "endColumn": 12,
+                  "endLine": 82,
+                  "snippet": {
+                    "text": "    IFS=','"
+                  },
+                  "startColumn": 5,
+                  "startLine": 82
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "The special variable IFS affects how splitting takes place when expanding unquoted variables. Don't set it globally. Prefer a dedicated utility such as 'cut' or 'awk' if you need to split input data. If you must use 'read', set IFS locally using e.g. 'IFS=\",\" read -a my_array'."
+          },
+          "properties": {},
+          "ruleId": "bash.lang.security.ifs-tampering.ifs-tampering"
+        },
+        {
+          "fingerprints": {
+            "matchBasedId/v1": "requires login"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "lib/package-managers/docker.sh",
+                  "uriBaseId": "%SRCROOT%"
+                },
+                "region": {
+                  "endColumn": 25,
+                  "endLine": 85,
+                  "snippet": {
+                    "text": "        IFS=\"${old_ifs}\""
+                  },
+                  "startColumn": 9,
+                  "startLine": 85
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "The special variable IFS affects how splitting takes place when expanding unquoted variables. Don't set it globally. Prefer a dedicated utility such as 'cut' or 'awk' if you need to split input data. If you must use 'read', set IFS locally using e.g. 'IFS=\",\" read -a my_array'."
+          },
+          "properties": {},
+          "ruleId": "bash.lang.security.ifs-tampering.ifs-tampering"
+        },
+        {
+          "fingerprints": {
+            "matchBasedId/v1": "requires login"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "lib/package-managers/docker.sh",
+                  "uriBaseId": "%SRCROOT%"
+                },
+                "region": {
+                  "endColumn": 21,
+                  "endLine": 98,
+                  "snippet": {
+                    "text": "    IFS=\"${old_ifs}\""
+                  },
+                  "startColumn": 5,
+                  "startLine": 98
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "The special variable IFS affects how splitting takes place when expanding unquoted variables. Don't set it globally. Prefer a dedicated utility such as 'cut' or 'awk' if you need to split input data. If you must use 'read', set IFS locally using e.g. 'IFS=\",\" read -a my_array'."
+          },
+          "properties": {},
+          "ruleId": "bash.lang.security.ifs-tampering.ifs-tampering"
+        },
+        {
+          "fingerprints": {
+            "matchBasedId/v1": "requires login"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "lib/pipeline/loader.sh",
+                  "uriBaseId": "%SRCROOT%"
+                },
+                "region": {
+                  "endColumn": 22,
+                  "endLine": 69,
+                  "snippet": {
+                    "text": "        local IFS=':'"
+                  },
+                  "startColumn": 15,
+                  "startLine": 69
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "The special variable IFS affects how splitting takes place when expanding unquoted variables. Don't set it globally. Prefer a dedicated utility such as 'cut' or 'awk' if you need to split input data. If you must use 'read', set IFS locally using e.g. 'IFS=\",\" read -a my_array'."
+          },
+          "properties": {},
+          "ruleId": "bash.lang.security.ifs-tampering.ifs-tampering"
+        },
+        {
+          "fingerprints": {
+            "matchBasedId/v1": "requires login"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "lib/stages/lint.sh",
+                  "uriBaseId": "%SRCROOT%"
+                },
+                "region": {
+                  "endColumn": 26,
+                  "endLine": 61,
+                  "snippet": {
+                    "text": "    checks_csv=\"$(IFS=','; printf '%s' \"${checks[*]}\")\""
+                  },
+                  "startColumn": 19,
+                  "startLine": 61
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "The special variable IFS affects how splitting takes place when expanding unquoted variables. Don't set it globally. Prefer a dedicated utility such as 'cut' or 'awk' if you need to split input data. If you must use 'read', set IFS locally using e.g. 'IFS=\",\" read -a my_array'."
+          },
+          "properties": {},
+          "ruleId": "bash.lang.security.ifs-tampering.ifs-tampering"
+        },
+        {
+          "fingerprints": {
+            "matchBasedId/v1": "requires login"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "lib/stages/verify/scan/license.sh",
+                  "uriBaseId": "%SRCROOT%"
+                },
+                "region": {
+                  "endColumn": 30,
+                  "endLine": 35,
+                  "snippet": {
+                    "text": "                local IFS=','"
+                  },
+                  "startColumn": 23,
+                  "startLine": 35
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "The special variable IFS affects how splitting takes place when expanding unquoted variables. Don't set it globally. Prefer a dedicated utility such as 'cut' or 'awk' if you need to split input data. If you must use 'read', set IFS locally using e.g. 'IFS=\",\" read -a my_array'."
+          },
+          "properties": {},
+          "ruleId": "bash.lang.security.ifs-tampering.ifs-tampering"
+        },
+        {
+          "fingerprints": {
+            "matchBasedId/v1": "requires login"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "lib/stages/verify/scan/license.sh",
+                  "uriBaseId": "%SRCROOT%"
+                },
+                "region": {
+                  "endColumn": 30,
+                  "endLine": 43,
+                  "snippet": {
+                    "text": "                local IFS=','"
+                  },
+                  "startColumn": 23,
+                  "startLine": 43
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "The special variable IFS affects how splitting takes place when expanding unquoted variables. Don't set it globally. Prefer a dedicated utility such as 'cut' or 'awk' if you need to split input data. If you must use 'read', set IFS locally using e.g. 'IFS=\",\" read -a my_array'."
+          },
+          "properties": {},
+          "ruleId": "bash.lang.security.ifs-tampering.ifs-tampering"
+        },
+        {
+          "fingerprints": {
+            "matchBasedId/v1": "requires login"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "spec/pipeline/bootstrap_install_env_spec.sh",
+                  "uriBaseId": "%SRCROOT%"
+                },
+                "region": {
+                  "endColumn": 21,
+                  "endLine": 98,
+                  "snippet": {
+                    "text": "        local IFS=\":\""
+                  },
+                  "startColumn": 15,
+                  "startLine": 98
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "The special variable IFS affects how splitting takes place when expanding unquoted variables. Don't set it globally. Prefer a dedicated utility such as 'cut' or 'awk' if you need to split input data. If you must use 'read', set IFS locally using e.g. 'IFS=\",\" read -a my_array'."
+          },
+          "properties": {},
+          "ruleId": "bash.lang.security.ifs-tampering.ifs-tampering"
+        },
+        {
+          "fingerprints": {
+            "matchBasedId/v1": "requires login"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "spec/pipeline/bootstrap_install_env_spec.sh",
+                  "uriBaseId": "%SRCROOT%"
+                },
+                "region": {
+                  "endColumn": 21,
+                  "endLine": 198,
+                  "snippet": {
+                    "text": "        local IFS=\":\""
+                  },
+                  "startColumn": 15,
+                  "startLine": 198
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "The special variable IFS affects how splitting takes place when expanding unquoted variables. Don't set it globally. Prefer a dedicated utility such as 'cut' or 'awk' if you need to split input data. If you must use 'read', set IFS locally using e.g. 'IFS=\",\" read -a my_array'."
+          },
+          "properties": {},
+          "ruleId": "bash.lang.security.ifs-tampering.ifs-tampering"
+        },
+        {
+          "fingerprints": {
+            "matchBasedId/v1": "requires login"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "spec/pipeline/bootstrap_tools_spec.sh",
+                  "uriBaseId": "%SRCROOT%"
+                },
+                "region": {
+                  "endColumn": 21,
+                  "endLine": 59,
+                  "snippet": {
+                    "text": "        local IFS=\":\""
+                  },
+                  "startColumn": 15,
+                  "startLine": 59
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "The special variable IFS affects how splitting takes place when expanding unquoted variables. Don't set it globally. Prefer a dedicated utility such as 'cut' or 'awk' if you need to split input data. If you must use 'read', set IFS locally using e.g. 'IFS=\",\" read -a my_array'."
+          },
+          "properties": {},
+          "ruleId": "bash.lang.security.ifs-tampering.ifs-tampering"
+        },
+        {
+          "fingerprints": {
+            "matchBasedId/v1": "requires login"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "spec/pipeline/bootstrap_tools_spec.sh",
+                  "uriBaseId": "%SRCROOT%"
+                },
+                "region": {
+                  "endColumn": 21,
+                  "endLine": 148,
+                  "snippet": {
+                    "text": "        local IFS=\":\""
+                  },
+                  "startColumn": 15,
+                  "startLine": 148
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "The special variable IFS affects how splitting takes place when expanding unquoted variables. Don't set it globally. Prefer a dedicated utility such as 'cut' or 'awk' if you need to split input data. If you must use 'read', set IFS locally using e.g. 'IFS=\",\" read -a my_array'."
+          },
+          "properties": {},
+          "ruleId": "bash.lang.security.ifs-tampering.ifs-tampering"
+        },
+        {
+          "fingerprints": {
+            "matchBasedId/v1": "requires login"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "spec/pipeline/bootstrap_tools_spec.sh",
+                  "uriBaseId": "%SRCROOT%"
+                },
+                "region": {
+                  "endColumn": 21,
+                  "endLine": 326,
+                  "snippet": {
+                    "text": "        local IFS=\":\""
+                  },
+                  "startColumn": 15,
+                  "startLine": 326
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "The special variable IFS affects how splitting takes place when expanding unquoted variables. Don't set it globally. Prefer a dedicated utility such as 'cut' or 'awk' if you need to split input data. If you must use 'read', set IFS locally using e.g. 'IFS=\",\" read -a my_array'."
+          },
+          "properties": {},
+          "ruleId": "bash.lang.security.ifs-tampering.ifs-tampering"
+        },
+        {
+          "fingerprints": {
+            "matchBasedId/v1": "requires login"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "spec/pipeline/bootstrap_tools_spec.sh",
+                  "uriBaseId": "%SRCROOT%"
+                },
+                "region": {
+                  "endColumn": 21,
+                  "endLine": 354,
+                  "snippet": {
+                    "text": "        local IFS=\":\""
+                  },
+                  "startColumn": 15,
+                  "startLine": 354
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "The special variable IFS affects how splitting takes place when expanding unquoted variables. Don't set it globally. Prefer a dedicated utility such as 'cut' or 'awk' if you need to split input data. If you must use 'read', set IFS locally using e.g. 'IFS=\",\" read -a my_array'."
+          },
+          "properties": {},
+          "ruleId": "bash.lang.security.ifs-tampering.ifs-tampering"
+        },
+        {
+          "fingerprints": {
+            "matchBasedId/v1": "requires login"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "spec/stages/verify/scan/secret_spec.sh",
+                  "uriBaseId": "%SRCROOT%"
+                },
+                "region": {
+                  "endColumn": 22,
+                  "endLine": 187,
+                  "snippet": {
+                    "text": "        local IFS=':'"
+                  },
+                  "startColumn": 15,
+                  "startLine": 187
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "The special variable IFS affects how splitting takes place when expanding unquoted variables. Don't set it globally. Prefer a dedicated utility such as 'cut' or 'awk' if you need to split input data. If you must use 'read', set IFS locally using e.g. 'IFS=\",\" read -a my_array'."
+          },
+          "properties": {},
+          "ruleId": "bash.lang.security.ifs-tampering.ifs-tampering"
+        },
+        {
+          "fingerprints": {
+            "matchBasedId/v1": "requires login"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "testdata/fixtures/workspaces/docker-simple/Dockerfile",
+                  "uriBaseId": "%SRCROOT%"
+                },
+                "region": {
+                  "endColumn": 22,
+                  "endLine": 2,
+                  "snippet": {
+                    "text": "CMD [\"echo\", \"hello\"]"
+                  },
+                  "startColumn": 1,
+                  "startLine": 2
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "By not specifying a USER, a program in the container may run as 'root'. This is a security hazard. If an attacker can control a process running as root, they may have control over the container. Ensure that the last USER in a Dockerfile is a USER other than 'root'."
+          },
+          "properties": {},
+          "ruleId": "dockerfile.security.missing-user.missing-user"
+        }
+      ],
+      "tool": {
+        "driver": {
+          "name": "Semgrep OSS",
+          "rules": [
+            {
+              "defaultConfiguration": {
+                "level": "warning"
+              },
+              "fullDescription": {
+                "text": "The special variable IFS affects how splitting takes place when expanding unquoted variables. Don't set it globally. Prefer a dedicated utility such as 'cut' or 'awk' if you need to split input data. If you must use 'read', set IFS locally using e.g. 'IFS=\",\" read -a my_array'."
+              },
+              "help": {
+                "markdown": "The special variable IFS affects how splitting takes place when expanding unquoted variables. Don't set it globally. Prefer a dedicated utility such as 'cut' or 'awk' if you need to split input data. If you must use 'read', set IFS locally using e.g. 'IFS=\",\" read -a my_array'.\n\n#### 💎 Enable cross-file analysis and Pro rules for free at <a href='https://sg.run/pro'>sg.run/pro</a>\n\n<b>References:</b>\n - [Semgrep Rule](https://semgrep.dev/r/bash.lang.security.ifs-tampering.ifs-tampering)\n - [https://owasp.org/Top10/A03_2021-Injection](https://owasp.org/Top10/A03_2021-Injection)\n",
+                "text": "The special variable IFS affects how splitting takes place when expanding unquoted variables. Don't set it globally. Prefer a dedicated utility such as 'cut' or 'awk' if you need to split input data. If you must use 'read', set IFS locally using e.g. 'IFS=\",\" read -a my_array'.\n💎 Enable cross-file analysis and Pro rules for free at sg.run/pro"
+              },
+              "helpUri": "https://semgrep.dev/r/bash.lang.security.ifs-tampering.ifs-tampering",
+              "id": "bash.lang.security.ifs-tampering.ifs-tampering",
+              "name": "bash.lang.security.ifs-tampering.ifs-tampering",
+              "properties": {
+                "precision": "very-high",
+                "tags": [
+                  "CWE-20: Improper Input Validation",
+                  "LOW CONFIDENCE",
+                  "OWASP-A03:2021 - Injection",
+                  "OWASP-A05:2025 - Injection",
+                  "security"
+                ]
+              },
+              "shortDescription": {
+                "text": "Semgrep Finding: bash.lang.security.ifs-tampering.ifs-tampering"
+              }
+            },
+            {
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "fullDescription": {
+                "text": "By not specifying a USER, a program in the container may run as 'root'. This is a security hazard. If an attacker can control a process running as root, they may have control over the container. Ensure that the last USER in a Dockerfile is a USER other than 'root'."
+              },
+              "help": {
+                "markdown": "By not specifying a USER, a program in the container may run as 'root'. This is a security hazard. If an attacker can control a process running as root, they may have control over the container. Ensure that the last USER in a Dockerfile is a USER other than 'root'.\n\n#### 💎 Enable cross-file analysis and Pro rules for free at <a href='https://sg.run/pro'>sg.run/pro</a>\n\n<b>References:</b>\n - [Semgrep Rule](https://semgrep.dev/r/dockerfile.security.missing-user.missing-user)\n - [https://owasp.org/Top10/A04_2021-Insecure_Design](https://owasp.org/Top10/A04_2021-Insecure_Design)\n",
+                "text": "By not specifying a USER, a program in the container may run as 'root'. This is a security hazard. If an attacker can control a process running as root, they may have control over the container. Ensure that the last USER in a Dockerfile is a USER other than 'root'.\n💎 Enable cross-file analysis and Pro rules for free at sg.run/pro"
+              },
+              "helpUri": "https://semgrep.dev/r/dockerfile.security.missing-user.missing-user",
+              "id": "dockerfile.security.missing-user.missing-user",
+              "name": "dockerfile.security.missing-user.missing-user",
+              "properties": {
+                "precision": "very-high",
+                "tags": [
+                  "CWE-250: Execution with Unnecessary Privileges",
+                  "MEDIUM CONFIDENCE",
+                  "OWASP-A04:2021 - Insecure Design",
+                  "OWASP-A06:2025 - Insecure Design",
+                  "security"
+                ]
+              },
+              "shortDescription": {
+                "text": "Semgrep Finding: dockerfile.security.missing-user.missing-user"
+              }
+            }
+          ],
+          "semanticVersion": "1.161.0"
+        }
+      }
+    }
+  ],
+  "$schema": "https://docs.oasis-open.org/sarif/sarif/v2.1.0/os/schemas/sarif-schema-2.1.0.json"
+}

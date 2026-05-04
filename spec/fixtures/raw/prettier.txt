@@ -1,0 +1,4 @@
+npm warn exec The following package was not found and will be installed: prettier@3.8.3
+Checking formatting...
+[warn] src/bad-prettier.js
+[warn] Code style issues found in the above file. Run Prettier with --write to fix.

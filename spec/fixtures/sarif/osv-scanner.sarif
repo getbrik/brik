@@ -1,0 +1,119 @@
+{
+  "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/main/sarif-2.1/schema/sarif-schema-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "addresses": [],
+      "artifacts": [
+        {
+          "length": -1,
+          "location": {
+            "index": -1,
+            "uri": "file:///src/package-lock.json"
+          },
+          "parentIndex": -1,
+          "roles": []
+        }
+      ],
+      "graphs": [],
+      "invocations": [],
+      "language": "en-US",
+      "logicalLocations": [],
+      "newlineSequences": [
+        "\r\n",
+        "\n"
+      ],
+      "policies": [],
+      "redactionTokens": [],
+      "results": [
+        {
+          "partialFingerprints": {
+            "primaryLocationLineHash": "91c9d49c7a2dc275b9722413495c2f45773a7a83d7cc8e4167685ffa861a17e3"
+          },
+          "attachments": [],
+          "codeFlows": [],
+          "fixes": [],
+          "graphTraversals": [],
+          "graphs": [],
+          "kind": "fail",
+          "level": "warning",
+          "locations": [
+            {
+              "annotations": [],
+              "id": -1,
+              "logicalLocations": [],
+              "physicalLocation": {
+                "artifactLocation": {
+                  "index": -1,
+                  "uri": "file:///src/package-lock.json"
+                }
+              },
+              "relationships": []
+            }
+          ],
+          "message": {
+            "arguments": [],
+            "text": "Package 'uuid@8.3.2' is vulnerable to 'GHSA-w5hq-g745-h8pq'."
+          },
+          "rank": -1,
+          "relatedLocations": [],
+          "ruleId": "GHSA-w5hq-g745-h8pq",
+          "ruleIndex": 0,
+          "stacks": [],
+          "taxa": []
+        }
+      ],
+      "runAggregates": [],
+      "taxonomies": [],
+      "threadFlowLocations": [],
+      "tool": {
+        "driver": {
+          "contents": [
+            "localizedData",
+            "nonLocalizedData"
+          ],
+          "informationUri": "https://github.com/google/osv-scanner",
+          "isComprehensive": false,
+          "language": "en-US",
+          "locations": [],
+          "name": "osv-scanner",
+          "notifications": [],
+          "rules": [
+            {
+              "deprecatedIds": [
+                "GHSA-w5hq-g745-h8pq"
+              ],
+              "fullDescription": {
+                "markdown": "### Summary\n\n`v3`, `v5`, and `v6` accept external output buffers but do not reject out-of-range writes (small `buf` or large `offset`).  \nBy contrast, `v4`, `v1`, and `v7` explicitly throw `RangeError` on invalid bounds.\n\nThis inconsistency allows **silent partial writes** into caller-provided buffers.\n\n\n### Affected code\n\n- `src/v35.ts` (`v3`/`v5` path) writes `buf[offset + i]` without bounds validation.\n- `src/v6.ts` writes `buf[offset + i]` without bounds validation.\n\n### Reproducible PoC\n\n```bash\ncd /home/StrawHat/uuid\nnpm ci\nnpm run build\n\nnode --input-type=module -e \"\nimport {v4,v5,v6} from './dist-node/index.js';\nconst ns='6ba7b810-9dad-11d1-80b4-00c04fd430c8';\nfor (const [name,fn] of [\n  ['v4',()=\u003ev4({},new Uint8Array(8),4)],\n  ['v5',()=\u003ev5('x',ns,new Uint8Array(8),4)],\n  ['v6',()=\u003ev6({},new Uint8Array(8),4)],\n]) {\n  try { fn(); console.log(name,'NO_THROW'); }\n  catch(e){ console.log(name,'THREW',e.name); }\n}\"\n```\n\nObserved:\n\n- `v4 THREW RangeError`\n- `v5 NO_THROW`\n- `v6 NO_THROW`\n\nExample partial overwrite evidence captured during audit:\n\n```text\nsame true buf [\n  170, 170, 170, 170,\n   75, 224, 100,  63\n]\nv6 [\n  187, 187, 187, 187,\n   31,  19, 185,  64\n]\n```\n\n### Security impact\n\n- **Primary**: integrity/robustness issue (silent partial output).\n- If an application assumes full UUID writes into preallocated buffers, this can produce malformed/truncated/partially stale identifiers without error.\n- In systems where caller-controlled offsets/buffer sizes are exposed indirectly, this may become a security-relevant logic flaw.\n\n### Suggested fix\n\nAdd the same guard used by `v4`/`v1`/`v7`:\n\n```ts\nif (offset \u003c 0 || offset + 16 \u003e buf.length) {\n  throw new RangeError(`UUID byte range ${offset}:${offset + 15} is out of buffer bounds`);\n}\n```\n\nApply to:\n\n- `src/v35.ts` (covers `v3` and `v5`)\n- `src/v6.ts`",
+                "text": "### Summary\n\n`v3`, `v5`, and `v6` accept external output buffers but do not reject out-of-range writes (small `buf` or large `offset`).  \nBy contrast, `v4`, `v1`, and `v7` explicitly throw `RangeError` on invalid bounds.\n\nThis inconsistency allows **silent partial writes** into caller-provided buffers.\n\n\n### Affected code\n\n- `src/v35.ts` (`v3`/`v5` path) writes `buf[offset + i]` without bounds validation.\n- `src/v6.ts` writes `buf[offset + i]` without bounds validation.\n\n### Reproducible PoC\n\n```bash\ncd /home/StrawHat/uuid\nnpm ci\nnpm run build\n\nnode --input-type=module -e \"\nimport {v4,v5,v6} from './dist-node/index.js';\nconst ns='6ba7b810-9dad-11d1-80b4-00c04fd430c8';\nfor (const [name,fn] of [\n  ['v4',()=\u003ev4({},new Uint8Array(8),4)],\n  ['v5',()=\u003ev5('x',ns,new Uint8Array(8),4)],\n  ['v6',()=\u003ev6({},new Uint8Array(8),4)],\n]) {\n  try { fn(); console.log(name,'NO_THROW'); }\n  catch(e){ console.log(name,'THREW',e.name); }\n}\"\n```\n\nObserved:\n\n- `v4 THREW RangeError`\n- `v5 NO_THROW`\n- `v6 NO_THROW`\n\nExample partial overwrite evidence captured during audit:\n\n```text\nsame true buf [\n  170, 170, 170, 170,\n   75, 224, 100,  63\n]\nv6 [\n  187, 187, 187, 187,\n   31,  19, 185,  64\n]\n```\n\n### Security impact\n\n- **Primary**: integrity/robustness issue (silent partial output).\n- If an application assumes full UUID writes into preallocated buffers, this can produce malformed/truncated/partially stale identifiers without error.\n- In systems where caller-controlled offsets/buffer sizes are exposed indirectly, this may become a security-relevant logic flaw.\n\n### Suggested fix\n\nAdd the same guard used by `v4`/`v1`/`v7`:\n\n```ts\nif (offset \u003c 0 || offset + 16 \u003e buf.length) {\n  throw new RangeError(`UUID byte range ${offset}:${offset + 15} is out of buffer bounds`);\n}\n```\n\nApply to:\n\n- `src/v35.ts` (covers `v3` and `v5`)\n- `src/v6.ts`"
+              },
+              "help": {
+                "markdown": "**Your dependency is vulnerable to [GHSA-w5hq-g745-h8pq](https://osv.dev/GHSA-w5hq-g745-h8pq)**.\n\n## [GHSA-w5hq-g745-h8pq](https://osv.dev/GHSA-w5hq-g745-h8pq)\n\n\u003cdetails\u003e\n\u003csummary\u003eDetails\u003c/summary\u003e\n\n\u003e ### Summary\n\u003e \n\u003e `v3`, `v5`, and `v6` accept external output buffers but do not reject out-of-range writes (small `buf` or large `offset`).  \n\u003e By contrast, `v4`, `v1`, and `v7` explicitly throw `RangeError` on invalid bounds.\n\u003e \n\u003e This inconsistency allows **silent partial writes** into caller-provided buffers.\n\u003e \n\u003e \n\u003e ### Affected code\n\u003e \n\u003e - `src/v35.ts` (`v3`/`v5` path) writes `buf[offset + i]` without bounds validation.\n\u003e - `src/v6.ts` writes `buf[offset + i]` without bounds validation.\n\u003e \n\u003e ### Reproducible PoC\n\u003e \n\u003e ```bash\n\u003e cd /home/StrawHat/uuid\n\u003e npm ci\n\u003e npm run build\n\u003e \n\u003e node --input-type=module -e \"\n\u003e import {v4,v5,v6} from './dist-node/index.js';\n\u003e const ns='6ba7b810-9dad-11d1-80b4-00c04fd430c8';\n\u003e for (const [name,fn] of [\n\u003e   ['v4',()=\u003ev4({},new Uint8Array(8),4)],\n\u003e   ['v5',()=\u003ev5('x',ns,new Uint8Array(8),4)],\n\u003e   ['v6',()=\u003ev6({},new Uint8Array(8),4)],\n\u003e ]) {\n\u003e   try { fn(); console.log(name,'NO_THROW'); }\n\u003e   catch(e){ console.log(name,'THREW',e.name); }\n\u003e }\"\n\u003e ```\n\u003e \n\u003e Observed:\n\u003e \n\u003e - `v4 THREW RangeError`\n\u003e - `v5 NO_THROW`\n\u003e - `v6 NO_THROW`\n\u003e \n\u003e Example partial overwrite evidence captured during audit:\n\u003e \n\u003e ```text\n\u003e same true buf [\n\u003e   170, 170, 170, 170,\n\u003e    75, 224, 100,  63\n\u003e ]\n\u003e v6 [\n\u003e   187, 187, 187, 187,\n\u003e    31,  19, 185,  64\n\u003e ]\n\u003e ```\n\u003e \n\u003e ### Security impact\n\u003e \n\u003e - **Primary**: integrity/robustness issue (silent partial output).\n\u003e - If an application assumes full UUID writes into preallocated buffers, this can produce malformed/truncated/partially stale identifiers without error.\n\u003e - In systems where caller-controlled offsets/buffer sizes are exposed indirectly, this may become a security-relevant logic flaw.\n\u003e \n\u003e ### Suggested fix\n\u003e \n\u003e Add the same guard used by `v4`/`v1`/`v7`:\n\u003e \n\u003e ```ts\n\u003e if (offset \u003c 0 || offset + 16 \u003e buf.length) {\n\u003e   throw new RangeError(`UUID byte range ${offset}:${offset + 15} is out of buffer bounds`);\n\u003e }\n\u003e ```\n\u003e \n\u003e Apply to:\n\u003e \n\u003e - `src/v35.ts` (covers `v3` and `v5`)\n\u003e - `src/v6.ts`\n\n\u003c/details\u003e\n\n---\n\n### Affected Packages\n\n| Source | Package Name | Package Version |\n| --- | --- | --- |\n| lockfile:/src/package-lock.json | uuid | 8.3.2 |\n\n## Remediation\n\nTo fix these vulnerabilities, update the vulnerabilities past the listed fixed versions below.\n\n### Fixed Versions\n\n| Vulnerability ID | Package Name | Fixed Version |\n| --- | --- | --- |\n| GHSA-w5hq-g745-h8pq | uuid | 14.0.0 |\n\nIf you believe these vulnerabilities do not affect your code and wish to ignore them, add them to the ignore list in an\n`osv-scanner.toml` file located in the same directory as the lockfile containing the vulnerable dependency.\n\nSee the format and more options in our documentation here: https://google.github.io/osv-scanner/configuration/\n\nAdd or append these values to the following config files to ignore this vulnerability:\n\n`/src/osv-scanner.toml`\n\n```\n[[IgnoredVulns]]\nid = \"GHSA-w5hq-g745-h8pq\"\nreason = \"Your reason for ignoring this vulnerability\"\n```\n",
+                "text": "**Your dependency is vulnerable to [GHSA-w5hq-g745-h8pq](https://osv.dev/GHSA-w5hq-g745-h8pq)**.\n\n## [GHSA-w5hq-g745-h8pq](https://osv.dev/GHSA-w5hq-g745-h8pq)\n\n\u003cdetails\u003e\n\u003csummary\u003eDetails\u003c/summary\u003e\n\n\u003e ### Summary\n\u003e \n\u003e `v3`, `v5`, and `v6` accept external output buffers but do not reject out-of-range writes (small `buf` or large `offset`).  \n\u003e By contrast, `v4`, `v1`, and `v7` explicitly throw `RangeError` on invalid bounds.\n\u003e \n\u003e This inconsistency allows **silent partial writes** into caller-provided buffers.\n\u003e \n\u003e \n\u003e ### Affected code\n\u003e \n\u003e - `src/v35.ts` (`v3`/`v5` path) writes `buf[offset + i]` without bounds validation.\n\u003e - `src/v6.ts` writes `buf[offset + i]` without bounds validation.\n\u003e \n\u003e ### Reproducible PoC\n\u003e \n\u003e ```bash\n\u003e cd /home/StrawHat/uuid\n\u003e npm ci\n\u003e npm run build\n\u003e \n\u003e node --input-type=module -e \"\n\u003e import {v4,v5,v6} from './dist-node/index.js';\n\u003e const ns='6ba7b810-9dad-11d1-80b4-00c04fd430c8';\n\u003e for (const [name,fn] of [\n\u003e   ['v4',()=\u003ev4({},new Uint8Array(8),4)],\n\u003e   ['v5',()=\u003ev5('x',ns,new Uint8Array(8),4)],\n\u003e   ['v6',()=\u003ev6({},new Uint8Array(8),4)],\n\u003e ]) {\n\u003e   try { fn(); console.log(name,'NO_THROW'); }\n\u003e   catch(e){ console.log(name,'THREW',e.name); }\n\u003e }\"\n\u003e ```\n\u003e \n\u003e Observed:\n\u003e \n\u003e - `v4 THREW RangeError`\n\u003e - `v5 NO_THROW`\n\u003e - `v6 NO_THROW`\n\u003e \n\u003e Example partial overwrite evidence captured during audit:\n\u003e \n\u003e ```text\n\u003e same true buf [\n\u003e   170, 170, 170, 170,\n\u003e    75, 224, 100,  63\n\u003e ]\n\u003e v6 [\n\u003e   187, 187, 187, 187,\n\u003e    31,  19, 185,  64\n\u003e ]\n\u003e ```\n\u003e \n\u003e ### Security impact\n\u003e \n\u003e - **Primary**: integrity/robustness issue (silent partial output).\n\u003e - If an application assumes full UUID writes into preallocated buffers, this can produce malformed/truncated/partially stale identifiers without error.\n\u003e - In systems where caller-controlled offsets/buffer sizes are exposed indirectly, this may become a security-relevant logic flaw.\n\u003e \n\u003e ### Suggested fix\n\u003e \n\u003e Add the same guard used by `v4`/`v1`/`v7`:\n\u003e \n\u003e ```ts\n\u003e if (offset \u003c 0 || offset + 16 \u003e buf.length) {\n\u003e   throw new RangeError(`UUID byte range ${offset}:${offset + 15} is out of buffer bounds`);\n\u003e }\n\u003e ```\n\u003e \n\u003e Apply to:\n\u003e \n\u003e - `src/v35.ts` (covers `v3` and `v5`)\n\u003e - `src/v6.ts`\n\n\u003c/details\u003e\n\n---\n\n### Affected Packages\n\n| Source | Package Name | Package Version |\n| --- | --- | --- |\n| lockfile:/src/package-lock.json | uuid | 8.3.2 |\n\n## Remediation\n\nTo fix these vulnerabilities, update the vulnerabilities past the listed fixed versions below.\n\n### Fixed Versions\n\n| Vulnerability ID | Package Name | Fixed Version |\n| --- | --- | --- |\n| GHSA-w5hq-g745-h8pq | uuid | 14.0.0 |\n\nIf you believe these vulnerabilities do not affect your code and wish to ignore them, add them to the ignore list in an\n`osv-scanner.toml` file located in the same directory as the lockfile containing the vulnerable dependency.\n\nSee the format and more options in our documentation here: https://google.github.io/osv-scanner/configuration/\n\nAdd or append these values to the following config files to ignore this vulnerability:\n\n`/src/osv-scanner.toml`\n\n```\n[[IgnoredVulns]]\nid = \"GHSA-w5hq-g745-h8pq\"\nreason = \"Your reason for ignoring this vulnerability\"\n```\n"
+              },
+              "id": "GHSA-w5hq-g745-h8pq",
+              "name": "GHSA-w5hq-g745-h8pq",
+              "properties": {
+                "security-severity": "6.3"
+              },
+              "relationships": [],
+              "shortDescription": {
+                "markdown": "GHSA-w5hq-g745-h8pq: uuid: Missing buffer bounds check in v3/v5/v6 when buf is provided",
+                "text": "GHSA-w5hq-g745-h8pq: uuid: Missing buffer bounds check in v3/v5/v6 when buf is provided"
+              }
+            }
+          ],
+          "supportedTaxonomies": [],
+          "taxa": [],
+          "version": "2.3.5"
+        },
+        "extensions": []
+      },
+      "translations": [],
+      "versionControlProvenance": [],
+      "webRequests": [],
+      "webResponses": []
+    }
+  ],
+  "properties": {}
+}
