@@ -446,6 +446,77 @@ YAML
       When call run_prep_identity
       The output should equal "identity,commit,"
     End
+
+    It "records release.business.changelog.path when changelog is generated"
+      run_prep_changelog_path() {
+        unset BRIK_DRY_RUN
+        export BRIK_RELEASE_CHANGELOG_ENABLED="true"
+        export BRIK_RELEASE_CHANGELOG_FILE="CHANGELOG.md"
+        brik.use() { :; }
+        changelog.generate() { printf '## Changes\n\n### Features\n\n- a (1)\n- b (2)\n'; return 0; }
+        changelog.count_entries() { printf '2'; return 0; }
+        transverse.git.config_identity() { :; }
+        transverse.git.commit_all() { return 0; }
+        pipeline.require_tool() { return 0; }
+        _stages.release._prepare 2>/dev/null "1.0.0"
+        jq -r '.stages[] | select(.name == "release") | .business.changelog.path // "<missing>"' \
+          "$BRIK_LOG_DIR/pipeline-report.json"
+      }
+      When call run_prep_changelog_path
+      The output should end with "/CHANGELOG.md"
+    End
+
+    It "records release.business.changelog.entries_count from changelog.count_entries"
+      run_prep_changelog_count() {
+        unset BRIK_DRY_RUN
+        export BRIK_RELEASE_CHANGELOG_ENABLED="true"
+        brik.use() { :; }
+        changelog.generate() { printf '## Changes\n\n### Features\n\n- a\n- b\n- c\n'; return 0; }
+        changelog.count_entries() { printf '3'; return 0; }
+        transverse.git.config_identity() { :; }
+        transverse.git.commit_all() { return 0; }
+        pipeline.require_tool() { return 0; }
+        _stages.release._prepare 2>/dev/null "1.0.0"
+        jq -r '.stages[] | select(.name == "release") | .business.changelog.entries_count // "<missing>"' \
+          "$BRIK_LOG_DIR/pipeline-report.json"
+      }
+      When call run_prep_changelog_count
+      The output should equal "3"
+    End
+
+    It "records release.business.changelog.generated_at as ISO-8601"
+      run_prep_changelog_ts() {
+        unset BRIK_DRY_RUN
+        export BRIK_RELEASE_CHANGELOG_ENABLED="true"
+        brik.use() { :; }
+        changelog.generate() { printf '## Changes\n\n- a\n'; return 0; }
+        changelog.count_entries() { printf '1'; return 0; }
+        transverse.git.config_identity() { :; }
+        transverse.git.commit_all() { return 0; }
+        pipeline.require_tool() { return 0; }
+        _stages.release._prepare 2>/dev/null "1.0.0"
+        jq -r '.stages[] | select(.name == "release") | .business.changelog.generated_at // "<missing>"' \
+          "$BRIK_LOG_DIR/pipeline-report.json"
+      }
+      When call run_prep_changelog_ts
+      The output should match pattern '20[0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]*'
+    End
+
+    It "omits release.business.changelog when changelog is disabled"
+      run_prep_no_changelog_record() {
+        unset BRIK_DRY_RUN
+        export BRIK_RELEASE_CHANGELOG_ENABLED="false"
+        brik.use() { :; }
+        transverse.git.config_identity() { :; }
+        transverse.git.commit_all() { return 0; }
+        pipeline.require_tool() { return 0; }
+        _stages.release._prepare 2>/dev/null "1.0.0"
+        jq -r '[.stages[] | select(.name == "release") | .business.changelog // null | select(. != null)] | length' \
+          "$BRIK_LOG_DIR/pipeline-report.json"
+      }
+      When call run_prep_no_changelog_record
+      The output should equal "0"
+    End
   End
 
   Describe "_stages.release._finalize"

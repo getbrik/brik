@@ -174,6 +174,72 @@ Describe "stages.init"
     The output should equal '{"sha":"abcdef0123456789abcdef0123456789abcdef01","short_sha":"abcdef01","ref":"main","branch":"main"}'
   End
 
+  It "records init.business.commit.author from BRIK_COMMIT_AUTHOR"
+    run_init_commit_author() {
+      export BRIK_COMMIT_SHA="abc"
+      export BRIK_COMMIT_AUTHOR="Carol Tester"
+      local ctx
+      ctx="$(context.create "init")" 2>/dev/null || ctx="$(mktemp)"
+      stages.init "$ctx" >/dev/null 2>&1 || return $?
+      read_init_business_path '.commit.author'
+    }
+    When call run_init_commit_author
+    The output should equal "Carol Tester"
+  End
+
+  It "records init.business.commit.author_email from BRIK_COMMIT_AUTHOR_EMAIL"
+    run_init_commit_author_email() {
+      export BRIK_COMMIT_SHA="abc"
+      export BRIK_COMMIT_AUTHOR_EMAIL="carol@example.com"
+      local ctx
+      ctx="$(context.create "init")" 2>/dev/null || ctx="$(mktemp)"
+      stages.init "$ctx" >/dev/null 2>&1 || return $?
+      read_init_business_path '.commit.author_email'
+    }
+    When call run_init_commit_author_email
+    The output should equal "carol@example.com"
+  End
+
+  It "records init.business.commit.timestamp from BRIK_COMMIT_TIMESTAMP"
+    run_init_commit_timestamp() {
+      export BRIK_COMMIT_SHA="abc"
+      export BRIK_COMMIT_TIMESTAMP="2026-05-04T09:15:30+02:00"
+      local ctx
+      ctx="$(context.create "init")" 2>/dev/null || ctx="$(mktemp)"
+      stages.init "$ctx" >/dev/null 2>&1 || return $?
+      read_init_business_path '.commit.timestamp'
+    }
+    When call run_init_commit_timestamp
+    The output should equal "2026-05-04T09:15:30+02:00"
+  End
+
+  It "records init.business.commit.message_subject from BRIK_COMMIT_MESSAGE_SUBJECT"
+    run_init_commit_subject() {
+      export BRIK_COMMIT_SHA="abc"
+      export BRIK_COMMIT_MESSAGE_SUBJECT="fix: regression in detector"
+      local ctx
+      ctx="$(context.create "init")" 2>/dev/null || ctx="$(mktemp)"
+      stages.init "$ctx" >/dev/null 2>&1 || return $?
+      read_init_business_path '.commit.message_subject'
+    }
+    When call run_init_commit_subject
+    The output should equal "fix: regression in detector"
+  End
+
+  It "omits init.business.commit.author when BRIK_COMMIT_AUTHOR is unset"
+    run_init_commit_author_omitted() {
+      export BRIK_COMMIT_SHA="abc"
+      unset BRIK_COMMIT_AUTHOR
+      local ctx
+      ctx="$(context.create "init")" 2>/dev/null || ctx="$(mktemp)"
+      stages.init "$ctx" >/dev/null 2>&1 || return $?
+      jq -c '.stages[] | select(.name == "init") | .business.commit | has("author")' \
+        "$BRIK_LOG_DIR/pipeline-report.json"
+    }
+    When call run_init_commit_author_omitted
+    The output should equal "false"
+  End
+
   It "records init.business.pipeline as a nested object from BRIK_PIPELINE_*"
     run_init_pipeline_ref() {
       export BRIK_PIPELINE_ID="42"

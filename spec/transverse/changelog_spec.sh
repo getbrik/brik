@@ -357,4 +357,54 @@ Describe "changelog.sh"
       The output should equal "Other Changes"
     End
   End
+
+  Describe "changelog.count_entries"
+    It "counts list bullet lines in a single section"
+      run_count() {
+        local md
+        md="$(printf '## Changes\n\n### Features\n\n- add login (abc1234)\n- add logout (def5678)\n')"
+        changelog.count_entries "$md"
+      }
+      When call run_count
+      The output should equal "2"
+    End
+
+    It "counts entries across multiple sections"
+      run_count() {
+        local md
+        md="$(printf '## Changes\n\n### Features\n\n- a (1)\n- b (2)\n\n### Bug Fixes\n\n- c (3)\n')"
+        changelog.count_entries "$md"
+      }
+      When call run_count
+      The output should equal "3"
+    End
+
+    It "ignores nested bullets and counts only top-level entries"
+      run_count() {
+        local md
+        md="$(printf '### Features\n\n- top entry (1)\n  - nested note\n- another top (2)\n')"
+        changelog.count_entries "$md"
+      }
+      When call run_count
+      The output should equal "2"
+    End
+
+    It "returns 0 for an empty changelog"
+      run_count() {
+        changelog.count_entries ""
+      }
+      When call run_count
+      The output should equal "0"
+    End
+
+    It "returns 0 for a changelog with no list items"
+      run_count() {
+        local md
+        md="$(printf '## Changes\n\nNo changes.\n')"
+        changelog.count_entries "$md"
+      }
+      When call run_count
+      The output should equal "0"
+    End
+  End
 End

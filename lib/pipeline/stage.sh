@@ -125,6 +125,42 @@ _pipeline.detect_metadata() {
     _helpers.set_if_unset BRIK_COMMIT_TAG     "${CI_COMMIT_TAG:-}"    "${GIT_TAG:-}"   "${BRIK_TAG:-}"
     _helpers.set_if_unset BRIK_TRIGGERED_BY   "${GITLAB_USER_LOGIN:-}" "${BUILD_USER_ID:-}" "${CI_PIPELINE_SOURCE:-}" "${BUILD_CAUSE:-}"
 
+    # Author identity. GitLab provides CI_COMMIT_AUTHOR as "Name <email>" so
+    # we split it into the two normalized fields. Jenkins has no equivalent
+    # native var; both Jenkins and local fall back to git log against
+    # BRIK_WORKSPACE.
+    local _gl_author="${CI_COMMIT_AUTHOR:-}"
+    local _gl_author_name="" _gl_author_email=""
+    if [[ -n "$_gl_author" ]]; then
+        # Literal '<' and '>' (no backslash). In bash ERE, '\<' and '\>'
+        # are word-boundary anchors on GNU systems and silently break the
+        # match. Use [^>]+ for the email so a name containing angle
+        # brackets does not swallow the closing '>'.
+        local _re='^(.*[^[:space:]])[[:space:]]+<([^>]+)>[[:space:]]*$'
+        if [[ "$_gl_author" =~ $_re ]]; then
+            _gl_author_name="${BASH_REMATCH[1]}"
+            _gl_author_email="${BASH_REMATCH[2]}"
+        else
+            _gl_author_name="$_gl_author"
+        fi
+    fi
+
+    local _git_author_name="" _git_author_email="" _git_timestamp="" _git_subject=""
+    if command -v git >/dev/null 2>&1; then
+        local _ws="${BRIK_WORKSPACE:-.}"
+        if git -C "$_ws" rev-parse --git-dir >/dev/null 2>&1; then
+            _git_author_name="$(git -C "$_ws" log -1 --format=%an 2>/dev/null || true)"
+            _git_author_email="$(git -C "$_ws" log -1 --format=%ae 2>/dev/null || true)"
+            _git_timestamp="$(git -C "$_ws" log -1 --format=%aI 2>/dev/null || true)"
+            _git_subject="$(git -C "$_ws" log -1 --format=%s 2>/dev/null || true)"
+        fi
+    fi
+
+    _helpers.set_if_unset BRIK_COMMIT_AUTHOR          "$_gl_author_name"  "$_git_author_name"
+    _helpers.set_if_unset BRIK_COMMIT_AUTHOR_EMAIL    "$_gl_author_email" "$_git_author_email"
+    _helpers.set_if_unset BRIK_COMMIT_TIMESTAMP       "${CI_COMMIT_TIMESTAMP:-}" "$_git_timestamp"
+    _helpers.set_if_unset BRIK_COMMIT_MESSAGE_SUBJECT "${CI_COMMIT_TITLE:-}"     "$_git_subject"
+
     return 0
 }
 

@@ -116,6 +116,26 @@ _stages.release._prepare() {
                 printf '%s\n' "$changelog_content"
             } > "$changelog_file" || return "$BRIK_EXIT_IO_FAILURE"
         fi
+
+        # Record the changelog audit object: path consumed downstream, entries
+        # count for at-a-glance density, generated_at as ISO-8601 for SLO/SLI
+        # tracing. Skipped on the idempotent re-run path (early-return above)
+        # because no new changelog is produced.
+        if command -v jq >/dev/null 2>&1; then
+            local _cl_count _cl_ts _cl_obj
+            _cl_count="$(changelog.count_entries "$changelog_content" 2>/dev/null || printf '0')"
+            # Sanitize: --argjson is fatal on a non-integer value. Defensive
+            # against helper edge cases and exotic locales.
+            [[ "$_cl_count" =~ ^[0-9]+$ ]] || _cl_count=0
+            _cl_ts="$(date -u +'%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || printf '')"
+            _cl_obj="$(jq -nc \
+                --arg path           "$changelog_file" \
+                --argjson entries    "$_cl_count" \
+                --arg generated_at   "$_cl_ts" \
+                '{path: $path, entries_count: $entries}
+                 + ( if $generated_at != "" then { generated_at: $generated_at } else {} end )')"
+            report.record_object "release" "business" "changelog" "$_cl_obj" 2>/dev/null || true
+        fi
     fi
 
     # Patch package.json version if present.

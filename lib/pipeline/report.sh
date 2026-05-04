@@ -471,6 +471,10 @@ report.aggregate_fragments() {
     local commit_ref="${BRIK_COMMIT_REF:-}"
     local commit_branch="${BRIK_COMMIT_BRANCH:-}"
     local commit_tag="${BRIK_COMMIT_TAG:-}"
+    local commit_author="${BRIK_COMMIT_AUTHOR:-}"
+    local commit_author_email="${BRIK_COMMIT_AUTHOR_EMAIL:-}"
+    local commit_timestamp="${BRIK_COMMIT_TIMESTAMP:-}"
+    local commit_message_subject="${BRIK_COMMIT_MESSAGE_SUBJECT:-}"
     local triggered_by="${BRIK_TRIGGERED_BY:-}"
 
     local backend="${log_dir}/pipeline-report.json"
@@ -516,6 +520,10 @@ report.aggregate_fragments() {
         --arg commit_ref "$commit_ref" \
         --arg commit_branch "$commit_branch" \
         --arg commit_tag "$commit_tag" \
+        --arg commit_author "$commit_author" \
+        --arg commit_author_email "$commit_author_email" \
+        --arg commit_timestamp "$commit_timestamp" \
+        --arg commit_message_subject "$commit_message_subject" \
         --arg triggered_by "$triggered_by" \
         --argjson frags "$frags_json" \
         '
@@ -534,11 +542,15 @@ report.aggregate_fragments() {
                 | { stage: .stage, reason: (.tech.warning_reason // "") }) ) as $warnings
         | ( if ($counts.failed // 0) > 0 then "failed" else "success" end ) as $pstatus
         | ( {}
-            + ( if $commit_sha       != "" then { sha:       $commit_sha       } else {} end )
-            + ( if $commit_short_sha != "" then { short_sha: $commit_short_sha } else {} end )
-            + ( if $commit_ref       != "" then { ref:       $commit_ref       } else {} end )
-            + ( if $commit_branch    != "" then { branch:    $commit_branch    } else {} end )
-            + ( if $commit_tag       != "" then { tag:       $commit_tag       } else {} end )
+            + ( if $commit_sha             != "" then { sha:             $commit_sha             } else {} end )
+            + ( if $commit_short_sha       != "" then { short_sha:       $commit_short_sha       } else {} end )
+            + ( if $commit_ref             != "" then { ref:             $commit_ref             } else {} end )
+            + ( if $commit_branch          != "" then { branch:          $commit_branch          } else {} end )
+            + ( if $commit_tag             != "" then { tag:             $commit_tag             } else {} end )
+            + ( if $commit_author          != "" then { author:          $commit_author          } else {} end )
+            + ( if $commit_author_email    != "" then { author_email:    $commit_author_email    } else {} end )
+            + ( if $commit_timestamp       != "" then { timestamp:       $commit_timestamp       } else {} end )
+            + ( if $commit_message_subject != "" then { message_subject: $commit_message_subject } else {} end )
           ) as $commit
         | ( {
               id: $pid,

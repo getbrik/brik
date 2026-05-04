@@ -29,6 +29,20 @@ _changelog._type_label() {
     esac
 }
 
+# Count top-level changelog entries in Markdown produced by changelog.generate.
+# Top-level entries are lines that begin with "- " (bullet at column 0). Nested
+# bullets (indented) are ignored so the count reflects user-facing items, not
+# sub-notes. Used by stages.release to record business.changelog.entries_count
+# without embedding the Markdown body in the report.
+#
+# Usage: changelog.count_entries <markdown_text>
+# Prints the integer count to stdout.
+changelog.count_entries() {
+    local _md="${1:-}"
+    [[ -z "$_md" ]] && { printf '0'; return 0; }
+    printf '%s\n' "$_md" | grep -cE '^- ' || true
+}
+
 # Generate a changelog from git log between two refs.
 # Usage: changelog.generate [--from <ref>] [--to <ref>] [--format conventional]
 # Prints Markdown to stdout.

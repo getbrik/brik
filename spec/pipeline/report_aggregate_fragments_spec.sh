@@ -506,6 +506,62 @@ Describe "report.aggregate_fragments"
       The output should equal "false"
     End
 
+    It "exposes BRIK_COMMIT_AUTHOR under pipeline.commit.author"
+      read_author() {
+        export BRIK_COMMIT_AUTHOR="Carol Tester"
+        write_fragment_file "init" "success" 0
+        report.aggregate_fragments "$FRAG_DIR" >/dev/null 2>&1 || return 1
+        jq -r '.pipeline.commit.author' "$AGG_LOG_DIR/pipeline-report.json"
+      }
+      When call read_author
+      The output should equal "Carol Tester"
+    End
+
+    It "exposes BRIK_COMMIT_AUTHOR_EMAIL under pipeline.commit.author_email"
+      read_author_email() {
+        export BRIK_COMMIT_AUTHOR_EMAIL="carol@example.com"
+        write_fragment_file "init" "success" 0
+        report.aggregate_fragments "$FRAG_DIR" >/dev/null 2>&1 || return 1
+        jq -r '.pipeline.commit.author_email' "$AGG_LOG_DIR/pipeline-report.json"
+      }
+      When call read_author_email
+      The output should equal "carol@example.com"
+    End
+
+    It "exposes BRIK_COMMIT_TIMESTAMP under pipeline.commit.timestamp"
+      read_timestamp() {
+        export BRIK_COMMIT_TIMESTAMP="2026-05-04T09:15:30+02:00"
+        write_fragment_file "init" "success" 0
+        report.aggregate_fragments "$FRAG_DIR" >/dev/null 2>&1 || return 1
+        jq -r '.pipeline.commit.timestamp' "$AGG_LOG_DIR/pipeline-report.json"
+      }
+      When call read_timestamp
+      The output should equal "2026-05-04T09:15:30+02:00"
+    End
+
+    It "exposes BRIK_COMMIT_MESSAGE_SUBJECT under pipeline.commit.message_subject"
+      read_subject() {
+        export BRIK_COMMIT_MESSAGE_SUBJECT="fix: regression in detector"
+        write_fragment_file "init" "success" 0
+        report.aggregate_fragments "$FRAG_DIR" >/dev/null 2>&1 || return 1
+        jq -r '.pipeline.commit.message_subject' "$AGG_LOG_DIR/pipeline-report.json"
+      }
+      When call read_subject
+      The output should equal "fix: regression in detector"
+    End
+
+    It "omits pipeline.commit.author when BRIK_COMMIT_AUTHOR is unset"
+      read_omit() {
+        export BRIK_COMMIT_SHA="abc"
+        unset BRIK_COMMIT_AUTHOR
+        write_fragment_file "init" "success" 0
+        report.aggregate_fragments "$FRAG_DIR" >/dev/null 2>&1 || return 1
+        jq '.pipeline.commit | has("author")' "$AGG_LOG_DIR/pipeline-report.json"
+      }
+      When call read_omit
+      The output should equal "false"
+    End
+
     It "exposes BRIK_TRIGGERED_BY as pipeline.triggered_by"
       read_trigger() {
         export BRIK_TRIGGERED_BY="alice"

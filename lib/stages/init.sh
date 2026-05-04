@@ -165,17 +165,25 @@ _stages.init._build_commit_object() {
     local _p_obj="{}"
     if command -v jq >/dev/null 2>&1; then
         _p_obj="$(jq -nc \
-            --arg sha       "${BRIK_COMMIT_SHA:-}" \
-            --arg short_sha "${BRIK_COMMIT_SHORT_SHA:-}" \
-            --arg ref       "${BRIK_COMMIT_REF:-}" \
-            --arg branch    "${BRIK_COMMIT_BRANCH:-}" \
-            --arg tag       "${BRIK_COMMIT_TAG:-}" \
+            --arg sha             "${BRIK_COMMIT_SHA:-}" \
+            --arg short_sha       "${BRIK_COMMIT_SHORT_SHA:-}" \
+            --arg ref             "${BRIK_COMMIT_REF:-}" \
+            --arg branch          "${BRIK_COMMIT_BRANCH:-}" \
+            --arg tag             "${BRIK_COMMIT_TAG:-}" \
+            --arg author          "${BRIK_COMMIT_AUTHOR:-}" \
+            --arg author_email    "${BRIK_COMMIT_AUTHOR_EMAIL:-}" \
+            --arg timestamp       "${BRIK_COMMIT_TIMESTAMP:-}" \
+            --arg message_subject "${BRIK_COMMIT_MESSAGE_SUBJECT:-}" \
             '{}
-             + ( if $sha       != "" then { sha:       $sha }       else {} end )
-             + ( if $short_sha != "" then { short_sha: $short_sha } else {} end )
-             + ( if $ref       != "" then { ref:       $ref }       else {} end )
-             + ( if $branch    != "" then { branch:    $branch }    else {} end )
-             + ( if $tag       != "" then { tag:       $tag }       else {} end )')"
+             + ( if $sha             != "" then { sha:             $sha }             else {} end )
+             + ( if $short_sha       != "" then { short_sha:       $short_sha }       else {} end )
+             + ( if $ref             != "" then { ref:             $ref }             else {} end )
+             + ( if $branch          != "" then { branch:          $branch }          else {} end )
+             + ( if $tag             != "" then { tag:             $tag }             else {} end )
+             + ( if $author          != "" then { author:          $author }          else {} end )
+             + ( if $author_email    != "" then { author_email:    $author_email }    else {} end )
+             + ( if $timestamp       != "" then { timestamp:       $timestamp }       else {} end )
+             + ( if $message_subject != "" then { message_subject: $message_subject } else {} end )')"
     fi
     printf '%s' "$_p_obj"
 }

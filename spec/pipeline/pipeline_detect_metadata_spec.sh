@@ -10,9 +10,12 @@ Describe "_pipeline.detect_metadata"
     unset BRIK_PIPELINE_ID BRIK_PIPELINE_URL
     unset BRIK_COMMIT_SHA BRIK_COMMIT_SHORT_SHA BRIK_COMMIT_REF
     unset BRIK_COMMIT_BRANCH BRIK_COMMIT_TAG
-    unset BRIK_TRIGGERED_BY
+    unset BRIK_COMMIT_AUTHOR BRIK_COMMIT_AUTHOR_EMAIL
+    unset BRIK_COMMIT_TIMESTAMP BRIK_COMMIT_MESSAGE_SUBJECT
+    unset BRIK_TRIGGERED_BY BRIK_WORKSPACE
     unset CI_PIPELINE_ID CI_PIPELINE_URL CI_COMMIT_SHA CI_COMMIT_SHORT_SHA
     unset CI_COMMIT_REF_NAME CI_COMMIT_BRANCH CI_COMMIT_TAG
+    unset CI_COMMIT_AUTHOR CI_COMMIT_TIMESTAMP CI_COMMIT_TITLE
     unset GITLAB_USER_LOGIN CI_PIPELINE_SOURCE
     unset BUILD_TAG BUILD_NUMBER BUILD_URL
     unset GIT_COMMIT GIT_BRANCH GIT_TAG
@@ -106,6 +109,50 @@ Describe "_pipeline.detect_metadata"
       }
       When call check
       The output should equal "<unset>"
+    End
+
+    It "exports BRIK_COMMIT_AUTHOR by parsing CI_COMMIT_AUTHOR Name <email>"
+      check() {
+        setup_gitlab
+        export CI_COMMIT_AUTHOR="Alice Example <alice@example.com>"
+        _pipeline.detect_metadata
+        printf '%s' "$BRIK_COMMIT_AUTHOR"
+      }
+      When call check
+      The output should equal "Alice Example"
+    End
+
+    It "exports BRIK_COMMIT_AUTHOR_EMAIL by parsing CI_COMMIT_AUTHOR Name <email>"
+      check() {
+        setup_gitlab
+        export CI_COMMIT_AUTHOR="Alice Example <alice@example.com>"
+        _pipeline.detect_metadata
+        printf '%s' "$BRIK_COMMIT_AUTHOR_EMAIL"
+      }
+      When call check
+      The output should equal "alice@example.com"
+    End
+
+    It "exports BRIK_COMMIT_TIMESTAMP from CI_COMMIT_TIMESTAMP"
+      check() {
+        setup_gitlab
+        export CI_COMMIT_TIMESTAMP="2026-05-03T18:38:10+0000"
+        _pipeline.detect_metadata
+        printf '%s' "$BRIK_COMMIT_TIMESTAMP"
+      }
+      When call check
+      The output should equal "2026-05-03T18:38:10+0000"
+    End
+
+    It "exports BRIK_COMMIT_MESSAGE_SUBJECT from CI_COMMIT_TITLE"
+      check() {
+        setup_gitlab
+        export CI_COMMIT_TITLE="feat: add fragment surfacing"
+        _pipeline.detect_metadata
+        printf '%s' "$BRIK_COMMIT_MESSAGE_SUBJECT"
+      }
+      When call check
+      The output should equal "feat: add fragment surfacing"
     End
   End
 
@@ -247,6 +294,82 @@ Describe "_pipeline.detect_metadata"
       check() {
         _pipeline.detect_metadata
         printf '%s' "${BRIK_TRIGGERED_BY:-<empty>}"
+      }
+      When call check
+      The output should equal "<empty>"
+    End
+  End
+
+  Describe "git log fallback (no CI vars, BRIK_WORKSPACE points to a git repo)"
+    Before 'reset_env'
+    After 'cleanup_git_fixture'
+
+    setup_git_fixture() {
+      BRIK_WORKSPACE_FIXTURE="$(mktemp -d)"
+      export BRIK_WORKSPACE="$BRIK_WORKSPACE_FIXTURE"
+      git -C "$BRIK_WORKSPACE" init -q -b main 2>/dev/null
+      git -C "$BRIK_WORKSPACE" config user.email "carol@example.com"
+      git -C "$BRIK_WORKSPACE" config user.name "Carol Tester"
+      git -C "$BRIK_WORKSPACE" config commit.gpgsign false
+      printf 'hello\n' > "$BRIK_WORKSPACE/file.txt"
+      git -C "$BRIK_WORKSPACE" add file.txt
+      GIT_AUTHOR_DATE="2026-05-04T09:15:30+02:00" \
+      GIT_COMMITTER_DATE="2026-05-04T09:15:30+02:00" \
+        git -C "$BRIK_WORKSPACE" commit -q -m "fix: regression in detector"
+    }
+
+    cleanup_git_fixture() {
+      [[ -n "${BRIK_WORKSPACE_FIXTURE:-}" ]] && rm -rf "$BRIK_WORKSPACE_FIXTURE"
+      unset BRIK_WORKSPACE_FIXTURE
+      reset_env
+    }
+
+    It "exports BRIK_COMMIT_AUTHOR from git log when no CI var is set"
+      check() {
+        setup_git_fixture
+        _pipeline.detect_metadata
+        printf '%s' "${BRIK_COMMIT_AUTHOR:-<empty>}"
+      }
+      When call check
+      The output should equal "Carol Tester"
+    End
+
+    It "exports BRIK_COMMIT_AUTHOR_EMAIL from git log when no CI var is set"
+      check() {
+        setup_git_fixture
+        _pipeline.detect_metadata
+        printf '%s' "${BRIK_COMMIT_AUTHOR_EMAIL:-<empty>}"
+      }
+      When call check
+      The output should equal "carol@example.com"
+    End
+
+    It "exports BRIK_COMMIT_TIMESTAMP from git log when no CI var is set"
+      check() {
+        setup_git_fixture
+        _pipeline.detect_metadata
+        printf '%s' "${BRIK_COMMIT_TIMESTAMP:-<empty>}"
+      }
+      When call check
+      The output should equal "2026-05-04T09:15:30+02:00"
+    End
+
+    It "exports BRIK_COMMIT_MESSAGE_SUBJECT from git log subject when no CI var is set"
+      check() {
+        setup_git_fixture
+        _pipeline.detect_metadata
+        printf '%s' "${BRIK_COMMIT_MESSAGE_SUBJECT:-<empty>}"
+      }
+      When call check
+      The output should equal "fix: regression in detector"
+    End
+
+    It "leaves BRIK_COMMIT_AUTHOR empty when BRIK_WORKSPACE is not a git repo"
+      check() {
+        BRIK_WORKSPACE_FIXTURE="$(mktemp -d)"
+        export BRIK_WORKSPACE="$BRIK_WORKSPACE_FIXTURE"
+        _pipeline.detect_metadata
+        printf '%s' "${BRIK_COMMIT_AUTHOR:-<empty>}"
       }
       When call check
       The output should equal "<empty>"
