@@ -44,9 +44,6 @@ stages.package() {
 
     log.info "building image: ${BRIK_PACKAGE_DOCKER_IMAGE}:${_app_tag}"
 
-    # Pipeline-report enrichment (chantier 20260502 L2.C.4). business.registry.*,
-    # business.signature.* (cosign, F.1), and business.sbom.* (CycloneDX, F.2)
-    # are deferred. business.publish.targets is also deferred.
     report.record "package" "tech" "packager" "docker" 2>/dev/null || true
     if [[ -n "${BRIK_PACKAGE_DOCKER_DOCKERFILE:-}" ]]; then
         report.record "package" "tech" "dockerfile" "$BRIK_PACKAGE_DOCKER_DOCKERFILE" 2>/dev/null || true
@@ -58,19 +55,47 @@ stages.package() {
             --arg tag  "$_app_tag" \
             '{name: $name, tag: $tag, full_name: ($name + ":" + $tag)}')"
         report.record_object "package" "business" "image" "$_img_obj" 2>/dev/null || true
+
+        local _reg_obj
+        _reg_obj="$(_stages.package._parse_registry "$BRIK_PACKAGE_DOCKER_IMAGE")"
+        if [[ -n "$_reg_obj" ]]; then
+            report.record_object "package" "business" "registry" "$_reg_obj" 2>/dev/null || true
+        fi
     fi
 
+    local _build_start_ms _build_end_ms _build_dur_ms
+    _build_start_ms="$(_helpers.epoch_ms 2>/dev/null || printf '0')"
     stacks.docker.build "${docker_args[@]}"
     result=$?
+    _build_end_ms="$(_helpers.epoch_ms 2>/dev/null || printf '0')"
+    _build_dur_ms=$(( _build_end_ms - _build_start_ms ))
+    [[ "$_build_dur_ms" -lt 0 ]] && _build_dur_ms=0
+    report.record "package" "tech" "build_duration_ms" "$_build_dur_ms" 2>/dev/null || true
 
     if [[ $result -ne 0 ]]; then
         return "$result"
     fi
 
-    # Source of truth consumed by stages.container_scan: the image was
-    # actually produced and is available locally for scanning.
     report.record "package" "tech" "image_built" "true" 2>/dev/null || true
     report.record "package" "tech" "image_ref"   "${BRIK_PACKAGE_DOCKER_IMAGE}:${_app_tag}" 2>/dev/null || true
+
+    # Capture the manifest digest. buildx imagetools inspect returns the
+    # canonical digest that container-scan will scan; silent fallback
+    # when not available (local-only builds in dev) so digest stays
+    # absent rather than mis-reported.
+    local _digest_raw _digest
+    _digest_raw="$(docker buildx imagetools inspect "${BRIK_PACKAGE_DOCKER_IMAGE}:${_app_tag}" \
+                    --format '{{json .Manifest.Digest}}' 2>/dev/null || true)"
+    _digest="$(printf '%s' "$_digest_raw" | tr -d '"' | tr -d '\n')"
+    if [[ "$_digest" =~ ^sha256: ]] && command -v jq >/dev/null 2>&1; then
+        local _img_with_digest
+        _img_with_digest="$(jq -nc \
+            --arg name   "$BRIK_PACKAGE_DOCKER_IMAGE" \
+            --arg tag    "$_app_tag" \
+            --arg digest "$_digest" \
+            '{name: $name, tag: $tag, full_name: ($name + ":" + $tag), digest: $digest}')"
+        report.record_object "package" "business" "image" "$_img_with_digest" 2>/dev/null || true
+    fi
 
     # Publish configured targets
     config.export_publish_vars
@@ -126,6 +151,55 @@ stages.package() {
         done
     fi
 
-    # pipeline.run records tech.status=success from rc (see commit cf719f5).
     return 0
+}
+
+# Parse a Docker image reference into {host, namespace, repository}. Mirrors
+# Docker CLI's normalization: bare names default to docker.io/library, and
+# a 2-segment ref without a "." or ":" in the first segment is treated as
+# a Docker Hub user/repo pair.
+# Usage: _stages.package._parse_registry <image_ref>
+# Prints the JSON object on stdout, or empty on error.
+_stages.package._parse_registry() {
+    local _ref="$1"
+    [[ -z "$_ref" ]] && return 0
+    command -v jq >/dev/null 2>&1 || return 0
+
+    # Strip an optional ":tag" so registry parsing only sees the path.
+    local _path="${_ref%%:*}"
+
+    local _host="" _namespace="" _repo=""
+    local _first="${_path%%/*}"
+    local _rest=""
+    [[ "$_path" == */* ]] && _rest="${_path#*/}"
+
+    if [[ -z "$_rest" ]]; then
+        # Single segment, e.g. "redis" -> docker.io/library/redis
+        _host="docker.io"
+        _namespace="library"
+        _repo="$_path"
+    elif [[ "$_first" == *.* || "$_first" == *:* ]]; then
+        # First segment looks like a host (contains a dot or port).
+        _host="$_first"
+        if [[ "$_rest" == */* ]]; then
+            _namespace="${_rest%/*}"
+            _repo="${_rest##*/}"
+        else
+            _namespace=""
+            _repo="$_rest"
+        fi
+    else
+        # First segment is a Docker Hub user; rest is the repository
+        # (possibly with further nesting, but Docker Hub flat-only is the
+        # common case).
+        _host="docker.io"
+        _namespace="$_first"
+        _repo="$_rest"
+    fi
+
+    jq -nc \
+        --arg host       "$_host" \
+        --arg namespace  "$_namespace" \
+        --arg repository "$_repo" \
+        '{host: $host, namespace: $namespace, repository: $repository}'
 }

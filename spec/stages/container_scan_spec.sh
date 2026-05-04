@@ -180,6 +180,64 @@ Describe "stages/container_scan.sh"
         When call invoke_tool
         The output should equal "auto"
       End
+
+      It "records container-scan.tech.target_digest from the package fragment when present"
+        invoke_target_digest() {
+          mkdir -p "$BRIK_WORKSPACE/brik-artifacts"
+          cat > "$BRIK_WORKSPACE/brik-artifacts/package.json" <<'JSON'
+{
+  "schema_version": "1.0",
+  "stage": "package",
+  "tech": {
+    "image_built": "true",
+    "image_ref": "myapp:1.0.0"
+  },
+  "business": {
+    "image": {
+      "name": "myapp",
+      "tag": "1.0.0",
+      "full_name": "myapp:1.0.0",
+      "digest": "sha256:fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210"
+    }
+  }
+}
+JSON
+          stages.container_scan "$CTX_FILE" >/dev/null 2>&1
+          read_cs_tech "target_digest"
+        }
+        When call invoke_target_digest
+        The output should equal "sha256:fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210"
+      End
+
+      It "omits container-scan.tech.target_digest when the package fragment has no digest"
+        invoke_no_digest() {
+          mkdir -p "$BRIK_WORKSPACE/brik-artifacts"
+          cat > "$BRIK_WORKSPACE/brik-artifacts/package.json" <<'JSON'
+{
+  "schema_version": "1.0",
+  "stage": "package",
+  "tech": {
+    "image_built": "true",
+    "image_ref": "myapp:1.0.0"
+  }
+}
+JSON
+          stages.container_scan "$CTX_FILE" >/dev/null 2>&1
+          jq -r '.stages[] | select(.name == "container-scan") | .tech | has("target_digest")' \
+            "$BRIK_LOG_DIR/pipeline-report.json"
+        }
+        When call invoke_no_digest
+        The output should equal "false"
+      End
+
+      It "records container-scan.tech.scan_duration_ms"
+        invoke_scan_duration() {
+          stages.container_scan "$CTX_FILE" >/dev/null 2>&1
+          read_cs_tech "scan_duration_ms"
+        }
+        When call invoke_scan_duration
+        The output should match pattern "[0-9]*"
+      End
     End
   End
 End

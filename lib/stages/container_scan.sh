@@ -33,7 +33,7 @@ stages.container_scan() {
     # it actually produced a Docker image (lib/stages/package.sh). When
     # absent or false, container-scan does not apply (silent skip, no
     # fragment, no warning).
-    local image_built="false" image_ref=""
+    local image_built="false" image_ref="" image_digest=""
     if command -v jq >/dev/null 2>&1; then
         # Read the package stage fragment directly. On GitLab each job has
         # an isolated backend, but brik-artifacts/package.json travels as
@@ -44,6 +44,7 @@ stages.container_scan() {
         if [[ -f "$_pkg_fragment" ]]; then
             image_built="$(jq -r '.tech.image_built // "false"' "$_pkg_fragment" 2>/dev/null || printf 'false')"
             image_ref="$(jq -r '.tech.image_ref // ""' "$_pkg_fragment" 2>/dev/null || printf '')"
+            image_digest="$(jq -r '.business.image.digest // ""' "$_pkg_fragment" 2>/dev/null || printf '')"
         fi
     fi
 
@@ -90,12 +91,19 @@ stages.container_scan() {
         brik.use verify.scan.scan
     fi
 
-    # Pipeline-report enrichment (chantier 20260502 L2.C.4). business.{vulnerabilities,
-    # distro, base_image} and tech.target_digest are deferred (need scanner JSON
-    # parsing + docker inspect, addressed by F.2 SARIF/CycloneDX).
     report.record "container-scan" "tech" "tool" "${BRIK_SECURITY_CONTAINER_TOOL:-auto}" 2>/dev/null || true
     report.record "container-scan" "tech" "target_image" "$image" 2>/dev/null || true
+    if [[ -n "$image_digest" ]]; then
+        report.record "container-scan" "tech" "target_digest" "$image_digest" 2>/dev/null || true
+    fi
 
-    # pipeline.run records tech.status from our rc (see commit cf719f5).
+    local _scan_start_ms _scan_end_ms _scan_dur_ms _scan_rc
+    _scan_start_ms="$(_helpers.epoch_ms 2>/dev/null || printf '0')"
     verify.scan.run "${BRIK_WORKSPACE}" --scans "container" --image "$image" --severity "$severity"
+    _scan_rc=$?
+    _scan_end_ms="$(_helpers.epoch_ms 2>/dev/null || printf '0')"
+    _scan_dur_ms=$(( _scan_end_ms - _scan_start_ms ))
+    [[ "$_scan_dur_ms" -lt 0 ]] && _scan_dur_ms=0
+    report.record "container-scan" "tech" "scan_duration_ms" "$_scan_dur_ms" 2>/dev/null || true
+    return "$_scan_rc"
 }

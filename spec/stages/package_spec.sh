@@ -108,6 +108,118 @@ YAML
       When call run_pkg_image_obj
       The output should equal '{"name":"registry.example.com/myapp","tag":"1.0.0","full_name":"registry.example.com/myapp:1.0.0"}'
     End
+
+    It "records package.business.registry parsed from the image reference"
+      run_pkg_registry() {
+        brik.use() { :; }
+        stacks.docker.build() { return 0; }
+        local ctx
+        ctx="$(context.create "package")" 2>/dev/null || ctx="$(mktemp)"
+        stages.package "$ctx" >/dev/null 2>&1
+        read_package_business_json "registry"
+      }
+      When call run_pkg_registry
+      The output should equal '{"host":"registry.example.com","namespace":"","repository":"myapp"}'
+    End
+
+    It "records package.tech.build_duration_ms"
+      run_pkg_build_duration() {
+        brik.use() { :; }
+        stacks.docker.build() { return 0; }
+        local ctx
+        ctx="$(context.create "package")" 2>/dev/null || ctx="$(mktemp)"
+        stages.package "$ctx" >/dev/null 2>&1
+        read_package_tech "build_duration_ms"
+      }
+      When call run_pkg_build_duration
+      The output should match pattern "[0-9]*"
+    End
+
+    It "records package.business.image.digest when docker buildx imagetools inspect returns one"
+      run_pkg_digest() {
+        brik.use() { :; }
+        stacks.docker.build() { return 0; }
+        docker() {
+          if [[ "$1" == "buildx" && "$2" == "imagetools" ]]; then
+            printf 'sha256:abc123def4567890abc123def4567890abc123def4567890abc123def4567890\n'
+            return 0
+          fi
+          return 0
+        }
+        export -f docker
+        local ctx
+        ctx="$(context.create "package")" 2>/dev/null || ctx="$(mktemp)"
+        stages.package "$ctx" >/dev/null 2>&1
+        unset -f docker
+        jq -r '.stages[] | select(.name == "package") | .business.image.digest // "<missing>"' \
+          "$BRIK_LOG_DIR/pipeline-report.json"
+      }
+      When call run_pkg_digest
+      The output should equal "sha256:abc123def4567890abc123def4567890abc123def4567890abc123def4567890"
+    End
+
+    It "omits package.business.image.digest when docker buildx imagetools inspect fails"
+      run_pkg_no_digest() {
+        brik.use() { :; }
+        stacks.docker.build() { return 0; }
+        docker() {
+          if [[ "$1" == "buildx" && "$2" == "imagetools" ]]; then
+            return 1
+          fi
+          return 0
+        }
+        export -f docker
+        local ctx
+        ctx="$(context.create "package")" 2>/dev/null || ctx="$(mktemp)"
+        stages.package "$ctx" >/dev/null 2>&1
+        unset -f docker
+        jq -r '.stages[] | select(.name == "package") | .business.image | has("digest")' \
+          "$BRIK_LOG_DIR/pipeline-report.json"
+      }
+      When call run_pkg_no_digest
+      The output should equal "false"
+    End
+  End
+
+  Describe "registry parsing edge cases"
+    parse_registry() {
+      cat > "$BRIK_CONFIG_FILE" <<YAML
+version: 1
+project:
+  name: test
+  stack: node
+package:
+  docker:
+    image: ${1}
+YAML
+      config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
+      brik.use() { :; }
+      stacks.docker.build() { return 0; }
+      local ctx
+      ctx="$(context.create "package")" 2>/dev/null || ctx="$(mktemp)"
+      stages.package "$ctx" >/dev/null 2>&1
+      read_package_business_json "registry"
+    }
+
+    It "parses registry/namespace/repository from a 3-segment image"
+      When call parse_registry "ghcr.io/getbrik/brik-runner-node"
+      The output should equal '{"host":"ghcr.io","namespace":"getbrik","repository":"brik-runner-node"}'
+    End
+
+    It "parses host/repository when no namespace is present"
+      When call parse_registry "registry.example.com/myapp"
+      The output should equal '{"host":"registry.example.com","namespace":"","repository":"myapp"}'
+    End
+
+    It "treats Docker Hub style user/image (no host dot) as namespace+repo"
+      When call parse_registry "library/redis"
+      The output should equal '{"host":"docker.io","namespace":"library","repository":"redis"}'
+    End
+
+    It "treats a single-segment image as docker.io/library/<image>"
+      When call parse_registry "redis"
+      The output should equal '{"host":"docker.io","namespace":"library","repository":"redis"}'
+    End
   End
 
   It "records status skipped in the pipeline report when no docker image"
