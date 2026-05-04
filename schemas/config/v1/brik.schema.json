@@ -322,6 +322,16 @@
               "description": "Ruleset or profile for the SAST tool (e.g. auto, p/security-audit).",
               "type": "string",
               "minLength": 1
+            },
+            "output_format": {
+              "description": "Format of the SAST report produced for pipeline-report business aggregation. Currently only sarif is supported.",
+              "type": "string",
+              "enum": ["sarif"]
+            },
+            "output_path": {
+              "description": "Path (relative to the workspace) where the SAST tool writes its report. Defaults to target/sast.sarif.",
+              "type": "string",
+              "minLength": 1
             }
           }
         },

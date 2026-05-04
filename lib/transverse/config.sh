@@ -332,6 +332,10 @@ config.export_security_vars() {
     [[ -n "$sast_ruleset" ]] && export BRIK_SECURITY_SAST_RULESET="$sast_ruleset"
     local sast_cmd; sast_cmd="$(config.get '.security.sast.command' '')"
     [[ -n "$sast_cmd" ]] && export BRIK_SECURITY_SAST_COMMAND="$sast_cmd"
+    local sast_output_format; sast_output_format="$(config.get '.security.sast.output_format' '')"
+    [[ -n "$sast_output_format" ]] && export BRIK_SECURITY_SAST_OUTPUT_FORMAT="$sast_output_format"
+    local sast_output_path; sast_output_path="$(config.get '.security.sast.output_path' '')"
+    [[ -n "$sast_output_path" ]] && export BRIK_SECURITY_SAST_OUTPUT_PATH="$sast_output_path"
 
     # Deps
     local deps_tool; deps_tool="$(config.get '.security.deps.tool' '')"

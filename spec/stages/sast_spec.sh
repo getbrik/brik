@@ -1,8 +1,11 @@
+#shellcheck shell=bash disable=SC2148,SC2317,SC2329
+
 Describe "stages.sast"
   Include "$BRIK_HOME/lib/pipeline/stage.sh"
   Include "$BRIK_HOME/lib/pipeline/loader.sh"
   Include "$BRIK_HOME/lib/pipeline/report.sh"
   Include "$BRIK_HOME/lib/transverse/config.sh"
+  Include "$BRIK_HOME/lib/transverse/sarif.sh"
   Include "$BRIK_HOME/lib/stages/verify/scan/scan.sh"
   Include "$BRIK_HOME/lib/stages/sast.sh"
 
@@ -275,6 +278,130 @@ YAML
       When call run_multi_fail
       The status should equal 10
       The error should be present
+    End
+  End
+
+  Describe "business.* aggregation from target/sast.sarif"
+    read_sast_business_json() {
+      local key="$1"
+      jq -c --arg k "$key" \
+        '.stages[] | select(.name == "sast") | .business[$k] // empty' \
+        "$BRIK_LOG_DIR/pipeline-report.json" 2>/dev/null
+    }
+
+    setup_sast_with_sarif() {
+      mkdir -p "$BRIK_WORKSPACE/target"
+    }
+    Before 'setup_sast_with_sarif'
+
+    It "records business.findings.total from semgrep SARIF"
+      run_total() {
+        cp "${BRIK_HOME}/spec/fixtures/sarif/semgrep.sarif" "$BRIK_WORKSPACE/target/sast.sarif"
+        verify.scan.run() { return 0; }
+        brik.use() { :; }
+        local ctx
+        ctx="$(context.create "sast")" 2>/dev/null || ctx="$(mktemp)"
+        stages.sast "$ctx" >/dev/null 2>&1
+        read_sast_business_json "findings" | jq -r '.total'
+      }
+      When call run_total
+      The output should equal "15"
+    End
+
+    It "records business.findings.by_severity from semgrep SARIF"
+      run_sev() {
+        cp "${BRIK_HOME}/spec/fixtures/sarif/semgrep.sarif" "$BRIK_WORKSPACE/target/sast.sarif"
+        verify.scan.run() { return 0; }
+        brik.use() { :; }
+        local ctx
+        ctx="$(context.create "sast")" 2>/dev/null || ctx="$(mktemp)"
+        stages.sast "$ctx" >/dev/null 2>&1
+        read_sast_business_json "findings" | jq -c '.by_severity'
+      }
+      When call run_sev
+      The output should equal '{"critical":0,"high":1,"medium":14,"low":0,"info":0}'
+    End
+
+    It "records business.findings.cwe (sorted, deduped) from semgrep SARIF"
+      run_cwe() {
+        cp "${BRIK_HOME}/spec/fixtures/sarif/semgrep.sarif" "$BRIK_WORKSPACE/target/sast.sarif"
+        verify.scan.run() { return 0; }
+        brik.use() { :; }
+        local ctx
+        ctx="$(context.create "sast")" 2>/dev/null || ctx="$(mktemp)"
+        stages.sast "$ctx" >/dev/null 2>&1
+        read_sast_business_json "findings" | jq -c '.cwe'
+      }
+      When call run_cwe
+      The output should equal '["CWE-20","CWE-250"]'
+    End
+
+    It "records business.report = {format, path}"
+      run_report() {
+        cp "${BRIK_HOME}/spec/fixtures/sarif/semgrep.sarif" "$BRIK_WORKSPACE/target/sast.sarif"
+        verify.scan.run() { return 0; }
+        brik.use() { :; }
+        local ctx
+        ctx="$(context.create "sast")" 2>/dev/null || ctx="$(mktemp)"
+        stages.sast "$ctx" >/dev/null 2>&1
+        read_sast_business_json "report"
+      }
+      When call run_report
+      The output should equal '{"format":"sarif","path":"target/sast.sarif"}'
+    End
+
+    It "honors a custom output_path from .security.sast.output_path"
+      run_custom_path() {
+        cat > "$BRIK_CONFIG_FILE" <<'YAML'
+version: 1
+project:
+  name: test
+  stack: node
+security:
+  sast:
+    output_format: sarif
+    output_path: build/security/sast.sarif
+YAML
+        config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
+        mkdir -p "$BRIK_WORKSPACE/build/security"
+        cp "${BRIK_HOME}/spec/fixtures/sarif/semgrep.sarif" "$BRIK_WORKSPACE/build/security/sast.sarif"
+        verify.scan.run() { return 0; }
+        brik.use() { :; }
+        local ctx
+        ctx="$(context.create "sast")" 2>/dev/null || ctx="$(mktemp)"
+        stages.sast "$ctx" >/dev/null 2>&1
+        read_sast_business_json "report"
+      }
+      When call run_custom_path
+      The output should equal '{"format":"sarif","path":"build/security/sast.sarif"}'
+    End
+
+    It "omits business.* entirely when no SARIF was produced"
+      run_no_sarif() {
+        verify.scan.run() { return 0; }
+        brik.use() { :; }
+        local ctx
+        ctx="$(context.create "sast")" 2>/dev/null || ctx="$(mktemp)"
+        stages.sast "$ctx" >/dev/null 2>&1
+        jq -c '.stages[] | select(.name == "sast") | .business // {}' \
+          "$BRIK_LOG_DIR/pipeline-report.json" 2>/dev/null
+      }
+      When call run_no_sarif
+      The output should equal "{}"
+    End
+
+    It "records empty business.findings.cwe when the SARIF has no CWE tags"
+      run_no_cwe() {
+        cp "${BRIK_HOME}/spec/fixtures/sarif/eslint.sarif" "$BRIK_WORKSPACE/target/sast.sarif"
+        verify.scan.run() { return 0; }
+        brik.use() { :; }
+        local ctx
+        ctx="$(context.create "sast")" 2>/dev/null || ctx="$(mktemp)"
+        stages.sast "$ctx" >/dev/null 2>&1
+        read_sast_business_json "findings" | jq -c '.cwe'
+      }
+      When call run_no_cwe
+      The output should equal '[]'
     End
   End
 End

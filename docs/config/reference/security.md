@@ -31,6 +31,8 @@ override) to decide what fails the build.
 | `security.sast.command` | string | -- | SAST command to execute. Overrides tool selection (Tier 1). |
 | `security.sast.tool` | string | -- | SAST tool to use (e.g. semgrep, sonarqube, codeql). Overrides auto-detection (Tier 2). |
 | `security.sast.ruleset` | string | -- | Ruleset or profile for the SAST tool (e.g. auto, p/security-audit). |
+| `security.sast.output_format` | enum (`sarif`) | -- | Format of the SAST report produced for pipeline-report business aggregation. Currently only sarif is supported. |
+| `security.sast.output_path` | string | -- | Path (relative to the workspace) where the SAST tool writes its report. Defaults to target/sast.sarif. |
 
 ### `security.deps`
 

@@ -58,4 +58,46 @@ stages.sast() {
 
     # pipeline.run records tech.status from our rc (see commit cf719f5).
     verify.scan.run "${BRIK_WORKSPACE}" --scans "$scans"
+    local _verify_rc=$?
+
+    # Pipeline-report business.* enrichment (chantier 20260502 L2.C.3 absorbed
+    # into L4): aggregate the SARIF report produced under
+    # ${BRIK_WORKSPACE}/${BRIK_SECURITY_SAST_OUTPUT_PATH:-target/sast.sarif}
+    # into business.findings.{total, by_severity, cwe} + business.report.
+    _sast._record_business 2>/dev/null || true
+
+    return "$_verify_rc"
+}
+
+# Aggregate the SAST SARIF report into business.findings + business.report.
+# No-op when the sarif transverse module is missing, jq is missing, or the
+# expected SARIF file does not exist under the workspace.
+_sast._record_business() {
+    command -v jq >/dev/null 2>&1 || return 0
+
+    local _path="${BRIK_SECURITY_SAST_OUTPUT_PATH:-target/sast.sarif}"
+    local _file="${BRIK_WORKSPACE:-.}/${_path}"
+    [[ -f "$_file" ]] || return 0
+
+    if ! declare -f sarif.count_total >/dev/null 2>&1; then
+        brik.use transverse.sarif 2>/dev/null || return 0
+    fi
+
+    local _total _by_severity _cwe
+    _total="$(sarif.count_total "$_file" 2>/dev/null || echo 0)"
+    _by_severity="$(sarif.count_by_severity "$_file" 2>/dev/null \
+        || echo '{"critical":0,"high":0,"medium":0,"low":0,"info":0}')"
+    _cwe="$(sarif.extract_cwe "$_file" 2>/dev/null || echo '[]')"
+
+    local _findings_obj
+    _findings_obj="$(jq -nc \
+        --argjson total       "$_total" \
+        --argjson by_severity "$_by_severity" \
+        --argjson cwe         "$_cwe" \
+        '{total: $total, by_severity: $by_severity, cwe: $cwe}')"
+    report.record_object "sast" "business" "findings" "$_findings_obj" 2>/dev/null || true
+
+    local _report_obj
+    _report_obj="$(jq -nc --arg path "$_path" '{format:"sarif", path:$path}')"
+    report.record_object "sast" "business" "report" "$_report_obj" 2>/dev/null || true
 }
