@@ -57,17 +57,22 @@ verify.format.run() {
     case "$tool" in
         prettier)
             if command -v npx >/dev/null 2>&1; then
-                # Make prettier ignore the Brik cache directory (grype DB,
-                # pip wheels, etc.). On Jenkins the workspace is shared
-                # across stages, so the parallel scan stage's cache lands
-                # next to the source and breaks `prettier --check .` on
-                # binary files. Prettier has no inline ignore flag; the
-                # supported channel is .prettierignore, which we append
-                # idempotently here while preserving any user patterns.
+                # Make prettier ignore Brik-managed directories. On Jenkins
+                # the workspace is shared across stages, so the parallel
+                # scan stage's cache, the sast/scan SARIF outputs (target/),
+                # and the report-fragment stash (brik-artifacts/) all land
+                # next to the source and break `prettier --check .` on
+                # binary files or non-prettier-formatted JSON. Prettier has
+                # no inline ignore flag; the supported channel is
+                # .prettierignore, which we append idempotently here while
+                # preserving any user patterns.
                 local _prettier_ignore="${BRIK_WORKSPACE:-.}/.prettierignore"
-                if ! grep -qF '.cache/' "$_prettier_ignore" 2>/dev/null; then
-                    printf '.cache/\n' >> "$_prettier_ignore"
-                fi
+                local _pat
+                for _pat in '.cache/' 'target/' 'brik-artifacts/'; do
+                    if ! grep -qF "$_pat" "$_prettier_ignore" 2>/dev/null; then
+                        printf '%s\n' "$_pat" >> "$_prettier_ignore"
+                    fi
+                done
                 fmt_cmd="npx prettier --check ."
             else
                 log.error "npx not found for prettier"
