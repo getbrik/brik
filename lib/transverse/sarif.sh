@@ -312,3 +312,63 @@ sarif.from_tsc() {
             }
         ' > "$_out"
 }
+
+# sarif.from_dotnet_format <input_json> <output_sarif>
+# Convert a `dotnet format --report` JSON document into a minimal valid
+# SARIF 2.1.0 document. The input is an array of file objects whose
+# FileChanges[] entries each yield one SARIF result with ruleId set to
+# DiagnosticId and level=warning (style issues, not compiler errors).
+sarif.from_dotnet_format() {
+    if [[ $# -lt 2 ]]; then
+        printf 'sarif.from_dotnet_format: missing input/output arguments\n' >&2
+        return 2
+    fi
+    local _in="$1" _out="$2"
+    if [[ ! -f "$_in" ]]; then
+        printf 'sarif.from_dotnet_format: input does not exist: %s\n' "$_in" >&2
+        return 1
+    fi
+
+    jq --arg tool "dotnet-format" '
+      [ .[]
+        | . as $file
+        | (.FileChanges // [])[] | . as $ch
+        | {
+            "ruleId": ($ch.DiagnosticId // "format"),
+            "level": "warning",
+            "message": { "text": ($ch.FormatDescription // "Formatting issue") },
+            "locations": [
+              {
+                "physicalLocation": {
+                  "artifactLocation": { "uri": ($file.FilePath // $file.FileName // "") },
+                  "region": {
+                    "startLine": ($ch.LineNumber // 1),
+                    "startColumn": ($ch.CharNumber // 1)
+                  }
+                }
+              }
+            ]
+          }
+      ] as $results
+      | {
+          "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+          "version": "2.1.0",
+          "runs": [
+            {
+              "tool": {
+                "driver": {
+                  "name": $tool,
+                  "rules": (
+                    $results
+                    | map(.ruleId)
+                    | unique
+                    | map({ "id": ., "shortDescription": { "text": ("dotnet-format diagnostic " + .) } })
+                  )
+                }
+              },
+              "results": $results
+            }
+          ]
+        }
+    ' "$_in" > "$_out"
+}

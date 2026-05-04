@@ -1,0 +1,116 @@
+[
+  {
+    "DocumentId": {
+      "ProjectId": {
+        "Id": "37ec9708-6076-4565-b2aa-ca0da120263a"
+      },
+      "Id": "1621d416-041a-4398-9a75-518f4448bdf2"
+    },
+    "FileName": "Program.cs",
+    "FilePath": "/src/Program.cs",
+    "FileChanges": [
+      {
+        "LineNumber": 2,
+        "CharNumber": 14,
+        "DiagnosticId": "WHITESPACE",
+        "FormatDescription": "Fix whitespace formatting. Replace 1 characters with \u0027\\n\u0027."
+      },
+      {
+        "LineNumber": 3,
+        "CharNumber": 1,
+        "DiagnosticId": "WHITESPACE",
+        "FormatDescription": "Fix whitespace formatting. Insert \u0027\\s\\s\\s\\s\u0027."
+      },
+      {
+        "LineNumber": 3,
+        "CharNumber": 14,
+        "DiagnosticId": "WHITESPACE",
+        "FormatDescription": "Fix whitespace formatting. Insert \u0027\\n\\s\\s\\s\\s\u0027."
+      },
+      {
+        "LineNumber": 4,
+        "CharNumber": 1,
+        "DiagnosticId": "WHITESPACE",
+        "FormatDescription": "Fix whitespace formatting. Insert \u0027\\s\\s\\s\\s\\s\\s\\s\\s\u0027."
+      },
+      {
+        "LineNumber": 4,
+        "CharNumber": 32,
+        "DiagnosticId": "WHITESPACE",
+        "FormatDescription": "Fix whitespace formatting. Insert \u0027\\n\\s\\s\\s\\s\\s\\s\\s\\s\u0027."
+      },
+      {
+        "LineNumber": 5,
+        "CharNumber": 1,
+        "DiagnosticId": "WHITESPACE",
+        "FormatDescription": "Fix whitespace formatting. Insert \u0027\\s\\s\\s\\s\\s\\s\\s\\s\\s\\s\\s\\s\u0027."
+      },
+      {
+        "LineNumber": 5,
+        "CharNumber": 3,
+        "DiagnosticId": "WHITESPACE",
+        "FormatDescription": "Fix whitespace formatting. Insert \u0027\\s\u0027."
+      },
+      {
+        "LineNumber": 5,
+        "CharNumber": 15,
+        "DiagnosticId": "WHITESPACE",
+        "FormatDescription": "Fix whitespace formatting. Insert \u0027\\s\u0027."
+      },
+      {
+        "LineNumber": 5,
+        "CharNumber": 16,
+        "DiagnosticId": "WHITESPACE",
+        "FormatDescription": "Fix whitespace formatting. Insert \u0027\\s\u0027."
+      },
+      {
+        "LineNumber": 5,
+        "CharNumber": 18,
+        "DiagnosticId": "WHITESPACE",
+        "FormatDescription": "Fix whitespace formatting. Insert \u0027\\s\u0027."
+      },
+      {
+        "LineNumber": 5,
+        "CharNumber": 19,
+        "DiagnosticId": "WHITESPACE",
+        "FormatDescription": "Fix whitespace formatting. Insert \u0027\\s\u0027."
+      },
+      {
+        "LineNumber": 5,
+        "CharNumber": 43,
+        "DiagnosticId": "WHITESPACE",
+        "FormatDescription": "Fix whitespace formatting. Insert \u0027\\s\u0027."
+      },
+      {
+        "LineNumber": 6,
+        "CharNumber": 1,
+        "DiagnosticId": "WHITESPACE",
+        "FormatDescription": "Fix whitespace formatting. Insert \u0027\\s\\s\\s\\s\\s\\s\\s\\s\\s\\s\\s\\s\u0027."
+      },
+      {
+        "LineNumber": 6,
+        "CharNumber": 11,
+        "DiagnosticId": "WHITESPACE",
+        "FormatDescription": "Fix whitespace formatting. Insert \u0027\\s\u0027."
+      },
+      {
+        "LineNumber": 6,
+        "CharNumber": 12,
+        "DiagnosticId": "WHITESPACE",
+        "FormatDescription": "Fix whitespace formatting. Insert \u0027\\s\u0027."
+      },
+      {
+        "LineNumber": 7,
+        "CharNumber": 1,
+        "DiagnosticId": "WHITESPACE",
+        "FormatDescription": "Fix whitespace formatting. Insert \u0027\\s\\s\\s\\s\\s\\s\\s\\s\u0027."
+      },
+      {
+        "LineNumber": 8,
+        "CharNumber": 1,
+        "DiagnosticId": "WHITESPACE",
+        "FormatDescription": "Fix whitespace formatting. Insert \u0027\\s\\s\\s\\s\u0027."
+      }
+    ]
+  }
+]

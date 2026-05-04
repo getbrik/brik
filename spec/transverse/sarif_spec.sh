@@ -1,4 +1,4 @@
-#shellcheck shell=bash disable=SC2148,SC2317
+#shellcheck shell=bash disable=SC2148,SC2317,SC2329
 
 Describe "transverse/sarif.sh"
   Include "$BRIK_TRANSVERSE_LIB/sarif.sh"
@@ -373,6 +373,91 @@ TXT
 
     It "fails with rc=1 when input does not exist"
       When call sarif.from_tsc "${TSC_DIR}/missing.txt" "${TSC_DIR}/out.sarif"
+      The status should equal 1
+      The stderr should include "does not exist"
+    End
+  End
+
+  Describe "sarif.from_dotnet_format"
+    setup_dn() { DN_DIR="$(mktemp -d)"; }
+    cleanup_dn() { rm -rf "$DN_DIR"; }
+    Before 'setup_dn'
+    After 'cleanup_dn'
+
+    It "produces a valid SARIF 2.1.0 document from the dotnet-format fixture"
+      run_valid() {
+        sarif.from_dotnet_format "${RAW}/dotnet-format.json" "${DN_DIR}/out.sarif"
+        sarif.is_valid "${DN_DIR}/out.sarif"
+      }
+      When call run_valid
+      The status should be success
+    End
+
+    It "produces tool driver name = dotnet-format"
+      run_tool() {
+        sarif.from_dotnet_format "${RAW}/dotnet-format.json" "${DN_DIR}/out.sarif"
+        sarif.tool_name "${DN_DIR}/out.sarif"
+      }
+      When call run_tool
+      The output should equal "dotnet-format"
+    End
+
+    It "yields 17 results (one per FileChange)"
+      run_count() {
+        sarif.from_dotnet_format "${RAW}/dotnet-format.json" "${DN_DIR}/out.sarif"
+        sarif.count_total "${DN_DIR}/out.sarif"
+      }
+      When call run_count
+      The output should equal "17"
+    End
+
+    It "uses DiagnosticId WHITESPACE as ruleId"
+      run_rules() {
+        sarif.from_dotnet_format "${RAW}/dotnet-format.json" "${DN_DIR}/out.sarif"
+        jq -c '.runs[0].results | map(.ruleId) | unique' "${DN_DIR}/out.sarif"
+      }
+      When call run_rules
+      The output should equal '["WHITESPACE"]'
+    End
+
+    It "places all 17 findings under medium (style issues = warning)"
+      run_sev() {
+        sarif.from_dotnet_format "${RAW}/dotnet-format.json" "${DN_DIR}/out.sarif"
+        sarif.count_by_severity "${DN_DIR}/out.sarif"
+      }
+      When call run_sev
+      The output should equal '{"critical":0,"high":0,"medium":17,"low":0,"info":0}'
+    End
+
+    It "preserves FilePath, LineNumber, and CharNumber in result location"
+      run_loc() {
+        sarif.from_dotnet_format "${RAW}/dotnet-format.json" "${DN_DIR}/out.sarif"
+        jq -c '.runs[0].results[0].locations[0].physicalLocation' "${DN_DIR}/out.sarif"
+      }
+      When call run_loc
+      The output should equal '{"artifactLocation":{"uri":"/src/Program.cs"},"region":{"startLine":2,"startColumn":14}}'
+    End
+
+    It "produces a valid empty SARIF when input has no FileChanges"
+      run_empty() {
+        echo '[]' > "${DN_DIR}/empty.json"
+        sarif.from_dotnet_format "${DN_DIR}/empty.json" "${DN_DIR}/out.sarif"
+        sarif.is_valid "${DN_DIR}/out.sarif" \
+          && sarif.count_total "${DN_DIR}/out.sarif"
+      }
+      When call run_empty
+      The output should equal "0"
+      The status should be success
+    End
+
+    It "fails with rc=2 when arguments are missing"
+      When call sarif.from_dotnet_format
+      The status should equal 2
+      The stderr should include "missing"
+    End
+
+    It "fails with rc=1 when input does not exist"
+      When call sarif.from_dotnet_format "${DN_DIR}/missing.json" "${DN_DIR}/out.sarif"
       The status should equal 1
       The stderr should include "does not exist"
     End

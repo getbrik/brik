@@ -27,6 +27,7 @@ spec/fixtures/
     prettier.txt        # prettier --check stderr, 1 file flagged
     tsc.txt             # tsc --noEmit error stream, 2 errors (TS2322 + TS2304)
     gitleaks.json       # gitleaks --report-format json (gitleaks >= 8.30 also supports SARIF natively)
+    dotnet-format.json  # dotnet format whitespace --report, 1 file with 17 WHITESPACE changes
 ```
 
 ## Per-fixture provenance
@@ -45,6 +46,7 @@ spec/fixtures/
 | `raw/prettier.txt` | `prettier --check <file>` | prettier 3.8.3 | synthetic-but-real malformed JS |
 | `raw/tsc.txt` | `tsc --noEmit` | typescript 6.0.3 | synthetic-but-real malformed TS |
 | `raw/gitleaks.json` | `gitleaks dir <path> --report-format json` | gitleaks 8.30.1 | brik/ repo |
+| `raw/dotnet-format.json` | `dotnet format whitespace --verify-no-changes --report <dir>` | .NET SDK 9.0 | synthetic-but-real malformed C# Program.cs (17 whitespace diagnostics on 1 file) |
 
 Capture date: 2026-05-04. All SARIF fixtures pass `jv schemas/external/sarif-2.1.0.json`.
 The CycloneDX fixture passes `jv schemas/external/cyclonedx-1.5.schema.json`.
