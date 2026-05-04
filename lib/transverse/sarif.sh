@@ -171,3 +171,59 @@ sarif.is_valid() {
         and ((.runs[0].tool.driver.name // null) | type == "string")
     ' "$_file" >/dev/null 2>&1
 }
+
+# sarif.from_prettier <input_text> <output_sarif>
+# Convert raw `prettier --check` stdout into a minimal valid SARIF 2.1.0
+# document. Each `[warn] <path>` line where <path> is a single token (no
+# whitespace) becomes one result with ruleId="formatting" and level="warning".
+# Lines whose payload contains whitespace (e.g. the trailing summary line)
+# are ignored.
+sarif.from_prettier() {
+    if [[ $# -lt 2 ]]; then
+        printf 'sarif.from_prettier: missing input/output arguments\n' >&2
+        return 2
+    fi
+    local _in="$1" _out="$2"
+    if [[ ! -f "$_in" ]]; then
+        printf 'sarif.from_prettier: input does not exist: %s\n' "$_in" >&2
+        return 1
+    fi
+
+    grep -E '^\[warn\] [^[:space:]]+$' "$_in" 2>/dev/null \
+        | sed -E 's/^\[warn\] //' \
+        | jq -R -s --arg tool "prettier" '
+            split("\n")
+            | map(select(length > 0))
+            | {
+                "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+                "version": "2.1.0",
+                "runs": [
+                  {
+                    "tool": {
+                      "driver": {
+                        "name": $tool,
+                        "rules": [
+                          {
+                            "id": "formatting",
+                            "shortDescription": { "text": "Code style issue detected by prettier" },
+                            "defaultConfiguration": { "level": "warning" }
+                          }
+                        ]
+                      }
+                    },
+                    "results": (
+                      . | map({
+                        "ruleId": "formatting",
+                        "ruleIndex": 0,
+                        "level": "warning",
+                        "message": { "text": "File does not conform to prettier formatting rules." },
+                        "locations": [
+                          { "physicalLocation": { "artifactLocation": { "uri": . } } }
+                        ]
+                      })
+                    )
+                  }
+                ]
+              }
+        ' > "$_out"
+}

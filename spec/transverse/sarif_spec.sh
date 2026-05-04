@@ -189,4 +189,97 @@ Describe "transverse/sarif.sh"
       The status should equal 1
     End
   End
+
+  RAW="${BRIK_HOME}/spec/fixtures/raw"
+
+  Describe "sarif.from_prettier"
+    setup_conv() { CONV_DIR="$(mktemp -d)"; }
+    cleanup_conv() { rm -rf "$CONV_DIR"; }
+    Before 'setup_conv'
+    After 'cleanup_conv'
+
+    It "produces a valid SARIF 2.1.0 document from the prettier fixture"
+      run_valid() {
+        sarif.from_prettier "${RAW}/prettier.txt" "${CONV_DIR}/out.sarif"
+        sarif.is_valid "${CONV_DIR}/out.sarif"
+      }
+      When call run_valid
+      The status should be success
+    End
+
+    It "produces tool driver name = prettier"
+      run_tool() {
+        sarif.from_prettier "${RAW}/prettier.txt" "${CONV_DIR}/out.sarif"
+        sarif.tool_name "${CONV_DIR}/out.sarif"
+      }
+      When call run_tool
+      The output should equal "prettier"
+    End
+
+    It "yields 1 result for the fixture (the bad-prettier.js file flagged)"
+      run_count() {
+        sarif.from_prettier "${RAW}/prettier.txt" "${CONV_DIR}/out.sarif"
+        sarif.count_total "${CONV_DIR}/out.sarif"
+      }
+      When call run_count
+      The output should equal "1"
+    End
+
+    It "places the finding under medium (level=warning per Brik mapping)"
+      run_sev() {
+        sarif.from_prettier "${RAW}/prettier.txt" "${CONV_DIR}/out.sarif"
+        sarif.count_by_severity "${CONV_DIR}/out.sarif"
+      }
+      When call run_sev
+      The output should equal '{"critical":0,"high":0,"medium":1,"low":0,"info":0}'
+    End
+
+    It "preserves the file URI in the result location"
+      run_uri() {
+        sarif.from_prettier "${RAW}/prettier.txt" "${CONV_DIR}/out.sarif"
+        jq -r '.runs[0].results[0].locations[0].physicalLocation.artifactLocation.uri' "${CONV_DIR}/out.sarif"
+      }
+      When call run_uri
+      The output should equal "src/bad-prettier.js"
+    End
+
+    It "produces a valid empty SARIF when prettier reports no findings"
+      run_empty() {
+        echo "Checking formatting..." > "${CONV_DIR}/clean.txt"
+        echo "All matched files use Prettier code style!" >> "${CONV_DIR}/clean.txt"
+        sarif.from_prettier "${CONV_DIR}/clean.txt" "${CONV_DIR}/out.sarif"
+        sarif.is_valid "${CONV_DIR}/out.sarif" \
+          && sarif.count_total "${CONV_DIR}/out.sarif"
+      }
+      When call run_empty
+      The output should equal "0"
+      The status should be success
+    End
+
+    It "ignores the trailing summary [warn] line"
+      run_filter() {
+        cat > "${CONV_DIR}/multiline.txt" <<'TXT'
+[warn] src/a.js
+[warn] src/b.ts
+[warn] Code style issues found in the above files. Run Prettier with --write to fix.
+TXT
+        sarif.from_prettier "${CONV_DIR}/multiline.txt" "${CONV_DIR}/out.sarif"
+        sarif.count_total "${CONV_DIR}/out.sarif"
+      }
+      When call run_filter
+      The output should equal "2"
+    End
+
+    It "fails with rc=2 when arguments are missing"
+      When call sarif.from_prettier
+      The status should equal 2
+      The stderr should include "missing"
+    End
+
+    It "fails with rc=1 when input does not exist"
+      When call sarif.from_prettier "${CONV_DIR}/missing.txt" "${CONV_DIR}/out.sarif"
+      The status should equal 1
+      The stderr should include "does not exist"
+    End
+  End
 End
