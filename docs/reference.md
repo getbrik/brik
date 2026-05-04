@@ -717,11 +717,74 @@ fields (`stage`, `status`, `rc`, `runner`, `duration_ms`, `timestamp`).
 | `business.coverage.line_pct` | string | from Cobertura `coverage.xml` or Jacoco `jacoco.xml` |
 | `business.coverage.branch_pct` | string | omitted when the report has no branch metric |
 
-#### `lint` / `sast` / `scan`
+#### `lint`
 
-`tech.{tool, checks, severity_threshold}` only in v1.0. The `business.*`
-counts (violations / findings / vulnerabilities by severity, CWE, SBOM
-path) require SARIF / CycloneDX export and are not populated yet.
+| Field | Type | Source |
+|---|---|---|
+| `tech.checks` | array | configured checks (`lint`, `format`, `type_check`) |
+| `tech.tools` | object | per-check tool name (`{lint: eslint, format: prettier, ...}`) |
+| `tech.commands` | object | per-check command override when set |
+| `business.violations.total` | int | `sarif.count_total` summed across present per-check SARIF files |
+| `business.violations.by_severity` | object | `{critical, high, medium, low, info}` summed across files |
+| `business.violations.by_check` | object | per-check totals, e.g. `{lint: 5, format: 6}` |
+| `business.report` | object | `{format: "sarif", path: "target/lint.sarif"}` rollup pointer |
+| `business.fix_applied` | bool | `BRIK_QUALITY_LINT_FIX` (`true` only when `--fix` ran) |
+
+The lint stage scans `${BRIK_WORKSPACE}/target/<check>.sarif` for each
+configured check. Tools without native SARIF support require a converter
+from `lib/transverse/sarif.sh` (`sarif.from_prettier`, `sarif.from_tsc`,
+`sarif.from_dotnet_format`). When no SARIF is produced, `business.*` is
+omitted (backward compatible).
+
+#### `sast`
+
+| Field | Type | Source |
+|---|---|---|
+| `tech.tool` | string | `.security.sast.tool` (default `semgrep`) |
+| `tech.ruleset` | string | `.security.sast.ruleset` |
+| `business.findings.total` | int | `sarif.count_total target/sast.sarif` |
+| `business.findings.by_severity` | object | `{critical, high, medium, low, info}` |
+| `business.findings.cwe` | array | sorted, deduped CWE identifiers extracted from rule tags |
+| `business.report` | object | `{format: "sarif", path: <BRIK_SECURITY_SAST_OUTPUT_PATH or target/sast.sarif>}` |
+
+Configured via `security.sast.{output_format, output_path}`.
+
+#### `scan`
+
+| Field | Type | Source |
+|---|---|---|
+| `tech.deps.tool` | string | `.security.deps.tool` (default `osv-scanner`) |
+| `tech.secret.tool` | string | `.security.secrets.tool` (default `gitleaks`) |
+| `tech.severity_threshold` | string | `.security.deps.severity` or global default |
+| `business.deps.vulnerabilities.{total, by_severity}` | object | parsed from `target/scan.sarif` |
+| `business.deps.affected_packages` | int | `sbom.vuln_count` (or `sbom.component_count` fallback) on `target/sbom.cdx.json` |
+| `business.deps.sbom_path` | string | path to the CycloneDX 1.5 file (when produced) |
+| `business.secret.findings_count` | int | `sarif.count_total target/secret.sarif` |
+| `business.secret.report` | object | `{format: "sarif", path: ...}` |
+| `business.report` | object | rollup pointer to the deps SARIF |
+
+Configured via `security.deps.{output_path, sbom.{enabled, format,
+output_path}}` and `security.secrets.output_path`. Each section is
+independently no-op when its artifact is absent.
+
+#### Severity normalization
+
+The canonical Brik severity vocabulary used in every `by_severity` object
+is `{critical, high, medium, low, info}`. SARIF producers express
+severity in different places (`result.level`, `tool.driver.rules[].defaultConfiguration.level`,
+or `properties.security-severity` numeric CVSS). `lib/transverse/sarif.sh`
+resolves them in this order, then maps:
+
+| Source | -> Canonical |
+|---|---|
+| `properties.security-severity` >= 9.0 (CVSS) | `critical` |
+| `properties.security-severity` >= 7.0 | `high` |
+| `properties.security-severity` >= 4.0 | `medium` |
+| `properties.security-severity` > 0 | `low` |
+| SARIF `level: error` | `high` |
+| SARIF `level: warning` | `medium` |
+| SARIF `level: note` | `low` |
+| SARIF `level: none`, null, or unresolved | `info` |
 
 #### `package`
 
