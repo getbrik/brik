@@ -4,6 +4,7 @@ Describe "stages.test"
   Include "$BRIK_HOME/lib/pipeline/stage.sh"
   Include "$BRIK_HOME/lib/pipeline/loader.sh"
   Include "$BRIK_HOME/lib/transverse/config.sh"
+  Include "$BRIK_HOME/lib/transverse/junit.sh"
   Include "$BRIK_HOME/lib/stages/test.sh"
 
   setup_env() {
@@ -298,6 +299,117 @@ YAML
     }
     When call run_test_unsupported_stack
     The output should equal "7"
+  End
+
+  Describe "business.tests recording from JUnit XML"
+    _stub_test_success() {
+      brik.use() { :; }
+      stacks.detect_from_framework() { printf 'node'; return 0; }
+      stacks.detect() { printf 'node'; return 0; }
+      stacks.node.test_cmd() { printf 'true'; return 0; }
+      stacks.node.test() { printf 'true'; return 0; }
+      stacks.install_deps() { :; }
+    }
+
+    _write_junit() {
+      mkdir -p "$BRIK_WORKSPACE/reports"
+      cat > "$BRIK_WORKSPACE/reports/junit.xml" <<'XML'
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="Suite" tests="10" failures="2" errors="0" skipped="1" time="3.456"/>
+</testsuites>
+XML
+      export BRIK_TEST_JUNIT_PATH="reports/junit.xml"
+    }
+
+    It "records business.tests.total when JUnit file exists"
+      run_total() {
+        _stub_test_success
+        _write_junit
+        local ctx
+        ctx="$(context.create "test")" 2>/dev/null || ctx="$(mktemp)"
+        stages.test "$ctx" >/dev/null 2>&1
+        jq -r '.stages[] | select(.name == "test") | .business.tests.total // "<missing>"' \
+          "$BRIK_LOG_DIR/pipeline-report.json"
+      }
+      When call run_total
+      The output should equal "10"
+    End
+
+    It "records business.tests.passed = total - failed - skipped"
+      run_passed() {
+        _stub_test_success
+        _write_junit
+        local ctx
+        ctx="$(context.create "test")" 2>/dev/null || ctx="$(mktemp)"
+        stages.test "$ctx" >/dev/null 2>&1
+        jq -r '.stages[] | select(.name == "test") | .business.tests.passed // "<missing>"' \
+          "$BRIK_LOG_DIR/pipeline-report.json"
+      }
+      When call run_passed
+      The output should equal "7"
+    End
+
+    It "records business.tests.failed and skipped"
+      run_failed_skipped() {
+        _stub_test_success
+        _write_junit
+        local ctx
+        ctx="$(context.create "test")" 2>/dev/null || ctx="$(mktemp)"
+        stages.test "$ctx" >/dev/null 2>&1
+        jq -c '.stages[] | select(.name == "test") | {f: .business.tests.failed, s: .business.tests.skipped}' \
+          "$BRIK_LOG_DIR/pipeline-report.json"
+      }
+      When call run_failed_skipped
+      The output should equal '{"f":2,"s":1}'
+    End
+
+    It "records business.tests.duration_ms"
+      run_dur() {
+        _stub_test_success
+        _write_junit
+        local ctx
+        ctx="$(context.create "test")" 2>/dev/null || ctx="$(mktemp)"
+        stages.test "$ctx" >/dev/null 2>&1
+        jq -r '.stages[] | select(.name == "test") | .business.tests.duration_ms // "<missing>"' \
+          "$BRIK_LOG_DIR/pipeline-report.json"
+      }
+      When call run_dur
+      The output should equal "3456"
+    End
+
+    It "omits business.tests when JUnit path does not point to an existing file"
+      run_omit() {
+        _stub_test_success
+        export BRIK_TEST_JUNIT_PATH="reports/missing.xml"
+        local ctx
+        ctx="$(context.create "test")" 2>/dev/null || ctx="$(mktemp)"
+        stages.test "$ctx" >/dev/null 2>&1
+        jq -r '[.stages[] | select(.name == "test") | .business.tests // null | select(. != null)] | length' \
+          "$BRIK_LOG_DIR/pipeline-report.json"
+      }
+      When call run_omit
+      The output should equal "0"
+    End
+
+    It "records business.tests even when tests fail (rc != 0)"
+      run_on_failure() {
+        brik.use() { :; }
+        stacks.detect_from_framework() { printf 'node'; return 0; }
+        stacks.detect() { printf 'node'; return 0; }
+        stacks.node.test_cmd() { printf 'false'; return 0; }
+        stacks.node.test() { printf 'false'; return 0; }
+        stacks.install_deps() { :; }
+        _write_junit
+        local ctx
+        ctx="$(context.create "test")" 2>/dev/null || ctx="$(mktemp)"
+        stages.test "$ctx" >/dev/null 2>&1
+        jq -r '.stages[] | select(.name == "test") | .business.tests.total // "<missing>"' \
+          "$BRIK_LOG_DIR/pipeline-report.json"
+      }
+      When call run_on_failure
+      The output should equal "10"
+    End
   End
 
   Describe "with BRIK_TEST_COVERAGE_THRESHOLD"

@@ -20,9 +20,6 @@ stages.test() {
 
     log.info "running tests"
 
-    # Pipeline-report enrichment (chantier 20260502 L2.C.2). Test counts and
-    # business.coverage.branch_pct are deferred to a follow-up that needs
-    # runner-output parsing and a coverage parser extension.
     if [[ -n "${BRIK_TEST_FRAMEWORK:-}" ]]; then
         report.record "test" "tech" "framework" "$BRIK_TEST_FRAMEWORK" 2>/dev/null || true
     fi
@@ -109,11 +106,33 @@ stages.test() {
         fi
     fi
 
+    # Record test counts from JUnit XML (when present). Run regardless of
+    # test pass/fail so a partial report still surfaces counts.
+    _stages.test._record_junit_business
+
     if [[ "$exit_code2" -ne 0 ]]; then
         log.error "tests failed with exit code $exit_code2"
         return "$BRIK_EXIT_CHECK_FAILED"
     fi
     log.info "tests passed"
-    # pipeline.run records tech.status=success from rc (see commit cf719f5).
     return 0
+}
+
+# Look up the configured JUnit path, parse it via transverse.junit, and
+# record the resulting counts under business.tests. Silent skip when the
+# file is absent (libraries with no test reports, runners that did not
+# emit JUnit, or BRIK_TEST_JUNIT_PATH explicitly empty).
+_stages.test._record_junit_business() {
+    local _junit_path="${BRIK_TEST_JUNIT_PATH:-}"
+    [[ -z "$_junit_path" ]] && return 0
+    if [[ "$_junit_path" != /* ]]; then
+        _junit_path="${BRIK_WORKSPACE:-.}/${_junit_path}"
+    fi
+    [[ -f "$_junit_path" ]] || return 0
+
+    brik.use transverse.junit 2>/dev/null || return 0
+    local _counts
+    _counts="$(junit.parse "$_junit_path" 2>/dev/null)" || return 0
+    [[ -z "$_counts" ]] && return 0
+    report.record_object "test" "business" "tests" "$_counts" 2>/dev/null || true
 }
