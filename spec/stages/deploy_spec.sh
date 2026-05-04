@@ -92,6 +92,122 @@ YAML
     The output should equal ""
   End
 
+  It "records deploy.business.environments[] with name, target, namespace per env"
+    run_deploy_business_envs() {
+      cat > "$BRIK_CONFIG_FILE" <<'YAML'
+version: 1
+project:
+  name: test
+  stack: node
+deploy:
+  environments:
+    staging:
+      target: k8s
+      namespace: stg
+    prod:
+      target: helm
+      release_name: prod-app
+YAML
+      config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
+      brik.use() { :; }
+      deploy.k8s.run() { return 0; }
+      deploy.helm.run() { return 0; }
+      local ctx
+      ctx="$(context.create "deploy")" 2>/dev/null || ctx="$(mktemp)"
+      stages.deploy "$ctx" >/dev/null 2>&1
+      jq -c '.stages[] | select(.name == "deploy") | .business.environments
+             | map({name, target, namespace})' \
+        "$BRIK_LOG_DIR/pipeline-report.json"
+    }
+    When call run_deploy_business_envs
+    The output should equal '[{"name":"staging","target":"k8s","namespace":"stg"},{"name":"prod","target":"helm","namespace":null}]'
+  End
+
+  It "records deploy.business.environments[].strategy when configured"
+    run_deploy_business_strategy() {
+      cat > "$BRIK_CONFIG_FILE" <<'YAML'
+version: 1
+project:
+  name: test
+  stack: node
+deploy:
+  environments:
+    canary:
+      target: k8s
+      namespace: cnr
+      strategy: canary
+YAML
+      config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
+      brik.use() { :; }
+      deploy.k8s.run() { return 0; }
+      rollout.strategy.run() { return 0; }
+      local ctx
+      ctx="$(context.create "deploy")" 2>/dev/null || ctx="$(mktemp)"
+      stages.deploy "$ctx" >/dev/null 2>&1
+      jq -r '.stages[] | select(.name == "deploy") | .business.environments[0].strategy // "<missing>"' \
+        "$BRIK_LOG_DIR/pipeline-report.json"
+    }
+    When call run_deploy_business_strategy
+    The output should equal "canary"
+  End
+
+  It "omits deploy.business.environments[].strategy when not configured"
+    run_deploy_no_strategy() {
+      cat > "$BRIK_CONFIG_FILE" <<'YAML'
+version: 1
+project:
+  name: test
+  stack: node
+deploy:
+  environments:
+    staging:
+      target: k8s
+      namespace: stg
+YAML
+      config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
+      brik.use() { :; }
+      deploy.k8s.run() { return 0; }
+      local ctx
+      ctx="$(context.create "deploy")" 2>/dev/null || ctx="$(mktemp)"
+      stages.deploy "$ctx" >/dev/null 2>&1
+      jq -r '.stages[] | select(.name == "deploy") | .business.environments[0] | has("strategy")' \
+        "$BRIK_LOG_DIR/pipeline-report.json"
+    }
+    When call run_deploy_no_strategy
+    The output should equal "false"
+  End
+
+  It "omits skipped environments from deploy.business.environments[]"
+    run_deploy_skipped_excluded() {
+      cat > "$BRIK_CONFIG_FILE" <<'YAML'
+version: 1
+project:
+  name: test
+  stack: node
+deploy:
+  environments:
+    staging:
+      target: k8s
+      namespace: stg
+    prod:
+      target: k8s
+      namespace: prd
+      when: branch == 'main'
+YAML
+      config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
+      brik.use() { :; }
+      deploy.k8s.run() { return 0; }
+      conditions.eval() { return 1; }
+      local ctx
+      ctx="$(context.create "deploy")" 2>/dev/null || ctx="$(mktemp)"
+      stages.deploy "$ctx" >/dev/null 2>&1
+      jq -c '.stages[] | select(.name == "deploy") | .business.environments | map(.name)' \
+        "$BRIK_LOG_DIR/pipeline-report.json"
+    }
+    When call run_deploy_skipped_excluded
+    The output should equal '["staging"]'
+  End
+
   Describe "with deploy environments"
     setup_deploy() {
       cat > "$BRIK_CONFIG_FILE" <<'YAML'

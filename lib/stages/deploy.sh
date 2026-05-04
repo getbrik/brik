@@ -32,10 +32,6 @@ stages.deploy() {
         return 0
     fi
 
-    # Pipeline-report enrichment (chantier 20260502 L2.C.4). Per-env details
-    # (target/strategy/namespace/url, image.deployed/digest, replicas, rollback,
-    # gitops.*) are deferred -- they require post-deploy state queries
-    # (kubectl, argocd, etc.) that are out of scope for this slice.
     if command -v jq >/dev/null 2>&1; then
         local _envs_arr
         _envs_arr="$(printf '%s' "${BRIK_DEPLOY_ENVIRONMENTS}" \
@@ -45,6 +41,10 @@ stages.deploy() {
 
     local env_name upper_env
     local deploy_failed=0
+    # business.environments[] accumulator: one object per env that actually
+    # ran (skipped envs and envs with no target are excluded so consumers
+    # see only the work that took place).
+    local _business_envs_json="[]"
 
     while IFS= read -r env_name; do
         [[ -z "$env_name" ]] && continue
@@ -96,6 +96,28 @@ stages.deploy() {
         fi
 
         log.info "deploying to $env_name (target=$target)"
+
+        # Build the business.environments entry for this env now that we
+        # know it will execute. Captured fields are env-var-derived only;
+        # post-deploy state (image digest, replicas, URLs, rollback ref)
+        # would require kubectl/argocd queries and is left to a future
+        # post-deploy hook on each deployments.<target> module.
+        if command -v jq >/dev/null 2>&1; then
+            local _ns_val _strat_val _env_obj
+            _ns_val="$(transverse.env.resolve_indirect "$namespace_var")"
+            _strat_val="$(transverse.env.resolve_indirect "BRIK_DEPLOY_${upper_env}_STRATEGY")"
+            _env_obj="$(jq -nc \
+                --arg name      "$env_name" \
+                --arg target    "$target" \
+                --arg namespace "$_ns_val" \
+                --arg strategy  "$_strat_val" \
+                '{name: $name, target: $target, namespace: ( if $namespace != "" then $namespace else null end )}
+                 + ( if $strategy != "" then { strategy: $strategy } else {} end )')"
+            _business_envs_json="$(jq -nc \
+                --argjson arr "$_business_envs_json" \
+                --argjson obj "$_env_obj" \
+                '$arr + [$obj]')"
+        fi
 
         local deploy_args=(--target "$target" --env "$env_name")
         local _v
@@ -152,10 +174,13 @@ stages.deploy() {
         "$_deploy_fn" "${deploy_args[@]}" || ((deploy_failed++))
     done <<< "$BRIK_DEPLOY_ENVIRONMENTS"
 
+    if command -v jq >/dev/null 2>&1 && [[ "$_business_envs_json" != "[]" ]]; then
+        report.record_object "deploy" "business" "environments" "$_business_envs_json" 2>/dev/null || true
+    fi
+
     if [[ $deploy_failed -gt 0 ]]; then
         return "$BRIK_EXIT_FAILURE"
     fi
 
-    # pipeline.run records tech.status=success from rc (see commit cf719f5).
     return 0
 }
