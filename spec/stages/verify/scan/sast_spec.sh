@@ -187,6 +187,8 @@ Describe "security/sast.sh"
         mock.create_logging "semgrep" "$MOCK_LOG"
         ln -sf "$(command -v bash)" "${MOCK_BIN}/bash"
         ln -sf "$(command -v grep)" "${MOCK_BIN}/grep"
+        ln -sf "$(command -v mkdir)" "${MOCK_BIN}/mkdir"
+        ln -sf "$(command -v dirname)" "${MOCK_BIN}/dirname"
         mock.isolate
       }
       cleanup_auto() {

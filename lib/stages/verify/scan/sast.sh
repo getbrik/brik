@@ -17,13 +17,23 @@ brik.use verify.scan._scan
 # exit non-zero so the stage can surface security issues. --severity bounds
 # which findings count as blocking. Setting BRIK_SECURITY_SAST_SEVERITY=ALL
 # disables the severity filter so any finding (INFO/WARNING/ERROR) blocks.
+#
+# --sarif --output writes the canonical SARIF 2.1.0 report alongside the
+# stderr summary. The L4 lib/stages/sast.sh aggregator reads this file to
+# populate business.findings.{total, by_severity, cwe} in the pipeline
+# report. mkdir -p ensures the destination exists even when no upstream
+# stage produced it.
 _verify.scan.sast._build_command() {
     local ruleset="${BRIK_SECURITY_SAST_RULESET:-auto}"
     local severity="${BRIK_SECURITY_SAST_SEVERITY:-ERROR}"
+    local out="${BRIK_SECURITY_SAST_OUTPUT_PATH:-target/sast.sarif}"
+    local out_dir; out_dir="$(dirname "$out")"
     if [[ "$severity" == "ALL" ]]; then
-        printf 'semgrep scan --error --config %s .' "$ruleset"
+        printf 'mkdir -p %s && semgrep scan --error --config %s --sarif --output %s .' \
+            "$out_dir" "$ruleset" "$out"
     else
-        printf 'semgrep scan --error --severity %s --config %s .' "$severity" "$ruleset"
+        printf 'mkdir -p %s && semgrep scan --error --severity %s --config %s --sarif --output %s .' \
+            "$out_dir" "$severity" "$ruleset" "$out"
     fi
 }
 
