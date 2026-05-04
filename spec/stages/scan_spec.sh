@@ -1,8 +1,12 @@
+#shellcheck shell=bash disable=SC2148,SC2317,SC2329
+
 Describe "stages.scan"
   Include "$BRIK_HOME/lib/pipeline/stage.sh"
   Include "$BRIK_HOME/lib/pipeline/loader.sh"
   Include "$BRIK_HOME/lib/pipeline/report.sh"
   Include "$BRIK_HOME/lib/transverse/config.sh"
+  Include "$BRIK_HOME/lib/transverse/sarif.sh"
+  Include "$BRIK_HOME/lib/transverse/sbom.sh"
   Include "$BRIK_HOME/lib/stages/verify/scan/scan.sh"
   Include "$BRIK_HOME/lib/stages/scan.sh"
 
@@ -268,6 +272,159 @@ YAML
       When call run_both_fail
       The status should equal 10
       The error should be present
+    End
+  End
+
+  Describe "business.* aggregation from target/{scan,secret}.sarif and target/sbom.cdx.json"
+    read_scan_business_json() {
+      local key="$1"
+      jq -c --arg k "$key" \
+        '.stages[] | select(.name == "scan") | .business[$k] // empty' \
+        "$BRIK_LOG_DIR/pipeline-report.json" 2>/dev/null
+    }
+
+    setup_scan_with_artifacts() {
+      mkdir -p "$BRIK_WORKSPACE/target"
+    }
+    Before 'setup_scan_with_artifacts'
+
+    It "records business.deps.vulnerabilities.total from scan SARIF"
+      run_total() {
+        cp "${BRIK_HOME}/spec/fixtures/sarif/osv-scanner.sarif" "$BRIK_WORKSPACE/target/scan.sarif"
+        verify.scan.run() { return 0; }
+        brik.use() { :; }
+        local ctx
+        ctx="$(context.create "scan")" 2>/dev/null || ctx="$(mktemp)"
+        stages.scan "$ctx" >/dev/null 2>&1
+        read_scan_business_json "deps" | jq -r '.vulnerabilities.total'
+      }
+      When call run_total
+      The output should equal "1"
+    End
+
+    It "records business.deps.vulnerabilities.by_severity from scan SARIF"
+      run_sev() {
+        cp "${BRIK_HOME}/spec/fixtures/sarif/osv-scanner.sarif" "$BRIK_WORKSPACE/target/scan.sarif"
+        verify.scan.run() { return 0; }
+        brik.use() { :; }
+        local ctx
+        ctx="$(context.create "scan")" 2>/dev/null || ctx="$(mktemp)"
+        stages.scan "$ctx" >/dev/null 2>&1
+        read_scan_business_json "deps" | jq -c '.vulnerabilities.by_severity'
+      }
+      When call run_sev
+      The output should equal '{"critical":0,"high":0,"medium":1,"low":0,"info":0}'
+    End
+
+    It "records business.deps.affected_packages from CycloneDX SBOM"
+      run_pkg() {
+        cp "${BRIK_HOME}/spec/fixtures/sarif/osv-scanner.sarif" "$BRIK_WORKSPACE/target/scan.sarif"
+        cp "${BRIK_HOME}/spec/fixtures/sbom/osv-scanner.cdx.json" "$BRIK_WORKSPACE/target/sbom.cdx.json"
+        verify.scan.run() { return 0; }
+        brik.use() { :; }
+        local ctx
+        ctx="$(context.create "scan")" 2>/dev/null || ctx="$(mktemp)"
+        stages.scan "$ctx" >/dev/null 2>&1
+        read_scan_business_json "deps" | jq -r '.affected_packages'
+      }
+      When call run_pkg
+      The output should equal "1"
+    End
+
+    It "records business.deps.sbom_path when SBOM is present"
+      run_sbom_path() {
+        cp "${BRIK_HOME}/spec/fixtures/sarif/osv-scanner.sarif" "$BRIK_WORKSPACE/target/scan.sarif"
+        cp "${BRIK_HOME}/spec/fixtures/sbom/osv-scanner.cdx.json" "$BRIK_WORKSPACE/target/sbom.cdx.json"
+        verify.scan.run() { return 0; }
+        brik.use() { :; }
+        local ctx
+        ctx="$(context.create "scan")" 2>/dev/null || ctx="$(mktemp)"
+        stages.scan "$ctx" >/dev/null 2>&1
+        read_scan_business_json "deps" | jq -r '.sbom_path'
+      }
+      When call run_sbom_path
+      The output should equal "target/sbom.cdx.json"
+    End
+
+    It "records business.secret.findings_count from secret SARIF"
+      run_secret_count() {
+        cp "${BRIK_HOME}/spec/fixtures/sarif/gitleaks.sarif" "$BRIK_WORKSPACE/target/secret.sarif"
+        verify.scan.run() { return 0; }
+        brik.use() { :; }
+        local ctx
+        ctx="$(context.create "scan")" 2>/dev/null || ctx="$(mktemp)"
+        stages.scan "$ctx" >/dev/null 2>&1
+        read_scan_business_json "secret" | jq -r '.findings_count'
+      }
+      When call run_secret_count
+      The output should equal "1"
+    End
+
+    It "records business.secret.report = {format, path}"
+      run_secret_report() {
+        cp "${BRIK_HOME}/spec/fixtures/sarif/gitleaks.sarif" "$BRIK_WORKSPACE/target/secret.sarif"
+        verify.scan.run() { return 0; }
+        brik.use() { :; }
+        local ctx
+        ctx="$(context.create "scan")" 2>/dev/null || ctx="$(mktemp)"
+        stages.scan "$ctx" >/dev/null 2>&1
+        read_scan_business_json "secret" | jq -c '.report'
+      }
+      When call run_secret_report
+      The output should equal '{"format":"sarif","path":"target/secret.sarif"}'
+    End
+
+    It "records business.report rollup pointing at target/scan.sarif"
+      run_rollup() {
+        cp "${BRIK_HOME}/spec/fixtures/sarif/osv-scanner.sarif" "$BRIK_WORKSPACE/target/scan.sarif"
+        verify.scan.run() { return 0; }
+        brik.use() { :; }
+        local ctx
+        ctx="$(context.create "scan")" 2>/dev/null || ctx="$(mktemp)"
+        stages.scan "$ctx" >/dev/null 2>&1
+        read_scan_business_json "report"
+      }
+      When call run_rollup
+      The output should equal '{"format":"sarif","path":"target/scan.sarif"}'
+    End
+
+    It "honors security.deps.output_path when set"
+      run_custom_deps_path() {
+        cat > "$BRIK_CONFIG_FILE" <<'YAML'
+version: 1
+project:
+  name: test
+  stack: node
+security:
+  deps:
+    output_path: build/scan/deps.sarif
+YAML
+        config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
+        mkdir -p "$BRIK_WORKSPACE/build/scan"
+        cp "${BRIK_HOME}/spec/fixtures/sarif/osv-scanner.sarif" "$BRIK_WORKSPACE/build/scan/deps.sarif"
+        verify.scan.run() { return 0; }
+        brik.use() { :; }
+        local ctx
+        ctx="$(context.create "scan")" 2>/dev/null || ctx="$(mktemp)"
+        stages.scan "$ctx" >/dev/null 2>&1
+        read_scan_business_json "report" | jq -r '.path'
+      }
+      When call run_custom_deps_path
+      The output should equal "build/scan/deps.sarif"
+    End
+
+    It "omits business.* entirely when no SARIF or SBOM was produced"
+      run_no_artifacts() {
+        verify.scan.run() { return 0; }
+        brik.use() { :; }
+        local ctx
+        ctx="$(context.create "scan")" 2>/dev/null || ctx="$(mktemp)"
+        stages.scan "$ctx" >/dev/null 2>&1
+        jq -c '.stages[] | select(.name == "scan") | .business // {}' \
+          "$BRIK_LOG_DIR/pipeline-report.json" 2>/dev/null
+      }
+      When call run_no_artifacts
+      The output should equal "{}"
     End
   End
 End

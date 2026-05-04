@@ -354,6 +354,32 @@
               "description": "Dependency scanning tool to use (e.g. npm-audit, pip-audit, osv-scanner).",
               "type": "string",
               "minLength": 1
+            },
+            "output_path": {
+              "description": "Path (relative to the workspace) where the dependency scan SARIF report is written. Defaults to target/scan.sarif.",
+              "type": "string",
+              "minLength": 1
+            },
+            "sbom": {
+              "description": "Software Bill of Materials configuration emitted alongside the dependency scan.",
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": {
+                  "description": "Whether to produce an SBOM during the scan stage.",
+                  "type": "boolean"
+                },
+                "format": {
+                  "description": "SBOM serialization format. Currently only CycloneDX 1.5 JSON is supported.",
+                  "type": "string",
+                  "enum": ["cyclonedx-1-5"]
+                },
+                "output_path": {
+                  "description": "Path (relative to the workspace) where the SBOM is written. Defaults to target/sbom.cdx.json.",
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
             }
           }
         },
@@ -369,6 +395,11 @@
             },
             "tool": {
               "description": "Secret scanning tool to use (e.g. gitleaks, trufflehog).",
+              "type": "string",
+              "minLength": 1
+            },
+            "output_path": {
+              "description": "Path (relative to the workspace) where the secret scan SARIF report is written. Defaults to target/secret.sarif.",
               "type": "string",
               "minLength": 1
             }

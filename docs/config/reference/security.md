@@ -41,6 +41,8 @@ override) to decide what fails the build.
 | `security.deps.command` | string | -- | Dependency scan command. Overrides tool-based scanning (Tier 1). |
 | `security.deps.severity` | enum (`critical`, `high`, `medium`, `low`) | -- | Minimum severity level that causes the dependency scan to fail. |
 | `security.deps.tool` | string | -- | Dependency scanning tool to use (e.g. npm-audit, pip-audit, osv-scanner). |
+| `security.deps.output_path` | string | -- | Path (relative to the workspace) where the dependency scan SARIF report is written. Defaults to target/scan.sarif. |
+| `security.deps.sbom` | object | -- | Software Bill of Materials configuration emitted alongside the dependency scan. |
 
 ### `security.secrets`
 
@@ -48,6 +50,7 @@ override) to decide what fails the build.
 |-------|------|---------|-------------|
 | `security.secrets.command` | string | -- | Secret scan command to execute. |
 | `security.secrets.tool` | string | -- | Secret scanning tool to use (e.g. gitleaks, trufflehog). |
+| `security.secrets.output_path` | string | -- | Path (relative to the workspace) where the secret scan SARIF report is written. Defaults to target/secret.sarif. |
 
 ### `security.license`
 

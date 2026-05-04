@@ -344,12 +344,22 @@ config.export_security_vars() {
     [[ -n "$deps_severity" ]] && export BRIK_SECURITY_DEPS_SEVERITY="$deps_severity"
     local deps_cmd; deps_cmd="$(config.get '.security.deps.command' '')"
     [[ -n "$deps_cmd" ]] && export BRIK_SECURITY_DEPS_COMMAND="$deps_cmd"
+    local deps_output_path; deps_output_path="$(config.get '.security.deps.output_path' '')"
+    [[ -n "$deps_output_path" ]] && export BRIK_SECURITY_DEPS_OUTPUT_PATH="$deps_output_path"
+    local sbom_enabled; sbom_enabled="$(config.get '.security.deps.sbom.enabled' '')"
+    [[ -n "$sbom_enabled" ]] && export BRIK_SECURITY_DEPS_SBOM_ENABLED="$sbom_enabled"
+    local sbom_format; sbom_format="$(config.get '.security.deps.sbom.format' '')"
+    [[ -n "$sbom_format" ]] && export BRIK_SECURITY_DEPS_SBOM_FORMAT="$sbom_format"
+    local sbom_output_path; sbom_output_path="$(config.get '.security.deps.sbom.output_path' '')"
+    [[ -n "$sbom_output_path" ]] && export BRIK_SECURITY_DEPS_SBOM_OUTPUT_PATH="$sbom_output_path"
 
     # Secrets
     local secrets_tool; secrets_tool="$(config.get '.security.secrets.tool' '')"
     [[ -n "$secrets_tool" ]] && export BRIK_SECURITY_SECRETS_TOOL="$secrets_tool"
     local secrets_cmd; secrets_cmd="$(config.get '.security.secrets.command' '')"
     [[ -n "$secrets_cmd" ]] && export BRIK_SECURITY_SECRETS_COMMAND="$secrets_cmd"
+    local secrets_output_path; secrets_output_path="$(config.get '.security.secrets.output_path' '')"
+    [[ -n "$secrets_output_path" ]] && export BRIK_SECURITY_SECRETS_OUTPUT_PATH="$secrets_output_path"
 
     # License
     local license_allowed; license_allowed="$(config.get '.security.license.allowed' '')"
