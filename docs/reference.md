@@ -295,7 +295,7 @@ hooks:
 
 Opt-in contract for producing coverage and JUnit XML reports during
 the test stage. When enabled, Brik injects framework-specific flags
-into the test command so `coverage/` and `reports/junit.xml` are
+into the test command so `brik-artifacts/test/coverage/` and `brik-artifacts/test/junit.xml` are
 populated and surfaced as CI artefacts (GitLab `coverage_report` /
 `junit` reports, Jenkins JUnit plugin).
 
@@ -303,8 +303,8 @@ populated and surfaced as CI artefacts (GitLab `coverage_report` /
 |-----|------|----------|---------|-------------|
 | `test.reports.enabled` | boolean | no | `false` | Single master switch for both coverage and JUnit emission. When false, the test runner uses its native defaults (no coverage, no JUnit). |
 | `test.reports.coverage.format` | enum | no | `auto` | One of `lcov`, `cobertura`, `jacoco`, `auto`. `auto` picks the native format per stack: lcov for node/rust, cobertura for python/dotnet, jacoco for java. |
-| `test.reports.coverage.output_dir` | string | no | `coverage` | Directory where the coverage report is written. |
-| `test.reports.junit.output_path` | string | no | `reports/junit.xml` | Path where the JUnit XML file is written. |
+| `test.reports.coverage.output_dir` | string | no | `brik-artifacts/test/coverage` | Directory where the coverage report is written. |
+| `test.reports.junit.output_path` | string | no | `brik-artifacts/test/junit.xml` | Path where the JUnit XML file is written. |
 
 The configured paths are exposed to downstream stages via four
 `brik-init.env` variables (`BRIK_TEST_REPORTS_ENABLED`,
@@ -352,7 +352,7 @@ auto-detect, where the user did not declare an explicit intent.
 
 ##### Lint stage status semantics
 
-`pipeline-report.json` records `stages.lint.tech.status` with one
+`aggregate-report.json` records `stages.lint.tech.status` with one
 of five values:
 
 | Status | Meaning | Stage exit code |
@@ -637,7 +637,7 @@ Bash Runtime (Layer 0) independently of the `hooks` section in `brik.yml`.
 
 ## Pipeline Report Fields
 
-Every pipeline run produces `pipeline-report.json` (and a Markdown rendering)
+Every pipeline run produces `aggregate-report.json` (and a Markdown rendering)
 under `${BRIK_LOG_DIR}` (local mode) or `${BRIK_WORKSPACE}/brik-artifacts/`
 (CI mode). The aggregator schema is locked at `schema_version: "1.0"` and
 opens both `tech` and `business` to `additionalProperties: true`, so the
@@ -727,10 +727,10 @@ fields (`stage`, `status`, `rc`, `runner`, `duration_ms`, `timestamp`).
 | `business.violations.total` | int | `sarif.count_total` summed across present per-check SARIF files |
 | `business.violations.by_severity` | object | `{critical, high, medium, low, info}` summed across files |
 | `business.violations.by_check` | object | per-check totals, e.g. `{lint: 5, format: 6}` |
-| `business.report` | object | `{format: "sarif", path: "target/lint.sarif"}` rollup pointer |
+| `business.report` | object | `{format: "sarif", path: "brik-artifacts/lint/lint.sarif"}` rollup pointer |
 | `business.fix_applied` | bool | `BRIK_QUALITY_LINT_FIX` (`true` only when `--fix` ran) |
 
-The lint stage scans `${BRIK_WORKSPACE}/target/<check>.sarif` for each
+The lint stage scans `${BRIK_WORKSPACE}/brik-artifacts/lint/<check>.sarif` for each
 configured check. Tools without native SARIF support require a converter
 from `lib/transverse/sarif.sh` (`sarif.from_prettier`, `sarif.from_tsc`,
 `sarif.from_dotnet_format`). When no SARIF is produced, `business.*` is
@@ -742,10 +742,10 @@ omitted (backward compatible).
 |---|---|---|
 | `tech.tool` | string | `.security.sast.tool` (default `semgrep`) |
 | `tech.ruleset` | string | `.security.sast.ruleset` |
-| `business.findings.total` | int | `sarif.count_total target/sast.sarif` |
+| `business.findings.total` | int | `sarif.count_total brik-artifacts/sast/sast.sarif` |
 | `business.findings.by_severity` | object | `{critical, high, medium, low, info}` |
 | `business.findings.cwe` | array | sorted, deduped CWE identifiers extracted from rule tags |
-| `business.report` | object | `{format: "sarif", path: <BRIK_SECURITY_SAST_OUTPUT_PATH or target/sast.sarif>}` |
+| `business.report` | object | `{format: "sarif", path: <BRIK_SECURITY_SAST_OUTPUT_PATH or brik-artifacts/sast/sast.sarif>}` |
 
 Configured via `security.sast.{output_format, output_path}`.
 
@@ -756,10 +756,10 @@ Configured via `security.sast.{output_format, output_path}`.
 | `tech.deps.tool` | string | `.security.deps.tool` (default `osv-scanner`) |
 | `tech.secret.tool` | string | `.security.secrets.tool` (default `gitleaks`) |
 | `tech.severity_threshold` | string | `.security.deps.severity` or global default |
-| `business.deps.vulnerabilities.{total, by_severity}` | object | parsed from `target/scan.sarif` |
-| `business.deps.affected_packages` | int | `sbom.vuln_count` (or `sbom.component_count` fallback) on `target/sbom.cdx.json` |
+| `business.deps.vulnerabilities.{total, by_severity}` | object | parsed from `brik-artifacts/scan/deps.sarif` |
+| `business.deps.affected_packages` | int | `sbom.vuln_count` (or `sbom.component_count` fallback) on `brik-artifacts/scan/sbom.cdx.json` |
 | `business.deps.sbom_path` | string | path to the CycloneDX 1.5 file (when produced) |
-| `business.secret.findings_count` | int | `sarif.count_total target/secret.sarif` |
+| `business.secret.findings_count` | int | `sarif.count_total brik-artifacts/scan/secret.sarif` |
 | `business.secret.report` | object | `{format: "sarif", path: ...}` |
 | `business.report` | object | rollup pointer to the deps SARIF |
 
@@ -824,7 +824,7 @@ actually executed.
 #### `notify`
 
 `notify` is a meta-stage that produces the report itself; its content is
-intentionally excluded from `pipeline-report.json` to avoid a double-pass
+intentionally excluded from `aggregate-report.json` to avoid a double-pass
 aggregation. The notify job's own job log (Slack / email / webhook
 delivery confirmations) remains the source of truth for notification
 outcomes.

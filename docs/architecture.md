@@ -239,8 +239,8 @@ stage.run("build", stages.build)
   │
   ├─ summary.build             # Generate stage summary
   ├─ _stage._finalize_fragment # Record tech.{duration_ms,exit_code,status}
-  │                            #   into pipeline-report.json + emit per-stage
-  │                            #   fragment to brik-artifacts/<stage>.json
+  │                            #   into aggregate-report.json + emit per-stage
+  │                            #   fragment to brik-artifacts/<stage>/<stage>.json
   │                            #   (skip when BRIK_DISABLE_REPORT_FRAGMENTS=1)
   ├─ stage.cleanup             # Remove temp files
   │
@@ -249,23 +249,23 @@ stage.run("build", stages.build)
 
 ### Pipeline report in CI mode
 
-The fragment / aggregate split makes `pipeline-report.{md,json}` work
+The fragment / aggregate split makes `aggregate-report.{md,json}` work
 identically in local mode and multi-container CI:
 
 - **Local mode** (`brik run pipeline`). One process, one `$BRIK_LOG_DIR`.
   `pipeline.run` calls `report.init`, every stage records into the same
-  `pipeline-report.json` backend, and `report.render` produces the final
+  `aggregate-report.json` backend, and `report.render` produces the final
   Markdown / JSON pair. Each `stage.run` invocation also writes a
-  `brik-artifacts/<stage>.json` fragment (harmless side effect, used as
+  `brik-artifacts/<stage>/<stage>.json` fragment (harmless side effect, used as
   CI artifact when the same workspace is uploaded).
 - **CI mode** (GitLab, Jenkins). Each stage runs in its own container with
   its own `$BRIK_LOG_DIR`. The runtime cannot share the JSON backend across
-  containers, so each stage ships `brik-artifacts/<stage>.json` as a job
+  containers, so each stage ships `brik-artifacts/<stage>/<stage>.json` as a job
   artifact (GitLab `artifacts.paths`) or stash (Jenkins). The Notify job
   declares `needs: artifacts: true` (or `unstash`-es each upstream stash),
   invokes `stages.notify`, which detects "CI aggregation mode" by the
   presence of valid fragments and calls `report.aggregate_fragments` to
-  merge them into the canonical `pipeline-report.{md,json}` before printing
+  merge them into the canonical `aggregate-report.{md,json}` before printing
   / archiving.
 
 Fragments and aggregate are versioned. Both schemas live under
