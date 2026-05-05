@@ -26,7 +26,7 @@ brik.use verify.scan._scan
 _verify.scan.sast._build_command() {
     local ruleset="${BRIK_SECURITY_SAST_RULESET:-auto}"
     local severity="${BRIK_SECURITY_SAST_SEVERITY:-ERROR}"
-    local out="${BRIK_SECURITY_SAST_OUTPUT_PATH:-target/sast.sarif}"
+    local out="${BRIK_SECURITY_SAST_OUTPUT_PATH:-brik-artifacts/sast/sast.sarif}"
     local out_dir; out_dir="$(dirname "$out")"
     if [[ "$severity" == "ALL" ]]; then
         printf 'mkdir -p %s && semgrep scan --error --config %s --sarif --output %s .' \

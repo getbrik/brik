@@ -62,7 +62,7 @@ stages.sast() {
 
     # Pipeline-report business.* enrichment (chantier 20260502 L2.C.3 absorbed
     # into L4): aggregate the SARIF report produced under
-    # ${BRIK_WORKSPACE}/${BRIK_SECURITY_SAST_OUTPUT_PATH:-target/sast.sarif}
+    # ${BRIK_WORKSPACE}/${BRIK_SECURITY_SAST_OUTPUT_PATH:-brik-artifacts/sast/sast.sarif}
     # into business.findings.{total, by_severity, cwe} + business.report.
     _sast._record_business 2>/dev/null || true
 
@@ -75,7 +75,7 @@ stages.sast() {
 _sast._record_business() {
     command -v jq >/dev/null 2>&1 || return 0
 
-    local _path="${BRIK_SECURITY_SAST_OUTPUT_PATH:-target/sast.sarif}"
+    local _path="${BRIK_SECURITY_SAST_OUTPUT_PATH:-brik-artifacts/sast/sast.sarif}"
     local _file="${BRIK_WORKSPACE:-.}/${_path}"
     [[ -f "$_file" ]] || return 0
 

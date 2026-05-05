@@ -15,7 +15,7 @@ stages.lint() {
 
     config.export_quality_vars
 
-    # Status semantics in pipeline-report.json:
+    # Status semantics in aggregate-report.json:
     #   - skipped        : tool configured but expected config absent (set
     #                      by verify.lint.run on Tier 3 fall-through), or
     #                      user opted out outside a release context (in
@@ -97,7 +97,7 @@ stages.lint() {
 
     # Pipeline-report business.* enrichment (chantier 20260502 L2.C.3 absorbed
     # into L4): aggregate any per-check SARIF outputs the verify helpers
-    # produced under ${BRIK_WORKSPACE}/target/<check>.sarif into the canonical
+    # produced under ${BRIK_WORKSPACE}/brik-artifacts/lint/<check>.sarif into the canonical
     # business.violations.{total, by_severity, by_check} object.
     _lint._record_business "${checks[@]}" 2>/dev/null || true
 
@@ -107,14 +107,14 @@ stages.lint() {
 # Aggregate per-check SARIF outputs into business.violations + business.report
 # + business.fix_applied. No-op when the sarif transverse module is missing,
 # jq is missing, or no per-check SARIF files exist under ${BRIK_WORKSPACE}/
-# target/.
+# brik-artifacts/lint/.
 _lint._record_business() {
     local _checks=( "$@" )
     [[ ${#_checks[@]} -gt 0 ]] || return 0
     command -v jq >/dev/null 2>&1 || return 0
 
-    local _target_dir="${BRIK_WORKSPACE:-.}/target"
-    [[ -d "$_target_dir" ]] || return 0
+    local _artifacts_dir="${BRIK_WORKSPACE:-.}/brik-artifacts/lint"
+    [[ -d "$_artifacts_dir" ]] || return 0
 
     if ! declare -f sarif.count_total >/dev/null 2>&1; then
         brik.use transverse.sarif 2>/dev/null || return 0
@@ -122,7 +122,7 @@ _lint._record_business() {
 
     local _check _file _present_checks=() _present_files=()
     for _check in "${_checks[@]}"; do
-        _file="${_target_dir}/${_check}.sarif"
+        _file="${_artifacts_dir}/${_check}.sarif"
         if [[ -f "$_file" ]]; then
             _present_checks+=( "$_check" )
             _present_files+=( "$_file" )
@@ -166,7 +166,7 @@ _lint._record_business() {
     report.record_object "lint" "business" "violations" "$_violations_obj" 2>/dev/null || true
 
     report.record_object "lint" "business" "report" \
-        '{"format":"sarif","path":"target/lint.sarif"}' 2>/dev/null || true
+        '{"format":"sarif","path":"brik-artifacts/lint/lint.sarif"}' 2>/dev/null || true
 
     local _fix
     case "${BRIK_QUALITY_LINT_FIX:-false}" in

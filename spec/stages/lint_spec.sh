@@ -40,14 +40,14 @@ Describe "stages.lint"
   # Prints the status (or empty string if none) on stdout.
   read_lint_status() {
     jq -r '.stages[] | select(.name == "lint") | .tech.status // empty' \
-      "$BRIK_LOG_DIR/pipeline-report.json" 2>/dev/null
+      "$BRIK_LOG_DIR/aggregate-report.json" 2>/dev/null
   }
 
   read_lint_tech_json() {
     local key="$1"
     jq -c --arg k "$key" \
       '.stages[] | select(.name == "lint") | .tech[$k] // empty' \
-      "$BRIK_LOG_DIR/pipeline-report.json" 2>/dev/null
+      "$BRIK_LOG_DIR/aggregate-report.json" 2>/dev/null
   }
 
   It "is callable as a function"
@@ -237,7 +237,7 @@ YAML
         ctx="$(context.create "lint")" 2>/dev/null || ctx="$(mktemp)"
         stages.lint "$ctx" >/dev/null 2>&1 || true
         jq -r '.stages[] | select(.name=="lint") | .tech.warning' \
-            "$BRIK_LOG_DIR/pipeline-report.json"
+            "$BRIK_LOG_DIR/aggregate-report.json"
       }
       When call run_lint_disabled_warning
       The output should equal "true"
@@ -399,12 +399,12 @@ YAML
     End
   End
 
-  Describe "business.* aggregation from target/<check>.sarif"
+  Describe "business.* aggregation from brik-artifacts/lint/<check>.sarif"
     read_lint_business_json() {
       local key="$1"
       jq -c --arg k "$key" \
         '.stages[] | select(.name == "lint") | .business[$k] // empty' \
-        "$BRIK_LOG_DIR/pipeline-report.json" 2>/dev/null
+        "$BRIK_LOG_DIR/aggregate-report.json" 2>/dev/null
     }
 
     setup_lint_with_sarif() {
@@ -423,14 +423,14 @@ quality:
     command: "true"
 YAML
       config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
-      mkdir -p "$BRIK_WORKSPACE/target"
+      mkdir -p "$BRIK_WORKSPACE/brik-artifacts/lint"
     }
     Before 'setup_lint_with_sarif'
 
     It "records business.violations.total summed across present per-check files"
       run_total() {
-        cp "${BRIK_HOME}/spec/fixtures/sarif/eslint.sarif"   "$BRIK_WORKSPACE/target/lint.sarif"
-        cp "${BRIK_HOME}/spec/fixtures/sarif/eslint.sarif"   "$BRIK_WORKSPACE/target/format.sarif"
+        cp "${BRIK_HOME}/spec/fixtures/sarif/eslint.sarif"   "$BRIK_WORKSPACE/brik-artifacts/lint/lint.sarif"
+        cp "${BRIK_HOME}/spec/fixtures/sarif/eslint.sarif"   "$BRIK_WORKSPACE/brik-artifacts/lint/format.sarif"
         brik.use() { :; }
         verify.run() { return 0; }
         local ctx
@@ -444,7 +444,7 @@ YAML
 
     It "records business.violations.by_severity summed across files"
       run_sev() {
-        cp "${BRIK_HOME}/spec/fixtures/sarif/eslint.sarif" "$BRIK_WORKSPACE/target/lint.sarif"
+        cp "${BRIK_HOME}/spec/fixtures/sarif/eslint.sarif" "$BRIK_WORKSPACE/brik-artifacts/lint/lint.sarif"
         brik.use() { :; }
         verify.run() { return 0; }
         local ctx
@@ -458,8 +458,8 @@ YAML
 
     It "records business.violations.by_check keyed by configured checks"
       run_by_check() {
-        cp "${BRIK_HOME}/spec/fixtures/sarif/eslint.sarif" "$BRIK_WORKSPACE/target/lint.sarif"
-        cp "${BRIK_HOME}/spec/fixtures/sarif/ruff.sarif"   "$BRIK_WORKSPACE/target/format.sarif"
+        cp "${BRIK_HOME}/spec/fixtures/sarif/eslint.sarif" "$BRIK_WORKSPACE/brik-artifacts/lint/lint.sarif"
+        cp "${BRIK_HOME}/spec/fixtures/sarif/ruff.sarif"   "$BRIK_WORKSPACE/brik-artifacts/lint/format.sarif"
         brik.use() { :; }
         verify.run() { return 0; }
         local ctx
@@ -473,7 +473,7 @@ YAML
 
     It "records business.report = {format, path}"
       run_report() {
-        cp "${BRIK_HOME}/spec/fixtures/sarif/eslint.sarif" "$BRIK_WORKSPACE/target/lint.sarif"
+        cp "${BRIK_HOME}/spec/fixtures/sarif/eslint.sarif" "$BRIK_WORKSPACE/brik-artifacts/lint/lint.sarif"
         brik.use() { :; }
         verify.run() { return 0; }
         local ctx
@@ -482,19 +482,19 @@ YAML
         read_lint_business_json "report"
       }
       When call run_report
-      The output should equal '{"format":"sarif","path":"target/lint.sarif"}'
+      The output should equal '{"format":"sarif","path":"brik-artifacts/lint/lint.sarif"}'
     End
 
     It "records business.fix_applied=false by default"
       run_fix_default() {
-        cp "${BRIK_HOME}/spec/fixtures/sarif/eslint.sarif" "$BRIK_WORKSPACE/target/lint.sarif"
+        cp "${BRIK_HOME}/spec/fixtures/sarif/eslint.sarif" "$BRIK_WORKSPACE/brik-artifacts/lint/lint.sarif"
         brik.use() { :; }
         verify.run() { return 0; }
         local ctx
         ctx="$(context.create "lint")" 2>/dev/null || ctx="$(mktemp)"
         stages.lint "$ctx" >/dev/null 2>&1
         jq -r '.stages[] | select(.name == "lint") | (.business.fix_applied | tostring)' \
-          "$BRIK_LOG_DIR/pipeline-report.json" 2>/dev/null
+          "$BRIK_LOG_DIR/aggregate-report.json" 2>/dev/null
       }
       When call run_fix_default
       The output should equal "false"
@@ -503,14 +503,14 @@ YAML
     It "records business.fix_applied=true when BRIK_QUALITY_LINT_FIX=true"
       run_fix_set() {
         export BRIK_QUALITY_LINT_FIX=true
-        cp "${BRIK_HOME}/spec/fixtures/sarif/eslint.sarif" "$BRIK_WORKSPACE/target/lint.sarif"
+        cp "${BRIK_HOME}/spec/fixtures/sarif/eslint.sarif" "$BRIK_WORKSPACE/brik-artifacts/lint/lint.sarif"
         brik.use() { :; }
         verify.run() { return 0; }
         local ctx
         ctx="$(context.create "lint")" 2>/dev/null || ctx="$(mktemp)"
         stages.lint "$ctx" >/dev/null 2>&1
         jq -r '.stages[] | select(.name == "lint") | (.business.fix_applied | tostring)' \
-          "$BRIK_LOG_DIR/pipeline-report.json" 2>/dev/null
+          "$BRIK_LOG_DIR/aggregate-report.json" 2>/dev/null
       }
       When call run_fix_set
       The output should equal "true"
@@ -524,7 +524,7 @@ YAML
         ctx="$(context.create "lint")" 2>/dev/null || ctx="$(mktemp)"
         stages.lint "$ctx" >/dev/null 2>&1
         jq -c '.stages[] | select(.name == "lint") | .business // {}' \
-          "$BRIK_LOG_DIR/pipeline-report.json" 2>/dev/null
+          "$BRIK_LOG_DIR/aggregate-report.json" 2>/dev/null
       }
       When call run_no_sarif
       The output should equal "{}"

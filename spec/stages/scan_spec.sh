@@ -37,14 +37,14 @@ Describe "stages.scan"
     local key="$1"
     jq -r --arg k "$key" \
       '.stages[] | select(.name == "scan") | .tech[$k] // empty' \
-      "$BRIK_LOG_DIR/pipeline-report.json" 2>/dev/null
+      "$BRIK_LOG_DIR/aggregate-report.json" 2>/dev/null
   }
 
   read_scan_tech_json() {
     local key="$1"
     jq -c --arg k "$key" \
       '.stages[] | select(.name == "scan") | .tech[$k] // empty' \
-      "$BRIK_LOG_DIR/pipeline-report.json" 2>/dev/null
+      "$BRIK_LOG_DIR/aggregate-report.json" 2>/dev/null
   }
   Before 'setup_env'
   After 'cleanup_env'
@@ -275,22 +275,22 @@ YAML
     End
   End
 
-  Describe "business.* aggregation from target/{scan,secret}.sarif and target/sbom.cdx.json"
+  Describe "business.* aggregation from brik-artifacts/scan/{deps,secret}.sarif and sbom.cdx.json"
     read_scan_business_json() {
       local key="$1"
       jq -c --arg k "$key" \
         '.stages[] | select(.name == "scan") | .business[$k] // empty' \
-        "$BRIK_LOG_DIR/pipeline-report.json" 2>/dev/null
+        "$BRIK_LOG_DIR/aggregate-report.json" 2>/dev/null
     }
 
     setup_scan_with_artifacts() {
-      mkdir -p "$BRIK_WORKSPACE/target"
+      mkdir -p "$BRIK_WORKSPACE/brik-artifacts/scan"
     }
     Before 'setup_scan_with_artifacts'
 
     It "records business.deps.vulnerabilities.total from scan SARIF"
       run_total() {
-        cp "${BRIK_HOME}/spec/fixtures/sarif/osv-scanner.sarif" "$BRIK_WORKSPACE/target/scan.sarif"
+        cp "${BRIK_HOME}/spec/fixtures/sarif/osv-scanner.sarif" "$BRIK_WORKSPACE/brik-artifacts/scan/deps.sarif"
         verify.scan.run() { return 0; }
         brik.use() { :; }
         local ctx
@@ -304,7 +304,7 @@ YAML
 
     It "records business.deps.vulnerabilities.by_severity from scan SARIF"
       run_sev() {
-        cp "${BRIK_HOME}/spec/fixtures/sarif/osv-scanner.sarif" "$BRIK_WORKSPACE/target/scan.sarif"
+        cp "${BRIK_HOME}/spec/fixtures/sarif/osv-scanner.sarif" "$BRIK_WORKSPACE/brik-artifacts/scan/deps.sarif"
         verify.scan.run() { return 0; }
         brik.use() { :; }
         local ctx
@@ -318,8 +318,8 @@ YAML
 
     It "records business.deps.affected_packages from CycloneDX SBOM"
       run_pkg() {
-        cp "${BRIK_HOME}/spec/fixtures/sarif/osv-scanner.sarif" "$BRIK_WORKSPACE/target/scan.sarif"
-        cp "${BRIK_HOME}/spec/fixtures/sbom/osv-scanner.cdx.json" "$BRIK_WORKSPACE/target/sbom.cdx.json"
+        cp "${BRIK_HOME}/spec/fixtures/sarif/osv-scanner.sarif" "$BRIK_WORKSPACE/brik-artifacts/scan/deps.sarif"
+        cp "${BRIK_HOME}/spec/fixtures/sbom/osv-scanner.cdx.json" "$BRIK_WORKSPACE/brik-artifacts/scan/sbom.cdx.json"
         verify.scan.run() { return 0; }
         brik.use() { :; }
         local ctx
@@ -333,8 +333,8 @@ YAML
 
     It "records business.deps.sbom_path when SBOM is present"
       run_sbom_path() {
-        cp "${BRIK_HOME}/spec/fixtures/sarif/osv-scanner.sarif" "$BRIK_WORKSPACE/target/scan.sarif"
-        cp "${BRIK_HOME}/spec/fixtures/sbom/osv-scanner.cdx.json" "$BRIK_WORKSPACE/target/sbom.cdx.json"
+        cp "${BRIK_HOME}/spec/fixtures/sarif/osv-scanner.sarif" "$BRIK_WORKSPACE/brik-artifacts/scan/deps.sarif"
+        cp "${BRIK_HOME}/spec/fixtures/sbom/osv-scanner.cdx.json" "$BRIK_WORKSPACE/brik-artifacts/scan/sbom.cdx.json"
         verify.scan.run() { return 0; }
         brik.use() { :; }
         local ctx
@@ -343,12 +343,12 @@ YAML
         read_scan_business_json "deps" | jq -r '.sbom_path'
       }
       When call run_sbom_path
-      The output should equal "target/sbom.cdx.json"
+      The output should equal "brik-artifacts/scan/sbom.cdx.json"
     End
 
     It "records business.secret.findings_count from secret SARIF"
       run_secret_count() {
-        cp "${BRIK_HOME}/spec/fixtures/sarif/gitleaks.sarif" "$BRIK_WORKSPACE/target/secret.sarif"
+        cp "${BRIK_HOME}/spec/fixtures/sarif/gitleaks.sarif" "$BRIK_WORKSPACE/brik-artifacts/scan/secret.sarif"
         verify.scan.run() { return 0; }
         brik.use() { :; }
         local ctx
@@ -362,7 +362,7 @@ YAML
 
     It "records business.secret.report = {format, path}"
       run_secret_report() {
-        cp "${BRIK_HOME}/spec/fixtures/sarif/gitleaks.sarif" "$BRIK_WORKSPACE/target/secret.sarif"
+        cp "${BRIK_HOME}/spec/fixtures/sarif/gitleaks.sarif" "$BRIK_WORKSPACE/brik-artifacts/scan/secret.sarif"
         verify.scan.run() { return 0; }
         brik.use() { :; }
         local ctx
@@ -371,12 +371,12 @@ YAML
         read_scan_business_json "secret" | jq -c '.report'
       }
       When call run_secret_report
-      The output should equal '{"format":"sarif","path":"target/secret.sarif"}'
+      The output should equal '{"format":"sarif","path":"brik-artifacts/scan/secret.sarif"}'
     End
 
-    It "records business.report rollup pointing at target/scan.sarif"
+    It "records business.report rollup pointing at brik-artifacts/scan/deps.sarif"
       run_rollup() {
-        cp "${BRIK_HOME}/spec/fixtures/sarif/osv-scanner.sarif" "$BRIK_WORKSPACE/target/scan.sarif"
+        cp "${BRIK_HOME}/spec/fixtures/sarif/osv-scanner.sarif" "$BRIK_WORKSPACE/brik-artifacts/scan/deps.sarif"
         verify.scan.run() { return 0; }
         brik.use() { :; }
         local ctx
@@ -385,7 +385,7 @@ YAML
         read_scan_business_json "report"
       }
       When call run_rollup
-      The output should equal '{"format":"sarif","path":"target/scan.sarif"}'
+      The output should equal '{"format":"sarif","path":"brik-artifacts/scan/deps.sarif"}'
     End
 
     It "honors security.deps.output_path when set"
@@ -421,7 +421,7 @@ YAML
         ctx="$(context.create "scan")" 2>/dev/null || ctx="$(mktemp)"
         stages.scan "$ctx" >/dev/null 2>&1
         jq -c '.stages[] | select(.name == "scan") | .business // {}' \
-          "$BRIK_LOG_DIR/pipeline-report.json" 2>/dev/null
+          "$BRIK_LOG_DIR/aggregate-report.json" 2>/dev/null
       }
       When call run_no_artifacts
       The output should equal "{}"

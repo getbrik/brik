@@ -80,9 +80,9 @@ _scan._record_business() {
         || brik.use transverse.sbom 2>/dev/null || true
 
     local _ws="${BRIK_WORKSPACE:-.}"
-    local _deps_path="${BRIK_SECURITY_DEPS_OUTPUT_PATH:-target/scan.sarif}"
-    local _sbom_path="${BRIK_SECURITY_DEPS_SBOM_OUTPUT_PATH:-target/sbom.cdx.json}"
-    local _secret_path="${BRIK_SECURITY_SECRETS_OUTPUT_PATH:-target/secret.sarif}"
+    local _deps_path="${BRIK_SECURITY_DEPS_OUTPUT_PATH:-brik-artifacts/scan/deps.sarif}"
+    local _sbom_path="${BRIK_SECURITY_DEPS_SBOM_OUTPUT_PATH:-brik-artifacts/scan/sbom.cdx.json}"
+    local _secret_path="${BRIK_SECURITY_SECRETS_OUTPUT_PATH:-brik-artifacts/scan/secret.sarif}"
 
     local _deps_file="${_ws}/${_deps_path}"
     local _sbom_file="${_ws}/${_sbom_path}"

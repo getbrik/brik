@@ -74,7 +74,7 @@ verify.scan.secret.run() {
     log.info "security secret scan with $resolved"
     local platform sarif sarif_dir
     platform="$(_verify.scan.secret._gitleaks_platform)"
-    sarif="${BRIK_SECURITY_SECRETS_OUTPUT_PATH:-target/secret.sarif}"
+    sarif="${BRIK_SECURITY_SECRETS_OUTPUT_PATH:-brik-artifacts/scan/secret.sarif}"
     sarif_dir="$(dirname "$sarif")"
     (cd "$workspace" && transverse.tools.exec sec_secret "$resolved" \
         workspace="$workspace" platform="$platform" \

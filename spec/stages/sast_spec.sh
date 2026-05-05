@@ -37,7 +37,7 @@ Describe "stages.sast"
     local key="$1"
     jq -r --arg k "$key" \
       '.stages[] | select(.name == "sast") | .tech[$k] // empty' \
-      "$BRIK_LOG_DIR/pipeline-report.json" 2>/dev/null
+      "$BRIK_LOG_DIR/aggregate-report.json" 2>/dev/null
   }
   Before 'setup_env'
   After 'cleanup_env'
@@ -281,22 +281,22 @@ YAML
     End
   End
 
-  Describe "business.* aggregation from target/sast.sarif"
+  Describe "business.* aggregation from brik-artifacts/sast/sast.sarif"
     read_sast_business_json() {
       local key="$1"
       jq -c --arg k "$key" \
         '.stages[] | select(.name == "sast") | .business[$k] // empty' \
-        "$BRIK_LOG_DIR/pipeline-report.json" 2>/dev/null
+        "$BRIK_LOG_DIR/aggregate-report.json" 2>/dev/null
     }
 
     setup_sast_with_sarif() {
-      mkdir -p "$BRIK_WORKSPACE/target"
+      mkdir -p "$BRIK_WORKSPACE/brik-artifacts/sast"
     }
     Before 'setup_sast_with_sarif'
 
     It "records business.findings.total from semgrep SARIF"
       run_total() {
-        cp "${BRIK_HOME}/spec/fixtures/sarif/semgrep.sarif" "$BRIK_WORKSPACE/target/sast.sarif"
+        cp "${BRIK_HOME}/spec/fixtures/sarif/semgrep.sarif" "$BRIK_WORKSPACE/brik-artifacts/sast/sast.sarif"
         verify.scan.run() { return 0; }
         brik.use() { :; }
         local ctx
@@ -310,7 +310,7 @@ YAML
 
     It "records business.findings.by_severity from semgrep SARIF"
       run_sev() {
-        cp "${BRIK_HOME}/spec/fixtures/sarif/semgrep.sarif" "$BRIK_WORKSPACE/target/sast.sarif"
+        cp "${BRIK_HOME}/spec/fixtures/sarif/semgrep.sarif" "$BRIK_WORKSPACE/brik-artifacts/sast/sast.sarif"
         verify.scan.run() { return 0; }
         brik.use() { :; }
         local ctx
@@ -324,7 +324,7 @@ YAML
 
     It "records business.findings.cwe (sorted, deduped) from semgrep SARIF"
       run_cwe() {
-        cp "${BRIK_HOME}/spec/fixtures/sarif/semgrep.sarif" "$BRIK_WORKSPACE/target/sast.sarif"
+        cp "${BRIK_HOME}/spec/fixtures/sarif/semgrep.sarif" "$BRIK_WORKSPACE/brik-artifacts/sast/sast.sarif"
         verify.scan.run() { return 0; }
         brik.use() { :; }
         local ctx
@@ -338,7 +338,7 @@ YAML
 
     It "records business.report = {format, path}"
       run_report() {
-        cp "${BRIK_HOME}/spec/fixtures/sarif/semgrep.sarif" "$BRIK_WORKSPACE/target/sast.sarif"
+        cp "${BRIK_HOME}/spec/fixtures/sarif/semgrep.sarif" "$BRIK_WORKSPACE/brik-artifacts/sast/sast.sarif"
         verify.scan.run() { return 0; }
         brik.use() { :; }
         local ctx
@@ -347,7 +347,7 @@ YAML
         read_sast_business_json "report"
       }
       When call run_report
-      The output should equal '{"format":"sarif","path":"target/sast.sarif"}'
+      The output should equal '{"format":"sarif","path":"brik-artifacts/sast/sast.sarif"}'
     End
 
     It "honors a custom output_path from .security.sast.output_path"
@@ -384,7 +384,7 @@ YAML
         ctx="$(context.create "sast")" 2>/dev/null || ctx="$(mktemp)"
         stages.sast "$ctx" >/dev/null 2>&1
         jq -c '.stages[] | select(.name == "sast") | .business // {}' \
-          "$BRIK_LOG_DIR/pipeline-report.json" 2>/dev/null
+          "$BRIK_LOG_DIR/aggregate-report.json" 2>/dev/null
       }
       When call run_no_sarif
       The output should equal "{}"
@@ -392,7 +392,7 @@ YAML
 
     It "records empty business.findings.cwe when the SARIF has no CWE tags"
       run_no_cwe() {
-        cp "${BRIK_HOME}/spec/fixtures/sarif/eslint.sarif" "$BRIK_WORKSPACE/target/sast.sarif"
+        cp "${BRIK_HOME}/spec/fixtures/sarif/eslint.sarif" "$BRIK_WORKSPACE/brik-artifacts/sast/sast.sarif"
         verify.scan.run() { return 0; }
         brik.use() { :; }
         local ctx

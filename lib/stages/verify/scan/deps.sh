@@ -82,7 +82,7 @@ verify.scan.deps.run() {
         fi
     fi
 
-    # L4 enrichment: emit SARIF + CycloneDX reports for the pipeline-report
+    # L4 enrichment: emit SARIF + CycloneDX reports for the aggregate-report
     # business.deps.* aggregation. Only osv-scanner has native support for
     # both formats here; grype takes a separate path. Failures of the
     # report passes are non-fatal (informational outputs).
@@ -105,8 +105,8 @@ verify.scan.deps.run() {
 # L4 lib/stages/scan.sh aggregator).
 _verify.scan.deps._emit_reports() {
     local workspace="$1"
-    local sarif="${BRIK_SECURITY_DEPS_OUTPUT_PATH:-target/scan.sarif}"
-    local sbom="${BRIK_SECURITY_DEPS_SBOM_OUTPUT_PATH:-target/sbom.cdx.json}"
+    local sarif="${BRIK_SECURITY_DEPS_OUTPUT_PATH:-brik-artifacts/scan/deps.sarif}"
+    local sbom="${BRIK_SECURITY_DEPS_SBOM_OUTPUT_PATH:-brik-artifacts/scan/sbom.cdx.json}"
     local sarif_dir; sarif_dir="$(dirname "$sarif")"
     local sbom_dir;  sbom_dir="$(dirname "$sbom")"
 
