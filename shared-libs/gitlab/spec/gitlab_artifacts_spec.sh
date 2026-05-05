@@ -72,4 +72,69 @@ Describe "shared-libs/gitlab templates - brik-artifacts paths"
       The output should equal "1 month"
     End
   End
+
+  Describe "test.yml declares the new brik-artifacts/test/ paths"
+    test_yml() { printf '%s' "${TEMPLATES_DIR}/test.yml"; }
+
+    It "junit report points at brik-artifacts/test/junit.xml default"
+      Skip if "yq not installed" yq_missing
+      When call yq -r '.brik-test.artifacts.reports.junit' "$(test_yml)"
+      The status should be success
+      The output should include "brik-artifacts/test/junit.xml"
+    End
+
+    It "coverage_report.path is brik-artifacts/test/coverage/coverage.xml"
+      Skip if "yq not installed" yq_missing
+      When call yq -r '.brik-test.artifacts.reports.coverage_report.path' "$(test_yml)"
+      The status should be success
+      The output should equal "brik-artifacts/test/coverage/coverage.xml"
+    End
+
+    It "artifacts.paths simplifies to a single brik-artifacts/ entry"
+      Skip if "yq not installed" yq_missing
+      When call yq -r '.brik-test.artifacts.paths | length' "$(test_yml)"
+      The status should be success
+      The output should equal "1"
+    End
+  End
+
+  Describe "sast.yml + scan.yml expose SARIF/CycloneDX reports for the Security tab"
+    sarif_contains() {
+      local file="$1" job_key="$2" path="$3"
+
+      yq -e ".${job_key}.artifacts.reports.sarif | contains([\"${path}\"])" \
+        "$file" >/dev/null 2>&1
+    }
+
+    cyclonedx_contains() {
+      local file="$1" job_key="$2" path="$3"
+
+      yq -e ".${job_key}.artifacts.reports.cyclonedx | contains([\"${path}\"])" \
+        "$file" >/dev/null 2>&1
+    }
+
+    It "sast.yml declares reports.sarif pointing at brik-artifacts/sast/sast.sarif"
+      Skip if "yq not installed" yq_missing
+      When call sarif_contains "${TEMPLATES_DIR}/sast.yml" "brik-sast" "brik-artifacts/sast/sast.sarif"
+      The status should be success
+    End
+
+    It "scan.yml declares reports.sarif containing deps and secret SARIF"
+      Skip if "yq not installed" yq_missing
+      When call sarif_contains "${TEMPLATES_DIR}/scan.yml" "brik-scan" "brik-artifacts/scan/deps.sarif"
+      The status should be success
+    End
+
+    It "scan.yml reports.sarif also lists secret"
+      Skip if "yq not installed" yq_missing
+      When call sarif_contains "${TEMPLATES_DIR}/scan.yml" "brik-scan" "brik-artifacts/scan/secret.sarif"
+      The status should be success
+    End
+
+    It "scan.yml declares reports.cyclonedx pointing at the SBOM"
+      Skip if "yq not installed" yq_missing
+      When call cyclonedx_contains "${TEMPLATES_DIR}/scan.yml" "brik-scan" "brik-artifacts/scan/sbom.cdx.json"
+      The status should be success
+    End
+  End
 End

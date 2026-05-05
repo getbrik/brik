@@ -30,6 +30,9 @@ brik-sast:
   artifacts:
     when: always
     expire_in: 1 week
+    reports:
+      sarif:
+        - brik-artifacts/sast/sast.sarif
     paths:
       - brik-artifacts/
   # exit 99 = stage.skip_with_warning (Brik): user disabled sast outside

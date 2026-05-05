@@ -33,7 +33,7 @@ brik-test:
   artifacts:
     when: always
     reports:
-      junit: ${BRIK_TEST_JUNIT_PATH:-reports/junit.xml}
+      junit: ${BRIK_TEST_JUNIT_PATH:-brik-artifacts/test/junit.xml}
       # GitLab schema-validates coverage_format at YAML-parse time and
       # only accepts "cobertura" or "jacoco" -- variables resolved from
       # an upstream job's dotenv arrive too late. We hardcode the
@@ -43,10 +43,7 @@ brik-test:
       # shared-libs/gitlab/README.md for the override recipe.
       coverage_report:
         coverage_format: cobertura
-        path: coverage/coverage.xml
+        path: brik-artifacts/test/coverage/coverage.xml
     paths:
-      - ${BRIK_TEST_COVERAGE_DIR:-coverage}/
-      - ${BRIK_TEST_JUNIT_PATH:-reports/junit.xml}
-      - reports/
       - brik-artifacts/
     expire_in: 1 week

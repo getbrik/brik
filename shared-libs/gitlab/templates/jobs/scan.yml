@@ -30,6 +30,12 @@ brik-scan:
   artifacts:
     when: always
     expire_in: 1 week
+    reports:
+      sarif:
+        - brik-artifacts/scan/deps.sarif
+        - brik-artifacts/scan/secret.sarif
+      cyclonedx:
+        - brik-artifacts/scan/sbom.cdx.json
     paths:
       - brik-artifacts/
   # exit 99 = stage.skip_with_warning (Brik): user disabled scan outside

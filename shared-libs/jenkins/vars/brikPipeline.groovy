@@ -188,13 +188,10 @@ def call(Map params = [:]) {
                         'Scan': { runInScanner('scan') },
                         'Test': { runStage('test') }
                     )
-                    // junit/**/*.xml covers the Java surefire/gradle layout;
-                    // reports/junit.xml covers node/python/dotnet.
-                    junit testResults: 'reports/junit.xml,reports/junit/**/*.xml',
+                    // brik-artifacts/test/junit/**/*.xml covers the Java surefire/gradle layout;
+                    // brik-artifacts/test/junit.xml covers node/python/dotnet.
+                    junit testResults: 'brik-artifacts/test/junit.xml,brik-artifacts/test/junit/**/*.xml',
                           allowEmptyResults: true
-                    archiveArtifacts artifacts: 'coverage/**,reports/**',
-                                     allowEmptyArchive: true,
-                                     fingerprint: false
                 }
                 runStageWithReporting('Package')        { runStage('package') }
                 runStageWithReporting('Container Scan') { runInScanner('container-scan') }
