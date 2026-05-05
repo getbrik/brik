@@ -66,7 +66,7 @@ verify.format.run() {
                 # no inline ignore flag; the supported channel is
                 # .prettierignore, which we append idempotently here while
                 # preserving any user patterns.
-                local _prettier_ignore="${BRIK_WORKSPACE:-.}/.prettierignore"
+                local _prettier_ignore="${workspace}/.prettierignore"
                 local _pat
                 for _pat in '.cache/' 'target/' 'brik-artifacts/'; do
                     if ! grep -qF "$_pat" "$_prettier_ignore" 2>/dev/null; then
