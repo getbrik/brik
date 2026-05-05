@@ -192,6 +192,27 @@ def call(Map params = [:]) {
                     // brik-artifacts/test/junit.xml covers node/python/dotnet.
                     junit testResults: 'brik-artifacts/test/junit.xml,brik-artifacts/test/junit/**/*.xml',
                           allowEmptyResults: true
+                    // Surface SARIF findings in the Warnings NG dashboard
+                    // (Jenkins free / community plugin). Wrapped in try/catch
+                    // so instances without Warnings NG installed log a notice
+                    // and continue; the SARIF files still ship as build
+                    // artifacts via archiveArtifacts below.
+                    try {
+                        recordIssues(
+                            enabledForFailure: true,
+                            aggregatingResults: true,
+                            tools: [
+                                sarif(pattern: 'brik-artifacts/sast/sast.sarif',
+                                      id: 'brik-sast',   name: 'SAST (semgrep)'),
+                                sarif(pattern: 'brik-artifacts/scan/deps.sarif',
+                                      id: 'brik-deps',   name: 'Dependencies (osv-scanner)'),
+                                sarif(pattern: 'brik-artifacts/scan/secret.sarif',
+                                      id: 'brik-secret', name: 'Secrets (gitleaks)')
+                            ]
+                        )
+                    } catch (Exception e) {
+                        echo "[brik] recordIssues skipped (Warnings NG plugin unavailable): ${e.message}"
+                    }
                 }
                 runStageWithReporting('Package')        { runStage('package') }
                 runStageWithReporting('Container Scan') { runInScanner('container-scan') }

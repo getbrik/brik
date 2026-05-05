@@ -17,4 +17,30 @@ Describe "shared-libs/jenkins brikPipeline.groovy - artifact layout"
     The status should be success
     The output should be present
   End
+
+  Describe "Warnings NG SARIF surfacing"
+    It "calls recordIssues to surface SARIF in the Warnings NG dashboard"
+      When call grep -F "recordIssues(" "$GROOVY"
+      The status should be success
+      The output should be present
+    End
+
+    It "wires the sast SARIF tool"
+      When call grep -F "brik-artifacts/sast/sast.sarif" "$GROOVY"
+      The status should be success
+      The output should be present
+    End
+
+    It "wires the deps SARIF tool"
+      When call grep -F "brik-artifacts/scan/deps.sarif" "$GROOVY"
+      The status should be success
+      The output should be present
+    End
+
+    It "wraps recordIssues in try/catch so missing plugin does not break the build"
+      When call grep -F "recordIssues skipped" "$GROOVY"
+      The status should be success
+      The output should be present
+    End
+  End
 End
