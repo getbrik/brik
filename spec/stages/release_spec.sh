@@ -27,21 +27,21 @@ Describe "stages.release"
 
   read_release_new_version() {
     jq -r '.stages[] | select(.name == "release") | .business.new_version // empty' \
-      "$BRIK_LOG_DIR/pipeline-report.json" 2>/dev/null
+      "$BRIK_LOG_DIR/aggregate-report.json" 2>/dev/null
   }
 
   read_release_tech() {
     local key="$1"
     jq -r --arg k "$key" \
       '.stages[] | select(.name == "release") | .tech[$k] // empty' \
-      "$BRIK_LOG_DIR/pipeline-report.json" 2>/dev/null
+      "$BRIK_LOG_DIR/aggregate-report.json" 2>/dev/null
   }
 
   read_release_business() {
     local key="$1"
     jq -r --arg k "$key" \
       '.stages[] | select(.name == "release") | .business[$k] // empty' \
-      "$BRIK_LOG_DIR/pipeline-report.json" 2>/dev/null
+      "$BRIK_LOG_DIR/aggregate-report.json" 2>/dev/null
   }
   Before 'setup_env'
   After 'cleanup_env'
@@ -103,7 +103,7 @@ Describe "stages.release"
       ctx="$(context.create "release")" 2>/dev/null || ctx="$(mktemp)"
       stages.release "$ctx" >/dev/null 2>&1
       jq -c '.stages[] | select(.name == "release") | .tech.dry_run' \
-        "$BRIK_LOG_DIR/pipeline-report.json"
+        "$BRIK_LOG_DIR/aggregate-report.json"
     }
     When call run_release_dryrun_record
     The output should equal "false"
@@ -116,7 +116,7 @@ Describe "stages.release"
       ctx="$(context.create "release")" 2>/dev/null || ctx="$(mktemp)"
       stages.release "$ctx" >/dev/null 2>&1
       jq -c '.stages[] | select(.name == "release") | .tech.dry_run' \
-        "$BRIK_LOG_DIR/pipeline-report.json"
+        "$BRIK_LOG_DIR/aggregate-report.json"
       unset BRIK_DRY_RUN
     }
     When call run_release_dryrun_true
@@ -254,7 +254,7 @@ YAML
         ctx="$(context.create "release")" 2>/dev/null || ctx="$(mktemp)"
         stages.release "$ctx" >/dev/null 2>&1
         jq -c '.stages[] | select(.name == "release") | .business.tag | {name, dry_run}' \
-          "$BRIK_LOG_DIR/pipeline-report.json"
+          "$BRIK_LOG_DIR/aggregate-report.json"
         unset BRIK_DRY_RUN
       }
       When call run_release_tag_object
@@ -460,7 +460,7 @@ YAML
         pipeline.require_tool() { return 0; }
         _stages.release._prepare 2>/dev/null "1.0.0"
         jq -r '.stages[] | select(.name == "release") | .business.changelog.path // "<missing>"' \
-          "$BRIK_LOG_DIR/pipeline-report.json"
+          "$BRIK_LOG_DIR/aggregate-report.json"
       }
       When call run_prep_changelog_path
       The output should end with "/CHANGELOG.md"
@@ -478,7 +478,7 @@ YAML
         pipeline.require_tool() { return 0; }
         _stages.release._prepare 2>/dev/null "1.0.0"
         jq -r '.stages[] | select(.name == "release") | .business.changelog.entries_count // "<missing>"' \
-          "$BRIK_LOG_DIR/pipeline-report.json"
+          "$BRIK_LOG_DIR/aggregate-report.json"
       }
       When call run_prep_changelog_count
       The output should equal "3"
@@ -496,7 +496,7 @@ YAML
         pipeline.require_tool() { return 0; }
         _stages.release._prepare 2>/dev/null "1.0.0"
         jq -r '.stages[] | select(.name == "release") | .business.changelog.generated_at // "<missing>"' \
-          "$BRIK_LOG_DIR/pipeline-report.json"
+          "$BRIK_LOG_DIR/aggregate-report.json"
       }
       When call run_prep_changelog_ts
       The output should match pattern '20[0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]*'
@@ -512,7 +512,7 @@ YAML
         pipeline.require_tool() { return 0; }
         _stages.release._prepare 2>/dev/null "1.0.0"
         jq -r '[.stages[] | select(.name == "release") | .business.changelog // null | select(. != null)] | length' \
-          "$BRIK_LOG_DIR/pipeline-report.json"
+          "$BRIK_LOG_DIR/aggregate-report.json"
       }
       When call run_prep_no_changelog_record
       The output should equal "0"

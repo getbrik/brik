@@ -13,7 +13,7 @@ _BRIK_STAGES_NOTIFY_LOADED=1
 # Detect "CI aggregation mode" by looking for at least one valid fragment
 # file in <dir>. Per-stage fragments produced by report.write_fragment in
 # upstream stages have a stable signature (.stage + .schema_version).
-# pipeline-report.json (the aggregate target) is filtered out by basename so
+# aggregate-report.json (the aggregate target) is filtered out by basename so
 # a previous run does not re-trigger aggregation in local mode.
 #
 # Usage: _notify._is_ci_aggregation_mode <dir>
@@ -26,9 +26,9 @@ _notify._is_ci_aggregation_mode() {
 
     shopt -s nullglob
     local f base
-    for f in "$dir"/*.json; do
+    for f in "$dir"/*/*.json; do
         base="$(basename "$f")"
-        [[ "$base" == "pipeline-report.json" ]] && continue
+        [[ "$base" == "aggregate-report.json" ]] && continue
         if jq -e 'type == "object" and has("stage") and has("schema_version")' \
                 "$f" >/dev/null 2>&1; then
             shopt -u nullglob
@@ -280,7 +280,7 @@ notify.send() {
 # Usage: stages.notify <context_file>
 stages.notify() {
     # context_file positionally passed by stage.run; unused here after §4.2
-    # step 7 (dead BRIK_PIPELINE_STATUS read replaced by pipeline-report.json
+    # step 7 (dead BRIK_PIPELINE_STATUS read replaced by aggregate-report.json
     # query).
     # shellcheck disable=SC2034
     local context_file="$1"
@@ -293,13 +293,13 @@ stages.notify() {
     project_name="$(config.get '.project.name' 'unnamed')"
 
     local _log_dir="${BRIK_LOG_DIR:-${BRIK_DEFAULT_LOG_DIR:-/tmp/brik/logs}}"
-    local _report_md="${_log_dir}/pipeline-report.md"
-    local _report_json="${_log_dir}/pipeline-report.json"
+    local _report_md="${_log_dir}/aggregate-report.md"
+    local _report_json="${_log_dir}/aggregate-report.json"
 
     # CI mode: per-stage fragments shipped via job artifacts must be merged
     # before the rest of stages.notify runs (cat, status derivation,
     # workspace copy). report.aggregate_fragments writes the aggregated
-    # pipeline-report.{md,json} into BRIK_LOG_DIR. In local mode (no
+    # aggregate-report.{md,json} into BRIK_LOG_DIR. In local mode (no
     # fragments to merge) this branch is a no-op and the existing
     # pipeline.run-produced report is preserved.
     local _ci_fragments_dir="${BRIK_WORKSPACE:-}/brik-artifacts"
@@ -309,7 +309,7 @@ stages.notify() {
             log.warn "fragment aggregation failed (non-fatal)"
     fi
 
-    # Emit the rendered pipeline-report.md on stdout so the full stage table +
+    # Emit the rendered aggregate-report.md on stdout so the full stage table +
     # business section are visible in CI job logs. Falls back to a minimal
     # banner if the report is absent (e.g. single-stage run outside pipeline.run).
     if [[ -f "$_report_md" ]]; then
@@ -326,7 +326,7 @@ stages.notify() {
     fi
 
     # Determine pipeline status from the aggregated pipeline report.
-    # Derives from any tech.status=failed in pipeline-report.json. Defaults
+    # Derives from any tech.status=failed in aggregate-report.json. Defaults
     # to "success" when no report or no jq.
     local pipeline_status="success"
     if [[ -f "$_report_json" ]] && command -v jq >/dev/null 2>&1; then
@@ -354,11 +354,11 @@ stages.notify() {
         else
             if [[ -f "$_report_md" ]]; then
                 cp "$_report_md" "$_artifacts_dir/" 2>/dev/null || \
-                    log.warn "could not copy pipeline-report.md to brik-artifacts/ (non-fatal)"
+                    log.warn "could not copy aggregate-report.md to brik-artifacts/ (non-fatal)"
             fi
             if [[ -f "$_report_json" ]]; then
                 cp "$_report_json" "$_artifacts_dir/" 2>/dev/null || \
-                    log.warn "could not copy pipeline-report.json to brik-artifacts/ (non-fatal)"
+                    log.warn "could not copy aggregate-report.json to brik-artifacts/ (non-fatal)"
             fi
         fi
     fi

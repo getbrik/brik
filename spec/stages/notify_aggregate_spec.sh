@@ -8,7 +8,7 @@ Describe "stages.notify - CI mode fragment aggregation"
   # brik-artifacts/ directory.
   write_fragment_file() {
     local dir="$1" stage="$2" status="$3" rc="$4"
-    mkdir -p "$dir"
+    mkdir -p "$dir/${stage}"
     jq -n \
       --arg stage "$stage" \
       --arg status "$status" \
@@ -20,7 +20,7 @@ Describe "stages.notify - CI mode fragment aggregation"
         rc: $rc,
         status: $status,
         runner: { platform: "gitlab" }
-      }' > "${dir}/${stage}.json"
+      }' > "${dir}/${stage}/${stage}.json"
   }
 
   setup_env() {
@@ -60,7 +60,7 @@ Describe "stages.notify - CI mode fragment aggregation"
       do_notify() {
         seed_ci_fragments
         stages.notify "$NOTIFY_CONFIG" >/dev/null 2>&1
-        test -f "$NOTIFY_LOG_DIR/pipeline-report.json"
+        test -f "$NOTIFY_LOG_DIR/aggregate-report.json"
       }
       When call do_notify
       The status should be success
@@ -70,7 +70,7 @@ Describe "stages.notify - CI mode fragment aggregation"
       do_notify_count() {
         seed_ci_fragments
         stages.notify "$NOTIFY_CONFIG" >/dev/null 2>&1
-        jq '.stages | length' "$NOTIFY_LOG_DIR/pipeline-report.json"
+        jq '.stages | length' "$NOTIFY_LOG_DIR/aggregate-report.json"
       }
       When call do_notify_count
       The output should equal "3"
@@ -80,7 +80,7 @@ Describe "stages.notify - CI mode fragment aggregation"
       do_notify_artifact() {
         seed_ci_fragments
         stages.notify "$NOTIFY_CONFIG" >/dev/null 2>&1
-        test -f "$NOTIFY_WORKSPACE/brik-artifacts/pipeline-report.json"
+        test -f "$NOTIFY_WORKSPACE/brik-artifacts/aggregate-report.json"
       }
       When call do_notify_artifact
       The status should be success
@@ -100,18 +100,18 @@ Describe "stages.notify - CI mode fragment aggregation"
                            status: "success" },
                stages: [],
                summary: { stages: { total:0, passed:0, failed:0, skipped:0 } } }' \
-        > "$NOTIFY_LOG_DIR/pipeline-report.json"
-      printf '# Pipeline Report\n' > "$NOTIFY_LOG_DIR/pipeline-report.md"
+        > "$NOTIFY_LOG_DIR/aggregate-report.json"
+      printf '# Pipeline Report\n' > "$NOTIFY_LOG_DIR/aggregate-report.md"
     }
 
-    It "leaves pipeline-report.json untouched (no re-aggregation)"
+    It "leaves aggregate-report.json untouched (no re-aggregation)"
       check_unchanged() {
         seed_local_aggregate
         local before
-        before="$(jq -r '.pipeline.id' "$NOTIFY_LOG_DIR/pipeline-report.json")"
+        before="$(jq -r '.pipeline.id' "$NOTIFY_LOG_DIR/aggregate-report.json")"
         stages.notify "$NOTIFY_CONFIG" >/dev/null 2>&1
         local after
-        after="$(jq -r '.pipeline.id' "$NOTIFY_LOG_DIR/pipeline-report.json")"
+        after="$(jq -r '.pipeline.id' "$NOTIFY_LOG_DIR/aggregate-report.json")"
         [[ "$before" == "local-1" && "$after" == "local-1" ]]
       }
       When call check_unchanged
@@ -126,7 +126,7 @@ Describe "stages.notify - CI mode fragment aggregation"
     It "does not create an aggregate when nothing to aggregate"
       do_notify_empty() {
         stages.notify "$NOTIFY_CONFIG" >/dev/null 2>&1
-        ! test -f "$NOTIFY_LOG_DIR/pipeline-report.json"
+        ! test -f "$NOTIFY_LOG_DIR/aggregate-report.json"
       }
       When call do_notify_empty
       The status should be success
@@ -154,7 +154,7 @@ Describe "stages.notify - CI mode fragment aggregation"
       do_notify_failed() {
         seed_failed_test
         stages.notify "$NOTIFY_CONFIG" >/dev/null 2>&1
-        jq -r '.pipeline.status' "$NOTIFY_LOG_DIR/pipeline-report.json"
+        jq -r '.pipeline.status' "$NOTIFY_LOG_DIR/aggregate-report.json"
       }
       When call do_notify_failed
       The output should equal "failed"

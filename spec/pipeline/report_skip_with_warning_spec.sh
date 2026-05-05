@@ -60,7 +60,7 @@ Describe "stage.skip_with_warning + summary.warnings"
         report.init >/dev/null 2>&1
         stage.skip_with_warning "sast" "user disabled outside release" >/dev/null 2>&1
         jq -r '.stages[] | select(.name=="sast") | .tech.status' \
-            "${BRIK_LOG_DIR}/pipeline-report.json"
+            "${BRIK_LOG_DIR}/aggregate-report.json"
       }
       When call skip_record_status
       The output should equal "skipped"
@@ -71,7 +71,7 @@ Describe "stage.skip_with_warning + summary.warnings"
         report.init >/dev/null 2>&1
         stage.skip_with_warning "scan" "user disabled outside release" >/dev/null 2>&1
         jq -r '.stages[] | select(.name=="scan") | .tech.warning' \
-            "${BRIK_LOG_DIR}/pipeline-report.json"
+            "${BRIK_LOG_DIR}/aggregate-report.json"
       }
       When call skip_record_warning
       The output should equal "true"
@@ -82,7 +82,7 @@ Describe "stage.skip_with_warning + summary.warnings"
         report.init >/dev/null 2>&1
         stage.skip_with_warning "scan" "user disabled outside release" >/dev/null 2>&1
         jq -r '.stages[] | select(.name=="scan") | .tech.warning_reason' \
-            "${BRIK_LOG_DIR}/pipeline-report.json"
+            "${BRIK_LOG_DIR}/aggregate-report.json"
       }
       When call skip_record_reason
       The output should equal "user disabled outside release"
@@ -99,8 +99,8 @@ Describe "stage.skip_with_warning + summary.warnings"
     write_warning_fragment() {
       local stage="$1" reason="$2"
       local dir="${BRIK_WORKSPACE}/brik-artifacts"
-      mkdir -p "$dir"
-      cat > "${dir}/${stage}.json" <<EOF
+      mkdir -p "$dir/${stage}"
+      cat > "${dir}/${stage}/${stage}.json" <<EOF
 {
   "schema_version": "1.0",
   "stage": "${stage}",
@@ -121,8 +121,8 @@ EOF
     write_success_fragment() {
       local stage="$1"
       local dir="${BRIK_WORKSPACE}/brik-artifacts"
-      mkdir -p "$dir"
-      cat > "${dir}/${stage}.json" <<EOF
+      mkdir -p "$dir/${stage}"
+      cat > "${dir}/${stage}/${stage}.json" <<EOF
 {
   "schema_version": "1.0",
   "stage": "${stage}",
@@ -141,7 +141,7 @@ EOF
         write_success_fragment "build"
         write_success_fragment "test"
         report.aggregate_fragments "${BRIK_WORKSPACE}/brik-artifacts" >/dev/null 2>&1
-        jq -c '.summary.warnings' "${BRIK_LOG_DIR}/pipeline-report.json"
+        jq -c '.summary.warnings' "${BRIK_LOG_DIR}/aggregate-report.json"
       }
       When call no_warnings
       The output should equal "[]"
@@ -152,7 +152,7 @@ EOF
         write_success_fragment "build"
         write_warning_fragment "lint" "user disabled outside release"
         report.aggregate_fragments "${BRIK_WORKSPACE}/brik-artifacts" >/dev/null 2>&1
-        jq -c '.summary.warnings' "${BRIK_LOG_DIR}/pipeline-report.json"
+        jq -c '.summary.warnings' "${BRIK_LOG_DIR}/aggregate-report.json"
       }
       When call one_warning
       The output should equal '[{"stage":"lint","reason":"user disabled outside release"}]'
@@ -164,7 +164,7 @@ EOF
         write_warning_fragment "sast" "sast disabled"
         write_warning_fragment "scan" "scan disabled"
         report.aggregate_fragments "${BRIK_WORKSPACE}/brik-artifacts" >/dev/null 2>&1
-        jq -r '.summary.warnings | length' "${BRIK_LOG_DIR}/pipeline-report.json"
+        jq -r '.summary.warnings | length' "${BRIK_LOG_DIR}/aggregate-report.json"
       }
       When call multiple_warnings
       The output should equal "3"
@@ -175,7 +175,8 @@ EOF
         write_success_fragment "build"
         write_warning_fragment "lint" "lint disabled"
         local dir="${BRIK_WORKSPACE}/brik-artifacts"
-        cat > "${dir}/deploy.json" <<'EOF'
+        mkdir -p "${dir}/deploy"
+        cat > "${dir}/deploy/deploy.json" <<'EOF'
 {
   "schema_version": "1.0",
   "stage": "deploy",
@@ -188,7 +189,7 @@ EOF
 }
 EOF
         report.aggregate_fragments "${BRIK_WORKSPACE}/brik-artifacts" >/dev/null 2>&1
-        jq -r '.summary.warnings | length' "${BRIK_LOG_DIR}/pipeline-report.json"
+        jq -r '.summary.warnings | length' "${BRIK_LOG_DIR}/aggregate-report.json"
       }
       When call mixed_fragments
       The output should equal "1"

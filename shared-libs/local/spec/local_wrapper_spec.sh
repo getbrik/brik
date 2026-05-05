@@ -443,7 +443,7 @@ Describe "local-wrapper.sh"
     It "runs release stage and records new_version in the pipeline report"
       run_release() {
         brik.local.run_stage "release" >/dev/null 2>&1
-        local report="${BRIK_LOG_DIR}/pipeline-report.json"
+        local report="${BRIK_LOG_DIR}/aggregate-report.json"
         if [[ -f "$report" ]]; then
           local version
           version="$(jq -r '.stages[] | select(.name == "release") | .business.new_version // empty' "$report")"
@@ -459,7 +459,7 @@ Describe "local-wrapper.sh"
     It "runs package stage and records status skipped in the pipeline report"
       run_package() {
         brik.local.run_stage "package" >/dev/null 2>&1
-        local report="${BRIK_LOG_DIR}/pipeline-report.json"
+        local report="${BRIK_LOG_DIR}/aggregate-report.json"
         if [[ -f "$report" ]]; then
           jq -r '.stages[] | select(.name == "package") | .tech.status // empty' "$report"
         else
@@ -473,7 +473,7 @@ Describe "local-wrapper.sh"
     It "runs deploy stage and silent-skips when no environments configured"
       run_deploy() {
         brik.local.run_stage "deploy" >/dev/null 2>&1
-        local report="${BRIK_LOG_DIR}/pipeline-report.json"
+        local report="${BRIK_LOG_DIR}/aggregate-report.json"
         if [[ -f "$report" ]]; then
           jq -r '.stages[] | select(.name == "deploy") | .tech.status // empty' "$report"
         else
@@ -635,7 +635,7 @@ MOCKEOF
   End
 
   # =========================================================================
-  # brik.local.print_summary (reads pipeline-report.json)
+  # brik.local.print_summary (reads aggregate-report.json)
   # =========================================================================
   Describe "brik.local.print_summary"
     Include "$BRIK_HOME/shared-libs/local/scripts/local-wrapper.sh"
@@ -726,7 +726,7 @@ MOCKEOF
     End
 
     It "returns error when report does not exist"
-      When call brik.local.print_summary "/nonexistent/pipeline-report.json"
+      When call brik.local.print_summary "/nonexistent/aggregate-report.json"
       The status should equal 6
       The error should include "pipeline report not found"
     End

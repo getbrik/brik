@@ -11,7 +11,7 @@ Describe "stages/container_scan.sh"
 
   read_container_scan_status() {
     jq -r '.stages[] | select(.name == "container-scan") | .tech.status // empty' \
-      "$BRIK_LOG_DIR/pipeline-report.json" 2>/dev/null
+      "$BRIK_LOG_DIR/aggregate-report.json" 2>/dev/null
   }
 
   Describe "stages.container_scan"
@@ -160,7 +160,7 @@ Describe "stages/container_scan.sh"
         local key="$1"
         jq -r --arg k "$key" \
           '.stages[] | select(.name == "container-scan") | .tech[$k] // empty' \
-          "$BRIK_LOG_DIR/pipeline-report.json" 2>/dev/null
+          "$BRIK_LOG_DIR/aggregate-report.json" 2>/dev/null
       }
 
       It "records container-scan.tech.target_image"
@@ -184,7 +184,7 @@ Describe "stages/container_scan.sh"
       It "records container-scan.tech.target_digest from the package fragment when present"
         invoke_target_digest() {
           mkdir -p "$BRIK_WORKSPACE/brik-artifacts"
-          cat > "$BRIK_WORKSPACE/brik-artifacts/package.json" <<'JSON'
+          mkdir -p "$BRIK_WORKSPACE/brik-artifacts/package" && cat > "$BRIK_WORKSPACE/brik-artifacts/package/package.json" <<'JSON'
 {
   "schema_version": "1.0",
   "stage": "package",
@@ -212,7 +212,7 @@ JSON
       It "omits container-scan.tech.target_digest when the package fragment has no digest"
         invoke_no_digest() {
           mkdir -p "$BRIK_WORKSPACE/brik-artifacts"
-          cat > "$BRIK_WORKSPACE/brik-artifacts/package.json" <<'JSON'
+          mkdir -p "$BRIK_WORKSPACE/brik-artifacts/package" && cat > "$BRIK_WORKSPACE/brik-artifacts/package/package.json" <<'JSON'
 {
   "schema_version": "1.0",
   "stage": "package",
@@ -224,7 +224,7 @@ JSON
 JSON
           stages.container_scan "$CTX_FILE" >/dev/null 2>&1
           jq -r '.stages[] | select(.name == "container-scan") | .tech | has("target_digest")' \
-            "$BRIK_LOG_DIR/pipeline-report.json"
+            "$BRIK_LOG_DIR/aggregate-report.json"
         }
         When call invoke_no_digest
         The output should equal "false"

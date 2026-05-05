@@ -11,9 +11,11 @@ Describe "report.aggregate_fragments"
   }
 
   # Helper: write a fragment file with the given shape into FRAG_DIR.
+  # Layout: per-stage subdirectory matches the production write_fragment.
   write_fragment_file() {
     local stage="$1" status="$2" rc="$3" extra_json="${4:-{\}}"
-    local path="${FRAG_DIR}/${stage}.json"
+    mkdir -p "${FRAG_DIR}/${stage}"
+    local path="${FRAG_DIR}/${stage}/${stage}.json"
     jq -n \
       --arg stage "$stage" \
       --arg status "$status" \
@@ -94,7 +96,7 @@ Describe "report.aggregate_fragments"
     It "succeeds with empty stages array"
       empty_run() {
         report.aggregate_fragments "$FRAG_DIR" || return 1
-        jq '.stages | length' "$AGG_LOG_DIR/pipeline-report.json"
+        jq '.stages | length' "$AGG_LOG_DIR/aggregate-report.json"
       }
       When call empty_run
       The output should equal "0"
@@ -103,7 +105,7 @@ Describe "report.aggregate_fragments"
     It "produces an aggregate with summary.stages.total = 0"
       empty_summary() {
         report.aggregate_fragments "$FRAG_DIR" || return 1
-        jq '.summary.stages.total' "$AGG_LOG_DIR/pipeline-report.json"
+        jq '.summary.stages.total' "$AGG_LOG_DIR/aggregate-report.json"
       }
       When call empty_summary
       The output should equal "0"
@@ -112,7 +114,7 @@ Describe "report.aggregate_fragments"
     It "produces an aggregate with pipeline.status = success when no failures"
       empty_status() {
         report.aggregate_fragments "$FRAG_DIR" || return 1
-        jq -r '.pipeline.status' "$AGG_LOG_DIR/pipeline-report.json"
+        jq -r '.pipeline.status' "$AGG_LOG_DIR/aggregate-report.json"
       }
       When call empty_status
       The output should equal "success"
@@ -122,7 +124,7 @@ Describe "report.aggregate_fragments"
       Skip if "jv not installed" jv_missing
       empty_validates() {
         report.aggregate_fragments "$FRAG_DIR" || return 1
-        validate_aggregate_file "$AGG_LOG_DIR/pipeline-report.json"
+        validate_aggregate_file "$AGG_LOG_DIR/aggregate-report.json"
       }
       When call empty_validates
       The status should be success
@@ -145,7 +147,7 @@ Describe "report.aggregate_fragments"
     It "stages array has one entry per fragment file"
       three_count() {
         seed_three && report.aggregate_fragments "$FRAG_DIR" || return 1
-        jq '.stages | length' "$AGG_LOG_DIR/pipeline-report.json"
+        jq '.stages | length' "$AGG_LOG_DIR/aggregate-report.json"
       }
       When call three_count
       The output should equal "3"
@@ -154,7 +156,7 @@ Describe "report.aggregate_fragments"
     It "summary.stages counts all-success correctly"
       three_summary() {
         seed_three && report.aggregate_fragments "$FRAG_DIR" || return 1
-        jq -c '.summary.stages' "$AGG_LOG_DIR/pipeline-report.json"
+        jq -c '.summary.stages' "$AGG_LOG_DIR/aggregate-report.json"
       }
       When call three_summary
       The output should equal '{"total":3,"passed":3,"failed":0,"skipped":0}'
@@ -163,7 +165,7 @@ Describe "report.aggregate_fragments"
     It "pipeline.status = success when no fragment failed"
       three_status() {
         seed_three && report.aggregate_fragments "$FRAG_DIR" || return 1
-        jq -r '.pipeline.status' "$AGG_LOG_DIR/pipeline-report.json"
+        jq -r '.pipeline.status' "$AGG_LOG_DIR/aggregate-report.json"
       }
       When call three_status
       The output should equal "success"
@@ -173,7 +175,7 @@ Describe "report.aggregate_fragments"
       Skip if "jv not installed" jv_missing
       three_validate() {
         seed_three && report.aggregate_fragments "$FRAG_DIR" || return 1
-        validate_aggregate_file "$AGG_LOG_DIR/pipeline-report.json"
+        validate_aggregate_file "$AGG_LOG_DIR/aggregate-report.json"
       }
       When call three_validate
       The status should be success
@@ -199,7 +201,7 @@ Describe "report.aggregate_fragments"
     It "summary.stages counts each status correctly"
       mixed_summary() {
         seed_mixed && report.aggregate_fragments "$FRAG_DIR" || return 1
-        jq -c '.summary.stages' "$AGG_LOG_DIR/pipeline-report.json"
+        jq -c '.summary.stages' "$AGG_LOG_DIR/aggregate-report.json"
       }
       When call mixed_summary
       The output should equal '{"total":6,"passed":2,"failed":1,"skipped":3}'
@@ -208,7 +210,7 @@ Describe "report.aggregate_fragments"
     It "pipeline.status = failed when at least one fragment failed"
       mixed_status() {
         seed_mixed && report.aggregate_fragments "$FRAG_DIR" || return 1
-        jq -r '.pipeline.status' "$AGG_LOG_DIR/pipeline-report.json"
+        jq -r '.pipeline.status' "$AGG_LOG_DIR/aggregate-report.json"
       }
       When call mixed_status
       The output should equal "failed"
@@ -218,7 +220,7 @@ Describe "report.aggregate_fragments"
       Skip if "jv not installed" jv_missing
       mixed_validate() {
         seed_mixed && report.aggregate_fragments "$FRAG_DIR" || return 1
-        validate_aggregate_file "$AGG_LOG_DIR/pipeline-report.json"
+        validate_aggregate_file "$AGG_LOG_DIR/aggregate-report.json"
       }
       When call mixed_validate
       The status should be success
@@ -236,12 +238,13 @@ Describe "report.aggregate_fragments"
       write_fragment_file "init"  "success" 0
       write_fragment_file "build" "success" 0
       # Future-version fragment; aggregator must skip it.
+      mkdir -p "${FRAG_DIR}/test"
       jq -n \
         '{ schema_version: "2.0", stage: "test",
            timestamp: "2026-04-21T14:00:00+0000",
            rc: 0, status: "success",
            runner: { platform: "gitlab" } }' \
-        > "${FRAG_DIR}/test.json"
+        > "${FRAG_DIR}/test/test.json"
     }
 
     It "logs a warning and skips the mismatched fragment"
@@ -256,7 +259,7 @@ Describe "report.aggregate_fragments"
     It "still aggregates the valid fragments"
       count_valid_only() {
         seed_with_v2 && report.aggregate_fragments "$FRAG_DIR" 2>/dev/null || return 1
-        jq '.stages | length' "$AGG_LOG_DIR/pipeline-report.json"
+        jq '.stages | length' "$AGG_LOG_DIR/aggregate-report.json"
       }
       When call count_valid_only
       The output should equal "2"
@@ -266,7 +269,7 @@ Describe "report.aggregate_fragments"
       Skip if "jv not installed" jv_missing
       validate_aggregate() {
         seed_with_v2 && report.aggregate_fragments "$FRAG_DIR" 2>/dev/null || return 1
-        validate_aggregate_file "$AGG_LOG_DIR/pipeline-report.json"
+        validate_aggregate_file "$AGG_LOG_DIR/aggregate-report.json"
       }
       When call validate_aggregate
       The status should be success
@@ -280,15 +283,15 @@ Describe "report.aggregate_fragments"
     Before 'setup_dirs'
     After 'cleanup_dirs'
 
-    It "ignores pipeline-report.json itself"
+    It "ignores aggregate-report.json itself"
       ignore_aggregate() {
         write_fragment_file "init"  "success" 0
         write_fragment_file "build" "success" 0
         # Pre-existing aggregate left over from a previous run.
         jq -n '{ schema_version: "1.0", pipeline: {}, stages: [], summary: { stages: { total:0, passed:0, failed:0, skipped:0 } } }' \
-          > "${FRAG_DIR}/pipeline-report.json"
+          > "${FRAG_DIR}/aggregate-report.json"
         report.aggregate_fragments "$FRAG_DIR" >/dev/null 2>&1 || return 1
-        jq '.stages | length' "$AGG_LOG_DIR/pipeline-report.json"
+        jq '.stages | length' "$AGG_LOG_DIR/aggregate-report.json"
       }
       When call ignore_aggregate
       The output should equal "2"
@@ -300,7 +303,7 @@ Describe "report.aggregate_fragments"
         printf 'not valid json\n' > "${FRAG_DIR}/notes.txt"
         printf '{ "broken' > "${FRAG_DIR}/broken.json"
         report.aggregate_fragments "$FRAG_DIR" >/dev/null 2>&1 || return 1
-        jq '.stages | length' "$AGG_LOG_DIR/pipeline-report.json"
+        jq '.stages | length' "$AGG_LOG_DIR/aggregate-report.json"
       }
       When call ignore_garbage
       The output should equal "1"
@@ -311,7 +314,7 @@ Describe "report.aggregate_fragments"
         write_fragment_file "init"  "success" 0
         jq -n '{ unrelated: "data", count: 5 }' > "${FRAG_DIR}/random.json"
         report.aggregate_fragments "$FRAG_DIR" >/dev/null 2>&1 || return 1
-        jq '.stages | length' "$AGG_LOG_DIR/pipeline-report.json"
+        jq '.stages | length' "$AGG_LOG_DIR/aggregate-report.json"
       }
       When call ignore_other_json
       The output should equal "1"
@@ -329,7 +332,7 @@ Describe "report.aggregate_fragments"
       read_id() {
         write_fragment_file "init" "success" 0
         report.aggregate_fragments "$FRAG_DIR" >/dev/null 2>&1 || return 1
-        jq -r '.pipeline.id' "$AGG_LOG_DIR/pipeline-report.json"
+        jq -r '.pipeline.id' "$AGG_LOG_DIR/aggregate-report.json"
       }
       When call read_id
       The output should equal "run-fixture-99"
@@ -340,7 +343,7 @@ Describe "report.aggregate_fragments"
         export BRIK_PLATFORM="jenkins"
         write_fragment_file "init" "success" 0
         report.aggregate_fragments "$FRAG_DIR" >/dev/null 2>&1 || return 1
-        jq -r '.pipeline.platform' "$AGG_LOG_DIR/pipeline-report.json"
+        jq -r '.pipeline.platform' "$AGG_LOG_DIR/aggregate-report.json"
       }
       When call read_platform
       The output should equal "jenkins"
@@ -350,7 +353,7 @@ Describe "report.aggregate_fragments"
       read_platform() {
         write_fragment_file "init" "success" 0
         report.aggregate_fragments "$FRAG_DIR" >/dev/null 2>&1 || return 1
-        jq -r '.pipeline.platform' "$AGG_LOG_DIR/pipeline-report.json"
+        jq -r '.pipeline.platform' "$AGG_LOG_DIR/aggregate-report.json"
       }
       When call read_platform
       The output should equal "local"
@@ -361,7 +364,7 @@ Describe "report.aggregate_fragments"
         export BRIK_PROJECT_NAME="my-app"
         write_fragment_file "init" "success" 0
         report.aggregate_fragments "$FRAG_DIR" >/dev/null 2>&1 || return 1
-        jq -r '.pipeline.project' "$AGG_LOG_DIR/pipeline-report.json"
+        jq -r '.pipeline.project' "$AGG_LOG_DIR/aggregate-report.json"
       }
       When call read_project
       The output should equal "my-app"
@@ -371,7 +374,7 @@ Describe "report.aggregate_fragments"
       read_finished() {
         write_fragment_file "init" "success" 0
         report.aggregate_fragments "$FRAG_DIR" >/dev/null 2>&1 || return 1
-        jq -r '.pipeline.finished_at' "$AGG_LOG_DIR/pipeline-report.json"
+        jq -r '.pipeline.finished_at' "$AGG_LOG_DIR/aggregate-report.json"
       }
       When call read_finished
       The output should match pattern '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]*'
@@ -414,7 +417,7 @@ Describe "report.aggregate_fragments"
         export BRIK_PIPELINE_ID="42"
         write_fragment_file "init" "success" 0
         report.aggregate_fragments "$FRAG_DIR" >/dev/null 2>&1 || return 1
-        jq -r '.pipeline.id' "$AGG_LOG_DIR/pipeline-report.json"
+        jq -r '.pipeline.id' "$AGG_LOG_DIR/aggregate-report.json"
       }
       When call read_id
       The output should equal "42"
@@ -425,7 +428,7 @@ Describe "report.aggregate_fragments"
         export BRIK_PIPELINE_URL="https://gitlab.example.com/group/project/-/pipelines/42"
         write_fragment_file "init" "success" 0
         report.aggregate_fragments "$FRAG_DIR" >/dev/null 2>&1 || return 1
-        jq -r '.pipeline.url' "$AGG_LOG_DIR/pipeline-report.json"
+        jq -r '.pipeline.url' "$AGG_LOG_DIR/aggregate-report.json"
       }
       When call read_url
       The output should equal "https://gitlab.example.com/group/project/-/pipelines/42"
@@ -435,7 +438,7 @@ Describe "report.aggregate_fragments"
       read_url() {
         write_fragment_file "init" "success" 0
         report.aggregate_fragments "$FRAG_DIR" >/dev/null 2>&1 || return 1
-        jq '.pipeline | has("url")' "$AGG_LOG_DIR/pipeline-report.json"
+        jq '.pipeline | has("url")' "$AGG_LOG_DIR/aggregate-report.json"
       }
       When call read_url
       The output should equal "false"
@@ -446,7 +449,7 @@ Describe "report.aggregate_fragments"
         export BRIK_COMMIT_SHA="abcdef0123456789abcdef0123456789abcdef01"
         write_fragment_file "init" "success" 0
         report.aggregate_fragments "$FRAG_DIR" >/dev/null 2>&1 || return 1
-        jq -r '.pipeline.commit.sha' "$AGG_LOG_DIR/pipeline-report.json"
+        jq -r '.pipeline.commit.sha' "$AGG_LOG_DIR/aggregate-report.json"
       }
       When call read_sha
       The output should equal "abcdef0123456789abcdef0123456789abcdef01"
@@ -457,7 +460,7 @@ Describe "report.aggregate_fragments"
         export BRIK_COMMIT_SHORT_SHA="abcdef01"
         write_fragment_file "init" "success" 0
         report.aggregate_fragments "$FRAG_DIR" >/dev/null 2>&1 || return 1
-        jq -r '.pipeline.commit.short_sha' "$AGG_LOG_DIR/pipeline-report.json"
+        jq -r '.pipeline.commit.short_sha' "$AGG_LOG_DIR/aggregate-report.json"
       }
       When call read_short
       The output should equal "abcdef01"
@@ -468,7 +471,7 @@ Describe "report.aggregate_fragments"
         export BRIK_COMMIT_REF="feature/x"
         write_fragment_file "init" "success" 0
         report.aggregate_fragments "$FRAG_DIR" >/dev/null 2>&1 || return 1
-        jq -r '.pipeline.commit.ref' "$AGG_LOG_DIR/pipeline-report.json"
+        jq -r '.pipeline.commit.ref' "$AGG_LOG_DIR/aggregate-report.json"
       }
       When call read_ref
       The output should equal "feature/x"
@@ -479,7 +482,7 @@ Describe "report.aggregate_fragments"
         export BRIK_COMMIT_BRANCH="main"
         write_fragment_file "init" "success" 0
         report.aggregate_fragments "$FRAG_DIR" >/dev/null 2>&1 || return 1
-        jq -r '.pipeline.commit.branch' "$AGG_LOG_DIR/pipeline-report.json"
+        jq -r '.pipeline.commit.branch' "$AGG_LOG_DIR/aggregate-report.json"
       }
       When call read_branch
       The output should equal "main"
@@ -490,7 +493,7 @@ Describe "report.aggregate_fragments"
         export BRIK_COMMIT_TAG="v1.2.3"
         write_fragment_file "init" "success" 0
         report.aggregate_fragments "$FRAG_DIR" >/dev/null 2>&1 || return 1
-        jq -r '.pipeline.commit.tag' "$AGG_LOG_DIR/pipeline-report.json"
+        jq -r '.pipeline.commit.tag' "$AGG_LOG_DIR/aggregate-report.json"
       }
       When call read_tag
       The output should equal "v1.2.3"
@@ -500,7 +503,7 @@ Describe "report.aggregate_fragments"
       read_commit() {
         write_fragment_file "init" "success" 0
         report.aggregate_fragments "$FRAG_DIR" >/dev/null 2>&1 || return 1
-        jq '.pipeline | has("commit")' "$AGG_LOG_DIR/pipeline-report.json"
+        jq '.pipeline | has("commit")' "$AGG_LOG_DIR/aggregate-report.json"
       }
       When call read_commit
       The output should equal "false"
@@ -511,7 +514,7 @@ Describe "report.aggregate_fragments"
         export BRIK_COMMIT_AUTHOR="Carol Tester"
         write_fragment_file "init" "success" 0
         report.aggregate_fragments "$FRAG_DIR" >/dev/null 2>&1 || return 1
-        jq -r '.pipeline.commit.author' "$AGG_LOG_DIR/pipeline-report.json"
+        jq -r '.pipeline.commit.author' "$AGG_LOG_DIR/aggregate-report.json"
       }
       When call read_author
       The output should equal "Carol Tester"
@@ -522,7 +525,7 @@ Describe "report.aggregate_fragments"
         export BRIK_COMMIT_AUTHOR_EMAIL="carol@example.com"
         write_fragment_file "init" "success" 0
         report.aggregate_fragments "$FRAG_DIR" >/dev/null 2>&1 || return 1
-        jq -r '.pipeline.commit.author_email' "$AGG_LOG_DIR/pipeline-report.json"
+        jq -r '.pipeline.commit.author_email' "$AGG_LOG_DIR/aggregate-report.json"
       }
       When call read_author_email
       The output should equal "carol@example.com"
@@ -533,7 +536,7 @@ Describe "report.aggregate_fragments"
         export BRIK_COMMIT_TIMESTAMP="2026-05-04T09:15:30+02:00"
         write_fragment_file "init" "success" 0
         report.aggregate_fragments "$FRAG_DIR" >/dev/null 2>&1 || return 1
-        jq -r '.pipeline.commit.timestamp' "$AGG_LOG_DIR/pipeline-report.json"
+        jq -r '.pipeline.commit.timestamp' "$AGG_LOG_DIR/aggregate-report.json"
       }
       When call read_timestamp
       The output should equal "2026-05-04T09:15:30+02:00"
@@ -544,7 +547,7 @@ Describe "report.aggregate_fragments"
         export BRIK_COMMIT_MESSAGE_SUBJECT="fix: regression in detector"
         write_fragment_file "init" "success" 0
         report.aggregate_fragments "$FRAG_DIR" >/dev/null 2>&1 || return 1
-        jq -r '.pipeline.commit.message_subject' "$AGG_LOG_DIR/pipeline-report.json"
+        jq -r '.pipeline.commit.message_subject' "$AGG_LOG_DIR/aggregate-report.json"
       }
       When call read_subject
       The output should equal "fix: regression in detector"
@@ -556,7 +559,7 @@ Describe "report.aggregate_fragments"
         unset BRIK_COMMIT_AUTHOR
         write_fragment_file "init" "success" 0
         report.aggregate_fragments "$FRAG_DIR" >/dev/null 2>&1 || return 1
-        jq '.pipeline.commit | has("author")' "$AGG_LOG_DIR/pipeline-report.json"
+        jq '.pipeline.commit | has("author")' "$AGG_LOG_DIR/aggregate-report.json"
       }
       When call read_omit
       The output should equal "false"
@@ -567,7 +570,7 @@ Describe "report.aggregate_fragments"
         export BRIK_TRIGGERED_BY="alice"
         write_fragment_file "init" "success" 0
         report.aggregate_fragments "$FRAG_DIR" >/dev/null 2>&1 || return 1
-        jq -r '.pipeline.triggered_by' "$AGG_LOG_DIR/pipeline-report.json"
+        jq -r '.pipeline.triggered_by' "$AGG_LOG_DIR/aggregate-report.json"
       }
       When call read_trigger
       The output should equal "alice"
@@ -577,7 +580,7 @@ Describe "report.aggregate_fragments"
       read_trigger() {
         write_fragment_file "init" "success" 0
         report.aggregate_fragments "$FRAG_DIR" >/dev/null 2>&1 || return 1
-        jq '.pipeline | has("triggered_by")' "$AGG_LOG_DIR/pipeline-report.json"
+        jq '.pipeline | has("triggered_by")' "$AGG_LOG_DIR/aggregate-report.json"
       }
       When call read_trigger
       The output should equal "false"
@@ -596,7 +599,7 @@ Describe "report.aggregate_fragments"
         export BRIK_TRIGGERED_BY="alice"
         write_fragment_file "init" "success" 0
         report.aggregate_fragments "$FRAG_DIR" >/dev/null 2>&1 || return 1
-        validate_aggregate_file "$AGG_LOG_DIR/pipeline-report.json"
+        validate_aggregate_file "$AGG_LOG_DIR/aggregate-report.json"
       }
       When call validate_full
       The status should be success
@@ -610,12 +613,12 @@ Describe "report.aggregate_fragments"
     Before 'setup_dirs'
     After 'cleanup_dirs'
 
-    It "renders pipeline-report.md alongside pipeline-report.json"
+    It "renders aggregate-report.md alongside aggregate-report.json"
       check_md() {
         write_fragment_file "init"  "success" 0
         write_fragment_file "build" "success" 0
         report.aggregate_fragments "$FRAG_DIR" >/dev/null 2>&1 || return 1
-        test -f "$AGG_LOG_DIR/pipeline-report.md"
+        test -f "$AGG_LOG_DIR/aggregate-report.md"
       }
       When call check_md
       The status should be success
@@ -626,7 +629,7 @@ Describe "report.aggregate_fragments"
         write_fragment_file "init"  "success" 0
         write_fragment_file "build" "success" 0
         report.aggregate_fragments "$FRAG_DIR" >/dev/null 2>&1 || return 1
-        cat "$AGG_LOG_DIR/pipeline-report.md"
+        cat "$AGG_LOG_DIR/aggregate-report.md"
       }
       When call check_md_content
       The output should include "# Pipeline Report"

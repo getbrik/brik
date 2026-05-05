@@ -15,16 +15,16 @@ Describe "report.sh"
     Before 'setup_report_dir'
     After 'cleanup_report_dir'
 
-    It "creates pipeline-report.json in BRIK_LOG_DIR"
+    It "creates aggregate-report.json in BRIK_LOG_DIR"
       When call report.init
       The status should be success
-      The file "$REPORT_LOG_DIR/pipeline-report.json" should be exist
+      The file "$REPORT_LOG_DIR/aggregate-report.json" should be exist
     End
 
     It "records pipeline_id from BRIK_RUN_ID"
       check_pipeline_id() {
         report.init || return 1
-        jq -r '.pipeline_id' "$REPORT_LOG_DIR/pipeline-report.json"
+        jq -r '.pipeline_id' "$REPORT_LOG_DIR/aggregate-report.json"
       }
       When call check_pipeline_id
       The output should equal "run-fixture-42"
@@ -33,7 +33,7 @@ Describe "report.sh"
     It "records started_at as an ISO-8601 timestamp"
       check_started_at() {
         report.init || return 1
-        jq -r '.started_at' "$REPORT_LOG_DIR/pipeline-report.json"
+        jq -r '.started_at' "$REPORT_LOG_DIR/aggregate-report.json"
       }
       When call check_started_at
       The output should match pattern '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]*'
@@ -42,7 +42,7 @@ Describe "report.sh"
     It "initializes stages as an empty array"
       check_stages_empty() {
         report.init || return 1
-        jq '.stages | length' "$REPORT_LOG_DIR/pipeline-report.json"
+        jq '.stages | length' "$REPORT_LOG_DIR/aggregate-report.json"
       }
       When call check_stages_empty
       The output should equal "0"
@@ -53,7 +53,7 @@ Describe "report.sh"
         report.init || return 1
         report.record "build" "tech" "exit_code" "0" || return 1
         report.init || return 1
-        jq '.stages | length' "$REPORT_LOG_DIR/pipeline-report.json"
+        jq '.stages | length' "$REPORT_LOG_DIR/aggregate-report.json"
       }
       When call reinit_sequence
       The output should equal "0"
@@ -68,7 +68,7 @@ Describe "report.sh"
       record_and_read() {
         report.init || return 1
         report.record "build" "tech" "duration_ms" "1234" || return 1
-        jq -r '.stages[0].name' "$REPORT_LOG_DIR/pipeline-report.json"
+        jq -r '.stages[0].name' "$REPORT_LOG_DIR/aggregate-report.json"
       }
       When call record_and_read
       The output should equal "build"
@@ -78,7 +78,7 @@ Describe "report.sh"
       record_tech() {
         report.init || return 1
         report.record "build" "tech" "exit_code" "0" || return 1
-        jq -r '.stages[0].tech.exit_code' "$REPORT_LOG_DIR/pipeline-report.json"
+        jq -r '.stages[0].tech.exit_code' "$REPORT_LOG_DIR/aggregate-report.json"
       }
       When call record_tech
       The output should equal "0"
@@ -88,7 +88,7 @@ Describe "report.sh"
       record_business() {
         report.init || return 1
         report.record "package" "business" "image_full_name" "ghcr.io/org/app:1.2.0" || return 1
-        jq -r '.stages[0].business.image_full_name' "$REPORT_LOG_DIR/pipeline-report.json"
+        jq -r '.stages[0].business.image_full_name' "$REPORT_LOG_DIR/aggregate-report.json"
       }
       When call record_business
       The output should equal "ghcr.io/org/app:1.2.0"
@@ -99,7 +99,7 @@ Describe "report.sh"
         report.init || return 1
         report.record "build" "tech" "exit_code" "0" || return 1
         report.record "build" "tech" "duration_ms" "1234" || return 1
-        jq -r '.stages[0].tech | "\(.exit_code)|\(.duration_ms)"' "$REPORT_LOG_DIR/pipeline-report.json"
+        jq -r '.stages[0].tech | "\(.exit_code)|\(.duration_ms)"' "$REPORT_LOG_DIR/aggregate-report.json"
       }
       When call record_multi_keys
       The output should equal "0|1234"
@@ -110,7 +110,7 @@ Describe "report.sh"
         report.init || return 1
         report.record "build" "tech" "exit_code" "0" || return 1
         report.record "build" "tech" "exit_code" "1" || return 1
-        jq -r '.stages[0].tech.exit_code' "$REPORT_LOG_DIR/pipeline-report.json"
+        jq -r '.stages[0].tech.exit_code' "$REPORT_LOG_DIR/aggregate-report.json"
       }
       When call upsert_same_key
       The output should equal "1"
@@ -121,7 +121,7 @@ Describe "report.sh"
         report.init || return 1
         report.record "build" "tech" "exit_code" "0" || return 1
         report.record "build" "business" "image_full_name" "ghcr.io/org/app:1.0.0" || return 1
-        jq '.stages | length' "$REPORT_LOG_DIR/pipeline-report.json"
+        jq '.stages | length' "$REPORT_LOG_DIR/aggregate-report.json"
       }
       When call multi_record_single_stage
       The output should equal "1"
@@ -132,7 +132,7 @@ Describe "report.sh"
         report.init || return 1
         report.record "build" "tech" "exit_code" "0" || return 1
         report.record "test" "tech" "exit_code" "0" || return 1
-        jq -r '.stages | map(.name) | join(",")' "$REPORT_LOG_DIR/pipeline-report.json"
+        jq -r '.stages | map(.name) | join(",")' "$REPORT_LOG_DIR/aggregate-report.json"
       }
       When call two_stages_order
       The output should equal "build,test"
@@ -154,7 +154,7 @@ Describe "report.sh"
       record_ws_value() {
         report.init || return 1
         report.record "build" "business" "note" "hello world with spaces" || return 1
-        jq -r '.stages[0].business.note' "$REPORT_LOG_DIR/pipeline-report.json"
+        jq -r '.stages[0].business.note' "$REPORT_LOG_DIR/aggregate-report.json"
       }
       When call record_ws_value
       The output should equal "hello world with spaces"
@@ -176,7 +176,7 @@ Describe "report.sh"
       record_object_nested() {
         report.init || return 1
         report.record_object "init" "business" "commit" '{"sha":"abc","short_sha":"abc12345"}' || return 1
-        jq -r '.stages[0].business.commit.sha' "$REPORT_LOG_DIR/pipeline-report.json"
+        jq -r '.stages[0].business.commit.sha' "$REPORT_LOG_DIR/aggregate-report.json"
       }
       When call record_object_nested
       The output should equal "abc"
@@ -186,7 +186,7 @@ Describe "report.sh"
       record_object_keys() {
         report.init || return 1
         report.record_object "init" "business" "commit" '{"sha":"abc","ref":"main","tag":null}' || return 1
-        jq -c '.stages[0].business.commit | keys' "$REPORT_LOG_DIR/pipeline-report.json"
+        jq -c '.stages[0].business.commit | keys' "$REPORT_LOG_DIR/aggregate-report.json"
       }
       When call record_object_keys
       The output should equal '["ref","sha","tag"]'
@@ -196,7 +196,7 @@ Describe "report.sh"
       record_object_array() {
         report.init || return 1
         report.record_object "test" "business" "flaky" '["foo","bar"]' || return 1
-        jq -c '.stages[0].business.flaky' "$REPORT_LOG_DIR/pipeline-report.json"
+        jq -c '.stages[0].business.flaky' "$REPORT_LOG_DIR/aggregate-report.json"
       }
       When call record_object_array
       The output should equal '["foo","bar"]'
@@ -206,7 +206,7 @@ Describe "report.sh"
       record_object_bool() {
         report.init || return 1
         report.record_object "init" "tech" "config_valid" 'true' || return 1
-        jq -c '.stages[0].tech.config_valid' "$REPORT_LOG_DIR/pipeline-report.json"
+        jq -c '.stages[0].tech.config_valid' "$REPORT_LOG_DIR/aggregate-report.json"
       }
       When call record_object_bool
       The output should equal "true"
@@ -217,7 +217,7 @@ Describe "report.sh"
         report.init || return 1
         report.record "init" "business" "project_name" "myapp" || return 1
         report.record_object "init" "business" "commit" '{"sha":"abc"}' || return 1
-        jq -c '.stages[0].business' "$REPORT_LOG_DIR/pipeline-report.json"
+        jq -c '.stages[0].business' "$REPORT_LOG_DIR/aggregate-report.json"
       }
       When call record_mixed
       The output should equal '{"project_name":"myapp","commit":{"sha":"abc"}}'
@@ -261,15 +261,15 @@ Describe "report.sh"
       }
       When call render_default
       The status should be success
-      The file "$REPORT_LOG_DIR/pipeline-report.md" should be exist
-      The file "$REPORT_LOG_DIR/pipeline-report.json" should be exist
+      The file "$REPORT_LOG_DIR/aggregate-report.md" should be exist
+      The file "$REPORT_LOG_DIR/aggregate-report.json" should be exist
     End
 
     It "stamps finished_at on the json"
       render_stamps_finished_at() {
         seed_report
         report.render >/dev/null
-        jq -r '.finished_at' "$REPORT_LOG_DIR/pipeline-report.json"
+        jq -r '.finished_at' "$REPORT_LOG_DIR/aggregate-report.json"
       }
       When call render_stamps_finished_at
       The output should match pattern '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]*'
@@ -278,19 +278,19 @@ Describe "report.sh"
     It "with --format md produces only the md file"
       render_md_only() {
         seed_report
-        rm -f "$REPORT_LOG_DIR/pipeline-report.md"
+        rm -f "$REPORT_LOG_DIR/aggregate-report.md"
         report.render --format md
       }
       When call render_md_only
       The status should be success
-      The file "$REPORT_LOG_DIR/pipeline-report.md" should be exist
+      The file "$REPORT_LOG_DIR/aggregate-report.md" should be exist
     End
 
     It "with --format json does not truncate the json"
       render_json_only_keeps_stages() {
         seed_report
         report.render --format json >/dev/null
-        jq '.stages | length' "$REPORT_LOG_DIR/pipeline-report.json"
+        jq '.stages | length' "$REPORT_LOG_DIR/aggregate-report.json"
       }
       When call render_json_only_keeps_stages
       The output should equal "2"
@@ -312,7 +312,7 @@ Describe "report.sh"
       render_md_stages() {
         seed_report
         report.render --format md >/dev/null
-        cat "$REPORT_LOG_DIR/pipeline-report.md"
+        cat "$REPORT_LOG_DIR/aggregate-report.md"
       }
       When call render_md_stages
       The output should include "build"
@@ -323,7 +323,7 @@ Describe "report.sh"
       render_md_business() {
         seed_report
         report.render --format md >/dev/null
-        cat "$REPORT_LOG_DIR/pipeline-report.md"
+        cat "$REPORT_LOG_DIR/aggregate-report.md"
       }
       When call render_md_business
       The output should include "image_full_name"

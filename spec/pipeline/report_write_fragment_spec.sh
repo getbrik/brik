@@ -60,7 +60,7 @@ Describe "report.write_fragment"
     Before 'setup_dirs'
     After 'cleanup_dirs'
 
-    It "returns BRIK_EXIT_IO_FAILURE when the backend pipeline-report.json is absent"
+    It "returns BRIK_EXIT_IO_FAILURE when the backend aggregate-report.json is absent"
       no_backend() {
         report.write_fragment "build"
       }
@@ -109,13 +109,13 @@ Describe "report.write_fragment"
       }
       When call do_write
       The status should be success
-      The file "$REPORT_WORKSPACE/brik-artifacts/build.json" should be exist
+      The file "$REPORT_WORKSPACE/brik-artifacts/build/build.json" should be exist
     End
 
     It "writes a fragment with schema_version 1.0"
       read_schema_version() {
         seed_full_build && report.write_fragment "build" || return 1
-        jq -r '.schema_version' "$REPORT_WORKSPACE/brik-artifacts/build.json"
+        jq -r '.schema_version' "$REPORT_WORKSPACE/brik-artifacts/build/build.json"
       }
       When call read_schema_version
       The output should equal "1.0"
@@ -124,7 +124,7 @@ Describe "report.write_fragment"
     It "writes a fragment with the requested stage name"
       read_stage_name() {
         seed_full_build && report.write_fragment "build" || return 1
-        jq -r '.stage' "$REPORT_WORKSPACE/brik-artifacts/build.json"
+        jq -r '.stage' "$REPORT_WORKSPACE/brik-artifacts/build/build.json"
       }
       When call read_stage_name
       The output should equal "build"
@@ -133,7 +133,7 @@ Describe "report.write_fragment"
     It "carries the recorded tech.status as fragment.status"
       read_status() {
         seed_full_build && report.write_fragment "build" || return 1
-        jq -r '.status' "$REPORT_WORKSPACE/brik-artifacts/build.json"
+        jq -r '.status' "$REPORT_WORKSPACE/brik-artifacts/build/build.json"
       }
       When call read_status
       The output should equal "success"
@@ -142,7 +142,7 @@ Describe "report.write_fragment"
     It "carries the recorded tech.exit_code as fragment.rc (numeric)"
       read_rc() {
         seed_full_build && report.write_fragment "build" || return 1
-        jq '.rc' "$REPORT_WORKSPACE/brik-artifacts/build.json"
+        jq '.rc' "$REPORT_WORKSPACE/brik-artifacts/build/build.json"
       }
       When call read_rc
       The output should equal "0"
@@ -151,7 +151,7 @@ Describe "report.write_fragment"
     It "carries the recorded tech.duration_ms as fragment.duration_ms (numeric)"
       read_duration() {
         seed_full_build && report.write_fragment "build" || return 1
-        jq '.duration_ms' "$REPORT_WORKSPACE/brik-artifacts/build.json"
+        jq '.duration_ms' "$REPORT_WORKSPACE/brik-artifacts/build/build.json"
       }
       When call read_duration
       The output should equal "1234"
@@ -160,7 +160,7 @@ Describe "report.write_fragment"
     It "preserves the full tech subtree from the backend"
       read_tech_status() {
         seed_full_build && report.write_fragment "build" || return 1
-        jq -r '.tech.status' "$REPORT_WORKSPACE/brik-artifacts/build.json"
+        jq -r '.tech.status' "$REPORT_WORKSPACE/brik-artifacts/build/build.json"
       }
       When call read_tech_status
       The output should equal "success"
@@ -169,7 +169,7 @@ Describe "report.write_fragment"
     It "preserves the full business subtree from the backend"
       read_business_stack() {
         seed_full_build && report.write_fragment "build" || return 1
-        jq -r '.business.stack' "$REPORT_WORKSPACE/brik-artifacts/build.json"
+        jq -r '.business.stack' "$REPORT_WORKSPACE/brik-artifacts/build/build.json"
       }
       When call read_business_stack
       The output should equal "java"
@@ -178,7 +178,7 @@ Describe "report.write_fragment"
     It "stamps an ISO-8601 timestamp with timezone offset"
       read_timestamp() {
         seed_full_build && report.write_fragment "build" || return 1
-        jq -r '.timestamp' "$REPORT_WORKSPACE/brik-artifacts/build.json"
+        jq -r '.timestamp' "$REPORT_WORKSPACE/brik-artifacts/build/build.json"
       }
       When call read_timestamp
       The output should match pattern '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]*'
@@ -188,7 +188,7 @@ Describe "report.write_fragment"
       Skip if "jv not installed" jv_missing
       do_write_then_validate() {
         seed_full_build && report.write_fragment "build" || return 1
-        validate_fragment_file "$REPORT_WORKSPACE/brik-artifacts/build.json"
+        validate_fragment_file "$REPORT_WORKSPACE/brik-artifacts/build/build.json"
       }
       When call do_write_then_validate
       The status should be success
@@ -211,7 +211,7 @@ Describe "report.write_fragment"
     It "defaults runner.platform to 'local' when BRIK_PLATFORM is unset"
       read_platform() {
         seed_minimal && report.write_fragment "init" || return 1
-        jq -r '.runner.platform' "$REPORT_WORKSPACE/brik-artifacts/init.json"
+        jq -r '.runner.platform' "$REPORT_WORKSPACE/brik-artifacts/init/init.json"
       }
       When call read_platform
       The output should equal "local"
@@ -221,7 +221,7 @@ Describe "report.write_fragment"
       read_platform() {
         export BRIK_PLATFORM="gitlab"
         seed_minimal && report.write_fragment "init" || return 1
-        jq -r '.runner.platform' "$REPORT_WORKSPACE/brik-artifacts/init.json"
+        jq -r '.runner.platform' "$REPORT_WORKSPACE/brik-artifacts/init/init.json"
       }
       When call read_platform
       The output should equal "gitlab"
@@ -232,7 +232,7 @@ Describe "report.write_fragment"
         export BRIK_PLATFORM="gitlab"
         export BRIK_RUNNER_IMAGE="ghcr.io/getbrik/brik-runner-java:21"
         seed_minimal && report.write_fragment "init" || return 1
-        jq -r '.runner.image' "$REPORT_WORKSPACE/brik-artifacts/init.json"
+        jq -r '.runner.image' "$REPORT_WORKSPACE/brik-artifacts/init/init.json"
       }
       When call read_image
       The output should equal "ghcr.io/getbrik/brik-runner-java:21"
@@ -243,7 +243,7 @@ Describe "report.write_fragment"
         export BRIK_PLATFORM="gitlab"
         export CI_JOB_URL="https://gitlab.example.com/jobs/123"
         seed_minimal && report.write_fragment "init" || return 1
-        jq -r '.runner.job_url' "$REPORT_WORKSPACE/brik-artifacts/init.json"
+        jq -r '.runner.job_url' "$REPORT_WORKSPACE/brik-artifacts/init/init.json"
       }
       When call read_job_url
       The output should equal "https://gitlab.example.com/jobs/123"
@@ -254,7 +254,7 @@ Describe "report.write_fragment"
         export BRIK_PLATFORM="jenkins"
         export BUILD_URL="https://jenkins.example.com/job/my-app/42/"
         seed_minimal && report.write_fragment "init" || return 1
-        jq -r '.runner.job_url' "$REPORT_WORKSPACE/brik-artifacts/init.json"
+        jq -r '.runner.job_url' "$REPORT_WORKSPACE/brik-artifacts/init/init.json"
       }
       When call read_job_url
       The output should equal "https://jenkins.example.com/job/my-app/42/"
@@ -264,7 +264,7 @@ Describe "report.write_fragment"
       check_no_image() {
         seed_minimal && report.write_fragment "init" || return 1
         jq 'has("runner") and (.runner | has("image") | not)' \
-          "$REPORT_WORKSPACE/brik-artifacts/init.json"
+          "$REPORT_WORKSPACE/brik-artifacts/init/init.json"
       }
       When call check_no_image
       The output should equal "true"
@@ -282,7 +282,7 @@ Describe "report.write_fragment"
       stub_status() {
         report.init >/dev/null 2>&1 || return 1
         report.write_fragment "release" || return 1
-        jq -r '.status' "$REPORT_WORKSPACE/brik-artifacts/release.json"
+        jq -r '.status' "$REPORT_WORKSPACE/brik-artifacts/release/release.json"
       }
       When call stub_status
       The output should equal "skipped"
@@ -292,7 +292,7 @@ Describe "report.write_fragment"
       stub_rc() {
         report.init >/dev/null 2>&1 || return 1
         report.write_fragment "release" || return 1
-        jq '.rc' "$REPORT_WORKSPACE/brik-artifacts/release.json"
+        jq '.rc' "$REPORT_WORKSPACE/brik-artifacts/release/release.json"
       }
       When call stub_rc
       The output should equal "0"
@@ -303,7 +303,7 @@ Describe "report.write_fragment"
       stub_validates() {
         report.init >/dev/null 2>&1 || return 1
         report.write_fragment "release" || return 1
-        validate_fragment_file "$REPORT_WORKSPACE/brik-artifacts/release.json"
+        validate_fragment_file "$REPORT_WORKSPACE/brik-artifacts/release/release.json"
       }
       When call stub_validates
       The status should be success
@@ -326,7 +326,7 @@ Describe "report.write_fragment"
     It "fragment.status is failed"
       read_status() {
         seed_failed_test && report.write_fragment "test" || return 1
-        jq -r '.status' "$REPORT_WORKSPACE/brik-artifacts/test.json"
+        jq -r '.status' "$REPORT_WORKSPACE/brik-artifacts/test/test.json"
       }
       When call read_status
       The output should equal "failed"
@@ -335,7 +335,7 @@ Describe "report.write_fragment"
     It "fragment.rc is 1"
       read_rc() {
         seed_failed_test && report.write_fragment "test" || return 1
-        jq '.rc' "$REPORT_WORKSPACE/brik-artifacts/test.json"
+        jq '.rc' "$REPORT_WORKSPACE/brik-artifacts/test/test.json"
       }
       When call read_rc
       The output should equal "1"
@@ -345,7 +345,7 @@ Describe "report.write_fragment"
       Skip if "jv not installed" jv_missing
       validates_failed() {
         seed_failed_test && report.write_fragment "test" || return 1
-        validate_fragment_file "$REPORT_WORKSPACE/brik-artifacts/test.json"
+        validate_fragment_file "$REPORT_WORKSPACE/brik-artifacts/test/test.json"
       }
       When call validates_failed
       The status should be success
@@ -364,7 +364,7 @@ Describe "report.write_fragment"
         report.init >/dev/null 2>&1 || return 1
         report.record "init" "business" "stack" "node" || return 1
         report.write_fragment "init" || return 1
-        jq -r '.status' "$REPORT_WORKSPACE/brik-artifacts/init.json"
+        jq -r '.status' "$REPORT_WORKSPACE/brik-artifacts/init/init.json"
       }
       When call do_write
       The output should equal "skipped"
@@ -393,7 +393,7 @@ Describe "report.write_fragment"
         report.init >/dev/null 2>&1 || return 1
         report.record "build" "tech" "status" "success" || return 1
         report.write_fragment "build" || return 1
-        test -f "$REPORT_LOG_DIR/brik-artifacts/build.json"
+        test -f "$REPORT_LOG_DIR/brik-artifacts/build/build.json"
       }
       When call fallback_path
       The status should be success
@@ -413,7 +413,7 @@ Describe "report.write_fragment"
         report.record "build" "tech" "status" "success" || return 1
         report.write_fragment "build" || return 1
         # No .tmp / .XXXXXX leftover next to the final file
-        ls -1 "$REPORT_WORKSPACE/brik-artifacts/" | grep -cE '^build\.json' || true
+        ls -1 "$REPORT_WORKSPACE/brik-artifacts/build/" | grep -cE '^build\.json' || true
       }
       When call atomic_check
       The output should equal "1"

@@ -33,14 +33,14 @@ Describe "stages.deploy"
 
   read_deploy_status() {
     jq -r '.stages[] | select(.name == "deploy") | .tech.status // empty' \
-      "$BRIK_LOG_DIR/pipeline-report.json" 2>/dev/null
+      "$BRIK_LOG_DIR/aggregate-report.json" 2>/dev/null
   }
 
   read_deploy_tech_json() {
     local key="$1"
     jq -c --arg k "$key" \
       '.stages[] | select(.name == "deploy") | .tech[$k] // empty' \
-      "$BRIK_LOG_DIR/pipeline-report.json" 2>/dev/null
+      "$BRIK_LOG_DIR/aggregate-report.json" 2>/dev/null
   }
 
   It "is callable as a function"
@@ -117,7 +117,7 @@ YAML
       stages.deploy "$ctx" >/dev/null 2>&1
       jq -c '.stages[] | select(.name == "deploy") | .business.environments
              | map({name, target, namespace})' \
-        "$BRIK_LOG_DIR/pipeline-report.json"
+        "$BRIK_LOG_DIR/aggregate-report.json"
     }
     When call run_deploy_business_envs
     The output should equal '[{"name":"staging","target":"k8s","namespace":"stg"},{"name":"prod","target":"helm","namespace":null}]'
@@ -145,7 +145,7 @@ YAML
       ctx="$(context.create "deploy")" 2>/dev/null || ctx="$(mktemp)"
       stages.deploy "$ctx" >/dev/null 2>&1
       jq -r '.stages[] | select(.name == "deploy") | .business.environments[0].strategy // "<missing>"' \
-        "$BRIK_LOG_DIR/pipeline-report.json"
+        "$BRIK_LOG_DIR/aggregate-report.json"
     }
     When call run_deploy_business_strategy
     The output should equal "canary"
@@ -171,7 +171,7 @@ YAML
       ctx="$(context.create "deploy")" 2>/dev/null || ctx="$(mktemp)"
       stages.deploy "$ctx" >/dev/null 2>&1
       jq -r '.stages[] | select(.name == "deploy") | .business.environments[0] | has("strategy")' \
-        "$BRIK_LOG_DIR/pipeline-report.json"
+        "$BRIK_LOG_DIR/aggregate-report.json"
     }
     When call run_deploy_no_strategy
     The output should equal "false"
@@ -202,7 +202,7 @@ YAML
       ctx="$(context.create "deploy")" 2>/dev/null || ctx="$(mktemp)"
       stages.deploy "$ctx" >/dev/null 2>&1
       jq -c '.stages[] | select(.name == "deploy") | .business.environments | map(.name)' \
-        "$BRIK_LOG_DIR/pipeline-report.json"
+        "$BRIK_LOG_DIR/aggregate-report.json"
     }
     When call run_deploy_skipped_excluded
     The output should equal '["staging"]'

@@ -31,7 +31,7 @@ Describe "stages.build"
     local key="$1"
     jq -r --arg k "$key" \
       '.stages[] | select(.name == "build") | .tech[$k] // empty' \
-      "$BRIK_LOG_DIR/pipeline-report.json" 2>/dev/null
+      "$BRIK_LOG_DIR/aggregate-report.json" 2>/dev/null
   }
   Before 'setup_env'
   After 'cleanup_env'
@@ -315,7 +315,7 @@ YAML
         ctx="$(context.create "build")" 2>/dev/null || ctx="$(mktemp)"
         stages.build "$ctx" >/dev/null 2>&1
         jq -r '.stages[] | select(.name == "build") | .business.artifact.name // "<missing>"' \
-          "$BRIK_LOG_DIR/pipeline-report.json"
+          "$BRIK_LOG_DIR/aggregate-report.json"
       }
       When call run_build_artifact_dist
       The output should equal "dist"
@@ -331,7 +331,7 @@ YAML
         ctx="$(context.create "build")" 2>/dev/null || ctx="$(mktemp)"
         stages.build "$ctx" >/dev/null 2>&1
         jq -r '.stages[] | select(.name == "build") | .business.artifact.type // "<missing>"' \
-          "$BRIK_LOG_DIR/pipeline-report.json"
+          "$BRIK_LOG_DIR/aggregate-report.json"
       }
       When call run_build_artifact_type
       The output should equal "directory"
@@ -347,7 +347,7 @@ YAML
         ctx="$(context.create "build")" 2>/dev/null || ctx="$(mktemp)"
         stages.build "$ctx" >/dev/null 2>&1
         jq -r '.stages[] | select(.name == "build") | .business.artifact.sha256 // "<missing>"' \
-          "$BRIK_LOG_DIR/pipeline-report.json"
+          "$BRIK_LOG_DIR/aggregate-report.json"
       }
       When call run_build_artifact_sha
       The output should match pattern '[a-f0-9]*'
@@ -371,7 +371,7 @@ YAML
         ctx="$(context.create "build")" 2>/dev/null || ctx="$(mktemp)"
         stages.build "$ctx" >/dev/null 2>&1
         jq -r '.stages[] | select(.name == "build") | .business.artifact.name // "<missing>"' \
-          "$BRIK_LOG_DIR/pipeline-report.json"
+          "$BRIK_LOG_DIR/aggregate-report.json"
       }
       When call run_build_artifact_target
       The output should equal "target"
@@ -385,7 +385,7 @@ YAML
         ctx="$(context.create "build")" 2>/dev/null || ctx="$(mktemp)"
         stages.build "$ctx" >/dev/null 2>&1
         jq -r '[.stages[] | select(.name == "build") | .business.artifact // null | select(. != null)] | length' \
-          "$BRIK_LOG_DIR/pipeline-report.json"
+          "$BRIK_LOG_DIR/aggregate-report.json"
       }
       When call run_build_artifact_omit
       The output should equal "0"
@@ -401,7 +401,7 @@ YAML
         ctx="$(context.create "build")" 2>/dev/null || ctx="$(mktemp)"
         stages.build "$ctx" >/dev/null 2>&1
         jq -r '[.stages[] | select(.name == "build") | .business.artifact // null | select(. != null)] | length' \
-          "$BRIK_LOG_DIR/pipeline-report.json"
+          "$BRIK_LOG_DIR/aggregate-report.json"
       }
       When call run_build_artifact_skip_on_fail
       The output should equal "0"
@@ -419,7 +419,7 @@ YAML
         stages.build "$ctx" >/dev/null 2>&1
         unset BRIK_BUILD_CACHE_HIT
         jq -c '.stages[] | select(.name == "build") | .tech.cache_hit' \
-          "$BRIK_LOG_DIR/pipeline-report.json"
+          "$BRIK_LOG_DIR/aggregate-report.json"
       }
       When call run_build_cache_hit_true
       The output should equal "true"
@@ -435,7 +435,7 @@ YAML
         stages.build "$ctx" >/dev/null 2>&1
         unset BRIK_BUILD_CACHE_HIT
         jq -c '.stages[] | select(.name == "build") | .tech.cache_hit' \
-          "$BRIK_LOG_DIR/pipeline-report.json"
+          "$BRIK_LOG_DIR/aggregate-report.json"
       }
       When call run_build_cache_hit_false
       The output should equal "false"
@@ -450,7 +450,7 @@ YAML
         ctx="$(context.create "build")" 2>/dev/null || ctx="$(mktemp)"
         stages.build "$ctx" >/dev/null 2>&1
         jq -r '.stages[] | select(.name == "build") | .tech | has("cache_hit")' \
-          "$BRIK_LOG_DIR/pipeline-report.json"
+          "$BRIK_LOG_DIR/aggregate-report.json"
       }
       When call run_build_cache_hit_omit
       The output should equal "false"

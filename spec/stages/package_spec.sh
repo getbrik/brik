@@ -31,21 +31,21 @@ Describe "stages.package"
 
   read_package_status() {
     jq -r '.stages[] | select(.name == "package") | .tech.status // empty' \
-      "$BRIK_LOG_DIR/pipeline-report.json" 2>/dev/null
+      "$BRIK_LOG_DIR/aggregate-report.json" 2>/dev/null
   }
 
   read_package_tech() {
     local key="$1"
     jq -r --arg k "$key" \
       '.stages[] | select(.name == "package") | .tech[$k] // empty' \
-      "$BRIK_LOG_DIR/pipeline-report.json" 2>/dev/null
+      "$BRIK_LOG_DIR/aggregate-report.json" 2>/dev/null
   }
 
   read_package_business_json() {
     local key="$1"
     jq -c --arg k "$key" \
       '.stages[] | select(.name == "package") | .business[$k] // empty' \
-      "$BRIK_LOG_DIR/pipeline-report.json" 2>/dev/null
+      "$BRIK_LOG_DIR/aggregate-report.json" 2>/dev/null
   }
 
   It "is callable as a function"
@@ -152,7 +152,7 @@ YAML
         stages.package "$ctx" >/dev/null 2>&1
         unset -f docker
         jq -r '.stages[] | select(.name == "package") | .business.image.digest // "<missing>"' \
-          "$BRIK_LOG_DIR/pipeline-report.json"
+          "$BRIK_LOG_DIR/aggregate-report.json"
       }
       When call run_pkg_digest
       The output should equal "sha256:abc123def4567890abc123def4567890abc123def4567890abc123def4567890"
@@ -174,7 +174,7 @@ YAML
         stages.package "$ctx" >/dev/null 2>&1
         unset -f docker
         jq -r '.stages[] | select(.name == "package") | .business.image | has("digest")' \
-          "$BRIK_LOG_DIR/pipeline-report.json"
+          "$BRIK_LOG_DIR/aggregate-report.json"
       }
       When call run_pkg_no_digest
       The output should equal "false"

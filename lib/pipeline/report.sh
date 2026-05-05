@@ -4,7 +4,7 @@
 # @description Persistent pipeline-level report aggregator.
 #
 # Records tech and business metrics per stage to a JSON backing store
-# ($BRIK_LOG_DIR/pipeline-report.json) and renders Markdown + JSON outputs
+# ($BRIK_LOG_DIR/aggregate-report.json) and renders Markdown + JSON outputs
 # for human readers and CI artifacts.
 #
 # Lifecycle:
@@ -25,7 +25,7 @@ _BRIK_REPORT_LOADED=1
 # Resolve the backend JSON path from BRIK_LOG_DIR.
 _report._backend_path() {
     local log_dir="${BRIK_LOG_DIR:-${BRIK_DEFAULT_LOG_DIR:-/tmp/brik/logs}}"
-    printf '%s/pipeline-report.json' "$log_dir"
+    printf '%s/aggregate-report.json' "$log_dir"
 }
 
 # Require jq on PATH. Returns BRIK_EXIT_MISSING_DEP if absent.
@@ -36,7 +36,7 @@ _report._require_jq() {
     }
 }
 
-# Create (or overwrite) the pipeline-report.json skeleton.
+# Create (or overwrite) the aggregate-report.json skeleton.
 # Uses BRIK_RUN_ID as pipeline_id (falls back to epoch-pid if unset).
 report.init() {
     _report._require_jq || return "$?"
@@ -266,16 +266,16 @@ _report._append_json_object() {
 
 # Write a per-stage report fragment to brik-artifacts/<stage>.json so CI
 # platforms (GitLab, Jenkins) can ship it as a job artifact and notify can
-# aggregate fragments back into a single pipeline-report at the end.
+# aggregate fragments back into a single aggregate-report at the end.
 #
-# The fragment is a snapshot of the backend pipeline-report.json entry for
+# The fragment is a snapshot of the backend aggregate-report.json entry for
 # this stage, wrapped in the v1 fragment envelope (schema_version, stage,
 # timestamp, rc, status, runner). When the backend has no entry for this
 # stage, the fragment is a stub with status=skipped, rc=0.
 #
 # Output path:
-#   - ${BRIK_WORKSPACE}/brik-artifacts/<stage>.json when BRIK_WORKSPACE is set
-#   - ${BRIK_LOG_DIR}/brik-artifacts/<stage>.json otherwise (local fallback)
+#   - ${BRIK_WORKSPACE}/brik-artifacts/<stage>/<stage>.json when BRIK_WORKSPACE is set
+#   - ${BRIK_LOG_DIR}/brik-artifacts/<stage>/<stage>.json otherwise (local fallback)
 #
 # Runner provenance:
 #   - platform := BRIK_PLATFORM (default: local)
@@ -313,12 +313,13 @@ report.write_fragment() {
     }
 
     local fragment_dir="${BRIK_WORKSPACE:-${BRIK_LOG_DIR:-${BRIK_DEFAULT_LOG_DIR:-/tmp/brik/logs}}}/brik-artifacts"
-    mkdir -p "$fragment_dir" || {
-        log.error "cannot create fragment directory: $fragment_dir"
+    local stage_dir="${fragment_dir}/${stage_name}"
+    mkdir -p "$stage_dir" || {
+        log.error "cannot create fragment directory: $stage_dir"
         return "$BRIK_EXIT_IO_FAILURE"
     }
 
-    local fragment_path="${fragment_dir}/${stage_name}.json"
+    local fragment_path="${stage_dir}/${stage_name}.json"
     local timestamp
     timestamp="$(date +"%Y-%m-%dT%H:%M:%S%z")"
     local platform="${BRIK_PLATFORM:-local}"
@@ -376,14 +377,14 @@ report.write_fragment() {
     return 0
 }
 
-# Aggregate per-stage fragment files into a single pipeline-report.{md,json}
+# Aggregate per-stage fragment files into a single aggregate-report.{md,json}
 # under $BRIK_LOG_DIR. Used by stages.notify in CI mode where each upstream
 # stage runs in its own container and ships its fragment as a job artifact.
 # In local mode this function is not called (pipeline.run already produces
 # the aggregate directly via report.record + report.render).
 #
 # Filtering rules:
-#   - <dir>/pipeline-report.json is ignored (it is the aggregate target).
+#   - <dir>/aggregate-report.json is ignored (it is the aggregate target).
 #   - Files that are not valid JSON are silently skipped.
 #   - Files lacking the fragment signature (.stage and .schema_version) are
 #     silently skipped (forward-compat with arbitrary brik-artifacts/ content).
@@ -436,10 +437,10 @@ report.aggregate_fragments() {
 
     shopt -s nullglob
     local f base
-    for f in "$fragment_dir"/*.json; do
+    for f in "$fragment_dir"/*/*.json; do
         base="$(basename "$f")"
         # Ignore the aggregate output if it lives in the same directory.
-        [[ "$base" == "pipeline-report.json" ]] && continue
+        [[ "$base" == "aggregate-report.json" ]] && continue
         # Must be valid JSON object with the fragment signature.
         if ! jq -e 'type == "object" and has("stage") and has("schema_version")' \
                 "$f" >/dev/null 2>&1; then
@@ -477,7 +478,7 @@ report.aggregate_fragments() {
     local commit_message_subject="${BRIK_COMMIT_MESSAGE_SUBJECT:-}"
     local triggered_by="${BRIK_TRIGGERED_BY:-}"
 
-    local backend="${log_dir}/pipeline-report.json"
+    local backend="${log_dir}/aggregate-report.json"
     local tmp
     tmp="$(mktemp "${backend}.XXXXXX")" || {
         rm -f "$valid_list"
@@ -590,8 +591,8 @@ report.aggregate_fragments() {
     # renderer because the aggregate document differs from the local
     # backend (.pipeline.id vs .pipeline_id, .stages[].stage vs .name,
     # status/rc at fragment level vs nested under tech).
-    _report._render_aggregate_md "$backend" > "${log_dir}/pipeline-report.md" 2>/dev/null || \
-        log.warn "could not render pipeline-report.md (non-fatal)"
+    _report._render_aggregate_md "$backend" > "${log_dir}/aggregate-report.md" 2>/dev/null || \
+        log.warn "could not render aggregate-report.md (non-fatal)"
 
     log.debug "aggregate report written: $backend"
     return 0
@@ -642,8 +643,8 @@ _report._render_aggregate_md() {
     # KCOV_EXCL_STOP
 }
 
-# Render the pipeline report. Default writes both pipeline-report.md and
-# pipeline-report.json into $BRIK_LOG_DIR. --format md|json restricts output.
+# Render the pipeline report. Default writes both aggregate-report.md and
+# aggregate-report.json into $BRIK_LOG_DIR. --format md|json restricts output.
 # --output <path> redirects the chosen format to a custom path.
 report.render() {
     _report._require_jq || return "$?"
@@ -706,14 +707,14 @@ report.render() {
 
     case "$format" in
         md)
-            local md_out="${output:-${log_dir}/pipeline-report.md}"
+            local md_out="${output:-${log_dir}/aggregate-report.md}"
             _report._render_md "$backend" > "$md_out" || {
                 log.error "cannot write md report: $md_out"
                 return "$BRIK_EXIT_IO_FAILURE"
             }
             ;;
         json)
-            local json_out="${output:-${log_dir}/pipeline-report.json}"
+            local json_out="${output:-${log_dir}/aggregate-report.json}"
             if [[ "$json_out" != "$backend" ]]; then
                 cp "$backend" "$json_out" || {
                     log.error "cannot copy json report to: $json_out"
@@ -722,11 +723,11 @@ report.render() {
             fi
             ;;
         both)
-            _report._render_md "$backend" > "${log_dir}/pipeline-report.md" || {
+            _report._render_md "$backend" > "${log_dir}/aggregate-report.md" || {
                 log.error "cannot write md report"
                 return "$BRIK_EXIT_IO_FAILURE"
             }
-            # JSON backend already lives at ${log_dir}/pipeline-report.json.
+            # JSON backend already lives at ${log_dir}/aggregate-report.json.
             ;;
     esac
     return 0

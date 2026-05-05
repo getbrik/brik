@@ -255,12 +255,12 @@ stage.skip_with_warning() {
     return "$BRIK_EXIT_SKIP_WITH_WARNING"
 }
 
-# Record the stage's terminal tech.* fields into the pipeline-report backend
+# Record the stage's terminal tech.* fields into the aggregate-report backend
 # and emit the per-stage fragment for CI artifact aggregation. Idempotent
 # when called repeatedly (report.record upserts).
 #
 # Behavior:
-#   - No-op when the backend pipeline-report.json is absent (legacy callers
+#   - No-op when the backend aggregate-report.json is absent (legacy callers
 #     that bypass pipeline.run / stage.dispatch).
 #   - Records tech.duration_ms, tech.exit_code, and tech.status (when not
 #     already set by the stage itself, e.g. config-skip pattern).
@@ -275,7 +275,7 @@ _stage._finalize_fragment() {
     local stage_start_ms="$3"
 
     local log_dir="${BRIK_LOG_DIR:-${BRIK_DEFAULT_LOG_DIR:-/tmp/brik/logs}}"
-    local backend="${log_dir}/pipeline-report.json"
+    local backend="${log_dir}/aggregate-report.json"
     [[ -f "$backend" ]] || return 0
 
     local stage_end_ms duration_ms
@@ -345,7 +345,7 @@ stage.run() {
         # Falls back silently to "completed successfully" if the report is
         # absent or jq is unavailable (stage run standalone outside pipeline).
         local _report_path _stage_status=""
-        _report_path="${BRIK_LOG_DIR:-${BRIK_DEFAULT_LOG_DIR:-/tmp/brik/logs}}/pipeline-report.json"
+        _report_path="${BRIK_LOG_DIR:-${BRIK_DEFAULT_LOG_DIR:-/tmp/brik/logs}}/aggregate-report.json"
         if [[ -f "$_report_path" ]] && command -v jq >/dev/null 2>&1; then
             _stage_status="$(jq -r --arg s "$stage_name" \
                 '.stages[] | select(.name == $s) | .tech.status // empty' \
@@ -415,7 +415,7 @@ stage.dispatch() {
     # Ensure the pipeline report exists so stages can report.record. When
     # invoked via pipeline.run, report.init was already called; in the
     # single-stage path (brik.wrapper.run_stage) we lazily initialize here.
-    local _report_path="${BRIK_LOG_DIR:-${BRIK_DEFAULT_LOG_DIR:-/tmp/brik/logs}}/pipeline-report.json"
+    local _report_path="${BRIK_LOG_DIR:-${BRIK_DEFAULT_LOG_DIR:-/tmp/brik/logs}}/aggregate-report.json"
     [[ -f "$_report_path" ]] || report.init >/dev/null 2>&1 || true
 
     local logic_function=""

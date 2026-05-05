@@ -49,7 +49,7 @@ stages.release() {
     pipeline.env.set "BRIK_APP_VERSION" "$current_version"
 
     # If on a tag (release trigger), prepare and finalize. A failure in either
-    # step must propagate so the pipeline (and pipeline-report.json) reflect
+    # step must propagate so the pipeline (and aggregate-report.json) reflect
     # the real outcome instead of the previous warn-and-return-0 behaviour.
     if [[ -n "${BRIK_TAG:-}" ]]; then
         _stages.release._prepare "$current_version" || return $?

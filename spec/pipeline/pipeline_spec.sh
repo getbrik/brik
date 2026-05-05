@@ -35,7 +35,7 @@ Describe "pipeline.sh"
       default_flow_ran_stages() {
         pipeline.run >/dev/null 2>&1
         jq -r '.stages | map(select(.tech.status == "success")) | map(.name) | join(",")' \
-          "$PIPELINE_LOG_DIR/pipeline-report.json"
+          "$PIPELINE_LOG_DIR/aggregate-report.json"
       }
       When call default_flow_ran_stages
       The output should equal "init,build,lint,sast,scan,test"
@@ -45,7 +45,7 @@ Describe "pipeline.sh"
       default_flow_skipped_stages() {
         pipeline.run >/dev/null 2>&1
         jq -r '.stages | map(select(.tech.status == "skipped")) | map(.name) | join(",")' \
-          "$PIPELINE_LOG_DIR/pipeline-report.json"
+          "$PIPELINE_LOG_DIR/aggregate-report.json"
       }
       When call default_flow_skipped_stages
       The output should equal "release,package,container-scan,deploy,notify"
@@ -58,11 +58,11 @@ Describe "pipeline.sh"
       The error should be present
     End
 
-    It "produces both pipeline-report.md and pipeline-report.json"
+    It "produces both aggregate-report.md and aggregate-report.json"
       When call pipeline.run
       The status should be success
-      The file "$PIPELINE_LOG_DIR/pipeline-report.md" should be exist
-      The file "$PIPELINE_LOG_DIR/pipeline-report.json" should be exist
+      The file "$PIPELINE_LOG_DIR/aggregate-report.md" should be exist
+      The file "$PIPELINE_LOG_DIR/aggregate-report.json" should be exist
       The output should be present
       The error should be present
     End
@@ -71,7 +71,7 @@ Describe "pipeline.sh"
       exit_codes_recorded() {
         pipeline.run >/dev/null 2>&1
         jq -r '.stages | map(select(.tech.status == "success")) | all(.tech.exit_code == "0")' \
-          "$PIPELINE_LOG_DIR/pipeline-report.json"
+          "$PIPELINE_LOG_DIR/aggregate-report.json"
       }
       When call exit_codes_recorded
       The output should equal "true"
@@ -86,7 +86,7 @@ Describe "pipeline.sh"
       all_stages_ran() {
         pipeline.run --with-release --with-package --with-deploy >/dev/null 2>&1
         jq -r '.stages | map(.name) | join(",")' \
-          "$PIPELINE_LOG_DIR/pipeline-report.json"
+          "$PIPELINE_LOG_DIR/aggregate-report.json"
       }
       When call all_stages_ran
       The output should equal "init,release,build,lint,sast,scan,test,package,container-scan,deploy,notify"
@@ -96,7 +96,7 @@ Describe "pipeline.sh"
       no_skips_with_all_flags() {
         pipeline.run --with-release --with-package --with-deploy >/dev/null 2>&1
         jq -r '.stages | map(select(.tech.status == "skipped")) | length' \
-          "$PIPELINE_LOG_DIR/pipeline-report.json"
+          "$PIPELINE_LOG_DIR/aggregate-report.json"
       }
       When call no_skips_with_all_flags
       The output should equal "0"
@@ -111,7 +111,7 @@ Describe "pipeline.sh"
       package_and_container_scan_ran() {
         pipeline.run --with-package >/dev/null 2>&1
         jq -r '.stages | map(select(.name == "package" or .name == "container-scan")) | map(.tech.status) | join(",")' \
-          "$PIPELINE_LOG_DIR/pipeline-report.json"
+          "$PIPELINE_LOG_DIR/aggregate-report.json"
       }
       When call package_and_container_scan_ran
       The output should equal "success,success"
@@ -126,7 +126,7 @@ Describe "pipeline.sh"
       deploy_and_notify_ran() {
         pipeline.run --with-deploy >/dev/null 2>&1
         jq -r '.stages | map(select(.name == "deploy" or .name == "notify")) | map(.tech.status) | join(",")' \
-          "$PIPELINE_LOG_DIR/pipeline-report.json"
+          "$PIPELINE_LOG_DIR/aggregate-report.json"
       }
       When call deploy_and_notify_ran
       The output should equal "success,success"
@@ -142,7 +142,7 @@ Describe "pipeline.sh"
         stages.build() { return 1; }
         pipeline.run >/dev/null 2>&1
         jq -r '.stages | map(select(.name == "lint" or .name == "sast" or .name == "scan" or .name == "test")) | map(.tech.status) | unique | join(",")' \
-          "$PIPELINE_LOG_DIR/pipeline-report.json"
+          "$PIPELINE_LOG_DIR/aggregate-report.json"
       }
       When call fail_fast_stops_remaining
       The output should equal "skipped"
@@ -161,7 +161,7 @@ Describe "pipeline.sh"
         stages.build() { return 1; }
         pipeline.run >/dev/null 2>&1
         jq -r '.stages | map(select(.name == "build")) | map(.tech.status) | first' \
-          "$PIPELINE_LOG_DIR/pipeline-report.json"
+          "$PIPELINE_LOG_DIR/aggregate-report.json"
       }
       When call failed_stage_status
       The output should equal "failed"
@@ -172,7 +172,7 @@ Describe "pipeline.sh"
         stages.build() { return 1; }
         pipeline.run --continue-on-error >/dev/null 2>&1
         jq -r '.stages | map(select(.name == "lint" or .name == "sast" or .name == "scan" or .name == "test")) | map(.tech.status) | unique | join(",")' \
-          "$PIPELINE_LOG_DIR/pipeline-report.json"
+          "$PIPELINE_LOG_DIR/aggregate-report.json"
       }
       When call continue_on_error_runs_rest
       The output should equal "success"
@@ -196,7 +196,7 @@ Describe "pipeline.sh"
         }
         pipeline.run >/dev/null 2>&1
         jq -r '.stages[] | select(.name == "lint") | .tech.status' \
-          "$PIPELINE_LOG_DIR/pipeline-report.json"
+          "$PIPELINE_LOG_DIR/aggregate-report.json"
       }
       When call lint_config_skip
       The output should equal "skipped"
@@ -236,7 +236,7 @@ Describe "pipeline.sh"
     It "stamps pipeline_id from BRIK_RUN_ID"
       pipeline_id_recorded() {
         pipeline.run >/dev/null 2>&1
-        jq -r '.pipeline_id' "$PIPELINE_LOG_DIR/pipeline-report.json"
+        jq -r '.pipeline_id' "$PIPELINE_LOG_DIR/aggregate-report.json"
       }
       When call pipeline_id_recorded
       The output should equal "run-pipeline-test"
@@ -246,7 +246,7 @@ Describe "pipeline.sh"
       timestamps_recorded() {
         pipeline.run >/dev/null 2>&1
         jq -r '[.started_at, .finished_at] | map(test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T")) | all' \
-          "$PIPELINE_LOG_DIR/pipeline-report.json"
+          "$PIPELINE_LOG_DIR/aggregate-report.json"
       }
       When call timestamps_recorded
       The output should equal "true"
@@ -256,7 +256,7 @@ Describe "pipeline.sh"
       durations_non_negative() {
         pipeline.run >/dev/null 2>&1
         jq -r '.stages | map(select(.tech.status == "success")) | all(.tech.duration_ms | tonumber >= 0)' \
-          "$PIPELINE_LOG_DIR/pipeline-report.json"
+          "$PIPELINE_LOG_DIR/aggregate-report.json"
       }
       When call durations_non_negative
       The output should equal "true"

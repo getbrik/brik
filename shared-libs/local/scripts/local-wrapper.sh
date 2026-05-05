@@ -106,7 +106,7 @@ brik.local.run_stage() {
 #
 # Thin delegator (per spec 6.15): wrapper setup has already been done by
 # brik.local.setup. We call pipeline.run in the lib layer, then render a
-# terminal-friendly summary from the produced pipeline-report.json.
+# terminal-friendly summary from the produced aggregate-report.json.
 #
 # Usage: brik.local.run_pipeline [--continue-on-error] [--with-release]
 #        [--with-package] [--with-deploy]
@@ -129,9 +129,9 @@ brik.local.run_pipeline() {
 # counts line ("X/Y passed, Z skipped"). Status labels: PASS (tech.status ==
 # success), FAIL (failed), SKIP (skipped).
 # Usage: brik.local.print_summary [<report_json_path>]
-# Default path: $BRIK_LOG_DIR/pipeline-report.json.
+# Default path: $BRIK_LOG_DIR/aggregate-report.json.
 brik.local.print_summary() {
-    local report_path="${1:-${BRIK_LOG_DIR:-${BRIK_DEFAULT_LOG_DIR:-/tmp/brik/logs}}/pipeline-report.json}"
+    local report_path="${1:-${BRIK_LOG_DIR:-${BRIK_DEFAULT_LOG_DIR:-/tmp/brik/logs}}/aggregate-report.json}"
 
     if [[ ! -f "$report_path" ]]; then
         log.warn "pipeline report not found: $report_path"

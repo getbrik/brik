@@ -14,7 +14,7 @@ Describe "stages.notify"
     export BRIK_PLATFORM="gitlab"
     export BRIK_COMMIT_REF="main"
     export BRIK_COMMIT_SHORT_SHA="abc123d"
-    # Isolate BRIK_LOG_DIR so a stale pipeline-report.md left by earlier specs
+    # Isolate BRIK_LOG_DIR so a stale aggregate-report.md left by earlier specs
     # (e.g. report_spec) doesn't get `cat`'d by notify.sh, masking the fallback
     # banner the notify tests assert against.
     _NOTIFY_ORIG_LOG_DIR="${BRIK_LOG_DIR:-}"
@@ -96,33 +96,33 @@ Describe "stages.notify"
     The error should be present
   End
 
-  Describe "pipeline-report copy into workspace"
+  Describe "aggregate-report copy into workspace"
     # CI templates declare artifacts: paths: [brik-artifacts/]; if notify
     # leaves the report only under BRIK_LOG_DIR (outside the workspace),
     # GitLab/Jenkins emit "no matching files" warnings on every run.
     setup_report() {
-      printf '# Pipeline Report\n' > "${BRIK_LOG_DIR}/pipeline-report.md"
-      printf '{"stages":[]}\n'      > "${BRIK_LOG_DIR}/pipeline-report.json"
+      printf '# Pipeline Report\n' > "${BRIK_LOG_DIR}/aggregate-report.md"
+      printf '{"stages":[]}\n'      > "${BRIK_LOG_DIR}/aggregate-report.json"
     }
     Before 'setup_report'
 
-    It "copies pipeline-report.md into workspace brik-artifacts/"
+    It "copies aggregate-report.md into workspace brik-artifacts/"
       run_notify_copy_md() {
         local ctx
         ctx="$(context.create "notify")" 2>/dev/null || ctx="$(mktemp)"
         stages.notify "$ctx" >/dev/null 2>&1
-        [[ -f "${BRIK_WORKSPACE}/brik-artifacts/pipeline-report.md" ]]
+        [[ -f "${BRIK_WORKSPACE}/brik-artifacts/aggregate-report.md" ]]
       }
       When call run_notify_copy_md
       The status should be success
     End
 
-    It "copies pipeline-report.json into workspace brik-artifacts/"
+    It "copies aggregate-report.json into workspace brik-artifacts/"
       run_notify_copy_json() {
         local ctx
         ctx="$(context.create "notify")" 2>/dev/null || ctx="$(mktemp)"
         stages.notify "$ctx" >/dev/null 2>&1
-        [[ -f "${BRIK_WORKSPACE}/brik-artifacts/pipeline-report.json" ]]
+        [[ -f "${BRIK_WORKSPACE}/brik-artifacts/aggregate-report.json" ]]
       }
       When call run_notify_copy_json
       The status should be success
@@ -150,7 +150,7 @@ Describe "stages.notify"
     End
   End
 
-  Describe "pipeline-report copy when reports absent"
+  Describe "aggregate-report copy when reports absent"
     It "does not create brik-artifacts/ when no report exists"
       run_notify_no_report() {
         local ctx

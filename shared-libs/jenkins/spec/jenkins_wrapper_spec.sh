@@ -368,7 +368,7 @@ Describe "jenkins-wrapper.sh"
     It "runs lint stage and records tech.status=skipped with warning"
       run_lint_check_report() {
         brik.jenkins.run_stage "lint" >/dev/null 2>&1
-        local report="${BRIK_LOG_DIR}/pipeline-report.json"
+        local report="${BRIK_LOG_DIR}/aggregate-report.json"
         if [[ -f "$report" ]]; then
           jq -r '.stages[] | select(.name == "lint") | .tech.status // empty' "$report"
         else
@@ -384,7 +384,7 @@ Describe "jenkins-wrapper.sh"
     It "runs scan stage and lazy-initializes the pipeline report"
       run_scan_check_report() {
         brik.jenkins.run_stage "scan" >/dev/null 2>&1
-        if [[ -f "${BRIK_LOG_DIR}/pipeline-report.json" ]]; then
+        if [[ -f "${BRIK_LOG_DIR}/aggregate-report.json" ]]; then
           echo "report_present"
         else
           echo "no_report"

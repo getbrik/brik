@@ -36,11 +36,11 @@ stages.container_scan() {
     local image_built="false" image_ref="" image_digest=""
     if command -v jq >/dev/null 2>&1; then
         # Read the package stage fragment directly. On GitLab each job has
-        # an isolated backend, but brik-artifacts/package.json travels as
+        # an isolated backend, but brik-artifacts/package/package.json travels as
         # an artifact (declared in package.yml + pulled via needs.artifacts
         # by the container-scan job). On Jenkins the workspace is shared,
         # so the same path is also visible. Single source of truth.
-        local _pkg_fragment="${BRIK_WORKSPACE:-.}/brik-artifacts/package.json"
+        local _pkg_fragment="${BRIK_WORKSPACE:-.}/brik-artifacts/package/package.json"
         if [[ -f "$_pkg_fragment" ]]; then
             image_built="$(jq -r '.tech.image_built // "false"' "$_pkg_fragment" 2>/dev/null || printf 'false')"
             image_ref="$(jq -r '.tech.image_ref // ""' "$_pkg_fragment" 2>/dev/null || printf '')"

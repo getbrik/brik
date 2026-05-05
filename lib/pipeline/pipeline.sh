@@ -79,7 +79,7 @@ pipeline.run() {
     report.init || return "$?"
 
     # Local mode treats per-stage fragments as a CI-only mechanism: pipeline.run
-    # produces the canonical pipeline-report.{md,json} directly via report.render
+    # produces the canonical aggregate-report.{md,json} directly via report.render
     # below. Emitting fragments here would populate ${BRIK_WORKSPACE}/brik-artifacts/
     # and trigger _notify._is_ci_aggregation_mode in stages.notify, which would
     # overwrite the canonical report with an aggregate that lacks pipeline.id /
@@ -146,13 +146,13 @@ pipeline.run() {
     return 0
 }
 
-# Copy pipeline-report.{md,json} to a workspace-relative directory so CI
+# Copy aggregate-report.{md,json} to a workspace-relative directory so CI
 # systems (GitLab via CI_PROJECT_DIR, Jenkins via WORKSPACE) can archive it.
 # No-op when no workspace root resolves (standalone local run outside CI).
 _pipeline._archive_report() {
     local _log_dir="${BRIK_LOG_DIR:-${BRIK_DEFAULT_LOG_DIR:-/tmp/brik/logs}}"
-    local _report_md="${_log_dir}/pipeline-report.md"
-    local _report_json="${_log_dir}/pipeline-report.json"
+    local _report_md="${_log_dir}/aggregate-report.md"
+    local _report_json="${_log_dir}/aggregate-report.json"
 
     local _artifacts_root="${CI_PROJECT_DIR:-${WORKSPACE:-${BRIK_WORKSPACE:-}}}"
     [[ -n "$_artifacts_root" && -d "$_artifacts_root" ]] || return 0
@@ -163,7 +163,7 @@ _pipeline._archive_report() {
     [[ -f "$_report_md" ]] && cp "$_report_md" "$_artifacts_dir/" 2>/dev/null || true
     [[ -f "$_report_json" ]] && cp "$_report_json" "$_artifacts_dir/" 2>/dev/null || true
 
-    if [[ -f "${_artifacts_dir}/pipeline-report.md" ]]; then
-        log.info "pipeline report archived: ${_artifacts_dir}/pipeline-report.{md,json}"
+    if [[ -f "${_artifacts_dir}/aggregate-report.md" ]]; then
+        log.info "pipeline report archived: ${_artifacts_dir}/aggregate-report.{md,json}"
     fi
 }

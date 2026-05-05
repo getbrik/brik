@@ -37,7 +37,7 @@ Describe "stage.run wires report.write_fragment"
     It "writes brik-artifacts/<stage>.json under BRIK_WORKSPACE"
       do_run() {
         stage.run "build" "success_logic" >/dev/null 2>&1
-        test -f "$SR_WORKSPACE/brik-artifacts/build.json"
+        test -f "$SR_WORKSPACE/brik-artifacts/build/build.json"
       }
       When call do_run
       The status should be success
@@ -46,7 +46,7 @@ Describe "stage.run wires report.write_fragment"
     It "fragment.status is success when stage returned 0"
       read_status() {
         stage.run "build" "success_logic" >/dev/null 2>&1
-        jq -r '.status' "$SR_WORKSPACE/brik-artifacts/build.json"
+        jq -r '.status' "$SR_WORKSPACE/brik-artifacts/build/build.json"
       }
       When call read_status
       The output should equal "success"
@@ -55,7 +55,7 @@ Describe "stage.run wires report.write_fragment"
     It "fragment.rc is 0"
       read_rc() {
         stage.run "build" "success_logic" >/dev/null 2>&1
-        jq '.rc' "$SR_WORKSPACE/brik-artifacts/build.json"
+        jq '.rc' "$SR_WORKSPACE/brik-artifacts/build/build.json"
       }
       When call read_rc
       The output should equal "0"
@@ -65,7 +65,7 @@ Describe "stage.run wires report.write_fragment"
       Skip if "jv not installed" jv_missing
       do_validate() {
         stage.run "build" "success_logic" >/dev/null 2>&1
-        validate_fragment_file "$SR_WORKSPACE/brik-artifacts/build.json"
+        validate_fragment_file "$SR_WORKSPACE/brik-artifacts/build/build.json"
       }
       When call do_validate
       The status should be success
@@ -91,7 +91,7 @@ Describe "stage.run wires report.write_fragment"
     It "writes a fragment even when the stage returns non-zero"
       do_run() {
         stage.run "build" "failure_logic" >/dev/null 2>&1 || true
-        test -f "$SR_WORKSPACE/brik-artifacts/build.json"
+        test -f "$SR_WORKSPACE/brik-artifacts/build/build.json"
       }
       When call do_run
       The status should be success
@@ -100,7 +100,7 @@ Describe "stage.run wires report.write_fragment"
     It "fragment.status is failed"
       read_status() {
         stage.run "build" "failure_logic" >/dev/null 2>&1 || true
-        jq -r '.status' "$SR_WORKSPACE/brik-artifacts/build.json"
+        jq -r '.status' "$SR_WORKSPACE/brik-artifacts/build/build.json"
       }
       When call read_status
       The output should equal "failed"
@@ -109,7 +109,7 @@ Describe "stage.run wires report.write_fragment"
     It "fragment.rc captures the stage's non-zero rc"
       read_rc() {
         stage.run "build" "failure_logic" >/dev/null 2>&1 || true
-        jq '.rc' "$SR_WORKSPACE/brik-artifacts/build.json"
+        jq '.rc' "$SR_WORKSPACE/brik-artifacts/build/build.json"
       }
       When call read_rc
       The output should equal "5"
@@ -133,7 +133,7 @@ Describe "stage.run wires report.write_fragment"
       do_run() {
         export BRIK_DISABLE_REPORT_FRAGMENTS=1
         stage.run "build" "success_logic" >/dev/null 2>&1
-        ! test -f "$SR_WORKSPACE/brik-artifacts/build.json"
+        ! test -f "$SR_WORKSPACE/brik-artifacts/build/build.json"
       }
       When call do_run
       The status should be success
@@ -170,7 +170,7 @@ Describe "stage.run wires report.write_fragment"
       measure() {
         stage.run "build" "sleep_logic" >/dev/null 2>&1
         local d
-        d="$(jq '.duration_ms' "$SR_WORKSPACE/brik-artifacts/build.json")"
+        d="$(jq '.duration_ms' "$SR_WORKSPACE/brik-artifacts/build/build.json")"
         [[ "$d" -gt 0 && $((d % 1000)) -ne 0 ]]
       }
       When call measure
@@ -207,7 +207,7 @@ HOOKEOF
     It "writes a fragment when the pre_stage hook aborts"
       do_run() {
         stage.run "build" "success_logic" >/dev/null 2>&1 || true
-        test -f "$SR_WORKSPACE/brik-artifacts/build.json"
+        test -f "$SR_WORKSPACE/brik-artifacts/build/build.json"
       }
       When call do_run
       The status should be success

@@ -41,6 +41,6 @@ brik-notify:
   artifacts:
     when: always
     expire_in: 1 month
-    name: "pipeline-report-${CI_PIPELINE_ID}"
+    name: "aggregate-report-${CI_PIPELINE_ID}"
     paths:
       - brik-artifacts/

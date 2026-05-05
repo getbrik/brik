@@ -314,7 +314,7 @@ Describe "gitlab-wrapper.sh"
       run_init_check_report() {
         brik.gitlab.run_stage "init" >/dev/null 2>&1
         local status=$?
-        local report="${BRIK_LOG_DIR}/pipeline-report.json"
+        local report="${BRIK_LOG_DIR}/aggregate-report.json"
         if [[ -f "$report" ]]; then
           jq -r '.stages[] | select(.name == "init") | .tech.stack // empty' "$report"
         else
@@ -346,7 +346,7 @@ Describe "gitlab-wrapper.sh"
     It "runs lint stage and records tech.status=skipped with warning"
       run_lint_check_report() {
         brik.gitlab.run_stage "lint" >/dev/null 2>&1
-        local report="${BRIK_LOG_DIR}/pipeline-report.json"
+        local report="${BRIK_LOG_DIR}/aggregate-report.json"
         if [[ -f "$report" ]]; then
           jq -r '.stages[] | select(.name == "lint") | .tech.status // empty' "$report"
         else
@@ -371,7 +371,7 @@ Describe "gitlab-wrapper.sh"
     It "runs scan stage and lazy-initializes the pipeline report"
       run_scan_check_report() {
         brik.gitlab.run_stage "scan" >/dev/null 2>&1
-        if [[ -f "${BRIK_LOG_DIR}/pipeline-report.json" ]]; then
+        if [[ -f "${BRIK_LOG_DIR}/aggregate-report.json" ]]; then
           echo "report_present"
         else
           echo "no_report"
@@ -420,7 +420,7 @@ Describe "gitlab-wrapper.sh"
     It "runs package stub and records status skipped in the pipeline report"
       run_package_check() {
         brik.gitlab.run_stage "package" >/dev/null 2>&1
-        local report="${BRIK_LOG_DIR}/pipeline-report.json"
+        local report="${BRIK_LOG_DIR}/aggregate-report.json"
         if [[ -f "$report" ]]; then
           jq -r '.stages[] | select(.name == "package") | .tech.status // empty' "$report"
         else
@@ -436,7 +436,7 @@ Describe "gitlab-wrapper.sh"
     It "runs deploy stub and silent-skips when no environments configured"
       run_deploy_check() {
         brik.gitlab.run_stage "deploy" >/dev/null 2>&1
-        local report="${BRIK_LOG_DIR}/pipeline-report.json"
+        local report="${BRIK_LOG_DIR}/aggregate-report.json"
         if [[ -f "$report" ]]; then
           jq -r '.stages[] | select(.name == "deploy") | .tech.status // empty' "$report"
         else
@@ -471,7 +471,7 @@ Describe "gitlab-wrapper.sh"
     It "runs release stage and records new_version in the pipeline report"
       run_release_check() {
         brik.gitlab.run_stage "release" >/dev/null 2>&1
-        local report="${BRIK_LOG_DIR}/pipeline-report.json"
+        local report="${BRIK_LOG_DIR}/aggregate-report.json"
         if [[ -f "$report" ]]; then
           local version
           version="$(jq -r '.stages[] | select(.name == "release") | .business.new_version // empty' "$report")"

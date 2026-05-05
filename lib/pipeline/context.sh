@@ -60,7 +60,7 @@ context.create() {
 # Prints the value on stdout. Returns 1 if key not found.
 # §4.2 step 7: privatized. Only stage.sh + summary.sh call this (lifecycle
 # keys). External callers must go through report.record / report JSON
-# instead (pipeline-report.json is the public aggregated store).
+# instead (aggregate-report.json is the public aggregated store).
 _context._get() {
     local context_file="$1"
     local key="$2"

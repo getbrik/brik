@@ -36,27 +36,27 @@ Describe "stages.init"
 
   read_init_stack() {
     jq -r '.stages[] | select(.name == "init") | .tech.stack // empty' \
-      "$BRIK_LOG_DIR/pipeline-report.json" 2>/dev/null
+      "$BRIK_LOG_DIR/aggregate-report.json" 2>/dev/null
   }
 
   read_init_tech() {
     local key="$1"
     jq -r --arg k "$key" \
       '.stages[] | select(.name == "init") | .tech[$k] // empty' \
-      "$BRIK_LOG_DIR/pipeline-report.json" 2>/dev/null
+      "$BRIK_LOG_DIR/aggregate-report.json" 2>/dev/null
   }
 
   read_init_business() {
     local key="$1"
     jq -r --arg k "$key" \
       '.stages[] | select(.name == "init") | .business[$k] // empty' \
-      "$BRIK_LOG_DIR/pipeline-report.json" 2>/dev/null
+      "$BRIK_LOG_DIR/aggregate-report.json" 2>/dev/null
   }
 
   read_init_business_path() {
     local path="$1"
     jq -r ".stages[] | select(.name == \"init\") | .business${path} // empty" \
-      "$BRIK_LOG_DIR/pipeline-report.json" 2>/dev/null
+      "$BRIK_LOG_DIR/aggregate-report.json" 2>/dev/null
   }
   Before 'setup_env'
   After 'cleanup_env'
@@ -118,7 +118,7 @@ Describe "stages.init"
       ctx="$(context.create "init")" 2>/dev/null || ctx="$(mktemp)"
       stages.init "$ctx" >/dev/null 2>&1 || return $?
       jq -c '.stages[] | select(.name == "init") | .tech.config_valid' \
-        "$BRIK_LOG_DIR/pipeline-report.json"
+        "$BRIK_LOG_DIR/aggregate-report.json"
     }
     When call run_init_config_valid
     The output should equal "true"
@@ -130,7 +130,7 @@ Describe "stages.init"
       ctx="$(context.create "init")" 2>/dev/null || ctx="$(mktemp)"
       stages.init "$ctx" >/dev/null 2>&1 || return $?
       jq -c '.stages[] | select(.name == "init") | .tech.prereqs_present | {yq, jq}' \
-        "$BRIK_LOG_DIR/pipeline-report.json"
+        "$BRIK_LOG_DIR/aggregate-report.json"
     }
     When call run_init_prereqs
     The output should equal '{"yq":true,"jq":true}'
@@ -168,7 +168,7 @@ Describe "stages.init"
       ctx="$(context.create "init")" 2>/dev/null || ctx="$(mktemp)"
       stages.init "$ctx" >/dev/null 2>&1 || return $?
       jq -c '.stages[] | select(.name == "init") | .business.commit' \
-        "$BRIK_LOG_DIR/pipeline-report.json"
+        "$BRIK_LOG_DIR/aggregate-report.json"
     }
     When call run_init_commit
     The output should equal '{"sha":"abcdef0123456789abcdef0123456789abcdef01","short_sha":"abcdef01","ref":"main","branch":"main"}'
@@ -234,7 +234,7 @@ Describe "stages.init"
       ctx="$(context.create "init")" 2>/dev/null || ctx="$(mktemp)"
       stages.init "$ctx" >/dev/null 2>&1 || return $?
       jq -c '.stages[] | select(.name == "init") | .business.commit | has("author")' \
-        "$BRIK_LOG_DIR/pipeline-report.json"
+        "$BRIK_LOG_DIR/aggregate-report.json"
     }
     When call run_init_commit_author_omitted
     The output should equal "false"
@@ -248,7 +248,7 @@ Describe "stages.init"
       ctx="$(context.create "init")" 2>/dev/null || ctx="$(mktemp)"
       stages.init "$ctx" >/dev/null 2>&1 || return $?
       jq -c '.stages[] | select(.name == "init") | .business.pipeline' \
-        "$BRIK_LOG_DIR/pipeline-report.json"
+        "$BRIK_LOG_DIR/aggregate-report.json"
     }
     When call run_init_pipeline_ref
     The output should equal '{"id":"42","url":"https://gitlab.example.com/p/-/pipelines/42"}'
