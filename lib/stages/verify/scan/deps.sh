@@ -70,6 +70,9 @@ verify.scan.deps.run() {
         # osv-scanner returns non-zero when no package sources found
         if echo "$scan_output" | grep -qi "no package sources found"; then
             log.warn "no package sources found for $resolved - skipping"
+            # Emit empty stubs so CI artifact uploads (artifacts.reports.cyclonedx
+            # and artifacts.paths) find the expected files instead of warning.
+            _verify.scan.deps._write_empty_reports "$workspace"
             return 0
         fi
         # osv-scanner can exit non-zero on transient extraction errors
@@ -97,6 +100,21 @@ verify.scan.deps.run() {
     fi
     log.info "security dependency scan passed"
     return 0
+}
+
+# Write valid empty SARIF and CycloneDX stubs at the canonical paths.
+# Used when osv-scanner reports "no package sources found" so CI artifact
+# uploads (GitLab artifacts.reports.cyclonedx, artifacts.paths) find the
+# expected files instead of emitting "no matching files" warnings.
+_verify.scan.deps._write_empty_reports() {
+    local workspace="$1"
+    local sarif="${BRIK_SECURITY_DEPS_OUTPUT_PATH:-brik-artifacts/scan/deps.sarif}"
+    local sbom="${BRIK_SECURITY_DEPS_SBOM_OUTPUT_PATH:-brik-artifacts/scan/sbom.cdx.json}"
+    (cd "$workspace" \
+        && mkdir -p "$(dirname "$sarif")" "$(dirname "$sbom")" \
+        && printf '%s\n' '{"$schema":"https://json.schemastore.org/sarif-2.1.0.json","version":"2.1.0","runs":[]}' > "$sarif" \
+        && printf '%s\n' '{"$schema":"http://cyclonedx.org/schema/bom-1.5.schema.json","bomFormat":"CycloneDX","specVersion":"1.5","version":1,"components":[],"vulnerabilities":[]}' > "$sbom") \
+        || true
 }
 
 # Run osv-scanner twice more: once for SARIF, once for CycloneDX 1.5.
