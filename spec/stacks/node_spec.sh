@@ -268,10 +268,10 @@ Describe "test/node.sh"
 
       It "injects coverage and jest-junit flags for jest"
         When call stacks.node.test_cmd "jest" "/workspace" ""
-        The output should include "JEST_JUNIT_OUTPUT_FILE='reports/junit.xml'"
+        The output should include "JEST_JUNIT_OUTPUT_FILE='brik-artifacts/test/junit.xml'"
         The output should include "npx jest"
         The output should include "--coverage"
-        The output should include "--coverageDirectory='coverage'"
+        The output should include "--coverageDirectory='brik-artifacts/test/coverage'"
         The output should include "--coverageReporters=cobertura"
         The output should include "--reporters=default"
         The output should include "--reporters=jest-junit"
@@ -279,7 +279,7 @@ Describe "test/node.sh"
 
       It "renames cobertura-coverage.xml to coverage.xml post-test"
         When call stacks.node.test_cmd "jest" "/workspace" ""
-        The output should include "cp -f 'coverage/cobertura-coverage.xml' 'coverage/coverage.xml'"
+        The output should include "cp -f 'brik-artifacts/test/coverage/cobertura-coverage.xml' 'brik-artifacts/test/coverage/coverage.xml'"
         The output should include "exit \$_rc"
       End
 
@@ -298,7 +298,7 @@ Describe "test/node.sh"
       It "ignores legacy report_dir argument when reports.enabled is true"
         When call stacks.node.test_cmd "jest" "/workspace" "/legacy/reports"
         The output should include "--coverage"
-        The output should include "JEST_JUNIT_OUTPUT_FILE='reports/junit.xml'"
+        The output should include "JEST_JUNIT_OUTPUT_FILE='brik-artifacts/test/junit.xml'"
       End
 
       It "leaves npm framework untouched"

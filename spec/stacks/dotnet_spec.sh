@@ -187,14 +187,14 @@ Describe "test/dotnet.sh"
         When call stacks.dotnet.test_cmd "dotnet" "/workspace" ""
         The output should include "dotnet test"
         The output should include "--collect:'XPlat Code Coverage'"
-        The output should include "--logger:'junit;LogFilePath=reports/junit.xml'"
+        The output should include "--logger:'junit;LogFilePath=brik-artifacts/test/junit.xml'"
         The output should not include "--results-directory"
       End
 
       It "flattens coverage.cobertura.xml from TestResults to ${cov_dir}/coverage.xml"
         When call stacks.dotnet.test_cmd "dotnet" "/workspace" ""
         The output should include "find . -path '*/TestResults/*/coverage.cobertura.xml'"
-        The output should include "cp -f {} 'coverage/coverage.xml'"
+        The output should include "cp -f {} 'brik-artifacts/test/coverage/coverage.xml'"
         The output should include "exit \$_rc"
       End
 

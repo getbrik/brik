@@ -252,8 +252,8 @@ _stages.init._write_dotenv() {
         # test runners keep their native defaults.
         printf 'BRIK_TEST_REPORTS_ENABLED=%s\n'  "$(config.get '.test.reports.enabled' 'false')"
         printf 'BRIK_TEST_COVERAGE_FORMAT=%s\n' "$(config.get '.test.reports.coverage.format' 'auto')"
-        printf 'BRIK_TEST_COVERAGE_DIR=%s\n'    "$(config.get '.test.reports.coverage.output_dir' 'coverage')"
-        printf 'BRIK_TEST_JUNIT_PATH=%s\n'      "$(config.get '.test.reports.junit.output_path' 'reports/junit.xml')"
+        printf 'BRIK_TEST_COVERAGE_DIR=%s\n'    "$(config.get '.test.reports.coverage.output_dir' 'brik-artifacts/test/coverage')"
+        printf 'BRIK_TEST_JUNIT_PATH=%s\n'      "$(config.get '.test.reports.junit.output_path' 'brik-artifacts/test/junit.xml')"
     } > "$dotenv" 2>/dev/null || {
         log.warn "could not write dotenv to $dotenv"
         return 0

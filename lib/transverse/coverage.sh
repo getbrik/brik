@@ -92,7 +92,7 @@ _brik.coverage._parse_branch_pct() {
 #
 # Usage: brik.coverage.summary [<cov_dir>]
 brik.coverage.summary() {
-    local cov_dir="${1:-${BRIK_TEST_COVERAGE_DIR:-coverage}}"
+    local cov_dir="${1:-${BRIK_TEST_COVERAGE_DIR:-brik-artifacts/test/coverage}}"
     local pct
     pct=$(_brik.coverage._parse_pct "$cov_dir")
 
@@ -119,7 +119,7 @@ brik.coverage.summary() {
 # Usage: brik.coverage.gate <threshold> [<cov_dir>]
 brik.coverage.gate() {
     local threshold="${1:-}"
-    local cov_dir="${2:-${BRIK_TEST_COVERAGE_DIR:-coverage}}"
+    local cov_dir="${2:-${BRIK_TEST_COVERAGE_DIR:-brik-artifacts/test/coverage}}"
 
     # Advisory mode: no threshold configured.
     if [[ -z "$threshold" ]]; then

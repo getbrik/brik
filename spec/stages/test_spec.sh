@@ -31,12 +31,12 @@ Describe "stages.test"
     local key="$1"
     jq -r --arg k "$key" \
       '.stages[] | select(.name == "test") | .tech[$k] // empty' \
-      "$BRIK_LOG_DIR/pipeline-report.json" 2>/dev/null
+      "$BRIK_LOG_DIR/aggregate-report.json" 2>/dev/null
   }
 
   read_test_coverage_pct() {
     jq -r '.stages[] | select(.name == "test") | .business.coverage.line_pct // empty' \
-      "$BRIK_LOG_DIR/pipeline-report.json" 2>/dev/null
+      "$BRIK_LOG_DIR/aggregate-report.json" 2>/dev/null
   }
   Before 'setup_env'
   After 'cleanup_env'
@@ -145,7 +145,7 @@ Describe "stages.test"
   It "records test.business.coverage.line_pct from a Cobertura report when reports.enabled=true"
     run_test_records_coverage() {
       export BRIK_TEST_REPORTS_ENABLED="true"
-      export BRIK_TEST_COVERAGE_DIR="$BRIK_WORKSPACE/coverage"
+      export BRIK_TEST_COVERAGE_DIR="$BRIK_WORKSPACE/brik-artifacts/test/coverage"
       mkdir -p "$BRIK_TEST_COVERAGE_DIR"
       printf '<?xml version="1.0"?>\n<coverage line-rate="0.8542" />\n' \
         > "$BRIK_TEST_COVERAGE_DIR/coverage.xml"
@@ -315,8 +315,8 @@ YAML
     }
 
     _write_cobertura_with_branch() {
-      mkdir -p "$BRIK_WORKSPACE/coverage"
-      cat > "$BRIK_WORKSPACE/coverage/coverage.xml" <<'XML'
+      mkdir -p "$BRIK_WORKSPACE/brik-artifacts/test/coverage"
+      cat > "$BRIK_WORKSPACE/brik-artifacts/test/coverage/coverage.xml" <<'XML'
 <?xml version="1.0" ?>
 <coverage line-rate="0.8542" branch-rate="0.72" version="6.0">
 </coverage>
@@ -332,7 +332,7 @@ XML
         ctx="$(context.create "test")" 2>/dev/null || ctx="$(mktemp)"
         stages.test "$ctx" >/dev/null 2>&1
         jq -r '.stages[] | select(.name == "test") | .business.coverage.branch_pct // "<missing>"' \
-          "$BRIK_LOG_DIR/pipeline-report.json"
+          "$BRIK_LOG_DIR/aggregate-report.json"
       }
       When call run_branch
       The output should equal "72.00"
@@ -347,7 +347,7 @@ XML
         ctx="$(context.create "test")" 2>/dev/null || ctx="$(mktemp)"
         stages.test "$ctx" >/dev/null 2>&1
         jq -r '.stages[] | select(.name == "test") | .business.coverage.line_pct // "<missing>"' \
-          "$BRIK_LOG_DIR/pipeline-report.json"
+          "$BRIK_LOG_DIR/aggregate-report.json"
       }
       When call run_both
       The output should equal "85.42"
@@ -356,8 +356,8 @@ XML
     It "omits branch_pct when cobertura lacks branch-rate"
       run_no_branch() {
         _stub_test_with_cov
-        mkdir -p "$BRIK_WORKSPACE/coverage"
-        cat > "$BRIK_WORKSPACE/coverage/coverage.xml" <<'XML'
+        mkdir -p "$BRIK_WORKSPACE/brik-artifacts/test/coverage"
+        cat > "$BRIK_WORKSPACE/brik-artifacts/test/coverage/coverage.xml" <<'XML'
 <?xml version="1.0" ?>
 <coverage line-rate="0.8542" version="6.0">
 </coverage>
@@ -367,7 +367,7 @@ XML
         ctx="$(context.create "test")" 2>/dev/null || ctx="$(mktemp)"
         stages.test "$ctx" >/dev/null 2>&1
         jq -r '.stages[] | select(.name == "test") | .business.coverage | has("branch_pct")' \
-          "$BRIK_LOG_DIR/pipeline-report.json"
+          "$BRIK_LOG_DIR/aggregate-report.json"
       }
       When call run_no_branch
       The output should equal "false"
@@ -393,7 +393,7 @@ XML
         stages.test "$ctx" >/dev/null 2>&1
         unset BRIK_TEST_TOOL
         jq -r '.stages[] | select(.name == "test") | .tech.tool // "<missing>"' \
-          "$BRIK_LOG_DIR/pipeline-report.json"
+          "$BRIK_LOG_DIR/aggregate-report.json"
       }
       When call run_tool_explicit
       The output should equal "vitest"
@@ -409,7 +409,7 @@ XML
         stages.test "$ctx" >/dev/null 2>&1
         unset BRIK_TEST_FRAMEWORK
         jq -r '.stages[] | select(.name == "test") | .tech.tool // "<missing>"' \
-          "$BRIK_LOG_DIR/pipeline-report.json"
+          "$BRIK_LOG_DIR/aggregate-report.json"
       }
       When call run_tool_fallback_framework
       The output should equal "jest"
@@ -425,7 +425,7 @@ XML
         stages.test "$ctx" >/dev/null 2>&1
         unset BRIK_TEST_TOOL BRIK_TEST_FRAMEWORK
         jq -r '.stages[] | select(.name == "test") | .tech.tool // "<missing>"' \
-          "$BRIK_LOG_DIR/pipeline-report.json"
+          "$BRIK_LOG_DIR/aggregate-report.json"
       }
       When call run_tool_priority
       The output should equal "vitest"
@@ -461,7 +461,7 @@ XML
         ctx="$(context.create "test")" 2>/dev/null || ctx="$(mktemp)"
         stages.test "$ctx" >/dev/null 2>&1
         jq -r '.stages[] | select(.name == "test") | .business.tests.total // "<missing>"' \
-          "$BRIK_LOG_DIR/pipeline-report.json"
+          "$BRIK_LOG_DIR/aggregate-report.json"
       }
       When call run_total
       The output should equal "10"
@@ -475,7 +475,7 @@ XML
         ctx="$(context.create "test")" 2>/dev/null || ctx="$(mktemp)"
         stages.test "$ctx" >/dev/null 2>&1
         jq -r '.stages[] | select(.name == "test") | .business.tests.passed // "<missing>"' \
-          "$BRIK_LOG_DIR/pipeline-report.json"
+          "$BRIK_LOG_DIR/aggregate-report.json"
       }
       When call run_passed
       The output should equal "7"
@@ -489,7 +489,7 @@ XML
         ctx="$(context.create "test")" 2>/dev/null || ctx="$(mktemp)"
         stages.test "$ctx" >/dev/null 2>&1
         jq -c '.stages[] | select(.name == "test") | {f: .business.tests.failed, s: .business.tests.skipped}' \
-          "$BRIK_LOG_DIR/pipeline-report.json"
+          "$BRIK_LOG_DIR/aggregate-report.json"
       }
       When call run_failed_skipped
       The output should equal '{"f":2,"s":1}'
@@ -503,7 +503,7 @@ XML
         ctx="$(context.create "test")" 2>/dev/null || ctx="$(mktemp)"
         stages.test "$ctx" >/dev/null 2>&1
         jq -r '.stages[] | select(.name == "test") | .business.tests.duration_ms // "<missing>"' \
-          "$BRIK_LOG_DIR/pipeline-report.json"
+          "$BRIK_LOG_DIR/aggregate-report.json"
       }
       When call run_dur
       The output should equal "3456"
@@ -517,7 +517,7 @@ XML
         ctx="$(context.create "test")" 2>/dev/null || ctx="$(mktemp)"
         stages.test "$ctx" >/dev/null 2>&1
         jq -r '[.stages[] | select(.name == "test") | .business.tests // null | select(. != null)] | length' \
-          "$BRIK_LOG_DIR/pipeline-report.json"
+          "$BRIK_LOG_DIR/aggregate-report.json"
       }
       When call run_omit
       The output should equal "0"
@@ -536,7 +536,7 @@ XML
         ctx="$(context.create "test")" 2>/dev/null || ctx="$(mktemp)"
         stages.test "$ctx" >/dev/null 2>&1
         jq -r '.stages[] | select(.name == "test") | .business.tests.total // "<missing>"' \
-          "$BRIK_LOG_DIR/pipeline-report.json"
+          "$BRIK_LOG_DIR/aggregate-report.json"
       }
       When call run_on_failure
       The output should equal "10"

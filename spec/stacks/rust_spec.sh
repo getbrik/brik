@@ -164,9 +164,9 @@ Describe "test/rust.sh"
           When call stacks.rust.test_cmd "cargo" "/workspace" ""
           The output should include "cargo llvm-cov"
           The output should include "--cobertura"
-          The output should include "--output-path 'coverage/coverage.xml'"
+          The output should include "--output-path 'brik-artifacts/test/coverage/coverage.xml'"
           The output should include "nextest --profile ci"
-          The output should include "mkdir -p 'coverage'"
+          The output should include "mkdir -p 'brik-artifacts/test/coverage'"
         End
 
         It "honours BRIK_TEST_COVERAGE_DIR override"
@@ -214,7 +214,7 @@ Describe "test/rust.sh"
 
         It "uses llvm-cov standalone and warns about JUnit"
           When call stacks.rust.test_cmd "cargo" "/workspace" ""
-          The output should include "cargo llvm-cov --cobertura --output-path 'coverage/coverage.xml'"
+          The output should include "cargo llvm-cov --cobertura --output-path 'brik-artifacts/test/coverage/coverage.xml'"
           The output should not include "nextest"
           The stderr should include "cargo-nextest not installed"
         End

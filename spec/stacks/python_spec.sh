@@ -448,8 +448,8 @@ Describe "test/python.sh"
         When call stacks.python.test_cmd "pytest" "/workspace" ""
         The output should include "python -m pytest"
         The output should include "--cov=."
-        The output should include "--cov-report=xml:'coverage/coverage.xml'"
-        The output should include "--junitxml='reports/junit.xml'"
+        The output should include "--cov-report=xml:'brik-artifacts/test/coverage/coverage.xml'"
+        The output should include "--junitxml='brik-artifacts/test/junit.xml'"
       End
 
       It "honours BRIK_TEST_COVERAGE_DIR override"

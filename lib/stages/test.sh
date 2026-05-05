@@ -88,7 +88,7 @@ stages.test() {
         # Record coverage in business section so consumers don't need to
         # re-parse the report file. line_pct only for now; branch_pct is
         # deferred (chantier 20260502 L2.C.2 follow-up).
-        local _cov_dir="${BRIK_TEST_COVERAGE_DIR:-coverage}"
+        local _cov_dir="${BRIK_TEST_COVERAGE_DIR:-brik-artifacts/test/coverage}"
         [[ "$_cov_dir" != /* ]] && _cov_dir="${BRIK_WORKSPACE:-.}/${_cov_dir}"
         local _cov_pct _cov_branch
         _cov_pct="$(_brik.coverage._parse_pct "$_cov_dir")"

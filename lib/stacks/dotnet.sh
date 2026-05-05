@@ -62,15 +62,15 @@ stacks.dotnet.test_cmd() {
         dotnet|xunit|nunit)
             cmd="dotnet test"
             if [[ "$reports_on" == "true" ]]; then
-                local cov_dir="${BRIK_TEST_COVERAGE_DIR:-coverage}"
-                local junit="${BRIK_TEST_JUNIT_PATH:-reports/junit.xml}"
+                local cov_dir="${BRIK_TEST_COVERAGE_DIR:-brik-artifacts/test/coverage}"
+                local junit="${BRIK_TEST_JUNIT_PATH:-brik-artifacts/test/junit.xml}"
                 # XPlat Code Coverage requires the coverlet.collector nuget
                 # package on the test project. The collector writes
                 # <test-project>/TestResults/<guid>/coverage.cobertura.xml;
                 # we flatten that to ${cov_dir}/coverage.xml post-test.
                 # JunitXml.TestLogger (also a nuget on the test project)
                 # writes LogFilePath relative to the TEST PROJECT's cwd
-                # (e.g. test/Calculator.Tests/reports/junit.xml), not the
+                # (e.g. test/Calculator.Tests/brik-artifacts/test/junit.xml), not the
                 # workspace root, so we also flatten the JUnit XML to
                 # the workspace-rooted ${junit} path.
                 # We do NOT pass --results-directory because that would

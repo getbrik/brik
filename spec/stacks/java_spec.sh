@@ -336,17 +336,17 @@ Describe "test/java.sh"
       It "appends post-test report standardization for maven"
         When call stacks.java.test_cmd "maven" "/workspace" ""
         The output should include "mvn -B test"
-        The output should include "mkdir -p reports/junit"
+        The output should include "mkdir -p brik-artifacts/test/junit"
         The output should include "target/surefire-reports"
         The output should include "target/site/jacoco/jacoco.xml"
-        The output should include "coverage/jacoco.xml"
+        The output should include "brik-artifacts/test/coverage/jacoco.xml"
         The output should include "exit \$_rc"
       End
 
       It "appends post-test report standardization for junit framework"
         When call stacks.java.test_cmd "junit" "/workspace" ""
         The output should include "mvn -B test"
-        The output should include "mkdir -p reports/junit"
+        The output should include "mkdir -p brik-artifacts/test/junit"
       End
 
       It "appends post-test report standardization for gradle"
@@ -354,7 +354,7 @@ Describe "test/java.sh"
         The output should include "gradle test"
         The output should include "build/test-results/test"
         The output should include "build/reports/jacoco/test/jacocoTestReport.xml"
-        The output should include "coverage/jacoco.xml"
+        The output should include "brik-artifacts/test/coverage/jacoco.xml"
         The output should include "exit \$_rc"
       End
 
@@ -367,7 +367,7 @@ Describe "test/java.sh"
       It "ignores legacy report_dir argument when reports.enabled is true"
         When call stacks.java.test_cmd "maven" "/workspace" "/legacy/reports"
         The output should not include "-Dsurefire.reportsDirectory=/legacy/reports"
-        The output should include "mkdir -p reports/junit"
+        The output should include "mkdir -p brik-artifacts/test/junit"
       End
     End
 

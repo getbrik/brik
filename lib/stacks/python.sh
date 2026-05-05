@@ -124,8 +124,8 @@ stacks.python.test_cmd() {
         pytest)
             cmd="python -m pytest"
             if [[ "$reports_on" == "true" ]]; then
-                local cov_dir="${BRIK_TEST_COVERAGE_DIR:-coverage}"
-                local junit="${BRIK_TEST_JUNIT_PATH:-reports/junit.xml}"
+                local cov_dir="${BRIK_TEST_COVERAGE_DIR:-brik-artifacts/test/coverage}"
+                local junit="${BRIK_TEST_JUNIT_PATH:-brik-artifacts/test/junit.xml}"
                 # pytest-cov writes the cobertura XML at the configured
                 # path; pytest itself emits the JUnit XML.
                 cmd="${cmd} --cov=. --cov-report=xml:'${cov_dir}/coverage.xml' --junitxml='${junit}'"

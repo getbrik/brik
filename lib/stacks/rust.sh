@@ -60,7 +60,7 @@ stacks.rust.test_cmd() {
         cargo)
             cmd="cargo test"
             if [[ "$reports_on" == "true" ]]; then
-                local cov_dir="${BRIK_TEST_COVERAGE_DIR:-coverage}"
+                local cov_dir="${BRIK_TEST_COVERAGE_DIR:-brik-artifacts/test/coverage}"
                 local has_nextest=0 has_llvm_cov=0
                 command -v cargo-nextest >/dev/null 2>&1 && has_nextest=1
                 command -v cargo-llvm-cov >/dev/null 2>&1 && has_llvm_cov=1
