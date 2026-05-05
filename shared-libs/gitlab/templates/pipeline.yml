@@ -117,7 +117,13 @@ include:
   - local: '/templates/jobs/build.yml'
   - local: '/templates/jobs/lint.yml'
   - local: '/templates/jobs/sast.yml'
+  - local: '/templates/jobs/sast-reports.yml'
+    rules:
+      - if: '$CI_GITLAB_FEATURES =~ /\bsast\b/'
   - local: '/templates/jobs/scan.yml'
+  - local: '/templates/jobs/scan-reports.yml'
+    rules:
+      - if: '$CI_GITLAB_FEATURES =~ /\b(dependency_scanning|secret_detection)\b/'
   - local: '/templates/jobs/test.yml'
   - local: '/templates/jobs/package.yml'
   - local: '/templates/jobs/container-scan.yml'

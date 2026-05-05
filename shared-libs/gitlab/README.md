@@ -193,7 +193,7 @@ Out of the box:
 |-------|--------------------------|--------------|
 | `python` (pytest-cov) | cobertura -> `coverage/coverage.xml` | works |
 | `dotnet` (XPlat Code Coverage) | cobertura -> `coverage/<guid>/coverage.cobertura.xml` | flatten or override path |
-| `java` (jacoco) | jacoco -> `coverage/jacoco.xml` | override format to jacoco |
+| `java` (jacoco) | jacoco -> `brik-artifacts/test/coverage/jacoco.xml` | override format to jacoco |
 | `node` (jest --coverage) | lcov -> `coverage/lcov.info` | override or accept no badge |
 | `rust` (cargo-llvm-cov) | lcov -> `coverage/lcov.info` | override or accept no badge |
 
@@ -221,7 +221,7 @@ brik-test:
 ```
 
 `lib/transverse/coverage.sh` reads either `coverage/coverage.xml`
-(Cobertura) or `coverage/jacoco.xml` (Jacoco) and computes the line
+(Cobertura) or `brik-artifacts/test/coverage/jacoco.xml` (Jacoco) and computes the line
 percentage. No per-project regex needed -- works for python, node,
 java, rust, dotnet without override.
 
@@ -244,7 +244,7 @@ brik-test:
     reports:
       coverage_report:
         coverage_format: jacoco
-        path: coverage/jacoco.xml
+        path: brik-artifacts/test/coverage/jacoco.xml
 ```
 
 If you keep your coverage report under a non-default directory, set the

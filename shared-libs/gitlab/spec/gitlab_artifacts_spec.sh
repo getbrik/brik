@@ -98,7 +98,7 @@ Describe "shared-libs/gitlab templates - brik-artifacts paths"
     End
   End
 
-  Describe "sast.yml + scan.yml expose SARIF/CycloneDX reports for the Security tab"
+  Describe "scan.yml + Ultimate overlays expose CycloneDX and SARIF for the Security tab"
     sarif_contains() {
       local file="$1" job_key="$2" path="$3"
 
@@ -113,28 +113,60 @@ Describe "shared-libs/gitlab templates - brik-artifacts paths"
         "$file" >/dev/null 2>&1
     }
 
-    It "sast.yml declares reports.sarif pointing at brik-artifacts/sast/sast.sarif"
-      Skip if "yq not installed" yq_missing
-      When call sarif_contains "${TEMPLATES_DIR}/sast.yml" "brik-sast" "brik-artifacts/sast/sast.sarif"
-      The status should be success
-    End
+    has_no_sarif() {
+      local file="$1" job_key="$2"
 
-    It "scan.yml declares reports.sarif containing deps and secret SARIF"
-      Skip if "yq not installed" yq_missing
-      When call sarif_contains "${TEMPLATES_DIR}/scan.yml" "brik-scan" "brik-artifacts/scan/deps.sarif"
-      The status should be success
-    End
+      ! yq -e ".${job_key}.artifacts.reports.sarif" "$file" >/dev/null 2>&1
+    }
 
-    It "scan.yml reports.sarif also lists secret"
-      Skip if "yq not installed" yq_missing
-      When call sarif_contains "${TEMPLATES_DIR}/scan.yml" "brik-scan" "brik-artifacts/scan/secret.sarif"
-      The status should be success
-    End
+    pipeline_yml() { printf '%s' "${TEMPLATES_DIR}/../pipeline.yml"; }
 
-    It "scan.yml declares reports.cyclonedx pointing at the SBOM"
+    It "scan.yml declares reports.cyclonedx pointing at the SBOM (free tier compatible)"
       Skip if "yq not installed" yq_missing
       When call cyclonedx_contains "${TEMPLATES_DIR}/scan.yml" "brik-scan" "brik-artifacts/scan/sbom.cdx.json"
       The status should be success
+    End
+
+    It "sast.yml does not embed reports.sarif (Ultimate-only, lives in overlay)"
+      Skip if "yq not installed" yq_missing
+      When call has_no_sarif "${TEMPLATES_DIR}/sast.yml" "brik-sast"
+      The status should be success
+    End
+
+    It "scan.yml does not embed reports.sarif (Ultimate-only, lives in overlay)"
+      Skip if "yq not installed" yq_missing
+      When call has_no_sarif "${TEMPLATES_DIR}/scan.yml" "brik-scan"
+      The status should be success
+    End
+
+    It "sast-reports.yml overlay declares reports.sarif on brik-sast"
+      Skip if "yq not installed" yq_missing
+      When call sarif_contains "${TEMPLATES_DIR}/sast-reports.yml" "brik-sast" "brik-artifacts/sast/sast.sarif"
+      The status should be success
+    End
+
+    It "scan-reports.yml overlay declares reports.sarif for deps"
+      Skip if "yq not installed" yq_missing
+      When call sarif_contains "${TEMPLATES_DIR}/scan-reports.yml" "brik-scan" "brik-artifacts/scan/deps.sarif"
+      The status should be success
+    End
+
+    It "scan-reports.yml overlay declares reports.sarif for secret"
+      Skip if "yq not installed" yq_missing
+      When call sarif_contains "${TEMPLATES_DIR}/scan-reports.yml" "brik-scan" "brik-artifacts/scan/secret.sarif"
+      The status should be success
+    End
+
+    It "pipeline.yml references sast-reports overlay (conditional include)"
+      When call grep -F "sast-reports.yml" "$(pipeline_yml)"
+      The status should be success
+      The output should be present
+    End
+
+    It "pipeline.yml references scan-reports overlay (conditional include)"
+      When call grep -F "scan-reports.yml" "$(pipeline_yml)"
+      The status should be success
+      The output should be present
     End
   End
 End
