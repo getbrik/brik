@@ -25,7 +25,7 @@ flow as native GitLab CI stages and jobs.
 ```yaml
 include:
   - project: 'brik/gitlab-templates'
-    ref: v0.1.0
+    ref: v0.4.0
     file: '/templates/pipeline.yml'
 ```
 
@@ -33,7 +33,7 @@ include:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `BRIK_LIB_REF` | `v0.1.0` | Git ref of the Brik runtime to clone |
+| `BRIK_LIB_REF` | `v0.4.0` | Git ref of the Brik runtime to clone |
 | `BRIK_REPO` | `${CI_SERVER_URL}/brik/brik.git` | URL of the Brik runtime repository |
 | `BRIK_HOME` | `/opt/brik` | Installation directory on runners |
 | `BRIK_LOG_LEVEL` | `info` | Log verbosity (debug, info, warn, error) |

@@ -101,7 +101,7 @@ flowchart LR
 ```yaml
 include:
   - project: 'brik/gitlab-templates'
-    ref: v0.1.0
+    ref: v0.4.0
     file: '/templates/pipeline.yml'
 ```
 
@@ -326,7 +326,7 @@ brik doctor --workspace ./my-project
 brik init --stack node --platform gitlab --dir ./my-project --non-interactive
 brik run stage build --config brik.yml --workspace .
 brik run pipeline --continue-on-error --with-release --with-package --with-deploy
-brik self-update --channel edge --version v0.2.0
+brik self-update --channel edge --version v0.4.0
 brik self-uninstall --force
 brik version --verbose
 ```

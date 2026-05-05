@@ -71,8 +71,8 @@ git add -A
 git commit -m "Initial commit"
 git remote add origin http://your-gitlab.com/brik/gitlab-templates.git
 git push -u origin main
-git tag v0.1.0
-git push origin v0.1.0
+git tag v0.4.0
+git push origin v0.4.0
 ```
 
 ### 3. Add the bootstrap file to your project
