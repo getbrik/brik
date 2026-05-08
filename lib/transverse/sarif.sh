@@ -47,7 +47,21 @@ def level_bucket(lvl):
 | ($sarif.runs[0].results // [])
 | map(
     . as $r
-    | (.properties["security-severity"] // null) as $cvss
+    | (
+        ([
+          (.properties["security-severity"] // null),
+          ((.ruleIndex // -1) as $idx
+           | if $idx >= 0 and $idx < ($rules | length)
+               then $rules[$idx].properties["security-severity"] // null
+               else null end),
+          (($rules[]?
+            | select(.id == $r.ruleId)
+            | .properties["security-severity"] // null)
+           // null)
+        ]
+        | map(select(. != null))
+        | first) // null
+      ) as $cvss
     | if $cvss != null then cvss_bucket($cvss)
       elif (.level // null) != null then level_bucket(.level)
       else

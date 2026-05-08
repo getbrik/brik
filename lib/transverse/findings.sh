@@ -214,11 +214,46 @@ findings.apply_policy() {
           elif lvl == "note"    then "low"
           else "info" end;
 
-        def severity_of_result($r):
-          ($r.properties["security-severity"] // null) as $cvss
+        # Rule lookup for severity/fix metadata. Grype encodes CVSS at
+        # rule.properties.security-severity and fix availability in
+        # rule.help.text ("Fix Version: <value>", empty = no upstream fix).
+        # The rule table is built from the input document at call time so
+        # this stays a pure function (no extra binding needed).
+        def rule_for($r; $sarif):
+          ($r.ruleId // null) as $rid
+          | if $rid == null then null
+            else
+              (($sarif.runs[0].tool.driver.rules // [])[]?
+               | select(.id == $rid))
+              // null
+            end;
+
+        def severity_of_result($r; $sarif):
+          rule_for($r; $sarif) as $rule
+          | ($r.properties["security-severity"]
+             // ($rule.properties["security-severity"] // null)) as $cvss
           | if   $cvss != null            then cvss_bucket($cvss)
             elif ($r.level // null) != null then level_bucket($r.level)
+            elif ($rule.defaultConfiguration.level // null) != null
+                                            then level_bucket($rule.defaultConfiguration.level)
             else "info" end;
+
+        # Resolve fix availability. Order: explicit result property, SARIF
+        # standard result.fixes[], grype-style "Fix Version:" in rule
+        # help.text, conservative default "fixed" so tools without fix
+        # metadata never qualify for the no-fix tags.
+        def fix_state_of_result($r; $sarif):
+          rule_for($r; $sarif) as $rule
+          | ($r.properties.fixState // null) as $explicit
+          | if $explicit != null then $explicit
+            elif (($r.fixes // []) | length) > 0 then "fixed"
+            else
+              (($rule.help.text // "")
+               | capture("Fix Version: (?<fv>[^\\n]*)")? // null) as $cap
+              | if $cap == null then "fixed"
+                elif ($cap.fv // "" | gsub("^\\s+|\\s+$"; "")) == "" then "not-fixed"
+                else "fixed" end
+            end;
 
         # Org policy CVE allowlist match. Returns the full brikSource tag
         # ("policy.org.cve-allowlist") on match, null otherwise.
@@ -249,10 +284,10 @@ findings.apply_policy() {
 
         # Built-in classification (chantier 20260508 P2 matrix). Returns the
         # full brikSource tag, e.g. "policy.built-in.below-severity".
-        def builtin_classify($r):
-          severity_of_result($r) as $sev
+        def builtin_classify($r; $sarif):
+          severity_of_result($r; $sarif) as $sev
           | severity_rank($sev) as $rank
-          | ($r.properties.fixState // "fixed") as $fix
+          | fix_state_of_result($r; $sarif) as $fix
           | (if $preset == "strict" then
               if $rank < $floor_rank then "below-severity" else null end
             elif $preset == "permissive" then
@@ -274,15 +309,15 @@ findings.apply_policy() {
         #   3. Built-in preset -> tag.
         # Returns a brikSource tag string, or null when the finding stays
         # failing.
-        def classify($r):
+        def classify($r; $sarif):
           (($r.suppressions // []) | length) as $sup_len
           | if $sup_len > 0 then null
             else
-              org_match_cve($r) // org_match_path($r) // builtin_classify($r)
+              org_match_cve($r) // org_match_path($r) // builtin_classify($r; $sarif)
             end;
 
-        def annotate($r):
-          classify($r) as $source
+        def annotate($r; $sarif):
+          classify($r; $sarif) as $source
           | if $source == null then $r
             else
               ($source | split(".") | last) as $reason
@@ -296,7 +331,8 @@ findings.apply_policy() {
                 )
               } end;
 
-        .runs[0].results = ((.runs[0].results // []) | map(annotate(.)))
+        . as $sarif
+        | .runs[0].results = ((.runs[0].results // []) | map(annotate(.; $sarif)))
     ' "$sarif_in" > "$tmp" || {
         rm -f "$tmp"
         printf 'findings.apply_policy: jq processing failed for %s\n' "$sarif_in" >&2
@@ -383,13 +419,27 @@ findings.aggregate() {
           elif lvl == "note"    then "low"
           else "info" end;
 
-        def severity_of_result($r):
-          ($r.properties["security-severity"] // null) as $cvss
+        def rule_for($r; $sarif):
+          ($r.ruleId // null) as $rid
+          | if $rid == null then null
+            else
+              (($sarif.runs[0].tool.driver.rules // [])[]?
+               | select(.id == $rid))
+              // null
+            end;
+
+        def severity_of_result($r; $sarif):
+          rule_for($r; $sarif) as $rule
+          | ($r.properties["security-severity"]
+             // ($rule.properties["security-severity"] // null)) as $cvss
           | if   $cvss != null            then cvss_bucket($cvss)
             elif ($r.level // null) != null then level_bucket($r.level)
+            elif ($rule.defaultConfiguration.level // null) != null
+                                            then level_bucket($rule.defaultConfiguration.level)
             else "info" end;
 
-        (.runs[0].results // []) as $results
+        . as $sarif
+        | (.runs[0].results // []) as $results
         | ($results | map(select(((.suppressions // []) | length) == 0)) | length) as $failing
         | ($results | map(select(((.suppressions // []) | length) > 0))) as $ign
         | (
@@ -399,7 +449,7 @@ findings.aggregate() {
           ) as $by_source
         | (
             $ign
-            | map(severity_of_result(.))
+            | map(severity_of_result(.; $sarif))
             | reduce .[] as $s ({"critical":0, "high":0, "medium":0, "low":0, "info":0};
                                 .[$s] += 1)
           ) as $ign_by_sev

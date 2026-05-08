@@ -559,6 +559,56 @@ Describe "transverse/findings.sh"
         The status should be success
       End
     End
+
+    # -------------------------------------------------------------------------
+    # Real grype shape: severity at rule.properties.security-severity, fix
+    # state encoded in rule.help.text "Fix Version: <value>". This is what
+    # grype 0.111.1 actually emits for a `python:3.13` base image scan and is
+    # the path that broke python-complete e2e during P4.G validation.
+    # -------------------------------------------------------------------------
+    Describe "pragmatic preset against real grype rule-shape SARIF"
+      GRYPE_RULE="${BRIK_HOME}/spec/fixtures/sarif/grype-rule-help.sarif"
+
+      It "marks only the high+fixed result as failing"
+        run_count_failing() {
+          export BRIK_QUALITY_FINDINGS_POLICY="pragmatic"
+          findings.apply_policy "$GRYPE_RULE" "$OUT" >/dev/null 2>&1
+          count_failing
+        }
+        When call run_count_failing
+        The output should equal "1"
+      End
+
+      It "tags critical+high no-fix as policy.built-in.no-upstream-fix"
+        run_count() {
+          export BRIK_QUALITY_FINDINGS_POLICY="pragmatic"
+          findings.apply_policy "$GRYPE_RULE" "$OUT" >/dev/null 2>&1
+          count_ignored_with_source "policy.built-in.no-upstream-fix"
+        }
+        When call run_count
+        The output should equal "2"
+      End
+
+      It "tags the medium result as policy.built-in.below-severity"
+        run_count() {
+          export BRIK_QUALITY_FINDINGS_POLICY="pragmatic"
+          findings.apply_policy "$GRYPE_RULE" "$OUT" >/dev/null 2>&1
+          count_ignored_with_source "policy.built-in.below-severity"
+        }
+        When call run_count
+        The output should equal "1"
+      End
+
+      It "buckets severities from rule.properties when results are sparse"
+        run_buckets() {
+          sarif.count_by_severity "$GRYPE_RULE"
+        }
+        When call run_buckets
+        The output should include '"critical":1'
+        The output should include '"high":2'
+        The output should include '"medium":1'
+      End
+    End
   End
 
   # ---------------------------------------------------------------------------
