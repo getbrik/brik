@@ -670,4 +670,186 @@ Describe "transverse/findings.sh"
       The output should equal "0"
     End
   End
+
+  # ---------------------------------------------------------------------------
+  # findings.apply_policy with org policy cache (chantier 20260508 P3)
+  # ---------------------------------------------------------------------------
+  Describe "findings.apply_policy org policy integration"
+    GRYPE="${BRIK_HOME}/spec/fixtures/sarif/grype-fixstate.sarif"
+
+    setup_org_env() {
+      OUT="$(mktemp).sarif"
+      CACHE="$(mktemp).cache.json"
+      export BRIK_POLICY_CACHE_PATH="$CACHE"
+      export BRIK_QUALITY_FINDINGS_POLICY="pragmatic"
+      unset BRIK_SECURITY_SEVERITY_THRESHOLD
+    }
+    cleanup_org_env() {
+      rm -f "$OUT" "$CACHE"
+      unset BRIK_POLICY_CACHE_PATH BRIK_QUALITY_FINDINGS_POLICY
+    }
+    Before 'setup_org_env'
+    After 'cleanup_org_env'
+
+    count_with_source() {
+      jq -r --arg s "$1" \
+        '[.runs[0].results[] | (.suppressions // [])[] | select(.properties.brikSource == $s)] | length' \
+        "$OUT"
+    }
+
+    Describe "with a CVE allowlist"
+      It "tags matching findings as policy.org.cve-allowlist"
+        # CVE-2026-0001 is critical+fixed; without org policy it would fail.
+        # The allowlist makes it ignored as policy.org.cve-allowlist.
+        run_cve_allow() {
+          printf '%s' '{
+            "preset_override": null,
+            "cve_allowlist": ["CVE-2026-0001"],
+            "cve_entries": [{"id":"CVE-2026-0001","reason":"x","expires":"2099-12-31"}],
+            "path_globs": [],
+            "path_entries": [],
+            "url": "file:///org",
+            "loaded_at": "2026-05-08T15:00:00+0200"
+          }' > "$CACHE"
+          findings.apply_policy "$GRYPE" "$OUT" >/dev/null 2>&1
+          count_with_source "policy.org.cve-allowlist"
+        }
+        When call run_cve_allow
+        The output should equal "1"
+      End
+
+      It "still applies built-in classification to other findings"
+        run_mix() {
+          printf '%s' '{
+            "preset_override": null,
+            "cve_allowlist": ["CVE-2026-0001"],
+            "cve_entries": [{"id":"CVE-2026-0001","reason":"x","expires":"2099-12-31"}],
+            "path_globs": [],
+            "path_entries": [],
+            "url": "file:///org",
+            "loaded_at": "2026-05-08T15:00:00+0200"
+          }' > "$CACHE"
+          findings.apply_policy "$GRYPE" "$OUT" >/dev/null 2>&1
+          # Pragmatic still tags below-severity entries; CVE-2026-0006/0007 are medium.
+          count_with_source "policy.built-in.below-severity"
+        }
+        When call run_mix
+        The output should equal "2"
+      End
+
+      It "org cve-allowlist outranks built-in classification (no double tag)"
+        run_org_priority() {
+          # CVE-2026-0007 is medium not-fixed; without org it would tag
+          # built-in below-severity (severity floor wins over fix-state in
+          # pragmatic). With the CVE in the allowlist, the org tag must win
+          # and below-severity must NOT be appended for that finding.
+          printf '%s' '{
+            "preset_override": null,
+            "cve_allowlist": ["CVE-2026-0007"],
+            "cve_entries": [{"id":"CVE-2026-0007","reason":"x","expires":"2099-12-31"}],
+            "path_globs": [],
+            "path_entries": [],
+            "url": "file:///org",
+            "loaded_at": "2026-05-08T15:00:00+0200"
+          }' > "$CACHE"
+          findings.apply_policy "$GRYPE" "$OUT" >/dev/null 2>&1
+          jq -r '
+            .runs[0].results[]
+            | select(.ruleId == "CVE-2026-0007")
+            | (.suppressions // []) | map(.properties.brikSource) | sort | join(",")
+          ' "$OUT"
+        }
+        When call run_org_priority
+        The output should equal "policy.org.cve-allowlist"
+      End
+    End
+
+    Describe "with a path allowlist"
+      It "tags matching URIs as policy.org.path-allowlist"
+        run_path_allow() {
+          # The fixture's CVE-2026-0001 URI is "pkg:deb/python3.14"; we use
+          # a glob that matches it. The compiled cache uses ^...$ regex.
+          printf '%s' '{
+            "preset_override": null,
+            "cve_allowlist": [],
+            "cve_entries": [],
+            "path_globs": [
+              {"glob":"pkg:deb/**","regex":"^pkg:deb/.*$","expires":"2099-12-31"}
+            ],
+            "path_entries": [{"glob":"pkg:deb/**","reason":"vendor pkgs","expires":"2099-12-31"}],
+            "url": "file:///org",
+            "loaded_at": "2026-05-08T15:00:00+0200"
+          }' > "$CACHE"
+          findings.apply_policy "$GRYPE" "$OUT" >/dev/null 2>&1
+          # 5 grype results have pkg:deb/* URIs (#0-#4 + #7 already pre-suppressed).
+          # Pre-suppressed (#7) is respected unchanged. Among the rest #0..#4
+          # match pkg:deb -> 5 results, but our path allowlist only annotates
+          # findings that don't already carry suppressions. So 5 fresh
+          # annotations.
+          count_with_source "policy.org.path-allowlist"
+        }
+        When call run_path_allow
+        The output should equal "5"
+      End
+    End
+
+    Describe "with a preset override"
+      It "uses the org preset_override instead of the project preset"
+        run_override() {
+          # Project sets pragmatic but the org file overrides to strict;
+          # under strict, no fix-state ignore happens, so #1 (critical not-fixed)
+          # becomes failing instead of ignored.
+          printf '%s' '{
+            "preset_override": "strict",
+            "cve_allowlist": [],
+            "cve_entries": [],
+            "path_globs": [],
+            "path_entries": [],
+            "url": "file:///org",
+            "loaded_at": "2026-05-08T15:00:00+0200"
+          }' > "$CACHE"
+          findings.apply_policy "$GRYPE" "$OUT" >/dev/null 2>&1
+          # Strict failing count = 5 (CVE-2026-0001..0005), regardless of
+          # fix-state.
+          jq -r '[.runs[0].results[] | select(((.suppressions // []) | length) == 0)] | length' \
+            "$OUT"
+        }
+        When call run_override
+        The output should equal "5"
+      End
+
+      It "rejects an org preset_override with an unknown value"
+        bad_override() {
+          printf '%s' '{
+            "preset_override": "aggressive",
+            "cve_allowlist": [],
+            "cve_entries": [],
+            "path_globs": [],
+            "path_entries": [],
+            "url": "file:///org",
+            "loaded_at": "2026-05-08T15:00:00+0200"
+          }' > "$CACHE"
+          findings.apply_policy "$GRYPE" "$OUT"
+        }
+        When call bad_override
+        The status should equal 7
+        The error should include "preset"
+      End
+    End
+
+    Describe "without a cache (back-compat with P2)"
+      It "behaves identically to P2 when the cache path does not exist"
+        run_no_cache() {
+          rm -f "$CACHE"
+          findings.apply_policy "$GRYPE" "$OUT" >/dev/null 2>&1
+          # Pragmatic without org allowlist -> 2 failing entries, identical to
+          # the P2 baseline test.
+          jq -r '[.runs[0].results[] | select(((.suppressions // []) | length) == 0)] | length' \
+            "$OUT"
+        }
+        When call run_no_cache
+        The output should equal "2"
+      End
+    End
+  End
 End

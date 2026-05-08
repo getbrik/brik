@@ -119,6 +119,8 @@ findings.apply_policy() {
         return "${BRIK_EXIT_IO_FAILURE:-6}"
     fi
 
+    # Project preset (default pragmatic). The org policy cache may override
+    # this further down with .preset_override.
     local preset="${BRIK_QUALITY_FINDINGS_POLICY:-pragmatic}"
     case "$preset" in
         pragmatic|strict|permissive) ;;
@@ -127,6 +129,31 @@ findings.apply_policy() {
             return "${BRIK_EXIT_CONFIG_ERROR:-7}"
             ;;
     esac
+
+    # Resolve the org policy cache (chantier 20260508 P3 D5). Mirrors
+    # org_policy.cache_path so callers do not need to source the loader
+    # module just to read the cache. When BRIK_POLICY_CACHE_PATH is unset,
+    # falls back to the canonical brik-artifacts location.
+    local cache_path="${BRIK_POLICY_CACHE_PATH:-${BRIK_WORKSPACE:-/tmp/brik}/brik-artifacts/.policy.cache.json}"
+    local cve_allowlist='[]'
+    local path_globs='[]'
+    if [[ -f "$cache_path" ]]; then
+        cve_allowlist="$(jq -c '.cve_allowlist // []' "$cache_path" 2>/dev/null || printf '[]')"
+        path_globs="$(jq -c '.path_globs // []' "$cache_path" 2>/dev/null || printf '[]')"
+        local override
+        override="$(jq -r '.preset_override // empty' "$cache_path" 2>/dev/null)"
+        if [[ -n "$override" ]]; then
+            case "$override" in
+                pragmatic|strict|permissive)
+                    preset="$override"
+                    ;;
+                *)
+                    printf 'findings.apply_policy: unknown preset %s in org cache (expected pragmatic|strict|permissive)\n' "$override" >&2
+                    return "${BRIK_EXIT_CONFIG_ERROR:-7}"
+                    ;;
+            esac
+        fi
+    fi
 
     local floor_raw="${BRIK_SECURITY_SEVERITY_THRESHOLD:-high}"
     local floor="${floor_raw,,}"
@@ -159,7 +186,10 @@ findings.apply_policy() {
     tmp="$(mktemp "${sarif_out}.XXXXXX")" || return "${BRIK_EXIT_IO_FAILURE:-6}"
 
     # KCOV_EXCL_START -- jq script body is not bash code
-    jq --arg preset "$preset" --argjson floor_rank "$floor_rank" '
+    jq --arg     preset        "$preset" \
+       --argjson floor_rank    "$floor_rank" \
+       --argjson cve_allowlist "$cve_allowlist" \
+       --argjson path_globs    "$path_globs" '
         def severity_rank(s):
           if   s == "critical" then 4
           elif s == "high"     then 3
@@ -190,43 +220,81 @@ findings.apply_policy() {
             elif ($r.level // null) != null then level_bucket($r.level)
             else "info" end;
 
-        # Classify a result. Returns a reason string when the policy ignores
-        # the finding, or null when the finding stays failing (or is already
-        # suppressed natively and must pass through).
+        # Org policy CVE allowlist match. Returns the full brikSource tag
+        # ("policy.org.cve-allowlist") on match, null otherwise.
+        def org_match_cve($r):
+          ($r.ruleId // null) as $rid
+          | if $rid != null and ($cve_allowlist | index($rid)) != null
+            then "policy.org.cve-allowlist"
+            else null end;
+
+        # Org policy path glob match: returns "policy.org.path-allowlist"
+        # when any location URI matches any compiled regex pattern. The
+        # try/catch around test() keeps a malformed pattern (e.g. unbalanced
+        # bracket from an unusual glob) from crashing the entire jq filter
+        # and silently dropping the SARIF document. A bad pattern simply
+        # fails to match and the next pattern is evaluated.
+        def org_match_path($r):
+          ($r.locations // [])
+          | map(.physicalLocation.artifactLocation.uri // "")
+          | reduce .[] as $uri (null;
+              if . != null then .
+              else
+                reduce $path_globs[] as $pg (null;
+                  if . != null then .
+                  elif (try ($uri | test($pg.regex)) catch false)
+                       then "policy.org.path-allowlist"
+                  else null end)
+              end);
+
+        # Built-in classification (chantier 20260508 P2 matrix). Returns the
+        # full brikSource tag, e.g. "policy.built-in.below-severity".
+        def builtin_classify($r):
+          severity_of_result($r) as $sev
+          | severity_rank($sev) as $rank
+          | ($r.properties.fixState // "fixed") as $fix
+          | (if $preset == "strict" then
+              if $rank < $floor_rank then "below-severity" else null end
+            elif $preset == "permissive" then
+              if   $rank < 4               then "below-severity"
+              elif $fix == "not-fixed"     then "no-upstream-fix"
+              elif $fix == "wont-fix"      then "vendor-wont-fix"
+              else null end
+            else
+              if   $rank < $floor_rank then "below-severity"
+              elif $fix == "not-fixed"     then "no-upstream-fix"
+              elif $fix == "wont-fix"      then "vendor-wont-fix"
+              else null end
+            end) as $r2
+          | if $r2 != null then ("policy.built-in." + $r2) else null end;
+
+        # Classify a result. Hierarchy (chantier Hierarchie d application):
+        #   1. Native suppressions[] -> respect, never touch.
+        #   2. Org policy (CVE allowlist, then path allowlist) -> tag.
+        #   3. Built-in preset -> tag.
+        # Returns a brikSource tag string, or null when the finding stays
+        # failing.
         def classify($r):
           (($r.suppressions // []) | length) as $sup_len
           | if $sup_len > 0 then null
             else
-              severity_of_result($r) as $sev
-              | severity_rank($sev) as $rank
-              | ($r.properties.fixState // "fixed") as $fix
-              | if $preset == "strict" then
-                  if $rank < $floor_rank then "below-severity" else null end
-                elif $preset == "permissive" then
-                  if   $rank < 4               then "below-severity"
-                  elif $fix == "not-fixed"     then "no-upstream-fix"
-                  elif $fix == "wont-fix"      then "vendor-wont-fix"
-                  else null end
-                else
-                  if   $rank < $floor_rank then "below-severity"
-                  elif $fix == "not-fixed"     then "no-upstream-fix"
-                  elif $fix == "wont-fix"      then "vendor-wont-fix"
-                  else null end
-                end
+              org_match_cve($r) // org_match_path($r) // builtin_classify($r)
             end;
 
         def annotate($r):
-          classify($r) as $reason
-          | if $reason == null then $r
-            else $r + {
-              suppressions: (
-                ($r.suppressions // []) + [{
-                  kind: "external",
-                  justification: ("Brik policy: " + $reason),
-                  properties: { brikSource: ("policy.built-in." + $reason) }
-                }]
-              )
-            } end;
+          classify($r) as $source
+          | if $source == null then $r
+            else
+              ($source | split(".") | last) as $reason
+              | $r + {
+                suppressions: (
+                  ($r.suppressions // []) + [{
+                    kind: "external",
+                    justification: ("Brik policy: " + $reason),
+                    properties: { brikSource: $source }
+                  }]
+                )
+              } end;
 
         .runs[0].results = ((.runs[0].results // []) | map(annotate(.)))
     ' "$sarif_in" > "$tmp" || {

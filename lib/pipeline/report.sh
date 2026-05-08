@@ -463,13 +463,55 @@ report.aggregate_fragments() {
     local finished_at
     finished_at="$(date +"%Y-%m-%dT%H:%M:%S%z")"
 
-    # Findings policy projection (chantier 20260508 P1.5). The active built-in
-    # preset comes from BRIK_QUALITY_FINDINGS_POLICY (export config flow), with
-    # pragmatic as the documented default. source records who picked the preset:
-    # in P1 it is always the project's brik.yml; P3 will set it to "org-policy"
-    # when BRIK_POLICY_URL contributes a preset override.
+    # Findings policy projection (chantier 20260508 P1.5 / P3.F). The active
+    # built-in preset comes from BRIK_QUALITY_FINDINGS_POLICY (export config
+    # flow), with pragmatic as the documented default. P3 layers the org
+    # policy cache on top: a non-null preset_override in the cache wins over
+    # the project preset and flips source to "org-policy". The cache also
+    # carries url + loaded_at + expiring_soon entries that surface alongside
+    # the active preset for the operator.
     local policy_preset="${BRIK_QUALITY_FINDINGS_POLICY:-pragmatic}"
     local policy_source="brik.yml"
+    local policy_org_url=""
+    local policy_org_loaded_at=""
+    local policy_expiring_soon='[]'
+
+    local _policy_cache="${BRIK_POLICY_CACHE_PATH:-${BRIK_WORKSPACE:-/tmp/brik}/brik-artifacts/.policy.cache.json}"
+    if [[ -f "$_policy_cache" ]] && command -v jq >/dev/null 2>&1; then
+        local _override
+        _override="$(jq -r '.preset_override // empty' "$_policy_cache" 2>/dev/null)"
+        if [[ -n "$_override" ]]; then
+            policy_preset="$_override"
+            policy_source="org-policy"
+        fi
+        policy_org_url="$(jq -r '.url // empty' "$_policy_cache" 2>/dev/null)"
+        policy_org_loaded_at="$(jq -r '.loaded_at // empty' "$_policy_cache" 2>/dev/null)"
+
+        # Compute expiring_soon entries inline. Lookback window defaults to
+        # 30 days and respects the BRIK_FINDINGS_EXPIRING_SOON_DAYS override.
+        local _days="${BRIK_FINDINGS_EXPIRING_SOON_DAYS:-30}"
+        local _now _soon_epoch _soon_date
+        _now="$(date -u +%s)"
+        _soon_epoch=$((_now + _days * 86400))
+        _soon_date="$(date -u -d "@${_soon_epoch}" +%Y-%m-%d 2>/dev/null \
+                   || date -u -r "${_soon_epoch}" +%Y-%m-%d 2>/dev/null \
+                   || date -u +%Y-%m-%d)"
+        # KCOV_EXCL_START -- jq script body is not bash code
+        policy_expiring_soon="$(jq -c --arg soon "$_soon_date" '
+            [
+              (.cve_entries // [])[]
+              | select(.expires <= $soon)
+              | { type: "cve", id: .id, expires: .expires, reason: (.reason // "") }
+            ]
+            +
+            [
+              (.path_entries // [])[]
+              | select(.expires <= $soon)
+              | { type: "path", glob: .glob, expires: .expires, reason: (.reason // "") }
+            ]
+        ' "$_policy_cache" 2>/dev/null || printf '[]')"
+        # KCOV_EXCL_STOP
+    fi
 
     # Optional pipeline metadata: surface only when the source variable is
     # set, so the aggregate omits absent fields rather than emitting empty
@@ -536,6 +578,9 @@ report.aggregate_fragments() {
         --arg triggered_by "$triggered_by" \
         --arg policy_preset "$policy_preset" \
         --arg policy_source "$policy_source" \
+        --arg policy_org_url "$policy_org_url" \
+        --arg policy_org_loaded_at "$policy_org_loaded_at" \
+        --argjson policy_expiring_soon "$policy_expiring_soon" \
         --argjson frags "$frags_json" \
         '
         ( $frags
@@ -552,7 +597,11 @@ report.aggregate_fragments() {
           | map(select((.tech.warning // false) == true)
                 | { stage: .stage, reason: (.tech.warning_reason // "") }) ) as $warnings
         | ( if ($counts.failed // 0) > 0 then "failed" else "success" end ) as $pstatus
-        | ( { preset: $policy_preset, source: $policy_source } ) as $policy
+        | ( { preset: $policy_preset, source: $policy_source }
+            + ( if $policy_org_url       != "" then { org_policy_url:       $policy_org_url       } else {} end )
+            + ( if $policy_org_loaded_at != "" then { org_policy_loaded_at: $policy_org_loaded_at } else {} end )
+            + ( if ($policy_expiring_soon | length) > 0 then { expiring_soon: $policy_expiring_soon } else {} end )
+          ) as $policy
         | ( {}
             + ( if $commit_sha             != "" then { sha:             $commit_sha             } else {} end )
             + ( if $commit_short_sha       != "" then { short_sha:       $commit_short_sha       } else {} end )

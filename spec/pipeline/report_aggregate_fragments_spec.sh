@@ -695,4 +695,183 @@ Describe "report.aggregate_fragments"
       The status should be success
     End
   End
+
+  # ---------------------------------------------------------------------------
+  # summary.policy enriched with org policy metadata (chantier 20260508 P3.F)
+  # ---------------------------------------------------------------------------
+  Describe "summary.policy enriched with org policy"
+    setup_org_aggregate() {
+      AGG_LOG_DIR="$(mktemp -d)"
+      FRAG_DIR="$(mktemp -d)"
+      ORG_CACHE="$(mktemp).cache.json"
+      export BRIK_LOG_DIR="$AGG_LOG_DIR"
+      export BRIK_RUN_ID="run-policy-99"
+      export BRIK_POLICY_CACHE_PATH="$ORG_CACHE"
+      unset BRIK_PLATFORM BRIK_PROJECT_NAME CI_PIPELINE_URL BRIK_STARTED_AT \
+            BRIK_QUALITY_FINDINGS_POLICY BRIK_FINDINGS_EXPIRING_SOON_DAYS
+    }
+    cleanup_org_aggregate() {
+      rm -rf "$AGG_LOG_DIR" "$FRAG_DIR"
+      rm -f "$ORG_CACHE"
+      unset BRIK_LOG_DIR BRIK_RUN_ID BRIK_POLICY_CACHE_PATH \
+            BRIK_QUALITY_FINDINGS_POLICY BRIK_FINDINGS_EXPIRING_SOON_DAYS
+    }
+    Before 'setup_org_aggregate'
+    After 'cleanup_org_aggregate'
+
+    write_org_cache() {
+      cat > "$ORG_CACHE"
+    }
+
+    It "exposes summary.policy.org_policy_url when a cache is present"
+      run_check() {
+        write_org_cache <<'JSON'
+{
+  "preset_override": null,
+  "cve_allowlist": ["CVE-2026-9000"],
+  "cve_entries": [{"id":"CVE-2026-9000","reason":"x","expires":"2099-12-31"}],
+  "path_globs": [],
+  "path_entries": [],
+  "url": "file:///etc/brik/policy/brik-policy.yml",
+  "loaded_at": "2026-05-08T10:00:00+0200"
+}
+JSON
+        write_fragment_file "init" "success" 0
+        report.aggregate_fragments "$FRAG_DIR" >/dev/null 2>&1 || return 1
+        jq -r '.summary.policy.org_policy_url' "$AGG_LOG_DIR/aggregate-report.json"
+      }
+      When call run_check
+      The output should equal "file:///etc/brik/policy/brik-policy.yml"
+    End
+
+    It "exposes summary.policy.org_policy_loaded_at when a cache is present"
+      run_check() {
+        write_org_cache <<'JSON'
+{
+  "preset_override": null,
+  "cve_allowlist": [],
+  "cve_entries": [],
+  "path_globs": [],
+  "path_entries": [],
+  "url": "http://policy.example.com/brik-policy.yml",
+  "loaded_at": "2026-05-08T11:23:45+0200"
+}
+JSON
+        write_fragment_file "init" "success" 0
+        report.aggregate_fragments "$FRAG_DIR" >/dev/null 2>&1 || return 1
+        jq -r '.summary.policy.org_policy_loaded_at' "$AGG_LOG_DIR/aggregate-report.json"
+      }
+      When call run_check
+      The output should equal "2026-05-08T11:23:45+0200"
+    End
+
+    It "tags source=org-policy when the cache provides a preset_override"
+      run_check() {
+        write_org_cache <<'JSON'
+{
+  "preset_override": "strict",
+  "cve_allowlist": [],
+  "cve_entries": [],
+  "path_globs": [],
+  "path_entries": [],
+  "url": "file:///etc/brik/policy/brik-policy.yml",
+  "loaded_at": "2026-05-08T11:23:45+0200"
+}
+JSON
+        write_fragment_file "init" "success" 0
+        report.aggregate_fragments "$FRAG_DIR" >/dev/null 2>&1 || return 1
+        jq -r '.summary.policy.source' "$AGG_LOG_DIR/aggregate-report.json"
+      }
+      When call run_check
+      The output should equal "org-policy"
+    End
+
+    It "promotes the preset value to the cache override when present"
+      run_check() {
+        export BRIK_QUALITY_FINDINGS_POLICY="pragmatic"
+        write_org_cache <<'JSON'
+{
+  "preset_override": "strict",
+  "cve_allowlist": [],
+  "cve_entries": [],
+  "path_globs": [],
+  "path_entries": [],
+  "url": "file:///etc/brik/policy/brik-policy.yml",
+  "loaded_at": "2026-05-08T11:23:45+0200"
+}
+JSON
+        write_fragment_file "init" "success" 0
+        report.aggregate_fragments "$FRAG_DIR" >/dev/null 2>&1 || return 1
+        jq -r '.summary.policy.preset' "$AGG_LOG_DIR/aggregate-report.json"
+      }
+      When call run_check
+      The output should equal "strict"
+    End
+
+    It "keeps source=brik.yml when the cache has no preset_override"
+      run_check() {
+        export BRIK_QUALITY_FINDINGS_POLICY="pragmatic"
+        write_org_cache <<'JSON'
+{
+  "preset_override": null,
+  "cve_allowlist": ["CVE-2026-9000"],
+  "cve_entries": [{"id":"CVE-2026-9000","reason":"x","expires":"2099-12-31"}],
+  "path_globs": [],
+  "path_entries": [],
+  "url": "file:///etc/brik/policy/brik-policy.yml",
+  "loaded_at": "2026-05-08T11:23:45+0200"
+}
+JSON
+        write_fragment_file "init" "success" 0
+        report.aggregate_fragments "$FRAG_DIR" >/dev/null 2>&1 || return 1
+        jq -r '.summary.policy.source' "$AGG_LOG_DIR/aggregate-report.json"
+      }
+      When call run_check
+      The output should equal "brik.yml"
+    End
+
+    It "exposes summary.policy.expiring_soon entries from the cache"
+      run_check() {
+        # Compute today + 7 days as a string the cache can carry without
+        # depending on date(1) flag flavor at test time.
+        local soon7
+        soon7="$(date -u -d '+7 days' +%Y-%m-%d 2>/dev/null \
+                || date -u -v '+7d' +%Y-%m-%d 2>/dev/null \
+                || date -u +%Y-%m-%d)"
+        cat > "$ORG_CACHE" <<JSON
+{
+  "preset_override": null,
+  "cve_allowlist": ["CVE-2026-9000"],
+  "cve_entries": [
+    { "id": "CVE-2026-9000", "reason": "renew", "expires": "${soon7}" },
+    { "id": "CVE-2026-9001", "reason": "long-lived", "expires": "2099-12-31" }
+  ],
+  "path_globs": [],
+  "path_entries": [],
+  "url": "file:///etc/brik/policy/brik-policy.yml",
+  "loaded_at": "2026-05-08T11:23:45+0200"
+}
+JSON
+        write_fragment_file "init" "success" 0
+        report.aggregate_fragments "$FRAG_DIR" >/dev/null 2>&1 || return 1
+        jq -r '.summary.policy.expiring_soon[].id' \
+          "$AGG_LOG_DIR/aggregate-report.json"
+      }
+      When call run_check
+      The output should equal "CVE-2026-9000"
+    End
+
+    It "omits org_policy_* fields when no cache is present (P1.5 back-compat)"
+      run_check() {
+        # Ensure the cache file does not exist for this scenario.
+        rm -f "$ORG_CACHE"
+        write_fragment_file "init" "success" 0
+        report.aggregate_fragments "$FRAG_DIR" >/dev/null 2>&1 || return 1
+        jq -r '.summary.policy | has("org_policy_url")' \
+          "$AGG_LOG_DIR/aggregate-report.json"
+      }
+      When call run_check
+      The output should equal "false"
+    End
+  End
 End

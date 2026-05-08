@@ -170,6 +170,22 @@
               "description": "ISO 8601 timestamp at which the org policy was fetched. Present only when source = org-policy.",
               "type": "string",
               "format": "date-time"
+            },
+            "expiring_soon": {
+              "description": "Org allowlist entries whose expires field falls within BRIK_FINDINGS_EXPIRING_SOON_DAYS (default 30). Present only when an org policy cache is loaded; each entry is either a cve {id, expires, reason} or a path {glob, expires, reason}.",
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": true,
+                "required": ["type", "expires"],
+                "properties": {
+                  "type":    { "type": "string", "enum": ["cve", "path"] },
+                  "id":      { "type": "string" },
+                  "glob":    { "type": "string" },
+                  "expires": { "type": "string", "format": "date" },
+                  "reason":  { "type": "string" }
+                }
+              }
             }
           }
         }
