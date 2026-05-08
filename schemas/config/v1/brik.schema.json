@@ -296,6 +296,19 @@
               "minLength": 1
             }
           }
+        },
+        "findings": {
+          "description": "Findings management policy. Selects the built-in preset that decides which findings fail the build vs. are ignored with reason. Org-wide exception lists are configured separately via BRIK_POLICY_URL (a DSI-owned brik-policy.yml).",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "policy": {
+              "description": "Built-in policy preset. pragmatic (default): ignores findings without an upstream fix or below the severity floor; fails the rest. strict: fails every finding at or above the severity floor, including no-fix entries. permissive: fails only critical findings that already have a fix.",
+              "type": "string",
+              "enum": ["pragmatic", "strict", "permissive"],
+              "default": "pragmatic"
+            }
+          }
         }
       }
     },

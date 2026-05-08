@@ -172,5 +172,81 @@ EOF
         The output should equal "check-jsonschema-ran"
       End
     End
+
+    # =========================================================================
+    # quality.findings.policy preset validation (chantier 20260508 P1.1)
+    # =========================================================================
+    Describe "quality.findings.policy preset validation"
+      setup_findings_dir() {
+        TEMP_DIR="$(mktemp -d)"
+        TEMP_CONFIG="$TEMP_DIR/brik.yml"
+        export BRIK_CONFIG_FILE="$TEMP_CONFIG"
+      }
+      cleanup_findings_dir() { rm -rf "$TEMP_DIR"; }
+      Before 'setup_findings_dir'
+      After 'cleanup_findings_dir'
+
+      It "accepts policy: pragmatic"
+        Skip if "jv not installed" jv_missing
+        accept_pragmatic() {
+          printf 'version: 1\nproject:\n  name: test\n  stack: node\nquality:\n  findings:\n    policy: pragmatic\n' > "$TEMP_CONFIG"
+          config.validate_schema
+        }
+        When call accept_pragmatic
+        The status should be success
+      End
+
+      It "accepts policy: strict"
+        Skip if "jv not installed" jv_missing
+        accept_strict() {
+          printf 'version: 1\nproject:\n  name: test\n  stack: node\nquality:\n  findings:\n    policy: strict\n' > "$TEMP_CONFIG"
+          config.validate_schema
+        }
+        When call accept_strict
+        The status should be success
+      End
+
+      It "accepts policy: permissive"
+        Skip if "jv not installed" jv_missing
+        accept_permissive() {
+          printf 'version: 1\nproject:\n  name: test\n  stack: node\nquality:\n  findings:\n    policy: permissive\n' > "$TEMP_CONFIG"
+          config.validate_schema
+        }
+        When call accept_permissive
+        The status should be success
+      End
+
+      It "rejects unknown policy values"
+        Skip if "jv not installed" jv_missing
+        reject_aggressive() {
+          printf 'version: 1\nproject:\n  name: test\n  stack: node\nquality:\n  findings:\n    policy: aggressive\n' > "$TEMP_CONFIG"
+          config.validate_schema
+        }
+        When call reject_aggressive
+        The status should equal 7
+        The error should include "validation failed"
+      End
+
+      It "accepts absence of quality.findings (default applied at runtime)"
+        Skip if "jv not installed" jv_missing
+        accept_absent() {
+          printf 'version: 1\nproject:\n  name: test\n  stack: node\n' > "$TEMP_CONFIG"
+          config.validate_schema
+        }
+        When call accept_absent
+        The status should be success
+      End
+
+      It "rejects unknown sub-keys under quality.findings"
+        Skip if "jv not installed" jv_missing
+        reject_unknown_subkey() {
+          printf 'version: 1\nproject:\n  name: test\n  stack: node\nquality:\n  findings:\n    policy: pragmatic\n    extra_knob: bogus\n' > "$TEMP_CONFIG"
+          config.validate_schema
+        }
+        When call reject_unknown_subkey
+        The status should equal 7
+        The error should include "validation failed"
+      End
+    End
   End
 End

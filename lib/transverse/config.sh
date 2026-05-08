@@ -317,6 +317,16 @@ config.export_quality_vars() {
     type_check_cmd="$(config.get '.quality.type_check.command' '')"
     [[ -n "$type_check_cmd" ]] && export BRIK_QUALITY_TYPE_CHECK_COMMAND="$type_check_cmd"
 
+    # Findings management policy (chantier 20260508 P1). Schema enum
+    # constrains values to pragmatic|strict|permissive; the runtime falls
+    # back to pragmatic when the field is absent. BRIK_FINDINGS_EXPIRING_SOON_DAYS
+    # is a runtime constant (no brik.yml knob) used by findings.expiring_soon
+    # to surface allowlist entries nearing their expiration.
+    local findings_policy
+    findings_policy="$(config.get '.quality.findings.policy' 'pragmatic')"
+    export BRIK_QUALITY_FINDINGS_POLICY="$findings_policy"
+    export BRIK_FINDINGS_EXPIRING_SOON_DAYS="${BRIK_FINDINGS_EXPIRING_SOON_DAYS:-30}"
+
     return 0
 }
 

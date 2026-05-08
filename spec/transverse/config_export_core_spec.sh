@@ -254,6 +254,73 @@ YAML
         The output should equal "false"
       End
     End
+
+    # ---------- findings.policy preset (chantier 20260508 P1.1/P1.4) ----------
+    Describe "findings policy preset"
+      Describe "with explicit quality.findings.policy"
+        setup_config() {
+          TEMP_CONFIG="$(mktemp)"
+          cat > "$TEMP_CONFIG" <<'YAML'
+version: 1
+project:
+  name: test
+  stack: node
+quality:
+  findings:
+    policy: strict
+YAML
+          export BRIK_CONFIG_FILE="$TEMP_CONFIG"
+        }
+        cleanup_config() { rm -f "$TEMP_CONFIG"; }
+        Before 'setup_config'
+        After 'cleanup_config'
+
+        It "exports BRIK_QUALITY_FINDINGS_POLICY from the configured preset"
+          export_and_check() {
+            config.export_quality_vars
+            printf '%s' "$BRIK_QUALITY_FINDINGS_POLICY"
+          }
+          When call export_and_check
+          The output should equal "strict"
+        End
+      End
+
+      Describe "without quality.findings section"
+        setup_config() {
+          TEMP_CONFIG="$(mktemp)"
+          cat > "$TEMP_CONFIG" <<'YAML'
+version: 1
+project:
+  name: test
+  stack: node
+YAML
+          export BRIK_CONFIG_FILE="$TEMP_CONFIG"
+        }
+        cleanup_config() { rm -f "$TEMP_CONFIG"; }
+        Before 'setup_config'
+        After 'cleanup_config'
+
+        It "defaults BRIK_QUALITY_FINDINGS_POLICY to pragmatic"
+          export_and_check() {
+            unset BRIK_QUALITY_FINDINGS_POLICY
+            config.export_quality_vars
+            printf '%s' "$BRIK_QUALITY_FINDINGS_POLICY"
+          }
+          When call export_and_check
+          The output should equal "pragmatic"
+        End
+
+        It "exports BRIK_FINDINGS_EXPIRING_SOON_DAYS as the runtime default 30"
+          export_and_check() {
+            unset BRIK_FINDINGS_EXPIRING_SOON_DAYS
+            config.export_quality_vars
+            printf '%s' "$BRIK_FINDINGS_EXPIRING_SOON_DAYS"
+          }
+          When call export_and_check
+          The output should equal "30"
+        End
+      End
+    End
   End
 
   # =========================================================================

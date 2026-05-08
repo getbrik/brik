@@ -147,6 +147,31 @@
             "version":      { "type": "string" },
             "deployed_to":  { "type": "string" }
           }
+        },
+        "policy": {
+          "description": "Findings management policy snapshot for this run. preset is the active built-in (pragmatic|strict|permissive); source records who picked it: brik.yml when the project's quality.findings.policy is in effect, org-policy when BRIK_POLICY_URL provided an override (P3+).",
+          "type": "object",
+          "additionalProperties": true,
+          "required": ["preset", "source"],
+          "properties": {
+            "preset": {
+              "type": "string",
+              "enum": ["pragmatic", "strict", "permissive"]
+            },
+            "source": {
+              "type": "string",
+              "enum": ["brik.yml", "org-policy"]
+            },
+            "org_policy_url": {
+              "description": "URL fetched for the active org policy. Present only when source = org-policy.",
+              "type": "string"
+            },
+            "org_policy_loaded_at": {
+              "description": "ISO 8601 timestamp at which the org policy was fetched. Present only when source = org-policy.",
+              "type": "string",
+              "format": "date-time"
+            }
+          }
         }
       }
     },

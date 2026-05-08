@@ -6,6 +6,7 @@ Describe "stages.sast"
   Include "$BRIK_HOME/lib/pipeline/report.sh"
   Include "$BRIK_HOME/lib/transverse/config.sh"
   Include "$BRIK_HOME/lib/transverse/sarif.sh"
+  Include "$BRIK_HOME/lib/transverse/findings.sh"
   Include "$BRIK_HOME/lib/stages/verify/scan/scan.sh"
   Include "$BRIK_HOME/lib/stages/sast.sh"
 

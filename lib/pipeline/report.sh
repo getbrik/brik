@@ -463,6 +463,14 @@ report.aggregate_fragments() {
     local finished_at
     finished_at="$(date +"%Y-%m-%dT%H:%M:%S%z")"
 
+    # Findings policy projection (chantier 20260508 P1.5). The active built-in
+    # preset comes from BRIK_QUALITY_FINDINGS_POLICY (export config flow), with
+    # pragmatic as the documented default. source records who picked the preset:
+    # in P1 it is always the project's brik.yml; P3 will set it to "org-policy"
+    # when BRIK_POLICY_URL contributes a preset override.
+    local policy_preset="${BRIK_QUALITY_FINDINGS_POLICY:-pragmatic}"
+    local policy_source="brik.yml"
+
     # Optional pipeline metadata: surface only when the source variable is
     # set, so the aggregate omits absent fields rather than emitting empty
     # strings (matches schema 'optional' semantics).
@@ -526,6 +534,8 @@ report.aggregate_fragments() {
         --arg commit_timestamp "$commit_timestamp" \
         --arg commit_message_subject "$commit_message_subject" \
         --arg triggered_by "$triggered_by" \
+        --arg policy_preset "$policy_preset" \
+        --arg policy_source "$policy_source" \
         --argjson frags "$frags_json" \
         '
         ( $frags
@@ -542,6 +552,7 @@ report.aggregate_fragments() {
           | map(select((.tech.warning // false) == true)
                 | { stage: .stage, reason: (.tech.warning_reason // "") }) ) as $warnings
         | ( if ($counts.failed // 0) > 0 then "failed" else "success" end ) as $pstatus
+        | ( { preset: $policy_preset, source: $policy_source } ) as $policy
         | ( {}
             + ( if $commit_sha             != "" then { sha:             $commit_sha             } else {} end )
             + ( if $commit_short_sha       != "" then { short_sha:       $commit_short_sha       } else {} end )
@@ -571,7 +582,8 @@ report.aggregate_fragments() {
             stages: $frags,
             summary: {
               stages: $counts,
-              warnings: $warnings
+              warnings: $warnings,
+              policy: $policy
             }
           }
         ' > "$tmp" || {

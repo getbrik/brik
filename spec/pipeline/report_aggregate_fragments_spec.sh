@@ -642,4 +642,57 @@ Describe "report.aggregate_fragments"
       The output should not include "Pipeline ID:** null"
     End
   End
+
+  # ---------------------------------------------------------------------------
+  # summary.policy projection (chantier 20260508 P1.5)
+  # ---------------------------------------------------------------------------
+  Describe "summary.policy projection"
+    Before 'setup_dirs'
+    After 'cleanup_dirs'
+
+    It "exposes summary.policy.preset from BRIK_QUALITY_FINDINGS_POLICY"
+      run_with_preset() {
+        export BRIK_QUALITY_FINDINGS_POLICY="strict"
+        write_fragment_file "init" "success" 0
+        report.aggregate_fragments "$FRAG_DIR" >/dev/null 2>&1 || return 1
+        jq -r '.summary.policy.preset' "$AGG_LOG_DIR/aggregate-report.json"
+      }
+      When call run_with_preset
+      The output should equal "strict"
+    End
+
+    It "defaults summary.policy.preset to pragmatic when the env var is unset"
+      run_default_preset() {
+        unset BRIK_QUALITY_FINDINGS_POLICY
+        write_fragment_file "init" "success" 0
+        report.aggregate_fragments "$FRAG_DIR" >/dev/null 2>&1 || return 1
+        jq -r '.summary.policy.preset' "$AGG_LOG_DIR/aggregate-report.json"
+      }
+      When call run_default_preset
+      The output should equal "pragmatic"
+    End
+
+    It "tags summary.policy.source as brik.yml in P1 (org-policy override lands in P3)"
+      run_source() {
+        export BRIK_QUALITY_FINDINGS_POLICY="pragmatic"
+        write_fragment_file "init" "success" 0
+        report.aggregate_fragments "$FRAG_DIR" >/dev/null 2>&1 || return 1
+        jq -r '.summary.policy.source' "$AGG_LOG_DIR/aggregate-report.json"
+      }
+      When call run_source
+      The output should equal "brik.yml"
+    End
+
+    It "produces a schema-valid aggregate even with summary.policy populated"
+      validate_with_policy() {
+        export BRIK_QUALITY_FINDINGS_POLICY="permissive"
+        write_fragment_file "init" "success" 0
+        report.aggregate_fragments "$FRAG_DIR" >/dev/null 2>&1 || return 1
+        validate_aggregate_file "$AGG_LOG_DIR/aggregate-report.json"
+      }
+      Skip if "jv not installed" jv_missing
+      When call validate_with_policy
+      The status should be success
+    End
+  End
 End

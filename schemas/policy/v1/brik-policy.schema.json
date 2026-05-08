@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://brik.dev/schemas/policy/v1/brik-policy.schema.json",
+  "title": "Brik organizational policy file",
+  "description": "DSI-owned policy file distributed via BRIK_POLICY_URL. Carries the optional preset override (project preset is the default) and the org-wide allowlists for CVEs and paths. Equipes projet n'editent jamais ce fichier; toute exception passe par un PR sur le repo DSI.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "preset": {
+      "description": "Optional override of the project's brik.yml quality.findings.policy preset. When present, the org preset wins over the project preset. Absent means the project preset is retained.",
+      "type": "string",
+      "enum": ["pragmatic", "strict", "permissive"]
+    },
+    "allow": {
+      "description": "Org-wide allowlists. Each entry MUST carry both reason and expires; permanent allowlists are not supported by design.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "cve": {
+          "description": "CVE allowlist. Each entry suppresses findings whose ruleId matches the CVE id, optionally scoped to a list of projects.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "reason", "expires"],
+            "properties": {
+              "id": {
+                "description": "CVE identifier in the CVE-YYYY-NNNN... canonical form.",
+                "type": "string",
+                "pattern": "^CVE-[0-9]{4}-[0-9]+$"
+              },
+              "reason": {
+                "description": "Human-readable rationale for the suppression. Required by governance; usually references an architecture or compliance ticket.",
+                "type": "string",
+                "minLength": 1
+              },
+              "expires": {
+                "description": "ISO 8601 date (YYYY-MM-DD) after which the entry is silently ignored by the runtime; the finding then re-enters the failing set.",
+                "type": "string",
+                "format": "date"
+              },
+              "projects": {
+                "description": "Optional list of project names (matched against BRIK_PROJECT_NAME with exact equality, no wildcards in v1). Absent means the entry applies to every project.",
+                "type": "array",
+                "minItems": 1,
+                "items": { "type": "string", "minLength": 1 }
+              }
+            }
+          }
+        },
+        "paths": {
+          "description": "Path allowlist. Each entry suppresses findings whose location.physicalLocation.artifactLocation.uri matches the glob, optionally scoped to a list of projects.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["glob", "reason", "expires"],
+            "properties": {
+              "glob": {
+                "description": "Glob pattern matched against the SARIF artifactLocation URI (e.g. vendor/**, legacy/**).",
+                "type": "string",
+                "minLength": 1
+              },
+              "reason": {
+                "description": "Human-readable rationale for the suppression.",
+                "type": "string",
+                "minLength": 1
+              },
+              "expires": {
+                "description": "ISO 8601 date (YYYY-MM-DD) after which the entry is silently ignored by the runtime.",
+                "type": "string",
+                "format": "date"
+              },
+              "projects": {
+                "description": "Optional list of project names (exact match against BRIK_PROJECT_NAME). Absent means the entry applies to every project.",
+                "type": "array",
+                "minItems": 1,
+                "items": { "type": "string", "minLength": 1 }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
