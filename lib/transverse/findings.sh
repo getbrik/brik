@@ -72,14 +72,38 @@ findings.from_sarif() {
     return 0
 }
 
-# Apply the active policy to a SARIF document. P1 implementation is a
-# passthrough copy: <sarif_in> -> <sarif_out> with no annotations. Later
-# phases layer in:
-#   P2 -- built-in preset (pragmatic|strict|permissive) tags result.suppressions[]
-#         with kind=external + properties.brikSource=policy.built-in.*.
-#   P3 -- org allowlist loaded from BRIK_POLICY_URL adds policy.org.* entries.
-# Keeping the I/O contract stable across phases means call sites never
-# need to change when policy logic evolves.
+# Apply the active built-in policy preset to a SARIF document. The preset
+# is read from BRIK_QUALITY_FINDINGS_POLICY (default pragmatic); the
+# severity floor is read from BRIK_SECURITY_SEVERITY_THRESHOLD (default
+# high). P3 will layer the organization allowlist from BRIK_POLICY_URL on
+# top of the preset output.
+#
+# Preset matrix (chantier 20260508 A2):
+#   pragmatic  : ignore severity<floor (below-severity), then fixState=
+#                not-fixed (no-upstream-fix), then fixState=wont-fix
+#                (vendor-wont-fix); fail the rest.
+#   strict     : ignore severity<floor; fail everything else (no-fix included).
+#   permissive : effective floor is critical; ignore severity<critical
+#                (below-severity), then not-fixed/wont-fix; fail only
+#                critical with an upstream fix.
+#
+# In every preset, results that already carry a non-empty suppressions[]
+# (tool-native allowlist, inline annotation, ...) pass through untouched
+# so the SARIF natif owner keeps full control of pre-existing decisions.
+#
+# Annotations appended on policy-ignored results:
+#   result.suppressions[+] = {
+#     kind: "external",
+#     justification: "Brik policy: <reason>",
+#     properties: { brikSource: "policy.built-in.<reason>" }
+#   }
+# Reason is one of: below-severity, no-upstream-fix, vendor-wont-fix.
+#
+# Severity resolution mirrors transverse.sarif: prefers
+# properties.security-severity (CVSS string) when present, else falls
+# back to result.level. fixState defaults to "fixed" when absent so tools
+# without grype-style fix metadata (semgrep, eslint, ...) never qualify
+# for the no-fix tags.
 #
 # Args:
 #   $1 sarif_in  -- input SARIF (typically the tool's native output).
@@ -94,13 +118,126 @@ findings.apply_policy() {
         printf 'findings.apply_policy: input not found: %s\n' "$sarif_in" >&2
         return "${BRIK_EXIT_IO_FAILURE:-6}"
     fi
+
+    local preset="${BRIK_QUALITY_FINDINGS_POLICY:-pragmatic}"
+    case "$preset" in
+        pragmatic|strict|permissive) ;;
+        *)
+            printf 'findings.apply_policy: unknown preset %s (expected pragmatic|strict|permissive)\n' "$preset" >&2
+            return "${BRIK_EXIT_CONFIG_ERROR:-7}"
+            ;;
+    esac
+
+    local floor_raw="${BRIK_SECURITY_SEVERITY_THRESHOLD:-high}"
+    local floor="${floor_raw,,}"
+    local floor_rank
+    case "$floor" in
+        info)     floor_rank=0 ;;
+        low)      floor_rank=1 ;;
+        medium)   floor_rank=2 ;;
+        high)     floor_rank=3 ;;
+        critical) floor_rank=4 ;;
+        *)
+            printf 'findings.apply_policy: unknown severity threshold %s (expected info|low|medium|high|critical)\n' "$floor_raw" >&2
+            return "${BRIK_EXIT_CONFIG_ERROR:-7}"
+            ;;
+    esac
+
     local out_dir
     out_dir="$(dirname "$sarif_out")"
     mkdir -p "$out_dir" || {
         printf 'findings.apply_policy: cannot create output directory: %s\n' "$out_dir" >&2
         return "${BRIK_EXIT_IO_FAILURE:-6}"
     }
-    cp "$sarif_in" "$sarif_out" || {
+
+    if ! command -v jq >/dev/null 2>&1; then
+        printf 'findings.apply_policy: jq not on PATH\n' >&2
+        return "${BRIK_EXIT_MISSING_DEP:-3}"
+    fi
+
+    local tmp
+    tmp="$(mktemp "${sarif_out}.XXXXXX")" || return "${BRIK_EXIT_IO_FAILURE:-6}"
+
+    # KCOV_EXCL_START -- jq script body is not bash code
+    jq --arg preset "$preset" --argjson floor_rank "$floor_rank" '
+        def severity_rank(s):
+          if   s == "critical" then 4
+          elif s == "high"     then 3
+          elif s == "medium"   then 2
+          elif s == "low"      then 1
+          else 0 end;
+
+        def cvss_bucket(s):
+          # tonumber? swallows non-numeric CVSS strings (truncated, garbage)
+          # so an upstream-malformed properties.security-severity downgrades
+          # to info instead of crashing the entire jq filter.
+          ((s | tonumber?) // -1) as $v
+          | if   $v >= 9.0 then "critical"
+            elif $v >= 7.0 then "high"
+            elif $v >= 4.0 then "medium"
+            elif $v > 0    then "low"
+            else "info" end;
+
+        def level_bucket(lvl):
+          if   lvl == "error"   then "high"
+          elif lvl == "warning" then "medium"
+          elif lvl == "note"    then "low"
+          else "info" end;
+
+        def severity_of_result($r):
+          ($r.properties["security-severity"] // null) as $cvss
+          | if   $cvss != null            then cvss_bucket($cvss)
+            elif ($r.level // null) != null then level_bucket($r.level)
+            else "info" end;
+
+        # Classify a result. Returns a reason string when the policy ignores
+        # the finding, or null when the finding stays failing (or is already
+        # suppressed natively and must pass through).
+        def classify($r):
+          (($r.suppressions // []) | length) as $sup_len
+          | if $sup_len > 0 then null
+            else
+              severity_of_result($r) as $sev
+              | severity_rank($sev) as $rank
+              | ($r.properties.fixState // "fixed") as $fix
+              | if $preset == "strict" then
+                  if $rank < $floor_rank then "below-severity" else null end
+                elif $preset == "permissive" then
+                  if   $rank < 4               then "below-severity"
+                  elif $fix == "not-fixed"     then "no-upstream-fix"
+                  elif $fix == "wont-fix"      then "vendor-wont-fix"
+                  else null end
+                else
+                  if   $rank < $floor_rank then "below-severity"
+                  elif $fix == "not-fixed"     then "no-upstream-fix"
+                  elif $fix == "wont-fix"      then "vendor-wont-fix"
+                  else null end
+                end
+            end;
+
+        def annotate($r):
+          classify($r) as $reason
+          | if $reason == null then $r
+            else $r + {
+              suppressions: (
+                ($r.suppressions // []) + [{
+                  kind: "external",
+                  justification: ("Brik policy: " + $reason),
+                  properties: { brikSource: ("policy.built-in." + $reason) }
+                }]
+              )
+            } end;
+
+        .runs[0].results = ((.runs[0].results // []) | map(annotate(.)))
+    ' "$sarif_in" > "$tmp" || {
+        rm -f "$tmp"
+        printf 'findings.apply_policy: jq processing failed for %s\n' "$sarif_in" >&2
+        return "${BRIK_EXIT_IO_FAILURE:-6}"
+    }
+    # KCOV_EXCL_STOP
+
+    mv "$tmp" "$sarif_out" || {
+        rm -f "$tmp"
         printf 'findings.apply_policy: cannot write %s\n' "$sarif_out" >&2
         return "${BRIK_EXIT_IO_FAILURE:-6}"
     }
@@ -152,12 +289,66 @@ findings.aggregate() {
         || printf '{"critical":0,"high":0,"medium":0,"low":0,"info":0}')"
     cwe="$(sarif.extract_cwe "$sarif_path" 2>/dev/null || printf '[]')"
 
+    # L4 v2 enrichment (chantier 20260508 P2): failing vs ignored split,
+    # ignored breakdown by brikSource and by severity. Counts are derived
+    # from result.suppressions[]: a result with at least one suppression
+    # entry counts as ignored; the brikSource on the first entry decides
+    # the source bucket (defaulting to tool_native for natively-suppressed
+    # results that lack our properties.brikSource annotation).
+    local v2_stats
+    # KCOV_EXCL_START -- jq script body is not bash code
+    v2_stats="$(jq -c '
+        def cvss_bucket(s):
+          # tonumber? swallows non-numeric CVSS strings (truncated, garbage)
+          # so an upstream-malformed properties.security-severity downgrades
+          # to info instead of crashing the entire jq filter.
+          ((s | tonumber?) // -1) as $v
+          | if   $v >= 9.0 then "critical"
+            elif $v >= 7.0 then "high"
+            elif $v >= 4.0 then "medium"
+            elif $v > 0    then "low"
+            else "info" end;
+
+        def level_bucket(lvl):
+          if   lvl == "error"   then "high"
+          elif lvl == "warning" then "medium"
+          elif lvl == "note"    then "low"
+          else "info" end;
+
+        def severity_of_result($r):
+          ($r.properties["security-severity"] // null) as $cvss
+          | if   $cvss != null            then cvss_bucket($cvss)
+            elif ($r.level // null) != null then level_bucket($r.level)
+            else "info" end;
+
+        (.runs[0].results // []) as $results
+        | ($results | map(select(((.suppressions // []) | length) == 0)) | length) as $failing
+        | ($results | map(select(((.suppressions // []) | length) > 0))) as $ign
+        | (
+            $ign
+            | map(.suppressions[0].properties.brikSource // "tool_native")
+            | reduce .[] as $src ({}; .[$src] = (.[$src] // 0) + 1)
+          ) as $by_source
+        | (
+            $ign
+            | map(severity_of_result(.))
+            | reduce .[] as $s ({"critical":0, "high":0, "medium":0, "low":0, "info":0};
+                                .[$s] += 1)
+          ) as $ign_by_sev
+        | {
+            failing: $failing,
+            ignored: { total: ($ign | length), by_source: $by_source, by_severity: $ign_by_sev }
+          }
+    ' "$sarif_path" 2>/dev/null || printf '{"failing":0,"ignored":{"total":0,"by_source":{},"by_severity":{"critical":0,"high":0,"medium":0,"low":0,"info":0}}}')"
+    # KCOV_EXCL_STOP
+
     local findings_obj
     findings_obj="$(jq -nc \
         --argjson total       "$total" \
         --argjson by_severity "$by_severity" \
         --argjson cwe         "$cwe" \
-        '{total: $total, by_severity: $by_severity, cwe: $cwe}')"
+        --argjson v2          "$v2_stats" \
+        '{total: $total, by_severity: $by_severity, cwe: $cwe} + $v2')"
     report.record_object "$stage" "business" "findings" "$findings_obj" 2>/dev/null || true
 
     local rel_path="$sarif_path"

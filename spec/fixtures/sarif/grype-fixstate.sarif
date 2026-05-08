@@ -1,0 +1,121 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "grype",
+          "version": "0.111.1",
+          "rules": [
+            { "id": "CVE-2026-0001", "shortDescription": { "text": "synthetic critical fixed" } },
+            { "id": "CVE-2026-0002", "shortDescription": { "text": "synthetic critical not-fixed" } },
+            { "id": "CVE-2026-0003", "shortDescription": { "text": "synthetic high not-fixed" } },
+            { "id": "CVE-2026-0004", "shortDescription": { "text": "synthetic high fixed" } },
+            { "id": "CVE-2026-0005", "shortDescription": { "text": "synthetic high wont-fix" } },
+            { "id": "CVE-2026-0006", "shortDescription": { "text": "synthetic medium fixed" } },
+            { "id": "CVE-2026-0007", "shortDescription": { "text": "synthetic medium not-fixed" } },
+            { "id": "CVE-2026-0008", "shortDescription": { "text": "synthetic critical fixed with existing tool-native suppression" } }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "CVE-2026-0001",
+          "ruleIndex": 0,
+          "level": "error",
+          "message": { "text": "Critical finding with upstream fix available." },
+          "locations": [{ "physicalLocation": { "artifactLocation": { "uri": "pkg:deb/python3.14" } } }],
+          "properties": {
+            "security-severity": "9.5",
+            "fixState": "fixed"
+          }
+        },
+        {
+          "ruleId": "CVE-2026-0002",
+          "ruleIndex": 1,
+          "level": "error",
+          "message": { "text": "Critical finding with no upstream fix." },
+          "locations": [{ "physicalLocation": { "artifactLocation": { "uri": "pkg:deb/python3.14" } } }],
+          "properties": {
+            "security-severity": "9.2",
+            "fixState": "not-fixed"
+          }
+        },
+        {
+          "ruleId": "CVE-2026-0003",
+          "ruleIndex": 2,
+          "level": "error",
+          "message": { "text": "High finding with no upstream fix." },
+          "locations": [{ "physicalLocation": { "artifactLocation": { "uri": "pkg:deb/openssl" } } }],
+          "properties": {
+            "security-severity": "7.5",
+            "fixState": "not-fixed"
+          }
+        },
+        {
+          "ruleId": "CVE-2026-0004",
+          "ruleIndex": 3,
+          "level": "error",
+          "message": { "text": "High finding with upstream fix available." },
+          "locations": [{ "physicalLocation": { "artifactLocation": { "uri": "pkg:deb/openssl" } } }],
+          "properties": {
+            "security-severity": "7.5",
+            "fixState": "fixed"
+          }
+        },
+        {
+          "ruleId": "CVE-2026-0005",
+          "ruleIndex": 4,
+          "level": "error",
+          "message": { "text": "High finding the vendor will not fix." },
+          "locations": [{ "physicalLocation": { "artifactLocation": { "uri": "pkg:deb/legacy-lib" } } }],
+          "properties": {
+            "security-severity": "7.0",
+            "fixState": "wont-fix"
+          }
+        },
+        {
+          "ruleId": "CVE-2026-0006",
+          "ruleIndex": 5,
+          "level": "warning",
+          "message": { "text": "Medium finding with upstream fix available." },
+          "locations": [{ "physicalLocation": { "artifactLocation": { "uri": "pkg:npm/lodash" } } }],
+          "properties": {
+            "security-severity": "5.5",
+            "fixState": "fixed"
+          }
+        },
+        {
+          "ruleId": "CVE-2026-0007",
+          "ruleIndex": 6,
+          "level": "warning",
+          "message": { "text": "Medium finding with no upstream fix." },
+          "locations": [{ "physicalLocation": { "artifactLocation": { "uri": "pkg:npm/lodash" } } }],
+          "properties": {
+            "security-severity": "5.0",
+            "fixState": "not-fixed"
+          }
+        },
+        {
+          "ruleId": "CVE-2026-0008",
+          "ruleIndex": 7,
+          "level": "error",
+          "message": { "text": "Critical finding pre-suppressed by a tool-native allowlist (e.g. .grype.yaml)." },
+          "locations": [{ "physicalLocation": { "artifactLocation": { "uri": "pkg:deb/preexisting" } } }],
+          "properties": {
+            "security-severity": "9.8",
+            "fixState": "fixed"
+          },
+          "suppressions": [
+            {
+              "kind": "external",
+              "justification": "Pre-existing tool-native suppression",
+              "properties": { "brikSource": "tool_native" }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

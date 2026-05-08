@@ -244,4 +244,430 @@ Describe "transverse/findings.sh"
       The error should include "not implemented"
     End
   End
+
+  # ---------------------------------------------------------------------------
+  # findings.apply_policy with built-in presets (chantier 20260508 P2)
+  # ---------------------------------------------------------------------------
+  Describe "findings.apply_policy built-in presets"
+    GRYPE="${BRIK_HOME}/spec/fixtures/sarif/grype-fixstate.sarif"
+
+    setup_policy_env() {
+      OUT="$(mktemp).sarif"
+      unset BRIK_QUALITY_FINDINGS_POLICY BRIK_SECURITY_SEVERITY_THRESHOLD
+    }
+    cleanup_policy_env() { rm -f "$OUT"; }
+    Before 'setup_policy_env'
+    After 'cleanup_policy_env'
+
+    # Result post apply_policy is "failing" when its output suppressions[] is
+    # absent or empty. "ignored" otherwise; brikSource on the appended entry
+    # discriminates between policy.built-in.* and pre-existing tool_native.
+    count_failing() {
+      jq -r '[.runs[0].results[] | select(((.suppressions // []) | length) == 0)] | length' "$OUT"
+    }
+    count_ignored_with_source() {
+      local src="$1"
+      jq -r --arg s "$src" \
+        '[.runs[0].results[] | (.suppressions // [])[] | select(.properties.brikSource == $s)] | length' \
+        "$OUT"
+    }
+
+    Describe "pragmatic preset (default)"
+      It "produces a valid SARIF document"
+        apply_pragmatic() {
+          export BRIK_QUALITY_FINDINGS_POLICY="pragmatic"
+          findings.apply_policy "$GRYPE" "$OUT" >/dev/null 2>&1 || return 1
+          sarif.is_valid "$OUT"
+        }
+        When call apply_pragmatic
+        The status should be success
+      End
+
+      It "marks 2 findings as failing (critical+fixed and high+fixed)"
+        run_count_failing() {
+          export BRIK_QUALITY_FINDINGS_POLICY="pragmatic"
+          findings.apply_policy "$GRYPE" "$OUT" >/dev/null 2>&1
+          count_failing
+        }
+        When call run_count_failing
+        The output should equal "2"
+      End
+
+      It "tags 2 findings as policy.built-in.no-upstream-fix"
+        run_count() {
+          export BRIK_QUALITY_FINDINGS_POLICY="pragmatic"
+          findings.apply_policy "$GRYPE" "$OUT" >/dev/null 2>&1
+          count_ignored_with_source "policy.built-in.no-upstream-fix"
+        }
+        When call run_count
+        The output should equal "2"
+      End
+
+      It "tags 1 finding as policy.built-in.vendor-wont-fix"
+        run_count() {
+          export BRIK_QUALITY_FINDINGS_POLICY="pragmatic"
+          findings.apply_policy "$GRYPE" "$OUT" >/dev/null 2>&1
+          count_ignored_with_source "policy.built-in.vendor-wont-fix"
+        }
+        When call run_count
+        The output should equal "1"
+      End
+
+      It "tags 2 findings as policy.built-in.below-severity (medium < high floor)"
+        run_count() {
+          export BRIK_QUALITY_FINDINGS_POLICY="pragmatic"
+          findings.apply_policy "$GRYPE" "$OUT" >/dev/null 2>&1
+          count_ignored_with_source "policy.built-in.below-severity"
+        }
+        When call run_count
+        The output should equal "2"
+      End
+
+      It "preserves the pre-existing tool_native suppression untouched"
+        run_count() {
+          export BRIK_QUALITY_FINDINGS_POLICY="pragmatic"
+          findings.apply_policy "$GRYPE" "$OUT" >/dev/null 2>&1
+          count_ignored_with_source "tool_native"
+        }
+        When call run_count
+        The output should equal "1"
+      End
+
+      It "uses the chantier preference order (severity floor before fix-state)"
+        # CVE-2026-0006 (medium fixed) and CVE-2026-0007 (medium not-fixed)
+        # both fall below the severity floor; pragmatic must tag them as
+        # below-severity, not no-upstream-fix, so the report explains the
+        # structural decision (we don't track that severity bucket).
+        check_ordering() {
+          export BRIK_QUALITY_FINDINGS_POLICY="pragmatic"
+          findings.apply_policy "$GRYPE" "$OUT" >/dev/null 2>&1
+          jq -r '
+            .runs[0].results[]
+            | select(.ruleId == "CVE-2026-0007")
+            | .suppressions[0].properties.brikSource
+          ' "$OUT"
+        }
+        When call check_ordering
+        The output should equal "policy.built-in.below-severity"
+      End
+
+      It "applies the same preset by default (no env var set)"
+        no_env() {
+          unset BRIK_QUALITY_FINDINGS_POLICY
+          findings.apply_policy "$GRYPE" "$OUT" >/dev/null 2>&1
+          count_failing
+        }
+        When call no_env
+        The output should equal "2"
+      End
+    End
+
+    Describe "strict preset"
+      It "fails 5 findings (everything at or above severity floor)"
+        run_count() {
+          export BRIK_QUALITY_FINDINGS_POLICY="strict"
+          findings.apply_policy "$GRYPE" "$OUT" >/dev/null 2>&1
+          count_failing
+        }
+        When call run_count
+        The output should equal "5"
+      End
+
+      It "still tags 2 findings as below-severity (severity check stays)"
+        run_count() {
+          export BRIK_QUALITY_FINDINGS_POLICY="strict"
+          findings.apply_policy "$GRYPE" "$OUT" >/dev/null 2>&1
+          count_ignored_with_source "policy.built-in.below-severity"
+        }
+        When call run_count
+        The output should equal "2"
+      End
+
+      It "does not tag any finding as no-upstream-fix or vendor-wont-fix"
+        run_count() {
+          export BRIK_QUALITY_FINDINGS_POLICY="strict"
+          findings.apply_policy "$GRYPE" "$OUT" >/dev/null 2>&1
+          local nf vw
+          nf="$(count_ignored_with_source "policy.built-in.no-upstream-fix")"
+          vw="$(count_ignored_with_source "policy.built-in.vendor-wont-fix")"
+          printf '%s\n' "${nf}+${vw}"
+        }
+        When call run_count
+        The output should equal "0+0"
+      End
+
+      It "preserves the pre-existing tool_native suppression"
+        run_count() {
+          export BRIK_QUALITY_FINDINGS_POLICY="strict"
+          findings.apply_policy "$GRYPE" "$OUT" >/dev/null 2>&1
+          count_ignored_with_source "tool_native"
+        }
+        When call run_count
+        The output should equal "1"
+      End
+    End
+
+    Describe "permissive preset"
+      It "fails only 1 finding (critical with upstream fix)"
+        run_count() {
+          export BRIK_QUALITY_FINDINGS_POLICY="permissive"
+          findings.apply_policy "$GRYPE" "$OUT" >/dev/null 2>&1
+          count_failing
+        }
+        When call run_count
+        The output should equal "1"
+      End
+
+      It "tags exactly the critical not-fixed entry as no-upstream-fix"
+        run_count() {
+          export BRIK_QUALITY_FINDINGS_POLICY="permissive"
+          findings.apply_policy "$GRYPE" "$OUT" >/dev/null 2>&1
+          count_ignored_with_source "policy.built-in.no-upstream-fix"
+        }
+        When call run_count
+        The output should equal "1"
+      End
+
+      It "tags 5 findings as below-severity (effective floor is critical)"
+        run_count() {
+          export BRIK_QUALITY_FINDINGS_POLICY="permissive"
+          findings.apply_policy "$GRYPE" "$OUT" >/dev/null 2>&1
+          count_ignored_with_source "policy.built-in.below-severity"
+        }
+        When call run_count
+        The output should equal "5"
+      End
+
+      It "preserves the pre-existing tool_native suppression"
+        run_count() {
+          export BRIK_QUALITY_FINDINGS_POLICY="permissive"
+          findings.apply_policy "$GRYPE" "$OUT" >/dev/null 2>&1
+          count_ignored_with_source "tool_native"
+        }
+        When call run_count
+        The output should equal "1"
+      End
+    End
+
+    Describe "severity floor override"
+      It "respects BRIK_SECURITY_SEVERITY_THRESHOLD=medium under pragmatic"
+        # With floor=medium, the medium entries (#5,#6) are no longer
+        # below-severity; #6 falls into no-upstream-fix, #5 becomes failing.
+        run_failing() {
+          export BRIK_QUALITY_FINDINGS_POLICY="pragmatic"
+          export BRIK_SECURITY_SEVERITY_THRESHOLD="medium"
+          findings.apply_policy "$GRYPE" "$OUT" >/dev/null 2>&1
+          count_failing
+        }
+        When call run_failing
+        # #0 crit fixed + #3 high fixed + #5 medium fixed = 3 failing
+        The output should equal "3"
+      End
+
+      It "shifts no-upstream-fix to include medium when floor=medium"
+        run_count() {
+          export BRIK_QUALITY_FINDINGS_POLICY="pragmatic"
+          export BRIK_SECURITY_SEVERITY_THRESHOLD="medium"
+          findings.apply_policy "$GRYPE" "$OUT" >/dev/null 2>&1
+          count_ignored_with_source "policy.built-in.no-upstream-fix"
+        }
+        When call run_count
+        # #1 crit not-fixed + #2 high not-fixed + #6 medium not-fixed = 3
+        The output should equal "3"
+      End
+    End
+
+    Describe "edge cases"
+      It "appends justification text on the policy suppression entry"
+        check_just() {
+          export BRIK_QUALITY_FINDINGS_POLICY="pragmatic"
+          findings.apply_policy "$GRYPE" "$OUT" >/dev/null 2>&1
+          jq -r '
+            .runs[0].results[]
+            | select(.ruleId == "CVE-2026-0002")
+            | .suppressions[0].justification
+          ' "$OUT"
+        }
+        When call check_just
+        The output should include "Brik policy"
+      End
+
+      It "uses kind=external on every appended suppression"
+        check_kind() {
+          export BRIK_QUALITY_FINDINGS_POLICY="pragmatic"
+          findings.apply_policy "$GRYPE" "$OUT" >/dev/null 2>&1
+          jq -r '
+            [.runs[0].results[]
+              | (.suppressions // [])[]
+              | select((.properties.brikSource // "") | startswith("policy."))
+              | .kind] | unique | .[]
+          ' "$OUT"
+        }
+        When call check_kind
+        The output should equal "external"
+      End
+
+      It "rejects an unknown preset name"
+        bad_preset() {
+          export BRIK_QUALITY_FINDINGS_POLICY="aggressive"
+          findings.apply_policy "$GRYPE" "$OUT"
+        }
+        When call bad_preset
+        The status should equal 7
+        The error should include "preset"
+      End
+
+      It "rejects an unknown severity threshold value"
+        bad_floor() {
+          export BRIK_QUALITY_FINDINGS_POLICY="pragmatic"
+          export BRIK_SECURITY_SEVERITY_THRESHOLD="hight"
+          findings.apply_policy "$GRYPE" "$OUT"
+        }
+        When call bad_floor
+        The status should equal 7
+        The error should include "threshold"
+      End
+
+      It "tolerates a malformed CVSS string (downgrades to info, no crash)"
+        bad_cvss_sarif() {
+          local in
+          in="$(mktemp).sarif"
+          jq '.runs[0].results[0].properties["security-severity"] = "not-a-number"' \
+            "$GRYPE" > "$in"
+          export BRIK_QUALITY_FINDINGS_POLICY="pragmatic"
+          findings.apply_policy "$in" "$OUT"
+          local rc=$?
+          rm -f "$in"
+          return "$rc"
+        }
+        When call bad_cvss_sarif
+        The status should be success
+      End
+
+      It "handles a SARIF with empty runs[] without crashing"
+        empty_runs_sarif() {
+          local in
+          in="$(mktemp).sarif"
+          printf '%s' '{"version":"2.1.0","runs":[]}' > "$in"
+          export BRIK_QUALITY_FINDINGS_POLICY="pragmatic"
+          findings.apply_policy "$in" "$OUT"
+          local rc=$?
+          rm -f "$in"
+          return "$rc"
+        }
+        When call empty_runs_sarif
+        The status should be success
+      End
+    End
+  End
+
+  # ---------------------------------------------------------------------------
+  # findings.aggregate L4 v2 extensions (chantier 20260508 P2)
+  # ---------------------------------------------------------------------------
+  Describe "findings.aggregate L4 v2 fields"
+    GRYPE="${BRIK_HOME}/spec/fixtures/sarif/grype-fixstate.sarif"
+
+    setup_l4v2() {
+      ANNOTATED="$(mktemp).sarif"
+      export BRIK_QUALITY_FINDINGS_POLICY="pragmatic"
+      unset BRIK_SECURITY_SEVERITY_THRESHOLD
+      findings.apply_policy "$GRYPE" "$ANNOTATED" >/dev/null 2>&1
+      findings.aggregate "container_scan" "$ANNOTATED" >/dev/null 2>&1
+    }
+    cleanup_l4v2() {
+      rm -f "$ANNOTATED"
+      unset BRIK_QUALITY_FINDINGS_POLICY
+    }
+    Before 'setup_l4v2'
+    After 'cleanup_l4v2'
+
+    read_findings() {
+      jq -c '.stages[] | select(.name == "container_scan") | .business.findings' \
+        "$BRIK_LOG_DIR/aggregate-report.json"
+    }
+
+    It "preserves L4 v1 total field"
+      check_total() {
+        read_findings | jq -r '.total'
+      }
+      When call check_total
+      The output should equal "8"
+    End
+
+    It "preserves L4 v1 by_severity field"
+      check_by_sev() {
+        read_findings | jq -c '.by_severity'
+      }
+      When call check_by_sev
+      The output should include "critical"
+      The output should include "high"
+      The output should include "medium"
+    End
+
+    It "exposes business.findings.failing"
+      check_failing() {
+        read_findings | jq -r '.failing'
+      }
+      When call check_failing
+      The output should equal "2"
+    End
+
+    It "exposes business.findings.ignored.total"
+      check_ign_total() {
+        read_findings | jq -r '.ignored.total'
+      }
+      When call check_ign_total
+      The output should equal "6"
+    End
+
+    It "exposes business.findings.ignored.by_source.no-upstream-fix"
+      check_ign_src() {
+        read_findings | jq -r '.ignored.by_source["policy.built-in.no-upstream-fix"]'
+      }
+      When call check_ign_src
+      The output should equal "2"
+    End
+
+    It "exposes business.findings.ignored.by_source.vendor-wont-fix"
+      check_ign_src() {
+        read_findings | jq -r '.ignored.by_source["policy.built-in.vendor-wont-fix"]'
+      }
+      When call check_ign_src
+      The output should equal "1"
+    End
+
+    It "exposes business.findings.ignored.by_source.below-severity"
+      check_ign_src() {
+        read_findings | jq -r '.ignored.by_source["policy.built-in.below-severity"]'
+      }
+      When call check_ign_src
+      The output should equal "2"
+    End
+
+    It "exposes business.findings.ignored.by_source.tool_native"
+      check_ign_src() {
+        read_findings | jq -r '.ignored.by_source["tool_native"]'
+      }
+      When call check_ign_src
+      The output should equal "1"
+    End
+
+    It "exposes business.findings.ignored.by_severity histogram"
+      check_ign_sev() {
+        read_findings | jq -c '.ignored.by_severity'
+      }
+      When call check_ign_sev
+      The output should include "critical"
+      The output should include "high"
+      The output should include "medium"
+    End
+
+    It "balances total = failing + ignored.total"
+      check_balance() {
+        read_findings | jq -r '.total - (.failing + .ignored.total)'
+      }
+      When call check_balance
+      The output should equal "0"
+    End
+  End
 End
