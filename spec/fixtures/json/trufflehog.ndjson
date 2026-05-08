@@ -1,0 +1,3 @@
+{"SourceMetadata":{"Data":{"Filesystem":{"file":"src/secrets.py","line":12}}},"SourceID":1,"SourceType":7,"DetectorName":"AWS","DecoderName":"PLAIN","Verified":true,"Raw":"AKIA[REDACTED]","Redacted":"AKIA[REDACTED]","ExtraData":{"account":"123456789012"}}
+{"SourceMetadata":{"Data":{"Filesystem":{"file":"src/config.yaml","line":7}}},"SourceID":1,"SourceType":7,"DetectorName":"GitHub","DecoderName":"PLAIN","Verified":false,"Raw":"ghp_[REDACTED]","Redacted":"ghp_[REDACTED]","ExtraData":{}}
+{"SourceMetadata":{"Data":{"Filesystem":{"file":"src/notify.py","line":24}}},"SourceID":1,"SourceType":7,"DetectorName":"Slack","DecoderName":"PLAIN","Verified":true,"Raw":"xoxb-[REDACTED]","Redacted":"xoxb-[REDACTED]","ExtraData":{"team":"acme"}}

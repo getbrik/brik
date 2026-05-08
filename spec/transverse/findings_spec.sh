@@ -227,12 +227,6 @@ Describe "transverse/findings.sh"
   End
 
   Describe "stub functions"
-    It "findings.from_json signals not-yet-implemented (P5 scope)"
-      When call findings.from_json
-      The status should not be success
-      The error should include "not implemented"
-    End
-
     It "findings.expiring_soon returns 0 when no allowlist is loaded"
       When call findings.expiring_soon
       The status should be success
@@ -242,6 +236,59 @@ Describe "transverse/findings.sh"
       When call findings.merge_pipeline
       The status should not be success
       The error should include "not implemented"
+    End
+  End
+
+  # ---------------------------------------------------------------------------
+  # findings.from_json dispatcher (chantier 20260508 P5.A). Per-tool
+  # converters are validated in their own specs (junit, ruff, bandit, ...);
+  # this block only covers the dispatch contract.
+  # ---------------------------------------------------------------------------
+  Describe "findings.from_json dispatcher"
+    setup_dispatcher_env() {
+      DISP_TMP="$(mktemp -d)"
+      DISP_INPUT="$DISP_TMP/input.json"
+      DISP_OUTPUT="$DISP_TMP/output.sarif"
+      printf '%s' '{"results":[]}' > "$DISP_INPUT"
+    }
+    cleanup_dispatcher_env() { rm -rf "$DISP_TMP"; }
+    Before 'setup_dispatcher_env'
+    After  'cleanup_dispatcher_env'
+
+    It "rejects missing arguments"
+      When call findings.from_json
+      The status should not be success
+      The error should include "missing arguments"
+    End
+
+    It "rejects an empty tool name"
+      When call findings.from_json "" "$DISP_INPUT" "$DISP_OUTPUT"
+      The status should not be success
+      The error should include "tool must not be empty"
+    End
+
+    It "fails IO when the input file is missing"
+      When call findings.from_json ruff "/nonexistent/input.json" "$DISP_OUTPUT"
+      The status should not be success
+      The error should include "input not found"
+    End
+
+    It "fails CONFIG_ERROR when no converter is registered"
+      When call findings.from_json totallymadeup "$DISP_INPUT" "$DISP_OUTPUT"
+      The status should not be success
+      The error should include "no converter registered"
+    End
+
+    It "rejects tool names that contain path separators"
+      When call findings.from_json "../sarif" "$DISP_INPUT" "$DISP_OUTPUT"
+      The status should not be success
+      The error should include "invalid tool name"
+    End
+
+    It "rejects tool names that start with a digit"
+      When call findings.from_json "1bad" "$DISP_INPUT" "$DISP_OUTPUT"
+      The status should not be success
+      The error should include "invalid tool name"
     End
   End
 

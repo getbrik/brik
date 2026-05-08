@@ -1,0 +1,63 @@
+{
+  "errors": [],
+  "metrics": {
+    "_totals": {
+      "CONFIDENCE.HIGH": 1,
+      "CONFIDENCE.LOW": 1,
+      "CONFIDENCE.MEDIUM": 1,
+      "SEVERITY.HIGH": 1,
+      "SEVERITY.LOW": 1,
+      "SEVERITY.MEDIUM": 1,
+      "loc": 120,
+      "nosec": 0,
+      "skipped_tests": 0
+    }
+  },
+  "results": [
+    {
+      "code": "    if user == 'admin':\n        password = 'admin'\n",
+      "col_offset": 8,
+      "end_col_offset": 25,
+      "filename": "src/auth.py",
+      "issue_confidence": "MEDIUM",
+      "issue_cwe": { "id": 259, "link": "https://cwe.mitre.org/data/definitions/259.html" },
+      "issue_severity": "LOW",
+      "issue_text": "Possible hardcoded password: 'admin'",
+      "line_number": 5,
+      "line_range": [5],
+      "more_info": "https://bandit.readthedocs.io/en/latest/plugins/b105_hardcoded_password_string.html",
+      "test_id": "B105",
+      "test_name": "hardcoded_password_string"
+    },
+    {
+      "code": "    cursor.execute(\"SELECT * FROM users WHERE id=\" + uid)\n",
+      "col_offset": 4,
+      "end_col_offset": 56,
+      "filename": "src/db.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": { "id": 89, "link": "https://cwe.mitre.org/data/definitions/89.html" },
+      "issue_severity": "HIGH",
+      "issue_text": "Possible SQL injection via string concatenation",
+      "line_number": 18,
+      "line_range": [18],
+      "more_info": "https://bandit.readthedocs.io/en/latest/plugins/b608_hardcoded_sql_expressions.html",
+      "test_id": "B608",
+      "test_name": "hardcoded_sql_expressions"
+    },
+    {
+      "code": "    token = random.randint(0, 2**32)\n",
+      "col_offset": 12,
+      "end_col_offset": 36,
+      "filename": "src/utils.py",
+      "issue_confidence": "HIGH",
+      "issue_cwe": { "id": 330, "link": "https://cwe.mitre.org/data/definitions/330.html" },
+      "issue_severity": "MEDIUM",
+      "issue_text": "Standard pseudo-random generators are not suitable for security/cryptographic purposes.",
+      "line_number": 42,
+      "line_range": [42],
+      "more_info": "https://bandit.readthedocs.io/en/latest/blacklists/blacklist_calls.html#b311-random",
+      "test_id": "B311",
+      "test_name": "random"
+    }
+  ]
+}

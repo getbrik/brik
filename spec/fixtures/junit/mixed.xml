@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<testsuites name="pytest">
+  <testsuite name="tests" tests="5" failures="1" errors="1" skipped="2" time="0.1">
+    <testcase classname="tests.test_calc" name="test_add" time="0.001"/>
+    <testcase classname="tests.test_calc" name="test_div_by_zero" time="0.002">
+      <failure message="AssertionError: 1/0 should raise" type="AssertionError">Traceback (most recent call last):
+  File "tests/test_calc.py", line 12, in test_div_by_zero
+    assert div(1, 0)
+AssertionError</failure>
+    </testcase>
+    <testcase classname="tests.test_io" name="test_read_file" time="0.003">
+      <error message="FileNotFoundError: missing.txt" type="FileNotFoundError">Traceback...
+FileNotFoundError: [Errno 2] No such file</error>
+    </testcase>
+    <testcase classname="tests.test_io" name="test_skipped_for_ci" time="0.000">
+      <skipped message="needs network" type="pytest.skip">tests/test_io.py:33: needs network</skipped>
+    </testcase>
+    <testcase classname="tests.test_io" name="test_xfail_known_bug" time="0.000">
+      <skipped message="known regression" type="pytest.xfail">tests/test_io.py:50: known regression</skipped>
+    </testcase>
+  </testsuite>
+</testsuites>

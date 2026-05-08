@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "junit",
+          "informationUri": "https://github.com/junit-team/junit5",
+          "rules": [
+            {
+              "id": "tests.test_calc.test_div_by_zero",
+              "shortDescription": {
+                "text": "tests.test_calc.test_div_by_zero"
+              }
+            },
+            {
+              "id": "tests.test_io.test_read_file",
+              "shortDescription": {
+                "text": "tests.test_io.test_read_file"
+              }
+            },
+            {
+              "id": "tests.test_io.test_skipped_for_ci",
+              "shortDescription": {
+                "text": "tests.test_io.test_skipped_for_ci"
+              }
+            },
+            {
+              "id": "tests.test_io.test_xfail_known_bug",
+              "shortDescription": {
+                "text": "tests.test_io.test_xfail_known_bug"
+              }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "tests.test_calc.test_div_by_zero",
+          "level": "error",
+          "kind": "fail",
+          "message": {
+            "text": "AssertionError: 1/0 should raise\nTraceback (most recent call last):\n  File \"tests/test_calc.py\", line 12, in test_div_by_zero\n    assert div(1, 0)\nAssertionError"
+          },
+          "properties": {
+            "source": "failure",
+            "testTime": "0.002"
+          }
+        },
+        {
+          "ruleId": "tests.test_io.test_read_file",
+          "level": "error",
+          "kind": "fail",
+          "message": {
+            "text": "FileNotFoundError: missing.txt\nTraceback...\nFileNotFoundError: [Errno 2] No such file"
+          },
+          "properties": {
+            "source": "error",
+            "testTime": "0.003"
+          }
+        },
+        {
+          "ruleId": "tests.test_io.test_skipped_for_ci",
+          "level": "note",
+          "kind": "review",
+          "message": {
+            "text": "needs network\ntests/test_io.py:33: needs network"
+          },
+          "properties": {
+            "source": "skipped",
+            "testTime": "0.000"
+          }
+        },
+        {
+          "ruleId": "tests.test_io.test_xfail_known_bug",
+          "level": "note",
+          "kind": "review",
+          "message": {
+            "text": "known regression\ntests/test_io.py:50: known regression"
+          },
+          "properties": {
+            "source": "skipped",
+            "testTime": "0.000"
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,67 @@
+{
+  "headers": [
+    {
+      "tool_name": "scancode-toolkit",
+      "tool_version": "32.4.0",
+      "options": { "input": ["."], "--license": true, "--json-pp": true }
+    }
+  ],
+  "files": [
+    {
+      "path": "src/main.py",
+      "type": "file",
+      "license_detections": [
+        {
+          "license_expression": "gpl-3.0-only",
+          "matches": [
+            {
+              "score": 100.0,
+              "start_line": 1,
+              "end_line": 3,
+              "license_expression": "gpl-3.0-only",
+              "rule_identifier": "gpl-3.0-only_text"
+            }
+          ]
+        }
+      ],
+      "package_data": []
+    },
+    {
+      "path": "src/utils.py",
+      "type": "file",
+      "license_detections": [
+        {
+          "license_expression": "gpl-3.0-only",
+          "matches": [
+            {
+              "score": 95.0,
+              "start_line": 2,
+              "end_line": 4,
+              "license_expression": "gpl-3.0-only",
+              "rule_identifier": "gpl-3.0-only_header"
+            }
+          ]
+        },
+        {
+          "license_expression": "mit",
+          "matches": [
+            {
+              "score": 100.0,
+              "start_line": 50,
+              "end_line": 52,
+              "license_expression": "mit",
+              "rule_identifier": "mit_notice"
+            }
+          ]
+        }
+      ],
+      "package_data": []
+    },
+    {
+      "path": "build/",
+      "type": "directory",
+      "license_detections": [],
+      "package_data": []
+    }
+  ]
+}

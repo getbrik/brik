@@ -1,0 +1,38 @@
+{
+  "summary": {
+    "fatal": 1,
+    "warn": 1,
+    "info": 1,
+    "skip": 0,
+    "pass": 12
+  },
+  "details": [
+    {
+      "code": "CIS-DI-0001",
+      "title": "Create a user for the container",
+      "level": "WARN",
+      "alerts": ["Last user should not be root"]
+    },
+    {
+      "code": "CIS-DI-0005",
+      "title": "Enable Content trust for Docker",
+      "level": "FATAL",
+      "alerts": ["DOCKER_CONTENT_TRUST is not set to 1"]
+    },
+    {
+      "code": "CIS-DI-0008",
+      "title": "Confirm safety of setuid/setgid files",
+      "level": "INFO",
+      "alerts": [
+        "setuid file: urwxr-xr-x usr/bin/passwd",
+        "setgid file: grwx--x--x usr/bin/wall"
+      ]
+    },
+    {
+      "code": "DKL-LI-0001",
+      "title": "Avoid empty password",
+      "level": "PASS",
+      "alerts": []
+    }
+  ]
+}

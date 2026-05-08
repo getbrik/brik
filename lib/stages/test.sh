@@ -145,4 +145,25 @@ _stages.test._record_junit_business() {
     _counts="$(junit.parse "$_junit_path" 2>/dev/null)" || return 0
     [[ -z "$_counts" ]] && return 0
     report.record_object "test" "business" "tests" "$_counts" 2>/dev/null || true
+
+    # Promote the JUnit XML to a SARIF document via the P5 converter so
+    # the test stage participates in the unified findings pipeline. Each
+    # failing or erroring testcase becomes a kind=fail SARIF result;
+    # skipped and xfail testcases land as kind=review notes. Passing
+    # testcases are intentionally omitted (a green suite produces an
+    # empty results[]). Failures of the converter are non-fatal -- a
+    # missing module or a malformed XML leaves business.tests intact,
+    # mirroring the silent-skip pattern of the legacy implementation.
+    local _sarif_rel="${BRIK_TEST_FINDINGS_OUTPUT_PATH:-brik-artifacts/test/findings.sarif}"
+    local _sarif_abs="$_sarif_rel"
+    [[ "$_sarif_abs" != /* ]] && _sarif_abs="${BRIK_WORKSPACE:-.}/${_sarif_abs}"
+
+    brik.use transverse.findings 2>/dev/null || return 0
+    if declare -f findings.from_json >/dev/null 2>&1; then
+        if findings.from_json junit "$_junit_path" "$_sarif_abs" >/dev/null 2>&1; then
+            if declare -f findings.aggregate >/dev/null 2>&1; then
+                findings.aggregate "test" "$_sarif_abs" 2>/dev/null || true
+            fi
+        fi
+    fi
 }

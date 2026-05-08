@@ -643,14 +643,80 @@ findings.gate() {
     return 0
 }
 
-# Convert a non-SARIF tool output to SARIF via a named converter. Real
-# implementations land per-tool in transverse/findings/converters/ during
-# P5 (ruff, clippy, trufflehog, dockle, bandit, scancode, junit-xml). The
-# stub keeps the public API addressable and fails loudly so callers know
-# the conversion is not yet wired up.
+# Convert a non-SARIF tool output to SARIF via a named converter. Each
+# tool ships its own jq/xq pipeline under transverse/findings/converters/
+# and exposes findings.converters.<tool>.to_sarif <input> <output>. The
+# function name keeps "from_json" for chantier continuity even though
+# some converters (e.g. junit) read XML -- "JSON" stands for the family
+# of structured tool outputs, not the wire format.
+#
+# The dispatcher:
+#   1. Validates arguments (tool, input file, output dir creatable).
+#   2. Sources the per-tool converter from a path relative to this file
+#      so unit tests can Include it without booting brik.use.
+#   3. Calls findings.converters.<tool>.to_sarif.
+#   4. Validates the resulting SARIF via findings.from_sarif so a buggy
+#      converter is caught before downstream policy gating.
+#
+# Args:
+#   $1 tool   -- converter name (ruff, bandit, junit, dockle, ...).
+#   $2 input  -- absolute or workspace-relative path to the native output.
+#   $3 output -- target SARIF path (parent directories created on demand).
 findings.from_json() {
-    printf 'findings.from_json: not implemented in P1 (scheduled for P5 converters phase)\n' >&2
-    return "${BRIK_EXIT_FAILURE:-1}"
+    if [[ $# -lt 3 ]]; then
+        printf 'findings.from_json: missing arguments (expected: tool input output)\n' >&2
+        return "${BRIK_EXIT_INVALID_INPUT:-2}"
+    fi
+    local tool="$1" input="$2" output="$3"
+
+    if [[ -z "$tool" ]]; then
+        printf 'findings.from_json: tool must not be empty\n' >&2
+        return "${BRIK_EXIT_INVALID_INPUT:-2}"
+    fi
+    # Tool names interpolate into a path and a function name; constrain to
+    # alnum + underscore to keep the dispatcher safe against directory
+    # traversal (e.g. "../../sarif") even when tool is supplied dynamically.
+    if [[ ! "$tool" =~ ^[A-Za-z][A-Za-z0-9_]*$ ]]; then
+        printf 'findings.from_json: invalid tool name (expected ^[A-Za-z][A-Za-z0-9_]*$): %s\n' "$tool" >&2
+        return "${BRIK_EXIT_INVALID_INPUT:-2}"
+    fi
+    if [[ ! -f "$input" ]]; then
+        printf 'findings.from_json: input not found: %s\n' "$input" >&2
+        return "${BRIK_EXIT_IO_FAILURE:-6}"
+    fi
+
+    local converter_path="${BASH_SOURCE[0]%/*}/findings/converters/${tool}.sh"
+    if [[ ! -f "$converter_path" ]]; then
+        printf 'findings.from_json: no converter registered for tool %s (expected %s)\n' \
+            "$tool" "$converter_path" >&2
+        return "${BRIK_EXIT_CONFIG_ERROR:-7}"
+    fi
+
+    # shellcheck source=/dev/null
+    . "$converter_path" || {
+        printf 'findings.from_json: failed to source converter %s\n' "$converter_path" >&2
+        return "${BRIK_EXIT_FAILURE:-1}"
+    }
+
+    local fn="findings.converters.${tool}.to_sarif"
+    if ! declare -f "$fn" >/dev/null 2>&1; then
+        printf 'findings.from_json: converter module did not define %s\n' "$fn" >&2
+        return "${BRIK_EXIT_CONFIG_ERROR:-7}"
+    fi
+
+    local out_dir
+    out_dir="$(dirname "$output")"
+    mkdir -p "$out_dir" || {
+        printf 'findings.from_json: cannot create output directory: %s\n' "$out_dir" >&2
+        return "${BRIK_EXIT_IO_FAILURE:-6}"
+    }
+
+    "$fn" "$input" "$output" || {
+        printf 'findings.from_json: converter failed for tool %s\n' "$tool" >&2
+        return "${BRIK_EXIT_FAILURE:-1}"
+    }
+
+    findings.from_sarif "$tool" "$output"
 }
 
 # Surface allowlist entries whose expires field falls within

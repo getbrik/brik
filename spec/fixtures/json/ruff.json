@@ -1,0 +1,36 @@
+[
+  {
+    "code": "E501",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long",
+    "message": "Line too long (132 > 100)",
+    "fix": null,
+    "location":     { "row": 12, "column": 1 },
+    "end_location": { "row": 12, "column": 132 },
+    "filename": "src/foo.py",
+    "noqa_row": 12
+  },
+  {
+    "code": "F401",
+    "url": "https://docs.astral.sh/ruff/rules/unused-import",
+    "message": "'os' imported but unused",
+    "fix": {
+      "applicability": "safe",
+      "edits": [{ "content": "", "location": {"row": 3, "column": 1}, "end_location": {"row": 4, "column": 1}}],
+      "message": "Remove unused import: `os`"
+    },
+    "location":     { "row": 3, "column": 1 },
+    "end_location": { "row": 3, "column": 10 },
+    "filename": "src/bar.py",
+    "noqa_row": 3
+  },
+  {
+    "code": "E501",
+    "url": "https://docs.astral.sh/ruff/rules/line-too-long",
+    "message": "Line too long (110 > 100)",
+    "fix": null,
+    "location":     { "row": 25, "column": 1 },
+    "end_location": { "row": 25, "column": 110 },
+    "filename": "src/foo.py",
+    "noqa_row": 25
+  }
+]
