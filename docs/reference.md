@@ -859,3 +859,100 @@ Separately, **module loading** uses a three-level resolution for `.sh` files
                           stages, stacks, rollout, deployments,
                           package-managers, cli)
 ```
+
+## Findings Management
+
+Brik unifies every static-analysis, scan, and test outcome behind a single
+**SARIF 2.1.0** pipeline. The flow is identical for every stage:
+
+```
+tool output -> findings.from_sarif (validate)
+            -> findings.apply_policy (preset + org allowlist + suppressions)
+            -> findings.aggregate    (business.findings on the pipeline report)
+            -> findings.merge_pipeline (notify stage -> aggregate.sarif)
+```
+
+Tools that already emit SARIF (semgrep, grype, gitleaks, eslint, osv-scanner,
+checkov, ...) plug in directly. Tools without native SARIF (ruff, bandit,
+clippy, dockle, trufflehog, scancode, junit-xml) go through a converter
+under `lib/transverse/findings/converters/<tool>.sh`; see
+[`docs/policy.md`](policy.md) for adding new converters.
+
+### Built-in policy presets
+
+`quality.findings.policy` selects how a finding is classified into
+**failing** vs **ignored**. Default is `pragmatic`, which automatically
+ignores findings below the severity floor and findings that have no
+upstream fix.
+
+| Preset      | Ignores below floor | Ignores `not-fixed` | Ignores `wont-fix` | Failing |
+|-------------|---------------------|---------------------|--------------------|---------|
+| `pragmatic` | yes                 | yes                 | yes                | rest    |
+| `strict`    | yes                 | no                  | no                 | rest    |
+| `permissive`| floor=critical      | yes                 | yes                | only critical with upstream fix |
+
+A result that already carries a non-empty `suppressions[]` (tool-native
+allowlist, inline annotation, ...) is never re-classified -- the SARIF
+owner keeps full control.
+
+### Severity resolution
+
+For grype-style SARIF (sparse results, severity on the rule), Brik reads
+CVSS at `runs[].tool.driver.rules[].properties["security-severity"]` and
+falls back to `result.level` (`error|warning|note|none`). For ruff/bandit
+and similar linters, the converter populates `result.properties` directly.
+
+CVSS bands map to Brik buckets:
+
+| CVSS    | Bucket   |
+|---------|----------|
+| >= 9.0  | critical |
+| >= 7.0  | high     |
+| >= 4.0  | medium   |
+| > 0     | low      |
+| 0 / N/A | info     |
+
+### Per-stage artifacts layout
+
+Each stage that emits findings writes two files side-by-side:
+
+```
+brik-artifacts/<stage>/
+  <tool>.sarif      -- raw output from the tool (preserved for audit)
+  findings.sarif    -- after apply_policy: same results, with
+                       Brik-managed entries appended to result.suppressions[]
+```
+
+The notify stage produces three pipeline-level artifacts:
+
+```
+brik-artifacts/
+  aggregate.sarif            -- multi-runs SARIF: one runs[] entry per stage source
+  gl-sast-report.json        -- GitLab non-Ultimate report (vulnerabilities[])
+  aggregate-report.{md,json} -- pipeline report with new sections:
+                                Active policy / Failing / Ignored / Expiring soon
+```
+
+### Knobs
+
+| Variable                              | Default      | Effect |
+|---------------------------------------|--------------|--------|
+| `quality.findings.policy`             | `pragmatic`  | Active built-in preset. |
+| `BRIK_POLICY_URL`                     | unset        | Fetches the DSI policy at init; fail-closed when unreachable. |
+| `BRIK_SECURITY_SEVERITY_THRESHOLD`    | `high`       | Severity floor used by `apply_policy`. |
+| `BRIK_FINDINGS_EXPIRING_SOON_DAYS`    | `30`         | Window for `findings.expiring_soon` warnings at init. |
+| `BRIK_POLICY_CACHE_PATH`              | `${BRIK_WORKSPACE}/brik-artifacts/.policy.cache.json` | Compiled-policy cache location. |
+
+### Expiring-soon notice
+
+When `BRIK_POLICY_URL` is set, the init stage automatically calls
+`findings.expiring_soon` and surfaces every allowlist entry whose
+`expires` falls within `BRIK_FINDINGS_EXPIRING_SOON_DAYS`. The notice is
+visible (logged + recorded under `business.policy_expiring_soon`) but
+non-blocking, so DSI sees the upcoming churn before it bites.
+
+### Operational guide
+
+For DSI-side documentation -- writing `brik-policy.yml`, deploying
+`BRIK_POLICY_URL`, debugging the compiled cache -- see
+[`docs/policy.md`](policy.md).

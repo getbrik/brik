@@ -720,18 +720,131 @@ findings.from_json() {
 }
 
 # Surface allowlist entries whose expires field falls within
-# BRIK_FINDINGS_EXPIRING_SOON_DAYS (default 30). Real implementation
-# depends on the org_policy loader (P3); P1 returns 0 so callers (init
-# stage) can wire the call without needing to gate behind feature flags.
+# BRIK_FINDINGS_EXPIRING_SOON_DAYS (default 30). Delegates to
+# org_policy.expiring_soon, auto-loading the loader module from the
+# canonical findings/ subdirectory when the host has not loaded it yet.
+# Always returns 0 -- this is a query, not a gate. Callers (init stage)
+# inspect the JSON array on stdout to decide what to surface.
+#
+# Output: JSON array on stdout. Each entry is shaped
+#   { type: "cve",  id:   <CVE-ID>, expires: <YYYY-MM-DD>, reason: <str> }
+#   { type: "path", glob: <glob>,   expires: <YYYY-MM-DD>, reason: <str> }
+# Empty array "[]" when no org policy is active or no entry expires within
+# the window -- mirrors the legacy stub behaviour for back-compat.
 findings.expiring_soon() {
+    if ! declare -f org_policy.expiring_soon >/dev/null 2>&1; then
+        local _loader="${BASH_SOURCE[0]%/*}/findings/org_policy.sh"
+        if [[ -f "$_loader" ]]; then
+            # shellcheck source=findings/org_policy.sh
+            . "$_loader" 2>/dev/null || true
+        fi
+    fi
+    if declare -f org_policy.expiring_soon >/dev/null 2>&1; then
+        org_policy.expiring_soon
+        return 0
+    fi
+    printf '[]'
     return 0
 }
 
-# Merge per-stage findings.sarif documents into a single pipeline-level
-# brik-artifacts/aggregate.sarif. Real implementation lands in P6 and
-# powers the GitLab Ultimate overlay, Jenkins Warnings NG, and the
-# generic GitLab non-Ultimate exporter (gl-sast-report.json).
+# Merge per-stage SARIF documents into a single pipeline-level
+# brik-artifacts/aggregate.sarif (chantier 20260508 P6.A). Walks every
+# subdirectory of brik-artifacts/ and picks one source SARIF per stage:
+#
+#   1. findings.sarif (post-policy, preferred) -- the document the policy
+#      gate already annotated, so the aggregate inherits the suppressions.
+#   2. otherwise the first <tool>.sarif we find -- raw tool output, used
+#      when the stage runs in pre-P4 compatibility mode.
+#
+# Both cases preserve runs[] verbatim so consumers (Jenkins Warnings NG,
+# GitLab Ultimate overlay, gl-sast-report exporter) keep identifying the
+# source tool via tool.driver.name.
+#
+# When no source SARIF exists, an empty but well-formed aggregate is
+# written so CI artifact uploads never warn about a missing file.
+#
+# Args:
+#   $1 workspace (optional) -- defaults to BRIK_WORKSPACE then ".".
 findings.merge_pipeline() {
-    printf 'findings.merge_pipeline: not implemented in P1 (scheduled for P6 pipeline aggregation phase)\n' >&2
-    return "${BRIK_EXIT_FAILURE:-1}"
+    local workspace="${1:-${BRIK_WORKSPACE:-.}}"
+    local artifacts="${workspace}/brik-artifacts"
+    local out="${artifacts}/aggregate.sarif"
+
+    if ! command -v jq >/dev/null 2>&1; then
+        printf 'findings.merge_pipeline: jq is required\n' >&2
+        return "${BRIK_EXIT_MISSING_DEP:-3}"
+    fi
+    if [[ ! -d "$artifacts" ]]; then
+        printf 'findings.merge_pipeline: no brik-artifacts directory: %s\n' "$artifacts" >&2
+        return "${BRIK_EXIT_IO_FAILURE:-6}"
+    fi
+
+    local sarif_files=()
+    local stage_dir s
+    for stage_dir in "$artifacts"/*/; do
+        [[ -d "$stage_dir" ]] || continue
+        # Skip the aggregate's own directory layout markers.
+        if [[ -f "${stage_dir}findings.sarif" ]]; then
+            sarif_files+=("${stage_dir}findings.sarif")
+            continue
+        fi
+        for s in "$stage_dir"*.sarif; do
+            [[ -f "$s" ]] || continue
+            # Skip aggregate.sarif if a previous run wrote it inside a stage
+            # subdir by mistake; the canonical aggregate lives one level up.
+            [[ "$(basename "$s")" == "aggregate.sarif" ]] && continue
+            sarif_files+=("$s")
+            break
+        done
+    done
+
+    mkdir -p "$artifacts" || {
+        printf 'findings.merge_pipeline: cannot create %s\n' "$artifacts" >&2
+        return "${BRIK_EXIT_IO_FAILURE:-6}"
+    }
+
+    local tmp
+    tmp="$(mktemp "${out}.XXXXXX")" || return "${BRIK_EXIT_IO_FAILURE:-6}"
+
+    if [[ ${#sarif_files[@]} -eq 0 ]]; then
+        # Atomic empty-aggregate write so a disk-full / read-only mount
+        # surfaces as IO_FAILURE instead of silently producing a missing
+        # file (jq exits 0 even when its stdout redirect fails).
+        if ! jq -n '{
+            "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+            version: "2.1.0",
+            runs: []
+        }' > "$tmp"; then
+            rm -f "$tmp"
+            printf 'findings.merge_pipeline: jq init failed\n' >&2
+            return "${BRIK_EXIT_IO_FAILURE:-6}"
+        fi
+        mv "$tmp" "$out" || {
+            rm -f "$tmp"
+            printf 'findings.merge_pipeline: cannot write %s\n' "$out" >&2
+            return "${BRIK_EXIT_IO_FAILURE:-6}"
+        }
+        return 0
+    fi
+
+    # Slurp every source SARIF, then concatenate their runs[] entries.
+    # Multiple runs[] per file (rare but valid SARIF) are preserved.
+    if ! jq -s '
+        {
+            "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+            version: "2.1.0",
+            runs: [ .[] | (.runs // [])[] ]
+        }
+    ' "${sarif_files[@]}" > "$tmp"; then
+        rm -f "$tmp"
+        printf 'findings.merge_pipeline: jq merge failed\n' >&2
+        return "${BRIK_EXIT_IO_FAILURE:-6}"
+    fi
+
+    mv "$tmp" "$out" || {
+        rm -f "$tmp"
+        printf 'findings.merge_pipeline: cannot write %s\n' "$out" >&2
+        return "${BRIK_EXIT_IO_FAILURE:-6}"
+    }
+    return 0
 }

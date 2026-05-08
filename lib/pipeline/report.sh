@@ -668,6 +668,77 @@ _report._render_aggregate_md() {
     local backend="$1"
     # KCOV_EXCL_START  -- jq script body is not bash code
     jq -r '
+        # Findings management sections (chantier 20260508 P6.B). Each
+        # section auto-skips when its source data is missing so the
+        # markdown stays terse for builds without policy / no L4 v2.
+        def by_sev_summary($bs):
+          [
+            (if ($bs.critical // 0) > 0 then "C:\($bs.critical)" else empty end),
+            (if ($bs.high     // 0) > 0 then "H:\($bs.high)"     else empty end),
+            (if ($bs.medium   // 0) > 0 then "M:\($bs.medium)"   else empty end),
+            (if ($bs.low      // 0) > 0 then "L:\($bs.low)"      else empty end),
+            (if ($bs.info     // 0) > 0 then "I:\($bs.info)"     else empty end)
+          ] | join(" ");
+
+        def by_source_summary($bs):
+          ($bs // {}) | to_entries
+          | map(select(.value > 0))
+          | map("\(.key)=\(.value)")
+          | join(", ");
+
+        def render_active_policy:
+          (.summary.policy // null) as $p
+          | if $p == null then empty
+            else
+              "## Active policy",
+              "",
+              "- **Preset:** \($p.preset // "pragmatic")",
+              "- **Source:** \($p.source // "built-in")",
+              (if ($p.org_policy_url       // "") != "" then "- **Org policy URL:** `\($p.org_policy_url)`" else empty end),
+              (if ($p.org_policy_loaded_at // "") != "" then "- **Loaded at:** \($p.org_policy_loaded_at)" else empty end),
+              ""
+            end;
+
+        def render_failing:
+          (any(.stages[]?; (.business.findings.failing // 0) > 0)) as $has
+          | "## Failing findings",
+            "",
+            (if $has then
+              ("| Stage | Failing | Total | Severities |", "|---|---|---|---|"),
+              (.stages[]?
+               | select((.business.findings.failing // 0) > 0)
+               | "| \(.stage) | \(.business.findings.failing // 0) | \(.business.findings.total // 0) | \(by_sev_summary(.business.findings.by_severity // {})) |")
+             else
+              "_No failing findings._"
+             end),
+            "";
+
+        def render_ignored:
+          (any(.stages[]?; (.business.findings.ignored.total // 0) > 0)) as $has
+          | "## Ignored findings",
+            "",
+            (if $has then
+              ("| Stage | Ignored | Sources | By severity |", "|---|---|---|---|"),
+              (.stages[]?
+               | select((.business.findings.ignored.total // 0) > 0)
+               | "| \(.stage) | \(.business.findings.ignored.total // 0) | \(by_source_summary(.business.findings.ignored.by_source // {})) | \(by_sev_summary(.business.findings.ignored.by_severity // {})) |")
+             else
+              "_No ignored findings._"
+             end),
+            "";
+
+        def render_expiring:
+          (.summary.policy.expiring_soon // []) as $exp
+          | if ($exp | length) == 0 then empty
+            else
+              "## Expiring soon",
+              "",
+              "| Entry | Expires | Days remaining |",
+              "|---|---|---|",
+              ($exp[] | "| \(.id // "-") | \(.expires // "-") | \(.days_remaining // "-") |"),
+              ""
+            end;
+
         "# Pipeline Report",
         "",
         "- **Pipeline ID:** \(.pipeline.id // "-")",
@@ -690,6 +761,10 @@ _report._render_aggregate_md() {
         "- **Failed:** \(.summary.stages.failed // 0)",
         "- **Skipped:** \(.summary.stages.skipped // 0)",
         "",
+        render_active_policy,
+        render_failing,
+        render_ignored,
+        render_expiring,
         "## Business",
         "",
         (

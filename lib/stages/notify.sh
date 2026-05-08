@@ -309,6 +309,18 @@ stages.notify() {
             log.warn "fragment aggregation failed (non-fatal)"
     fi
 
+    # Pipeline-level SARIF aggregation + GitLab non-Ultimate exporter
+    # (chantier 20260508 P6.E). Both are best-effort: a missing module or
+    # an upstream stage that did not emit SARIF leaves the existing
+    # notify behaviour intact. The aggregate lands at
+    # brik-artifacts/aggregate.sarif and the GitLab report at
+    # brik-artifacts/gl-sast-report.json so artifacts.reports.sast in
+    # the GitLab notify job can publish either one.
+    if [[ -n "${BRIK_WORKSPACE:-}" ]]; then
+        _notify._merge_findings_pipeline "${BRIK_WORKSPACE}"
+        _notify._export_gitlab_sast "${BRIK_WORKSPACE}"
+    fi
+
     # Emit the rendered aggregate-report.md on stdout so the full stage table +
     # business section are visible in CI job logs. Falls back to a minimal
     # banner if the report is absent (e.g. single-stage run outside pipeline.run).
@@ -391,4 +403,46 @@ stages.notify() {
     fi
 
     return 0
+}
+
+# Merge per-stage SARIF documents into brik-artifacts/aggregate.sarif via
+# transverse.findings.merge_pipeline. Best-effort: when the module is not
+# loaded (e.g. a stripped-down install) or no SARIF exists upstream, the
+# call is a no-op. Logs at debug only so a happy path stays quiet.
+_notify._merge_findings_pipeline() {
+    local workspace="$1"
+    [[ -d "${workspace}/brik-artifacts" ]] || return 0
+
+    brik.use transverse.findings 2>/dev/null || return 0
+    if ! declare -f findings.merge_pipeline >/dev/null 2>&1; then
+        return 0
+    fi
+    # Keep stderr visible so a real failure (jq error, IO problem) lands
+    # in the CI job log instead of being swallowed and reported only as
+    # a generic "non-fatal" warning the operator cannot diagnose.
+    if findings.merge_pipeline "$workspace" >/dev/null; then
+        log.info "wrote brik-artifacts/aggregate.sarif"
+    else
+        log.warn "findings.merge_pipeline failed (non-fatal)"
+    fi
+}
+
+# Convert the aggregate SARIF to a GitLab gl-sast-report.json so
+# non-Ultimate GitLab MR widgets surface findings without the SARIF
+# overlay. Best-effort; silent skip when no aggregate.sarif exists.
+_notify._export_gitlab_sast() {
+    local workspace="$1"
+    local agg="${workspace}/brik-artifacts/aggregate.sarif"
+    local out="${workspace}/brik-artifacts/gl-sast-report.json"
+    [[ -f "$agg" ]] || return 0
+
+    brik.use transverse.findings.exporters.gitlab 2>/dev/null || return 0
+    if ! declare -f findings.exporters.gitlab.from_sarif >/dev/null 2>&1; then
+        return 0
+    fi
+    if findings.exporters.gitlab.from_sarif "$agg" "$out" >/dev/null; then
+        log.info "wrote brik-artifacts/gl-sast-report.json"
+    else
+        log.warn "findings.exporters.gitlab.from_sarif failed (non-fatal)"
+    fi
 }

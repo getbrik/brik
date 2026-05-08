@@ -227,15 +227,126 @@ Describe "transverse/findings.sh"
   End
 
   Describe "stub functions"
-    It "findings.expiring_soon returns 0 when no allowlist is loaded"
+    It "findings.expiring_soon returns 0 and emits [] when no allowlist is loaded"
       When call findings.expiring_soon
+      The status should be success
+      The output should equal "[]"
+    End
+
+  End
+
+  # ---------------------------------------------------------------------------
+  # findings.merge_pipeline (chantier 20260508 P6.A). Walks brik-artifacts/
+  # and emits brik-artifacts/aggregate.sarif preserving one runs[] per
+  # source SARIF (multi-runs strategy).
+  # ---------------------------------------------------------------------------
+  Describe "findings.merge_pipeline"
+    setup_merge() {
+      MERGE_WS="$(mktemp -d)"
+      mkdir -p "$MERGE_WS/brik-artifacts/sast" \
+               "$MERGE_WS/brik-artifacts/scan" \
+               "$MERGE_WS/brik-artifacts/container_scan" \
+               "$MERGE_WS/brik-artifacts/test"
+
+      # sast: post-policy findings.sarif preferred over raw sast.sarif.
+      # Results carry message + level so the SARIF passes strict OASIS
+      # schema validation, and the policy suppression carries the kind
+      # required by the schema.
+      printf '%s\n' '{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"sast-raw"}},"results":[{"ruleId":"r1","message":{"text":"raw"}}]}]}' \
+        > "$MERGE_WS/brik-artifacts/sast/sast.sarif"
+      printf '%s\n' '{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"semgrep"}},"results":[{"ruleId":"r1","level":"warning","message":{"text":"sast finding"},"suppressions":[{"kind":"external","justification":"Brik policy: below-severity","properties":{"brikSource":"policy.built-in.below-severity"}}]}]}]}' \
+        > "$MERGE_WS/brik-artifacts/sast/findings.sarif"
+
+      # scan: only raw deps.sarif (legacy stage without findings.sarif)
+      printf '%s\n' '{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"osv-scanner"}},"results":[{"ruleId":"GHSA-1","message":{"text":"dep finding"}}]}]}' \
+        > "$MERGE_WS/brik-artifacts/scan/deps.sarif"
+
+      # container_scan: both raw and policy SARIF, only findings.sarif used
+      printf '%s\n' '{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"grype-raw"}},"results":[]}]}' \
+        > "$MERGE_WS/brik-artifacts/container_scan/container_scan.sarif"
+      printf '%s\n' '{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"grype"}},"results":[{"ruleId":"CVE-1","message":{"text":"cve"}}]}]}' \
+        > "$MERGE_WS/brik-artifacts/container_scan/findings.sarif"
+
+      # test: P5 junit converter output (empty results -> green suite)
+      printf '%s\n' '{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"junit"}},"results":[]}]}' \
+        > "$MERGE_WS/brik-artifacts/test/findings.sarif"
+    }
+    cleanup_merge() { rm -rf "$MERGE_WS"; }
+    Before 'setup_merge'
+    After  'cleanup_merge'
+
+    It "produces a structurally valid SARIF aggregate"
+      run_then_check() {
+        findings.merge_pipeline "$MERGE_WS" || return 1
+        sarif.is_valid "$MERGE_WS/brik-artifacts/aggregate.sarif"
+      }
+      When call run_then_check
       The status should be success
     End
 
-    It "findings.merge_pipeline signals not-yet-implemented (P6 scope)"
-      When call findings.merge_pipeline
+    It "concatenates one runs[] entry per source SARIF"
+      run_count_runs() {
+        findings.merge_pipeline "$MERGE_WS" >/dev/null 2>&1
+        jq -r '.runs | length' "$MERGE_WS/brik-artifacts/aggregate.sarif"
+      }
+      When call run_count_runs
+      The output should equal "4"
+    End
+
+    It "prefers findings.sarif over the raw <stage>.sarif"
+      run_tool_names() {
+        findings.merge_pipeline "$MERGE_WS" >/dev/null 2>&1
+        jq -r '[.runs[].tool.driver.name] | sort | .[]' "$MERGE_WS/brik-artifacts/aggregate.sarif"
+      }
+      When call run_tool_names
+      The output should include "semgrep"
+      The output should include "grype"
+      The output should include "osv-scanner"
+      The output should include "junit"
+      The output should not include "sast-raw"
+      The output should not include "grype-raw"
+    End
+
+    It "preserves per-stage suppressions in the aggregate"
+      run_check_supp() {
+        findings.merge_pipeline "$MERGE_WS" >/dev/null 2>&1
+        jq -r '[.runs[].results[]?.suppressions[]?.properties.brikSource] | unique | .[]' \
+          "$MERGE_WS/brik-artifacts/aggregate.sarif"
+      }
+      When call run_check_supp
+      The output should equal "policy.built-in.below-severity"
+    End
+
+    It "writes an empty aggregate when no source SARIF exists"
+      run_empty() {
+        local empty_ws
+        empty_ws="$(mktemp -d)"
+        mkdir -p "$empty_ws/brik-artifacts"
+        findings.merge_pipeline "$empty_ws"
+        local rc=$?
+        local count
+        count="$(jq -r '.runs | length' "$empty_ws/brik-artifacts/aggregate.sarif" 2>/dev/null)"
+        rm -rf "$empty_ws"
+        [[ $rc -eq 0 ]] || return $rc
+        printf '%s\n' "$count"
+      }
+      When call run_empty
+      The output should equal "0"
+    End
+
+    It "fails IO when brik-artifacts is missing"
+      run_missing() {
+        local nodir
+        nodir="$(mktemp -d)"
+        rm -rf "$nodir/brik-artifacts" 2>/dev/null
+        findings.merge_pipeline "$nodir"
+        local rc=$?
+        rmdir "$nodir" 2>/dev/null
+        return $rc
+      }
+      When call run_missing
       The status should not be success
-      The error should include "not implemented"
+      The error should include "no brik-artifacts directory"
     End
   End
 

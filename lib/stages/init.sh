@@ -59,6 +59,18 @@ stages.init() {
     brik.use transverse.env
     transverse.env.load_project || return "$BRIK_EXIT_CONFIG_ERROR"
 
+    # Findings-management governance bootstrap (chantier 20260508 P6.C).
+    # When BRIK_POLICY_URL is set, fetch the DSI policy file, validate it,
+    # and compile a per-run cache that downstream stages (apply_policy,
+    # expiring_soon) consume. The fetch is fail-closed: an invalid or
+    # unreachable URL surfaces a CONFIG_ERROR rather than silently falling
+    # back to the built-in preset, so a project that opted into org policy
+    # never silently regresses to defaults.
+    _stages.init._load_org_policy || return $?
+    # Surface upcoming allowlist expirations as a non-blocking notice and
+    # record them in business.policy.expiring_soon for the report.
+    _stages.init._record_expiring_soon
+
     # Log project info
     local project_name
     project_name="$(config.get '.project.name' 'unnamed')"
@@ -272,4 +284,71 @@ _stages.init._write_dotenv() {
     done < "$dotenv"
 
     log.info "wrote $(wc -l < "$dotenv" 2>/dev/null | tr -d ' ') variables to $dotenv"
+}
+
+# Fetch + compile the DSI policy file when BRIK_POLICY_URL is set.
+# Silent no-op when unset (project keeps the built-in preset); fail-closed
+# CONFIG_ERROR when the URL is set but unreachable / invalid -- a project
+# that opted into org policy must never silently regress to defaults.
+_stages.init._load_org_policy() {
+    [[ -n "${BRIK_POLICY_URL:-}" ]] || return 0
+
+    # Fail-closed: when BRIK_POLICY_URL is set, the org policy module MUST
+    # be available. A stripped install or a corrupt module path silently
+    # regressing to the built-in preset would defeat the governance gate.
+    if ! brik.use transverse.findings.org_policy 2>/dev/null; then
+        log.error "BRIK_POLICY_URL is set but transverse.findings.org_policy is unavailable"
+        return "$BRIK_EXIT_CONFIG_ERROR"
+    fi
+    if ! declare -f org_policy.load >/dev/null 2>&1; then
+        log.error "BRIK_POLICY_URL is set but org_policy.load is missing from the loader module"
+        return "$BRIK_EXIT_CONFIG_ERROR"
+    fi
+
+    log.info "loading organizational policy from $BRIK_POLICY_URL"
+    if ! org_policy.load "$BRIK_POLICY_URL"; then
+        log.error "failed to load organizational policy: $BRIK_POLICY_URL"
+        return "$BRIK_EXIT_CONFIG_ERROR"
+    fi
+    return 0
+}
+
+# Surface allowlist entries whose expires falls within
+# BRIK_FINDINGS_EXPIRING_SOON_DAYS (default 30) as a non-blocking notice
+# and record the list under business.policy for the aggregate report.
+# Silent no-op when no policy is loaded.
+_stages.init._record_expiring_soon() {
+    brik.use transverse.findings 2>/dev/null || return 0
+    if ! declare -f findings.expiring_soon >/dev/null 2>&1; then
+        return 0
+    fi
+
+    local _expiring
+    _expiring="$(findings.expiring_soon 2>/dev/null)" || _expiring="[]"
+    [[ -z "$_expiring" ]] && _expiring="[]"
+
+    local _count=0
+    if command -v jq >/dev/null 2>&1; then
+        _count="$(printf '%s' "$_expiring" | jq -r 'length' 2>/dev/null || printf '0')"
+    fi
+    [[ "$_count" =~ ^[0-9]+$ ]] || _count=0
+
+    if [[ "$_count" -gt 0 ]]; then
+        log.warn "${_count} organizational policy entries expire within \
+${BRIK_FINDINGS_EXPIRING_SOON_DAYS:-30} days"
+        # Best-effort log of each entry id/glob so the operator sees what
+        # is about to expire even when the aggregate report is not consulted.
+        if command -v jq >/dev/null 2>&1; then
+            local _line
+            while IFS= read -r _line; do
+                [[ -n "$_line" ]] && log.warn "  $_line"
+            done < <(printf '%s' "$_expiring" \
+                | jq -r '.[] | "\(.type):\(.id // .glob) expires=\(.expires)"' 2>/dev/null \
+                || true)
+        fi
+
+        report.record_object "init" "business" "policy_expiring_soon" \
+            "$_expiring" 2>/dev/null || true
+    fi
+    return 0
 }

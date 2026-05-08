@@ -197,11 +197,20 @@ def call(Map params = [:]) {
                     // so instances without Warnings NG installed log a notice
                     // and continue; the SARIF files still ship as build
                     // artifacts via archiveArtifacts below.
+                    //
+                    // The aggregate.sarif (chantier 20260508 P6) merges every
+                    // stage's findings.sarif into one document and is the
+                    // preferred Warnings NG source. Per-stage entries stay as
+                    // a fallback so the dashboard still surfaces findings on
+                    // pipelines that ran before the notify stage produced the
+                    // aggregate (e.g. early-fail builds).
                     try {
                         recordIssues(
                             enabledForFailure: true,
                             aggregatingResults: true,
                             tools: [
+                                sarif(pattern: 'brik-artifacts/aggregate.sarif',
+                                      id: 'brik-aggregate', name: 'Brik findings (aggregate)'),
                                 sarif(pattern: 'brik-artifacts/sast/sast.sarif',
                                       id: 'brik-sast',   name: 'SAST (semgrep)'),
                                 sarif(pattern: 'brik-artifacts/scan/deps.sarif',

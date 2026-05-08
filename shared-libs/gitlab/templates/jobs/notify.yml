@@ -38,9 +38,15 @@ brik-notify:
   when: always
   # Expose the pipeline report written by stages.notify so it is reachable
   # via the GitLab job artifact URL (suitable for Slack/email links later).
+  # Publish the GitLab SAST report (gl-sast-report.json) alongside the
+  # aggregate SARIF so non-Ultimate instances surface findings in the MR
+  # widget. Ultimate instances keep their per-stage SARIF overlay via the
+  # sast-reports.yml job; the aggregate is additive.
   artifacts:
     when: always
     expire_in: 1 month
     name: "aggregate-report-${CI_PIPELINE_ID}"
     paths:
       - brik-artifacts/
+    reports:
+      sast: brik-artifacts/gl-sast-report.json
