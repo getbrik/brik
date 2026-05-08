@@ -48,12 +48,12 @@ stages.sast() {
         brik.use verify.scan.scan
     fi
 
-    # Lazy load of the unified findings module (chantier 20260508 P1.6).
+    # Lazy load of the unified findings module (chantier 20260508 P1.6 / P4).
     # Tests Include findings.sh directly so this brik.use is a no-op there;
     # in prod it pulls the module on first SAST run. Failures of brik.use
     # are intentionally not suppressed -- a missing module would surface a
     # log.error and the pipeline operator must fix the install.
-    if ! declare -f findings.aggregate >/dev/null 2>&1; then
+    if ! declare -f findings.process >/dev/null 2>&1; then
         brik.use transverse.findings
     fi
 
@@ -69,13 +69,16 @@ stages.sast() {
     verify.scan.run "${BRIK_WORKSPACE}" --scans "$scans"
     local _verify_rc=$?
 
-    # Pipeline-report business.* enrichment via the unified findings module
-    # (chantier 20260508 P1.6, factored from the legacy _sast._record_business).
-    # The recorded shape is preserved verbatim (business.findings.{total,
-    # by_severity, cwe} + business.report.{format, path}) so Jenkins
-    # Warnings NG and the GitLab Ultimate SARIF overlay keep working.
+    # Run the SARIF through the unified ingest -> policy -> aggregate
+    # pipeline (chantier 20260508 P4). The recorded L4 v1 shape
+    # (business.findings.{total, by_severity, cwe} + business.report.{format,
+    # path}) is preserved verbatim so Jenkins Warnings NG and the GitLab
+    # Ultimate SARIF overlay keep working unchanged; L4 v2 fields
+    # (failing, ignored.*) are added on top via apply_policy.
     local _sast_sarif="${BRIK_WORKSPACE:-.}/${BRIK_SECURITY_SAST_OUTPUT_PATH:-brik-artifacts/sast/sast.sarif}"
-    findings.aggregate "sast" "$_sast_sarif" 2>/dev/null || true
-
+    if declare -f findings.scan_gate >/dev/null 2>&1; then
+        findings.scan_gate "sast" "$_verify_rc" "$_sast_sarif"
+        return $?
+    fi
     return "$_verify_rc"
 }

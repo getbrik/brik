@@ -852,4 +852,231 @@ Describe "transverse/findings.sh"
       End
     End
   End
+
+  # ---------------------------------------------------------------------------
+  # findings.process unified ingest -> policy -> aggregate (chantier 20260508 P4)
+  # ---------------------------------------------------------------------------
+  Describe "findings.process"
+    GRYPE="${BRIK_HOME}/spec/fixtures/sarif/grype-fixstate.sarif"
+
+    setup_proc() {
+      export BRIK_LOG_DIR
+      BRIK_LOG_DIR="$(mktemp -d)"
+      export BRIK_WORKSPACE
+      BRIK_WORKSPACE="$(mktemp -d)"
+      export BRIK_RUN_ID="findings-process-spec"
+      mkdir -p "$BRIK_WORKSPACE/brik-artifacts/container_scan"
+      cp "$GRYPE" "$BRIK_WORKSPACE/brik-artifacts/container_scan/container_scan.sarif"
+      export BRIK_QUALITY_FINDINGS_POLICY="pragmatic"
+      unset BRIK_SECURITY_SEVERITY_THRESHOLD BRIK_POLICY_CACHE_PATH
+      report.init >/dev/null 2>&1 || true
+    }
+    cleanup_proc() {
+      rm -rf "$BRIK_LOG_DIR" "$BRIK_WORKSPACE"
+      unset BRIK_RUN_ID BRIK_QUALITY_FINDINGS_POLICY
+    }
+    Before 'setup_proc'
+    After 'cleanup_proc'
+
+    read_business() {
+      local stage="$1" key="$2"
+      jq -c --arg s "$stage" --arg k "$key" \
+        '.stages[] | select(.name == $s) | .business[$k] // empty' \
+        "$BRIK_LOG_DIR/aggregate-report.json"
+    }
+
+    It "is declared as a public function"
+      When call declare -f findings.process
+      The status should be success
+      The output should not be blank
+    End
+
+    It "rejects missing arguments"
+      When call findings.process
+      The status should equal 2
+      The error should include "missing arguments"
+    End
+
+    It "rejects an empty stage name"
+      When call findings.process "" "$GRYPE"
+      The status should equal 2
+      The error should include "stage must not be empty"
+    End
+
+    It "is a silent no-op when the tool SARIF is missing"
+      When call findings.process "container_scan" "/nonexistent.sarif"
+      The status should be success
+    End
+
+    It "writes brik-artifacts/<stage>/findings.sarif alongside the tool SARIF"
+      run_proc() {
+        findings.process "container_scan" \
+          "$BRIK_WORKSPACE/brik-artifacts/container_scan/container_scan.sarif" >/dev/null 2>&1
+        test -f "$BRIK_WORKSPACE/brik-artifacts/container_scan/findings.sarif"
+      }
+      When call run_proc
+      The status should be success
+    End
+
+    It "preserves the tool SARIF unchanged"
+      run_proc() {
+        local in="$BRIK_WORKSPACE/brik-artifacts/container_scan/container_scan.sarif"
+        local before; before="$(jq -S . "$in")"
+        findings.process "container_scan" "$in" >/dev/null 2>&1
+        local after; after="$(jq -S . "$in")"
+        [[ "$before" == "$after" ]]
+      }
+      When call run_proc
+      The status should be success
+    End
+
+    It "produces a findings.sarif annotated with policy.built-in.* suppressions"
+      run_proc() {
+        findings.process "container_scan" \
+          "$BRIK_WORKSPACE/brik-artifacts/container_scan/container_scan.sarif" >/dev/null 2>&1
+        jq -r '
+          [.runs[0].results[]
+            | (.suppressions // [])[]
+            | select((.properties.brikSource // "") | startswith("policy.built-in."))]
+          | length
+        ' "$BRIK_WORKSPACE/brik-artifacts/container_scan/findings.sarif"
+      }
+      When call run_proc
+      # Pragmatic on grype-fixstate: 2 no-upstream-fix + 1 vendor-wont-fix + 2 below-severity = 5 brik-tagged entries.
+      The output should equal "5"
+    End
+
+    It "records L4 v2 business.findings.failing from the annotated SARIF"
+      run_proc() {
+        findings.process "container_scan" \
+          "$BRIK_WORKSPACE/brik-artifacts/container_scan/container_scan.sarif" >/dev/null 2>&1
+        read_business "container_scan" "findings" | jq -r '.failing'
+      }
+      When call run_proc
+      # Pragmatic baseline on the fixture: 2 failing.
+      The output should equal "2"
+    End
+
+    It "records L4 v2 business.findings.ignored.by_source from the annotated SARIF"
+      run_proc() {
+        findings.process "container_scan" \
+          "$BRIK_WORKSPACE/brik-artifacts/container_scan/container_scan.sarif" >/dev/null 2>&1
+        read_business "container_scan" "findings" \
+          | jq -r '.ignored.by_source["policy.built-in.no-upstream-fix"]'
+      }
+      When call run_proc
+      The output should equal "2"
+    End
+
+    It "falls back to aggregate-only when the tool SARIF is structurally invalid"
+      run_proc_bad_sarif() {
+        local in
+        in="$BRIK_WORKSPACE/brik-artifacts/container_scan/container_scan.sarif"
+        printf '{"not":"sarif"}' > "$in"
+        findings.process "container_scan" "$in"
+        local rc=$?
+        # No findings.sarif should be created on the policy-skipped path.
+        local out_sarif="$BRIK_WORKSPACE/brik-artifacts/container_scan/findings.sarif"
+        if [[ -f "$out_sarif" ]]; then
+          rc=99
+        fi
+        return "$rc"
+      }
+      When call run_proc_bad_sarif
+      The status should be success
+    End
+  End
+
+  # ---------------------------------------------------------------------------
+  # findings.gate -- pass/fail decision from business.findings.failing
+  # ---------------------------------------------------------------------------
+  Describe "findings.gate"
+    GRYPE="${BRIK_HOME}/spec/fixtures/sarif/grype-fixstate.sarif"
+
+    setup_gate() {
+      export BRIK_LOG_DIR
+      BRIK_LOG_DIR="$(mktemp -d)"
+      export BRIK_WORKSPACE
+      BRIK_WORKSPACE="$(mktemp -d)"
+      export BRIK_RUN_ID="findings-gate-spec"
+      export BRIK_QUALITY_FINDINGS_POLICY="pragmatic"
+      unset BRIK_SECURITY_SEVERITY_THRESHOLD BRIK_POLICY_CACHE_PATH
+      report.init >/dev/null 2>&1 || true
+    }
+    cleanup_gate() {
+      rm -rf "$BRIK_LOG_DIR" "$BRIK_WORKSPACE"
+      unset BRIK_RUN_ID BRIK_QUALITY_FINDINGS_POLICY
+    }
+    Before 'setup_gate'
+    After 'cleanup_gate'
+
+    It "is declared as a public function"
+      When call declare -f findings.gate
+      The status should be success
+      The output should not be blank
+    End
+
+    It "rejects missing arguments"
+      When call findings.gate
+      The status should equal 2
+      The error should include "missing argument"
+    End
+
+    It "returns 0 when no backend report exists yet (early pipeline)"
+      no_backend() {
+        rm -f "$BRIK_LOG_DIR/aggregate-report.json"
+        findings.gate "container_scan"
+      }
+      When call no_backend
+      The status should be success
+    End
+
+    It "returns 0 when the stage has no business.findings recorded"
+      empty_stage() {
+        # Backend exists but stage entry is absent.
+        findings.gate "container_scan"
+      }
+      When call empty_stage
+      The status should be success
+    End
+
+    It "returns 0 when business.findings.failing is 0"
+      gate_pass() {
+        # Process the grype fixture under pragmatic: pragmatic ignores all
+        # but the 2 fixed entries; we then mutate the cache to mark even
+        # those as ignored. Easier: install a synthetic backend with
+        # failing=0 directly.
+        local sarif
+        sarif="$BRIK_WORKSPACE/x.sarif"
+        cp "$GRYPE" "$sarif"
+        findings.process "container_scan" "$sarif" >/dev/null 2>&1
+        # Override failing to 0 to simulate a fully-policy-ignored run.
+        local backend="$BRIK_LOG_DIR/aggregate-report.json"
+        local tmp; tmp="$(mktemp)"
+        jq '
+          .stages |= map(
+            if .name == "container_scan" then
+              .business.findings.failing = 0
+            else . end
+          )
+        ' "$backend" > "$tmp" && mv "$tmp" "$backend"
+        findings.gate "container_scan"
+      }
+      When call gate_pass
+      The status should be success
+    End
+
+    It "returns BRIK_EXIT_CHECK_FAILED when business.findings.failing is non-zero"
+      gate_fail() {
+        local sarif
+        sarif="$BRIK_WORKSPACE/x.sarif"
+        cp "$GRYPE" "$sarif"
+        findings.process "container_scan" "$sarif" >/dev/null 2>&1
+        # Pragmatic on the fixture leaves 2 results failing.
+        findings.gate "container_scan"
+      }
+      When call gate_fail
+      The status should equal 10
+    End
+  End
 End

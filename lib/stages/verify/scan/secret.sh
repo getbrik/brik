@@ -76,12 +76,32 @@ verify.scan.secret.run() {
     platform="$(_verify.scan.secret._gitleaks_platform)"
     sarif="${BRIK_SECURITY_SECRETS_OUTPUT_PATH:-brik-artifacts/scan/secret.sarif}"
     sarif_dir="$(dirname "$sarif")"
+    local _scan_rc=0
     (cd "$workspace" && transverse.tools.exec sec_secret "$resolved" \
         workspace="$workspace" platform="$platform" \
-        sarif="$sarif" sarif_dir="$sarif_dir") || {
+        sarif="$sarif" sarif_dir="$sarif_dir") || _scan_rc=$?
+
+    # Run the SARIF (when present) through the unified ingest -> policy ->
+    # aggregate pipeline (chantier 20260508 P4). findings.scan_gate falls
+    # back to the original tool rc when no SARIF was produced (e.g.
+    # trufflehog path which has no native SARIF until the P5 converter).
+    if ! declare -f findings.scan_gate >/dev/null 2>&1; then
+        brik.use transverse.findings 2>/dev/null || true
+    fi
+    local _secret_sarif="${workspace}/${sarif}"
+    if declare -f findings.scan_gate >/dev/null 2>&1; then
+        if findings.scan_gate "scan_secret" "$_scan_rc" "$_secret_sarif" 2>/dev/null; then
+            log.info "security secret scan passed"
+            return 0
+        fi
         log.error "security secret scan findings detected"
         return "$BRIK_EXIT_CHECK_FAILED"
-    }
+    fi
+
+    if [[ "$_scan_rc" -ne 0 ]]; then
+        log.error "security secret scan findings detected"
+        return "$BRIK_EXIT_CHECK_FAILED"
+    fi
     log.info "security secret scan passed"
     return 0
 }

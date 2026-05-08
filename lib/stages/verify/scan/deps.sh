@@ -89,8 +89,32 @@ verify.scan.deps.run() {
     # business.deps.* aggregation. Only osv-scanner has native support for
     # both formats here; grype takes a separate path. Failures of the
     # report passes are non-fatal (informational outputs).
-    if [[ "$resolved" == "osv-scanner" ]]; then
+    #
+    # Gating on scan_rc == 0 (chantier 20260508 P4 review HIGH 1): a real
+    # tool failure must NOT trigger the SARIF/CycloneDX emission, because a
+    # second osv-scanner invocation could write a clean report that masks
+    # the original error from the policy gate downstream.
+    if [[ "$resolved" == "osv-scanner" && "$scan_rc" -eq 0 ]]; then
         _verify.scan.deps._emit_reports "$workspace"
+    fi
+
+    # Run the SARIF (when present) through the unified ingest -> policy ->
+    # aggregate pipeline (chantier 20260508 P4). findings.scan_gate gives
+    # the final stage rc: 0 when the policy-annotated business.findings has
+    # no failing entries, BRIK_EXIT_CHECK_FAILED otherwise; falls back to
+    # scan_rc when no SARIF was produced (e.g. grype dir-mode in P4).
+    if ! declare -f findings.scan_gate >/dev/null 2>&1; then
+        brik.use transverse.findings 2>/dev/null || true
+    fi
+    local _deps_sarif="${workspace}/${BRIK_SECURITY_DEPS_OUTPUT_PATH:-brik-artifacts/scan/deps.sarif}"
+    if declare -f findings.scan_gate >/dev/null 2>&1; then
+        if findings.scan_gate "scan_deps" "$scan_rc" "$_deps_sarif" 2>/dev/null; then
+            log.info "security dependency scan passed"
+            return 0
+        fi
+        printf '%s\n' "$scan_output" >&2
+        log.error "security dependency vulnerabilities found"
+        return "$BRIK_EXIT_CHECK_FAILED"
     fi
 
     if [[ "$scan_rc" -ne 0 ]]; then

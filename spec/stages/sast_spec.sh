@@ -337,7 +337,7 @@ YAML
       The output should equal '["CWE-20","CWE-250"]'
     End
 
-    It "records business.report = {format, path}"
+    It "records business.report = {format, path} pointing at the post-policy findings.sarif"
       run_report() {
         cp "${BRIK_HOME}/spec/fixtures/sarif/semgrep.sarif" "$BRIK_WORKSPACE/brik-artifacts/sast/sast.sarif"
         verify.scan.run() { return 0; }
@@ -348,7 +348,11 @@ YAML
         read_sast_business_json "report"
       }
       When call run_report
-      The output should equal '{"format":"sarif","path":"brik-artifacts/sast/sast.sarif"}'
+      # Chantier 20260508 D6 / P4: apply_policy writes the post-policy SARIF
+      # alongside the tool output so consumers (Jenkins Warnings NG, GitLab
+      # Ultimate overlay) read the suppressions-annotated document. The
+      # tool-native sast.sarif stays intact next to it.
+      The output should equal '{"format":"sarif","path":"brik-artifacts/sast/findings.sarif"}'
     End
 
     It "honors a custom output_path from .security.sast.output_path"
@@ -374,7 +378,10 @@ YAML
         read_sast_business_json "report"
       }
       When call run_custom_path
-      The output should equal '{"format":"sarif","path":"build/security/sast.sarif"}'
+      # P4 layout: findings.sarif is written alongside the tool SARIF in
+      # the configured output directory. The directory comes from
+      # output_path; the filename is always findings.sarif.
+      The output should equal '{"format":"sarif","path":"build/security/findings.sarif"}'
     End
 
     It "omits business.* entirely when no SARIF was produced"
