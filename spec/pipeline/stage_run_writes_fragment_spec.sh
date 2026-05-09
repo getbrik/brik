@@ -1,5 +1,6 @@
 Describe "stage.run wires report.write_fragment"
   Include "$BRIK_PIPELINE_LIB/stage.sh"
+  Include "$BRIK_HOME/spec/support/mock_helper.sh"
 
   FRAGMENT_SCHEMA="${BRIK_HOME}/schemas/report/v1/fragment.schema.json"
   jv_missing() { ! command -v jv >/dev/null 2>&1; }
@@ -10,17 +11,18 @@ Describe "stage.run wires report.write_fragment"
 
   setup_dirs() {
     SR_LOG_DIR="$(mktemp -d)"
-    SR_WORKSPACE="$(mktemp -d)"
     export BRIK_LOG_DIR="$SR_LOG_DIR"
-    export BRIK_WORKSPACE="$SR_WORKSPACE"
+    mock.workspace.setup
+    SR_WORKSPACE="$BRIK_WORKSPACE"
     export BRIK_RUN_ID="run-fixture-stage"
     export BRIK_PROJECT_DIR="/nonexistent"
     unset BRIK_DISABLE_REPORT_FRAGMENTS BRIK_PLATFORM
     report.init >/dev/null 2>&1
   }
   cleanup_dirs() {
-    rm -rf "$SR_LOG_DIR" "$SR_WORKSPACE"
-    unset BRIK_LOG_DIR BRIK_WORKSPACE BRIK_RUN_ID BRIK_PROJECT_DIR
+    rm -rf "$SR_LOG_DIR"
+    mock.workspace.teardown
+    unset BRIK_LOG_DIR BRIK_RUN_ID BRIK_PROJECT_DIR
     unset BRIK_DISABLE_REPORT_FRAGMENTS BRIK_PLATFORM
   }
 
@@ -184,22 +186,23 @@ Describe "stage.run wires report.write_fragment"
   Describe "pre-stage hook abort path"
     setup_with_hook() {
       SR_LOG_DIR="$(mktemp -d)"
-      SR_WORKSPACE="$(mktemp -d)"
       HOOK_DIR="$(mktemp -d)"
       mkdir -p "${HOOK_DIR}/.brik/hooks"
       cat > "${HOOK_DIR}/.brik/hooks/pre_stage.sh" << 'HOOKEOF'
 pre_stage() { return 7; }
 HOOKEOF
       export BRIK_LOG_DIR="$SR_LOG_DIR"
-      export BRIK_WORKSPACE="$SR_WORKSPACE"
+      mock.workspace.setup
+      SR_WORKSPACE="$BRIK_WORKSPACE"
       export BRIK_RUN_ID="run-fixture-prehook"
       export BRIK_PROJECT_DIR="$HOOK_DIR"
       unset BRIK_DISABLE_REPORT_FRAGMENTS BRIK_PLATFORM
       report.init >/dev/null 2>&1
     }
     cleanup_with_hook() {
-      rm -rf "$SR_LOG_DIR" "$SR_WORKSPACE" "$HOOK_DIR"
-      unset BRIK_LOG_DIR BRIK_WORKSPACE BRIK_RUN_ID BRIK_PROJECT_DIR
+      rm -rf "$SR_LOG_DIR" "$HOOK_DIR"
+      mock.workspace.teardown
+      unset BRIK_LOG_DIR BRIK_RUN_ID BRIK_PROJECT_DIR
     }
     Before 'setup_with_hook'
     After 'cleanup_with_hook'

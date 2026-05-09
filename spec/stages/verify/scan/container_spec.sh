@@ -10,14 +10,21 @@ Describe "security/container.sh"
     Describe "Tier 3: auto-detect grype"
       setup_grype() {
         mock.setup
-        TEST_WS="$(mktemp -d)"
+        # Production code resolves the SARIF path against BRIK_WORKSPACE
+        # (falls back to "." when unset). Use the workspace helper so the
+        # `mkdir -p brik-artifacts/container-scan` baked into the grype
+        # command lands inside the temp workspace instead of the spec
+        # runner's cwd (which would leak brik-artifacts/ at the project
+        # root).
+        mock.workspace.setup
+        TEST_WS="$BRIK_WORKSPACE"
         MOCK_LOG="${TEST_WS}/mock.log"
         mock.create_logging "grype" "$MOCK_LOG"
         mock.activate
       }
       cleanup_grype() {
         mock.cleanup
-        rm -rf "$TEST_WS"
+        mock.workspace.teardown
       }
       Before 'setup_grype'
       After 'cleanup_grype'
@@ -47,12 +54,13 @@ Describe "security/container.sh"
     Describe "no scanner available"
       setup_none() {
         mock.setup
-        TEST_WS="$(mktemp -d)"
+        mock.workspace.setup
+        TEST_WS="$BRIK_WORKSPACE"
         mock.isolate
       }
       cleanup_none() {
         mock.cleanup
-        rm -rf "$TEST_WS"
+        mock.workspace.teardown
       }
       Before 'setup_none'
       After 'cleanup_none'
@@ -67,8 +75,8 @@ Describe "security/container.sh"
     Describe "findings.scan_gate stage key alignment"
       setup_gate_key() {
         mock.setup
-        TEST_WS="$(mktemp -d)"
-        export BRIK_WORKSPACE="$TEST_WS"
+        mock.workspace.setup
+        TEST_WS="$BRIK_WORKSPACE"
         MOCK_LOG="${TEST_WS}/mock.log"
         mock.create_logging "grype" "$MOCK_LOG"
         mock.activate
@@ -79,9 +87,8 @@ Describe "security/container.sh"
       }
       cleanup_gate_key() {
         unset -f findings.scan_gate 2>/dev/null || true
-        unset BRIK_WORKSPACE 2>/dev/null || true
         mock.cleanup
-        rm -rf "$TEST_WS"
+        mock.workspace.teardown
       }
       Before 'setup_gate_key'
       After 'cleanup_gate_key'

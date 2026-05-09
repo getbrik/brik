@@ -1,22 +1,14 @@
 Describe "transverse/artifacts.sh"
   Include "$BRIK_PIPELINE_LIB/logging.sh"
   Include "$BRIK_TRANSVERSE_LIB/artifacts.sh"
+  Include "$BRIK_HOME/spec/support/mock_helper.sh"
 
   setup_workspace() {
-    ART_WS="$(mktemp -d)"
-    SAVED_WORKSPACE="${BRIK_WORKSPACE:-}"
-    export BRIK_WORKSPACE="$ART_WS"
-  }
-  cleanup_workspace() {
-    if [[ -n "$SAVED_WORKSPACE" ]]; then
-      export BRIK_WORKSPACE="$SAVED_WORKSPACE"
-    else
-      unset BRIK_WORKSPACE
-    fi
-    rm -rf "$ART_WS"
+    mock.workspace.setup
+    ART_WS="$BRIK_WORKSPACE"
   }
   Before 'setup_workspace'
-  After 'cleanup_workspace'
+  After 'mock.workspace.teardown'
 
   Describe "brik.artifacts.root"
     It "returns BRIK_WORKSPACE/brik-artifacts"

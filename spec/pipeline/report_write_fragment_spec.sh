@@ -1,5 +1,6 @@
 Describe "report.write_fragment"
   Include "$BRIK_PIPELINE_LIB/report.sh"
+  Include "$BRIK_HOME/spec/support/mock_helper.sh"
 
   FRAGMENT_SCHEMA="${BRIK_HOME}/schemas/report/v1/fragment.schema.json"
   jv_missing() { ! command -v jv >/dev/null 2>&1; }
@@ -12,16 +13,17 @@ Describe "report.write_fragment"
 
   setup_dirs() {
     REPORT_LOG_DIR="$(mktemp -d)"
-    REPORT_WORKSPACE="$(mktemp -d)"
     export BRIK_LOG_DIR="$REPORT_LOG_DIR"
-    export BRIK_WORKSPACE="$REPORT_WORKSPACE"
+    mock.workspace.setup
+    REPORT_WORKSPACE="$BRIK_WORKSPACE"
     export BRIK_RUN_ID="run-fixture-42"
     # Clear runner provenance so individual examples opt-in explicitly.
     unset BRIK_PLATFORM BRIK_RUNNER_IMAGE CI_JOB_URL BUILD_URL
   }
   cleanup_dirs() {
-    rm -rf "$REPORT_LOG_DIR" "$REPORT_WORKSPACE"
-    unset BRIK_LOG_DIR BRIK_WORKSPACE BRIK_RUN_ID
+    rm -rf "$REPORT_LOG_DIR"
+    mock.workspace.teardown
+    unset BRIK_LOG_DIR BRIK_RUN_ID
     unset BRIK_PLATFORM BRIK_RUNNER_IMAGE CI_JOB_URL BUILD_URL
   }
 

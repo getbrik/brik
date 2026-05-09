@@ -5,6 +5,7 @@ Describe "stages.init"
   Include "$BRIK_HOME/lib/pipeline/pipeline-env.sh"
   Include "$BRIK_HOME/lib/transverse/config.sh"
   Include "$BRIK_HOME/lib/stages/init.sh"
+  Include "$BRIK_HOME/spec/support/mock_helper.sh"
 
   setup_env() {
     # jv detects YAML by file extension, so the fixture must live in
@@ -13,8 +14,7 @@ Describe "stages.init"
     BRIK_CONFIG_DIR="$(mktemp -d)"
     export BRIK_CONFIG_FILE="$BRIK_CONFIG_DIR/brik.yml"
     printf 'version: 1\nproject:\n  name: test-project\n  stack: node\n' > "$BRIK_CONFIG_FILE"
-    export BRIK_WORKSPACE
-    BRIK_WORKSPACE="$(mktemp -d)"
+    mock.workspace.setup
     export BRIK_LOG_DIR
     BRIK_LOG_DIR="$(mktemp -d)"
     export BRIK_PROJECT_DIR="$BRIK_WORKSPACE"
@@ -27,7 +27,8 @@ Describe "stages.init"
     pipeline.env.init >/dev/null 2>&1 || true
   }
   cleanup_env() {
-    rm -rf "$BRIK_CONFIG_DIR" "$BRIK_WORKSPACE" "$BRIK_LOG_DIR"
+    rm -rf "$BRIK_CONFIG_DIR" "$BRIK_LOG_DIR"
+    mock.workspace.teardown
     unset BRIK_RUN_ID BRIK_PIPELINE_ENV BRIK_CONFIG_DIR 2>/dev/null || true
   }
 

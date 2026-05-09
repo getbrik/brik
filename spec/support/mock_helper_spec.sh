@@ -396,4 +396,73 @@ Describe "mock_helper.sh API"
       The status should be success
     End
   End
+
+  Describe "mock.workspace.setup / mock.workspace.teardown"
+    It "creates a temp dir, exports BRIK_WORKSPACE, restores unset on teardown"
+      test_setup_unset() {
+        unset BRIK_WORKSPACE
+        mock.workspace.setup
+        local ws="$BRIK_WORKSPACE"
+        [[ -d "$ws" ]] || return 1
+        mock.workspace.teardown
+        [[ "${BRIK_WORKSPACE+x}" != "x" ]] || return 1
+        [[ ! -d "$ws" ]]
+      }
+      When call test_setup_unset
+      The status should be success
+    End
+
+    It "restores a previously set BRIK_WORKSPACE on teardown"
+      test_setup_restore() {
+        export BRIK_WORKSPACE="/tmp/spec-prior-ws"
+        mock.workspace.setup
+        [[ "$BRIK_WORKSPACE" != "/tmp/spec-prior-ws" ]] || return 1
+        mock.workspace.teardown
+        [[ "$BRIK_WORKSPACE" == "/tmp/spec-prior-ws" ]] || return 1
+        unset BRIK_WORKSPACE
+        return 0
+      }
+      When call test_setup_restore
+      The status should be success
+    End
+
+    It "preserves an empty-string BRIK_WORKSPACE prior value (vs unset)"
+      test_setup_restore_empty() {
+        export BRIK_WORKSPACE=""
+        mock.workspace.setup >/dev/null
+        mock.workspace.teardown
+        [[ "${BRIK_WORKSPACE+x}" == "x" && -z "$BRIK_WORKSPACE" ]] || return 1
+        unset BRIK_WORKSPACE
+        return 0
+      }
+      When call test_setup_restore_empty
+      The status should be success
+    End
+
+    It "adopts a caller-supplied path and does not delete it on teardown"
+      test_setup_adopt_path() {
+        unset BRIK_WORKSPACE
+        local owned
+        owned="$(mktemp -d)"
+        mock.workspace.setup "$owned" >/dev/null
+        [[ "$BRIK_WORKSPACE" == "$owned" ]] || { rm -rf "$owned"; return 1; }
+        mock.workspace.teardown
+        if [[ ! -d "$owned" ]]; then return 1; fi
+        rm -rf "$owned"
+      }
+      When call test_setup_adopt_path
+      The status should be success
+    End
+
+    It "is idempotent on teardown when setup was never called"
+      test_teardown_idempotent() {
+        unset BRIK_WORKSPACE
+        unset _MOCK_WS_OWNED _MOCK_WS_HAD_VALUE _MOCK_WS_SAVED _MOCK_WS_PATH 2>/dev/null || true
+        mock.workspace.teardown
+        [[ "${BRIK_WORKSPACE+x}" != "x" ]]
+      }
+      When call test_teardown_idempotent
+      The status should be success
+    End
+  End
 End

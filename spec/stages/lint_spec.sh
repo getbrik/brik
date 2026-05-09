@@ -9,13 +9,13 @@ Describe "stages.lint"
   Include "$BRIK_HOME/lib/transverse/sarif.sh"
   Include "$BRIK_HOME/lib/stages/verify/verify.sh"
   Include "$BRIK_HOME/lib/stages/lint.sh"
+  Include "$BRIK_HOME/spec/support/mock_helper.sh"
 
   setup_env() {
     export BRIK_CONFIG_FILE
     BRIK_CONFIG_FILE="$(mktemp)"
     printf 'version: 1\nproject:\n  name: test\n  stack: node\n' > "$BRIK_CONFIG_FILE"
-    export BRIK_WORKSPACE
-    BRIK_WORKSPACE="$(mktemp -d)"
+    mock.workspace.setup
     export BRIK_LOG_DIR
     BRIK_LOG_DIR="$(mktemp -d)"
     export BRIK_PROJECT_DIR="$BRIK_WORKSPACE"
@@ -26,7 +26,8 @@ Describe "stages.lint"
   }
   cleanup_env() {
     rm -f "$BRIK_CONFIG_FILE"
-    rm -rf "$BRIK_WORKSPACE" "$BRIK_LOG_DIR"
+    rm -rf "$BRIK_LOG_DIR"
+    mock.workspace.teardown
     unset BRIK_QUALITY_LINT_TOOL BRIK_QUALITY_FORMAT_TOOL \
           BRIK_QUALITY_TYPE_CHECK_TOOL BRIK_QUALITY_LINT_COMMAND \
           BRIK_QUALITY_FORMAT_COMMAND BRIK_QUALITY_TYPE_CHECK_COMMAND \

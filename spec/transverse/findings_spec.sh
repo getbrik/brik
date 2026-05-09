@@ -5,19 +5,20 @@ Describe "transverse/findings.sh"
   Include "$BRIK_HOME/lib/pipeline/report.sh"
   Include "$BRIK_HOME/lib/transverse/sarif.sh"
   Include "$BRIK_HOME/lib/transverse/findings.sh"
+  Include "$BRIK_HOME/spec/support/mock_helper.sh"
 
   FIX="${BRIK_HOME}/spec/fixtures/sarif"
 
   setup_env() {
     export BRIK_LOG_DIR
     BRIK_LOG_DIR="$(mktemp -d)"
-    export BRIK_WORKSPACE
-    BRIK_WORKSPACE="$(mktemp -d)"
+    mock.workspace.setup
     export BRIK_RUN_ID="findings-spec"
     report.init >/dev/null 2>&1 || true
   }
   cleanup_env() {
-    rm -rf "$BRIK_LOG_DIR" "$BRIK_WORKSPACE"
+    rm -rf "$BRIK_LOG_DIR"
+    mock.workspace.teardown
     unset BRIK_RUN_ID
   }
   Before 'setup_env'
@@ -1070,8 +1071,7 @@ Describe "transverse/findings.sh"
     setup_proc() {
       export BRIK_LOG_DIR
       BRIK_LOG_DIR="$(mktemp -d)"
-      export BRIK_WORKSPACE
-      BRIK_WORKSPACE="$(mktemp -d)"
+      mock.workspace.setup
       export BRIK_RUN_ID="findings-process-spec"
       mkdir -p "$BRIK_WORKSPACE/brik-artifacts/container-scan"
       cp "$GRYPE" "$BRIK_WORKSPACE/brik-artifacts/container-scan/container-scan.sarif"
@@ -1080,7 +1080,8 @@ Describe "transverse/findings.sh"
       report.init >/dev/null 2>&1 || true
     }
     cleanup_proc() {
-      rm -rf "$BRIK_LOG_DIR" "$BRIK_WORKSPACE"
+      rm -rf "$BRIK_LOG_DIR"
+      mock.workspace.teardown
       unset BRIK_RUN_ID BRIK_QUALITY_FINDINGS_POLICY
     }
     Before 'setup_proc'
@@ -1204,15 +1205,15 @@ Describe "transverse/findings.sh"
     setup_gate() {
       export BRIK_LOG_DIR
       BRIK_LOG_DIR="$(mktemp -d)"
-      export BRIK_WORKSPACE
-      BRIK_WORKSPACE="$(mktemp -d)"
+      mock.workspace.setup
       export BRIK_RUN_ID="findings-gate-spec"
       export BRIK_QUALITY_FINDINGS_POLICY="pragmatic"
       unset BRIK_SECURITY_SEVERITY_THRESHOLD BRIK_POLICY_CACHE_PATH
       report.init >/dev/null 2>&1 || true
     }
     cleanup_gate() {
-      rm -rf "$BRIK_LOG_DIR" "$BRIK_WORKSPACE"
+      rm -rf "$BRIK_LOG_DIR"
+      mock.workspace.teardown
       unset BRIK_RUN_ID BRIK_QUALITY_FINDINGS_POLICY
     }
     Before 'setup_gate'

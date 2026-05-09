@@ -6,13 +6,13 @@ Describe "stages.deploy"
   Include "$BRIK_HOME/lib/transverse/conditions.sh"
   Include "$BRIK_HOME/lib/transverse/env.sh"
   Include "$BRIK_HOME/lib/stages/deploy.sh"
+  Include "$BRIK_HOME/spec/support/mock_helper.sh"
 
   setup_env() {
     export BRIK_CONFIG_FILE
     BRIK_CONFIG_FILE="$(mktemp)"
     printf 'version: 1\nproject:\n  name: test\n  stack: node\n' > "$BRIK_CONFIG_FILE"
-    export BRIK_WORKSPACE
-    BRIK_WORKSPACE="$(mktemp -d)"
+    mock.workspace.setup
     export BRIK_LOG_DIR
     BRIK_LOG_DIR="$(mktemp -d)"
     export BRIK_PROJECT_DIR="$BRIK_WORKSPACE"
@@ -23,7 +23,8 @@ Describe "stages.deploy"
   }
   cleanup_env() {
     rm -f "$BRIK_CONFIG_FILE"
-    rm -rf "$BRIK_WORKSPACE" "$BRIK_LOG_DIR"
+    rm -rf "$BRIK_LOG_DIR"
+    mock.workspace.teardown
     unset BRIK_DEPLOY_ENVIRONMENTS BRIK_DEPLOY_STAGING_TARGET \
           BRIK_DEPLOY_STAGING_NAMESPACE BRIK_DEPLOY_STAGING_WHEN \
           BRIK_RUN_ID 2>/dev/null || true

@@ -9,13 +9,13 @@ Describe "stages.scan"
   Include "$BRIK_HOME/lib/transverse/sbom.sh"
   Include "$BRIK_HOME/lib/stages/verify/scan/scan.sh"
   Include "$BRIK_HOME/lib/stages/scan.sh"
+  Include "$BRIK_HOME/spec/support/mock_helper.sh"
 
   setup_env() {
     export BRIK_CONFIG_FILE
     BRIK_CONFIG_FILE="$(mktemp)"
     printf 'version: 1\nproject:\n  name: test\n  stack: node\n' > "$BRIK_CONFIG_FILE"
-    export BRIK_WORKSPACE
-    BRIK_WORKSPACE="$(mktemp -d)"
+    mock.workspace.setup
     export BRIK_LOG_DIR
     BRIK_LOG_DIR="$(mktemp -d)"
     export BRIK_PROJECT_DIR="$BRIK_WORKSPACE"
@@ -26,7 +26,8 @@ Describe "stages.scan"
   }
   cleanup_env() {
     rm -f "$BRIK_CONFIG_FILE"
-    rm -rf "$BRIK_WORKSPACE" "$BRIK_LOG_DIR"
+    rm -rf "$BRIK_LOG_DIR"
+    mock.workspace.teardown
     unset BRIK_SECURITY_DEPS_TOOL BRIK_SECURITY_DEPS_COMMAND \
           BRIK_SECURITY_DEPS_SEVERITY BRIK_SECURITY_SECRETS_TOOL \
           BRIK_SECURITY_SECRETS_COMMAND BRIK_SECURITY_SEVERITY_THRESHOLD \

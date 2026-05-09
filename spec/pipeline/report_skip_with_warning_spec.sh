@@ -1,18 +1,20 @@
 Describe "stage.skip_with_warning + summary.warnings"
   Include "$BRIK_PIPELINE_LIB/stage.sh"
   Include "$BRIK_PIPELINE_LIB/report.sh"
+  Include "$BRIK_HOME/spec/support/mock_helper.sh"
 
   setup_dirs() {
     REPORT_LOG_DIR="$(mktemp -d)"
-    REPORT_WORKSPACE="$(mktemp -d)"
     export BRIK_LOG_DIR="$REPORT_LOG_DIR"
-    export BRIK_WORKSPACE="$REPORT_WORKSPACE"
+    mock.workspace.setup
+    REPORT_WORKSPACE="$BRIK_WORKSPACE"
     export BRIK_RUN_ID="run-skip-warning-fixture"
     unset BRIK_PLATFORM BRIK_RUNNER_IMAGE CI_JOB_URL BUILD_URL
   }
   cleanup_dirs() {
-    rm -rf "$REPORT_LOG_DIR" "$REPORT_WORKSPACE"
-    unset BRIK_LOG_DIR BRIK_WORKSPACE BRIK_RUN_ID
+    rm -rf "$REPORT_LOG_DIR"
+    mock.workspace.teardown
+    unset BRIK_LOG_DIR BRIK_RUN_ID
     unset BRIK_PLATFORM BRIK_RUNNER_IMAGE CI_JOB_URL BUILD_URL
   }
 

@@ -55,8 +55,7 @@ Describe "stages/container_scan.sh"
         BRIK_CONFIG_FILE="$(mktemp)"
         printf 'version: 1\nproject:\n  name: test\n  stack: node\nsecurity:\n  container:\n    image: myapp:latest\n' > "$BRIK_CONFIG_FILE"
         CTX_FILE="$(mktemp)"
-        export BRIK_WORKSPACE
-        BRIK_WORKSPACE="$(mktemp -d)"
+        mock.workspace.setup
         mock.setup
         mock.create_exit "grype" 0
         mock.activate
@@ -64,7 +63,7 @@ Describe "stages/container_scan.sh"
       cleanup_autoload() {
         mock.cleanup
         rm -f "$BRIK_CONFIG_FILE" "$CTX_FILE"
-        rm -rf "$BRIK_WORKSPACE"
+        mock.workspace.teardown
       }
       Before 'setup_autoload'
       After 'cleanup_autoload'
@@ -84,13 +83,12 @@ Describe "stages/container_scan.sh"
         BRIK_CONFIG_FILE="$(mktemp)"
         printf 'version: 1\nproject:\n  name: test\n  stack: node\nsecurity:\n  container:\n    image: myapp:latest\n    severity: critical\n' > "$BRIK_CONFIG_FILE"
         CTX_FILE="$(mktemp)"
-        export BRIK_WORKSPACE
-        BRIK_WORKSPACE="$(mktemp -d)"
+        mock.workspace.setup
         verify.scan.container.run() { return 0; }
       }
       cleanup_with_scanner() {
         rm -f "$BRIK_CONFIG_FILE" "$CTX_FILE"
-        rm -rf "$BRIK_WORKSPACE"
+        mock.workspace.teardown
         unset -f verify.scan.container.run 2>/dev/null || true
       }
       Before 'setup_with_scanner'
@@ -111,13 +109,12 @@ Describe "stages/container_scan.sh"
         BRIK_CONFIG_FILE="$(mktemp)"
         printf 'version: 1\nproject:\n  name: test\n  stack: node\nsecurity:\n  container:\n    image: myapp:latest\n' > "$BRIK_CONFIG_FILE"
         CTX_FILE="$(mktemp)"
-        export BRIK_WORKSPACE
-        BRIK_WORKSPACE="$(mktemp -d)"
+        mock.workspace.setup
         verify.scan.container.run() { return 1; }
       }
       cleanup_failing_scanner() {
         rm -f "$BRIK_CONFIG_FILE" "$CTX_FILE"
-        rm -rf "$BRIK_WORKSPACE"
+        mock.workspace.teardown
         unset -f verify.scan.container.run 2>/dev/null || true
       }
       Before 'setup_failing_scanner'
@@ -138,8 +135,7 @@ Describe "stages/container_scan.sh"
         BRIK_CONFIG_FILE="$(mktemp)"
         printf 'version: 1\nproject:\n  name: test\n  stack: node\nsecurity:\n  container:\n    image: myapp:1.0.0\n' > "$BRIK_CONFIG_FILE"
         CTX_FILE="$(mktemp)"
-        export BRIK_WORKSPACE
-        BRIK_WORKSPACE="$(mktemp -d)"
+        mock.workspace.setup
         export BRIK_LOG_DIR
         BRIK_LOG_DIR="$(mktemp -d)"
         export BRIK_RUN_ID="cs-c4-fixture"
@@ -149,7 +145,8 @@ Describe "stages/container_scan.sh"
       }
       cleanup_c4() {
         rm -f "$BRIK_CONFIG_FILE" "$CTX_FILE"
-        rm -rf "$BRIK_WORKSPACE" "$BRIK_LOG_DIR"
+        rm -rf "$BRIK_LOG_DIR"
+        mock.workspace.teardown
         unset -f verify.scan.container.run verify.scan.run 2>/dev/null || true
         unset BRIK_RUN_ID 2>/dev/null || true
       }

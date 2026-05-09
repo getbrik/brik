@@ -113,7 +113,12 @@ Describe "Integration: Quality and Security stages"
     Describe "with container scan enabled"
       setup_container() {
         mock.setup
-        TEST_WS="$(mktemp -d)"
+        # Use the workspace helper so the grype mock's
+        # `mkdir -p $BRIK_WORKSPACE/brik-artifacts/container-scan` lands
+        # in the temp dir instead of the spec runner's cwd (which would
+        # leak brik-artifacts/ at the project root).
+        mock.workspace.setup
+        TEST_WS="$BRIK_WORKSPACE"
         printf '{"name":"test"}\n' > "${TEST_WS}/package.json"
         mock.create_exit "npm" 0
         mock.create_exit "gitleaks" 0
@@ -122,7 +127,7 @@ Describe "Integration: Quality and Security stages"
       }
       cleanup_container() {
         mock.cleanup
-        rm -rf "$TEST_WS"
+        mock.workspace.teardown
       }
       Before 'setup_container'
       After 'cleanup_container'

@@ -39,7 +39,9 @@
 #   mock.call_count       - Count how many times a mock was called
 #
 # Workspace:
-#   mock.workspace        - Create a temporary workspace directory
+#   mock.workspace          - Create a temporary workspace directory
+#   mock.workspace.setup    - Create + export BRIK_WORKSPACE (saves prior value)
+#   mock.workspace.teardown - Restore prior BRIK_WORKSPACE + remove temp dir
 
 # Guard against double-sourcing
 [[ -n "${_BRIK_MOCK_HELPER_LOADED:-}" ]] && return 0
@@ -238,4 +240,59 @@ mock.call_count() {
 # Usage: local ws; ws="$(mock.workspace)"
 mock.workspace() {
   mktemp -d
+}
+
+# Create or take ownership of a workspace directory and export it as
+# BRIK_WORKSPACE for the duration of the test. The previous value (or
+# unset state) is saved so mock.workspace.teardown can restore it.
+#
+# Usage:
+#   mock.workspace.setup            # uses a fresh mktemp -d
+#   mock.workspace.setup /path/ws   # adopts an existing path (no rm in teardown)
+#
+# After the call BRIK_WORKSPACE is exported. The function intentionally
+# does NOT echo the path: capturing via $(mock.workspace.setup) would run
+# in a subshell, losing the export and the state vars used by teardown.
+# Callers read $BRIK_WORKSPACE directly when they need the path.
+mock.workspace.setup() {
+  local ws
+  if [[ $# -gt 0 && -n "$1" ]]; then
+    ws="$1"
+    _MOCK_WS_OWNED="0"
+  else
+    ws="$(mktemp -d)"
+    _MOCK_WS_OWNED="1"
+  fi
+
+  # ${var+x} expands to "x" iff var is set (even when empty); a plain
+  # ${var-} would conflate "unset" and "empty string" and the teardown
+  # would unset a value that the spec's parent setup may have legitimately
+  # set to empty.
+  if [[ "${BRIK_WORKSPACE+x}" == "x" ]]; then
+    _MOCK_WS_HAD_VALUE="1"
+    _MOCK_WS_SAVED="$BRIK_WORKSPACE"
+  else
+    _MOCK_WS_HAD_VALUE="0"
+    _MOCK_WS_SAVED=""
+  fi
+
+  _MOCK_WS_PATH="$ws"
+  export BRIK_WORKSPACE="$ws"
+}
+
+# Restore BRIK_WORKSPACE to its prior state (set, empty, or unset) and
+# remove the temp directory iff mock.workspace.setup was the one that
+# created it (a caller-supplied path is left intact).
+#
+# Idempotent and safe to call when setup was never invoked.
+mock.workspace.teardown() {
+  if [[ "${_MOCK_WS_HAD_VALUE:-}" == "1" ]]; then
+    export BRIK_WORKSPACE="$_MOCK_WS_SAVED"
+  else
+    unset BRIK_WORKSPACE 2>/dev/null || true
+  fi
+  if [[ "${_MOCK_WS_OWNED:-}" == "1" && -n "${_MOCK_WS_PATH:-}" ]]; then
+    rm -rf "$_MOCK_WS_PATH"
+  fi
+  unset _MOCK_WS_OWNED _MOCK_WS_HAD_VALUE _MOCK_WS_SAVED _MOCK_WS_PATH 2>/dev/null || true
 }

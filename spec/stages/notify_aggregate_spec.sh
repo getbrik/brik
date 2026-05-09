@@ -3,6 +3,7 @@ Describe "stages.notify - CI mode fragment aggregation"
   Include "$BRIK_HOME/lib/pipeline/loader.sh"
   Include "$BRIK_HOME/lib/transverse/config.sh"
   Include "$BRIK_HOME/lib/stages/notify.sh"
+  Include "$BRIK_HOME/spec/support/mock_helper.sh"
 
   # Helper: write a fragment file with the given shape into the workspace
   # brik-artifacts/ directory.
@@ -25,12 +26,12 @@ Describe "stages.notify - CI mode fragment aggregation"
 
   setup_env() {
     NOTIFY_LOG_DIR="$(mktemp -d)"
-    NOTIFY_WORKSPACE="$(mktemp -d)"
     NOTIFY_CONFIG="$(mktemp)"
     printf 'version: 1\nproject:\n  name: test-project\n  stack: node\n' > "$NOTIFY_CONFIG"
     export BRIK_CONFIG_FILE="$NOTIFY_CONFIG"
     export BRIK_LOG_DIR="$NOTIFY_LOG_DIR"
-    export BRIK_WORKSPACE="$NOTIFY_WORKSPACE"
+    mock.workspace.setup
+    NOTIFY_WORKSPACE="$BRIK_WORKSPACE"
     export BRIK_PROJECT_DIR="$NOTIFY_WORKSPACE"
     export BRIK_PLATFORM="gitlab"
     export BRIK_RUN_ID="run-fixture-notify"
@@ -38,8 +39,9 @@ Describe "stages.notify - CI mode fragment aggregation"
   }
   cleanup_env() {
     rm -f "$NOTIFY_CONFIG"
-    rm -rf "$NOTIFY_LOG_DIR" "$NOTIFY_WORKSPACE"
-    unset BRIK_CONFIG_FILE BRIK_LOG_DIR BRIK_WORKSPACE
+    rm -rf "$NOTIFY_LOG_DIR"
+    mock.workspace.teardown
+    unset BRIK_CONFIG_FILE BRIK_LOG_DIR
     unset BRIK_PROJECT_DIR BRIK_PLATFORM BRIK_RUN_ID
     unset BRIK_NOTIFY_SLACK_CHANNEL BRIK_NOTIFY_EMAIL_TO BRIK_NOTIFY_WEBHOOK_URL
   }
