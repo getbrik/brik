@@ -35,7 +35,11 @@ jobs:
 
       - name: Install jv (JSON Schema validator)
         run: |
-          go install github.com/santhosh-tekuri/jsonschema/cmd/jv@v6.0.2
+          # cmd/jv is a separate Go module from the parent jsonschema library.
+          # Its tags follow `cmd/jv/v0.x.y`, independent of the library's
+          # `v6.x.y`. v0.7.0 is the latest published cmd/jv tag and pulls in
+          # jsonschema/v6 v6.0.1 transitively.
+          go install github.com/santhosh-tekuri/jsonschema/cmd/jv@v0.7.0
           echo "$HOME/go/bin" >> "$GITHUB_PATH"
 
       - name: Validate inline YAML blocks in docs/config
