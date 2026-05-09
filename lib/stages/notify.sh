@@ -10,6 +10,69 @@ _BRIK_STAGES_NOTIFY_LOADED=1
 # Private helpers
 # -----------------------------------------------------------------------------
 
+# Render a Unicode recap table on stderr summarizing each stage in the
+# pipeline aggregate, with adaptive metrics per stage type. Best-effort:
+# silently no-op when jq is missing or the aggregate JSON is absent --
+# the aggregate-report.{md,json,html} artifacts are the structured
+# rollup; this is a live-log convenience for operators.
+#
+# Usage: _notify._emit_recap_table <aggregate_json_path>
+_notify._emit_recap_table() {
+    local report="$1"
+    [[ -f "$report" ]] || return 0
+    command -v jq >/dev/null 2>&1 || return 0
+    brik.use transverse.format 2>/dev/null || return 0
+
+    local jq_filter
+    jq_filter='
+        def stage_rank($name):
+          ["init","release","build",
+           "lint","sast","scan","test",
+           "package","container-scan","deploy","notify"]
+          | index($name) // 99 ;
+        def status_glyph(s):
+          if s == "success" then "✓ success"
+          elif s == "failed"  then "✗ failed"
+          elif s == "skipped" then "- skipped"
+          else "? \(s|tostring)" end ;
+        def round1(x): ((x * 10) | round) / 10 ;
+        def human_dur(ms):
+          if ms == null then "-"
+          elif ms < 1000  then "\(ms)ms"
+          elif ms < 60000 then "\(round1(ms / 1000.0))s"
+          else "\((ms/60000)|floor)m\(((ms%60000)/1000)|floor)s" end ;
+        def human_size(b):
+          if b == null then "-"
+          elif b < 1024    then "\(b)B"
+          elif b < 1048576 then "\(round1(b / 1024.0))KB"
+          else "\(round1(b / 1048576.0))MB" end ;
+        def metrics_for(b):
+          if b == null then "-"
+          elif (b.findings.total // null) != null then
+            "findings \(b.findings.failing // 0)/\(b.findings.total)"
+          elif (b.tests.total // null) != null then
+            "\(b.tests.passed // 0)/\(b.tests.total) passed"
+          elif (b.artifact.size_bytes // null) != null then
+            "artifact \(human_size(b.artifact.size_bytes))"
+          elif (b.image.full_name // null) != null then
+            "image \(b.image.full_name)"
+          elif (b.commit.short_sha // null) != null then
+            "commit \(b.commit.short_sha)"
+          else "-" end ;
+        .stages
+        | sort_by([stage_rank(.stage), .stage])
+        | ["Stage|Status|Duration|Metrics"]
+          + map("\(.stage)|\(status_glyph(.status))|\(human_dur(.duration_ms))|\(metrics_for(.business // null))")
+        | .[]'
+
+    local data
+    data="$(jq -r "$jq_filter" "$report" 2>/dev/null)" || return 0
+    [[ -z "$data" ]] && return 0
+
+    log.info "pipeline recap:"
+    printf '%s\n' "$data" | format.table --delim '|'
+}
+
 # Detect "CI aggregation mode" by looking for at least one valid fragment
 # file in <dir>. Per-stage fragments produced by report.write_fragment in
 # upstream stages have a stable signature (.stage + .schema_version).
@@ -336,6 +399,10 @@ stages.notify() {
         echo "  SHA     : ${BRIK_COMMIT_SHORT_SHA:-unknown}"
         echo "========================================"
     fi
+
+    # Compact recap table on stderr alongside the MD on stdout so operators
+    # see the per-stage rollup at a glance in the live CI log.
+    _notify._emit_recap_table "$_report_json"
 
     # Determine pipeline status from the aggregated pipeline report.
     # Derives from any tech.status=failed in aggregate-report.json. Defaults
