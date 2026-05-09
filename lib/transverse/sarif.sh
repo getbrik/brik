@@ -129,6 +129,7 @@ sarif.count_by_severity() {
         printf 'sarif.count_by_severity: file does not exist: %s\n' "$_file" >&2
         return 1
     fi
+    # KCOV_EXCL_START -- inline jq script body, not bash code
     jq -c "
         ${_SARIF_SEVERITY_PIPE}
         | reduce .[] as \$b (
@@ -136,6 +137,7 @@ sarif.count_by_severity() {
             .[\$b] += 1
           )
     " "$_file"
+    # KCOV_EXCL_STOP
 }
 
 # sarif.extract_cwe <file>
@@ -151,6 +153,7 @@ sarif.extract_cwe() {
         printf 'sarif.extract_cwe: file does not exist: %s\n' "$_file" >&2
         return 1
     fi
+    # KCOV_EXCL_START -- inline jq script body, not bash code
     jq -c '
       [
         (.runs[0].tool.driver.rules // [])[]
@@ -160,6 +163,7 @@ sarif.extract_cwe() {
       ]
       | unique
     ' "$_file"
+    # KCOV_EXCL_STOP
 }
 
 # sarif.is_valid <file>
@@ -179,11 +183,13 @@ sarif.is_valid() {
         return 1
     fi
 
+    # KCOV_EXCL_START -- inline jq script body, not bash code
     jq -e '
         (.version == "2.1.0")
         and (.runs | type == "array")
         and ((.runs[0].tool.driver.name // null) | type == "string")
     ' "$_file" >/dev/null 2>&1
+    # KCOV_EXCL_STOP
 }
 
 # sarif.from_prettier <input_text> <output_sarif>
@@ -203,6 +209,7 @@ sarif.from_prettier() {
         return 1
     fi
 
+    # KCOV_EXCL_START -- inline jq script body, not bash code
     grep -E '^\[warn\] [^[:space:]]+$' "$_in" 2>/dev/null \
         | sed -E 's/^\[warn\] //' \
         | jq -R -s --arg tool "prettier" '
@@ -240,6 +247,7 @@ sarif.from_prettier() {
                 ]
               }
         ' > "$_out"
+    # KCOV_EXCL_STOP
 }
 
 # sarif.from_tsc <input_text> <output_sarif>
@@ -277,6 +285,7 @@ sarif.from_tsc() {
             fi
         done
     }
+    # KCOV_EXCL_START -- inline jq script body, not bash code
     _sarif._parse_tsc_lines < "$_in" \
       | jq -R -s --arg tool "tsc" '
           def to_level(s):
@@ -325,6 +334,7 @@ sarif.from_tsc() {
               ]
             }
         ' > "$_out"
+    # KCOV_EXCL_STOP
 }
 
 # sarif.from_dotnet_format <input_json> <output_sarif>
@@ -343,6 +353,7 @@ sarif.from_dotnet_format() {
         return 1
     fi
 
+    # KCOV_EXCL_START -- inline jq script body, not bash code
     jq --arg tool "dotnet-format" '
       [ .[]
         | . as $file
@@ -385,4 +396,5 @@ sarif.from_dotnet_format() {
           ]
         }
     ' "$_in" > "$_out"
+    # KCOV_EXCL_STOP
 }

@@ -43,6 +43,18 @@ Describe "transverse/sbom.sh"
       When call no_vulns_file
       The output should equal "0"
     End
+
+    It "fails with rc=1 when file does not exist"
+      When call sbom.vuln_count "${FIX}/missing.cdx.json"
+      The status should equal 1
+      The stderr should include "file does not exist"
+    End
+
+    It "fails with rc=2 when no argument is given"
+      When call sbom.vuln_count
+      The status should equal 2
+      The stderr should include "missing file argument"
+    End
   End
 
   Describe "sbom.is_valid"
@@ -67,6 +79,11 @@ Describe "transverse/sbom.sh"
 
     It "rejects a non-existent file"
       When call sbom.is_valid "${FIX}/missing.cdx.json"
+      The status should equal 1
+    End
+
+    It "rejects a missing argument with rc=1"
+      When call sbom.is_valid
       The status should equal 1
     End
   End
@@ -142,6 +159,12 @@ Describe "transverse/sbom.sh"
       When call sbom.merge "${MERGE_DIR}/out.cdx.json"
       The status should equal 2
       The stderr should include "at least one input"
+    End
+
+    It "fails when no output path is given"
+      When call sbom.merge
+      The status should equal 2
+      The stderr should include "missing output path"
     End
 
     It "fails when an input does not exist"

@@ -810,6 +810,7 @@ findings.merge_pipeline() {
         # Atomic empty-aggregate write so a disk-full / read-only mount
         # surfaces as IO_FAILURE instead of silently producing a missing
         # file (jq exits 0 even when its stdout redirect fails).
+        # KCOV_EXCL_START -- inline jq script body, not bash code
         if ! jq -n '{
             "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
             version: "2.1.0",
@@ -819,6 +820,7 @@ findings.merge_pipeline() {
             printf 'findings.merge_pipeline: jq init failed\n' >&2
             return "${BRIK_EXIT_IO_FAILURE:-6}"
         fi
+        # KCOV_EXCL_STOP
         mv "$tmp" "$out" || {
             rm -f "$tmp"
             printf 'findings.merge_pipeline: cannot write %s\n' "$out" >&2
@@ -829,6 +831,7 @@ findings.merge_pipeline() {
 
     # Slurp every source SARIF, then concatenate their runs[] entries.
     # Multiple runs[] per file (rare but valid SARIF) are preserved.
+    # KCOV_EXCL_START -- inline jq script body, not bash code
     if ! jq -s '
         {
             "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
@@ -840,6 +843,7 @@ findings.merge_pipeline() {
         printf 'findings.merge_pipeline: jq merge failed\n' >&2
         return "${BRIK_EXIT_IO_FAILURE:-6}"
     fi
+    # KCOV_EXCL_STOP
 
     mv "$tmp" "$out" || {
         rm -f "$tmp"

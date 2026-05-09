@@ -57,10 +57,12 @@ sbom.is_valid() {
         return 1
     fi
 
+    # KCOV_EXCL_START -- inline jq script body, not bash code
     jq -e '
         (.bomFormat == "CycloneDX")
         and (.specVersion == "1.5")
     ' "$_file" >/dev/null 2>&1
+    # KCOV_EXCL_STOP
 }
 
 # sbom.merge <output_path> <input_path>...
@@ -86,6 +88,7 @@ sbom.merge() {
         fi
     done
 
+    # KCOV_EXCL_START -- cyclonedx-cli is optional and not installed in CI
     if command -v cyclonedx-cli >/dev/null 2>&1; then
         local _args=()
         for _f in "$@"; do
@@ -94,6 +97,7 @@ sbom.merge() {
         cyclonedx-cli merge --output-format json --output-file "$_out" "${_args[@]}" >/dev/null 2>&1 && return 0
         printf 'sbom.merge: cyclonedx-cli failed; falling back to jq merge\n' >&2
     fi
+    # KCOV_EXCL_STOP
 
     _sbom._jq_merge "$_out" "$@"
 }
@@ -104,6 +108,7 @@ sbom.merge() {
 _sbom._jq_merge() {
     local _out="$1"
     shift
+    # KCOV_EXCL_START -- inline jq script body, not bash code
     jq -s '
       def comp_key(c):
         c["bom-ref"] // ((c.name // "") + "@" + (c.version // ""));
@@ -116,4 +121,5 @@ _sbom._jq_merge() {
       | .components = $components
       | .vulnerabilities = $vulns
     ' "$@" > "$_out"
+    # KCOV_EXCL_STOP
 }

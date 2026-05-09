@@ -3,6 +3,7 @@
 
 Describe "transverse/findings/exporters/gitlab.sh"
   Include "$BRIK_HOME/lib/transverse/findings/exporters/gitlab.sh"
+  Include "$BRIK_HOME/spec/support/mock_helper.sh"
 
   setup_export() {
     OUT="$(mktemp).json"
@@ -175,6 +176,38 @@ JSON
       When call findings.exporters.gitlab.from_sarif "/nonexistent.sarif" "$OUT"
       The status should not be success
       The error should include "input not found"
+    End
+
+    It "fails when jq is missing"
+      run_no_jq() {
+        mock.setup
+        mock.isolate
+        printf '%s' '{"version":"2.1.0","runs":[]}' > "$SARIF"
+        findings.exporters.gitlab.from_sarif "$SARIF" "$OUT"
+        local rc=$?
+        mock.cleanup
+        return $rc
+      }
+      When call run_no_jq
+      The status should equal 3
+      The stderr should include "jq is required"
+    End
+
+    It "fails when the output directory cannot be created"
+      run_bad_outdir() {
+        local blocker
+        blocker="$(mktemp)"
+        : > "$blocker"
+        local bad_out="${blocker}/sub/out.json"
+        printf '%s' '{"version":"2.1.0","runs":[]}' > "$SARIF"
+        findings.exporters.gitlab.from_sarif "$SARIF" "$bad_out"
+        local rc=$?
+        rm -f "$blocker"
+        return $rc
+      }
+      When call run_bad_outdir
+      The status should equal 6
+      The stderr should include "cannot create"
     End
   End
 End

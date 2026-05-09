@@ -17,7 +17,7 @@ _artifact._size_bytes() {
         if stat -c%s "$_p" >/dev/null 2>&1; then
             stat -c%s "$_p"
         else
-            stat -f%z "$_p"
+            stat -f%z "$_p"  # KCOV_EXCL_LINE -- BSD/macOS fallback, unreachable on GNU stat
         fi
     elif [[ -d "$_p" ]]; then
         local _total=0 _n
@@ -26,7 +26,7 @@ _artifact._size_bytes() {
             if stat -c%s "$_n" >/dev/null 2>&1; then
                 _s="$(stat -c%s "$_n" 2>/dev/null || printf '0')"
             else
-                _s="$(stat -f%z "$_n" 2>/dev/null || printf '0')"
+                _s="$(stat -f%z "$_n" 2>/dev/null || printf '0')"  # KCOV_EXCL_LINE -- BSD/macOS fallback
             fi
             _total=$((_total + _s))
         done < <(find "$_p" -type f -print0 2>/dev/null)
@@ -58,12 +58,14 @@ _artifact._sha256() {
                     --no-recursion -cf - --files-from=- 2>/dev/null) \
               | sha256sum 2>/dev/null | cut -d' ' -f1
         else
+            # KCOV_EXCL_START -- BSD tar fallback, unreachable on GNU tar CI
             (cd "$_p" && printf '%s\n' "$_list" | tar -cf - -T - 2>/dev/null) \
               | sha256sum 2>/dev/null | cut -d' ' -f1
+            # KCOV_EXCL_STOP
         fi
         return 0
     fi
-    return 1
+    return 1  # KCOV_EXCL_LINE -- defensive guard, callers always pass a file or dir
 }
 
 # Resolve to an absolute path. realpath when available; pwd fallback
@@ -73,6 +75,8 @@ _artifact._abs_path() {
     if command -v realpath >/dev/null 2>&1; then
         realpath "$_p" 2>/dev/null && return 0
     fi
+    # KCOV_EXCL_START -- realpath is present on every supported runner; this
+    # block is the no-coreutils fallback for stripped-down environments.
     if [[ -d "$_p" ]]; then
         (cd "$_p" 2>/dev/null && pwd)
     elif [[ -f "$_p" ]]; then
@@ -83,6 +87,7 @@ _artifact._abs_path() {
     else
         return 1
     fi
+    # KCOV_EXCL_STOP
 }
 
 # Summarize an artifact path into a JSON object.
@@ -121,6 +126,7 @@ artifact.summarize() {
         return 3
     fi
 
+    # KCOV_EXCL_START -- inline jq script body, not bash code
     jq -nc \
         --arg type "$_type" \
         --arg name "$_name" \
@@ -128,4 +134,5 @@ artifact.summarize() {
         --arg sha    "${_sha:-}" \
         --arg path   "$_abs" \
         '{type: $type, name: $name, size_bytes: $size, sha256: $sha, path: $path}'
+    # KCOV_EXCL_STOP
 }

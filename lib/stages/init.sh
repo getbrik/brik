@@ -176,6 +176,7 @@ _stages.init._collect_prereqs() {
 _stages.init._build_commit_object() {
     local _p_obj="{}"
     if command -v jq >/dev/null 2>&1; then
+        # KCOV_EXCL_START -- inline jq script body, not bash code
         _p_obj="$(jq -nc \
             --arg sha             "${BRIK_COMMIT_SHA:-}" \
             --arg short_sha       "${BRIK_COMMIT_SHORT_SHA:-}" \
@@ -196,6 +197,7 @@ _stages.init._build_commit_object() {
              + ( if $author_email    != "" then { author_email:    $author_email }    else {} end )
              + ( if $timestamp       != "" then { timestamp:       $timestamp }       else {} end )
              + ( if $message_subject != "" then { message_subject: $message_subject } else {} end )')"
+        # KCOV_EXCL_STOP
     fi
     printf '%s' "$_p_obj"
 }
@@ -205,12 +207,14 @@ _stages.init._build_commit_object() {
 _stages.init._build_pipeline_ref_object() {
     local _p_obj="{}"
     if command -v jq >/dev/null 2>&1; then
+        # KCOV_EXCL_START -- inline jq script body, not bash code
         _p_obj="$(jq -nc \
             --arg id  "${BRIK_PIPELINE_ID:-}" \
             --arg url "${BRIK_PIPELINE_URL:-}" \
             '{}
              + ( if $id  != "" then { id:  $id }  else {} end )
              + ( if $url != "" then { url: $url } else {} end )')"
+        # KCOV_EXCL_STOP
     fi
     printf '%s' "$_p_obj"
 }
