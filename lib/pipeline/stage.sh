@@ -312,7 +312,7 @@ stage.run() {
     local stage_start_ms
     stage_start_ms="$(_helpers.epoch_ms)"
 
-    banner.stage "$stage_name"
+    banner.stage "$stage_name" "${BRIK_RUNNER_IMAGE:-}" "${BRIK_STAGE_TECH:-}"
     log.info "starting stage: $stage_name"
 
     # Create execution context

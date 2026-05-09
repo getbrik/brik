@@ -36,18 +36,88 @@ banner.brik() {
     echo >&2
 }
 
-# Display a stage delimiter banner.
-# The stage name is uppercased and left-aligned between two lines.
-# Usage: banner.stage <stage_name>
+# Total banner width in characters. Inner content area is total_width - 2.
+_BRIK_BANNER_WIDTH=100
+
+# Repeat a single character n times. Safer than `printf '%*s' n ''` + `tr`
+# when the character is multi-byte UTF-8 (box-drawing chars).
+_banner._repeat() {
+    local char="$1"
+    local n="$2"
+    local out=""
+    local i
+    for ((i=0; i<n; i++)); do
+        out+="$char"
+    done
+    printf '%s' "$out"
+}
+
+# Build a metadata line content (without the surrounding `│ │`), padded
+# to width. Format: "  KEY:     VALUE" with KEY column 8 chars wide.
+_banner._meta_line() {
+    local key="$1"
+    local value="$2"
+    local width="$3"
+    local content
+    content="  $(printf '%-8s' "${key}:")${value}"
+    if (( ${#content} > width )); then
+        content="${content:0:width}"
+    fi
+    local pad
+    pad="$(_banner._repeat ' ' $((width - ${#content})))"
+    printf '%s%s' "$content" "$pad"
+}
+
+# Display a stage banner: a single-trait box with the stage name spaced
+# and centered on the title line, then a blank line, then runner and tech
+# metadata. Missing metadata is shown as '-'.
+# Usage: banner.stage <stage_name> [<runner>] [<tech>]
 banner.stage() {
     local stage_name="${1:-}"
-    local upper_name
-    upper_name="$(printf '%s' "$stage_name" | tr '[:lower:]' '[:upper:]')"
+    local runner="${2:-}"
+    local tech="${3:-}"
+    [[ -z "$runner" ]] && runner="-"
+    [[ -z "$tech" ]] && tech="-"
 
-    cat >&2 <<EOF
+    local upper
+    upper="$(printf '%s' "$stage_name" | tr '[:lower:]' '[:upper:]')"
 
-══════════════════════════════════
-  ${upper_name}
-══════════════════════════════════
-EOF
+    # Spaced title: "S A S T". One space between each character.
+    local spaced=""
+    local i ch
+    for ((i=0; i<${#upper}; i++)); do
+        ch="${upper:$i:1}"
+        if [[ -z "$spaced" ]]; then
+            spaced="$ch"
+        else
+            spaced="${spaced} ${ch}"
+        fi
+    done
+
+    local inner=$((_BRIK_BANNER_WIDTH - 2))
+    local hr blank
+    hr="$(_banner._repeat '─' "$inner")"
+    blank="$(_banner._repeat ' ' "$inner")"
+
+    # Center the title in the inner width.
+    local pad_total=$(( inner - ${#spaced} ))
+    local pad_left=$(( pad_total / 2 ))
+    local pad_right=$(( pad_total - pad_left ))
+    local left_sp right_sp
+    left_sp="$(_banner._repeat ' ' "$pad_left")"
+    right_sp="$(_banner._repeat ' ' "$pad_right")"
+
+    local runner_line tech_line
+    runner_line="$(_banner._meta_line "runner" "$runner" "$inner")"
+    tech_line="$(_banner._meta_line "tech" "$tech" "$inner")"
+
+    {
+        echo
+        printf '┌%s┐\n' "$hr"
+        printf '│%s%s%s│\n' "$left_sp" "$spaced" "$right_sp"
+        printf '│%s│\n' "$blank"
+        printf '│%s│\n' "$runner_line"
+        printf '│%s│\n' "$tech_line"
+        printf '└%s┘\n' "$hr"
+    } >&2
 }

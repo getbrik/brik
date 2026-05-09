@@ -32,19 +32,47 @@ Describe "banner.sh"
   End
 
   Describe "banner.stage"
-    It "outputs the stage name in uppercase on stderr"
+    It "outputs the stage name in spaced uppercase on stderr"
       When call banner.stage "build"
-      The stderr should include "BUILD"
+      The stderr should include "B U I L D"
     End
 
-    It "outputs visual delimiters"
+    It "outputs the box-drawing top corner"
       When call banner.stage "build"
-      The stderr should include "══════"
+      The stderr should include "┌"
+      The stderr should include "─"
+      The stderr should include "┐"
+    End
+
+    It "outputs the box-drawing bottom corner"
+      When call banner.stage "build"
+      The stderr should include "└"
+      The stderr should include "┘"
     End
 
     It "uppercases multi-word stage names"
       When call banner.stage "quality"
-      The stderr should include "QUALITY"
+      The stderr should include "Q U A L I T Y"
+    End
+
+    It "shows runner metadata when provided"
+      When call banner.stage "sast" "ghcr.io/getbrik/runner:1" "semgrep"
+      The stderr should include "runner:"
+      The stderr should include "ghcr.io/getbrik/runner:1"
+    End
+
+    It "shows tech metadata when provided"
+      When call banner.stage "sast" "ghcr.io/getbrik/runner:1" "semgrep"
+      The stderr should include "tech:"
+      The stderr should include "semgrep"
+    End
+
+    It "falls back to '-' when runner and tech are missing"
+      When call banner.stage "build"
+      The stderr should include "runner:"
+      The stderr should include "tech:"
+      The stderr should match pattern "*runner:*-*"
+      The stderr should match pattern "*tech:*-*"
     End
 
     It "does not write anything to stdout"
