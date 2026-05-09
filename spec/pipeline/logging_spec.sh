@@ -68,6 +68,21 @@ Describe "logging.sh"
     End
   End
 
+  Describe "log.success"
+    It "emits an OK level line"
+      When call log.success "stage done"
+      The stderr should include "[OK]"
+      The stderr should include "stage done"
+    End
+
+    It "filters identically to info (suppressed at level=warn)"
+      export BRIK_LOG_LEVEL="warn"
+      When call log.success "suppressed"
+      The stderr should equal ""
+      unset BRIK_LOG_LEVEL
+    End
+  End
+
   Describe "level filtering"
     It "suppresses info when BRIK_LOG_LEVEL=warn"
       export BRIK_LOG_LEVEL="warn"
@@ -81,6 +96,69 @@ Describe "logging.sh"
       When call log.warn "visible"
       The stderr should include "[WARN]"
       unset BRIK_LOG_LEVEL
+    End
+  End
+
+  Describe "color support"
+    It "emits no ANSI escapes by default in non-TTY context"
+      unset BRIK_LOG_FORCE_COLOR
+      unset BRIK_LOG_NO_COLOR
+      unset NO_COLOR GITLAB_CI JENKINS_URL
+      When call log.warn "no colors here"
+      The stderr should not include $'\033'"["
+    End
+
+    It "wraps the level label in ANSI when BRIK_LOG_FORCE_COLOR=1"
+      export BRIK_LOG_FORCE_COLOR=1
+      When call log.error "boom"
+      The stderr should include $'\033'"[31mERROR"$'\033'"[0m"
+      unset BRIK_LOG_FORCE_COLOR
+    End
+
+    It "uses green for success when colors are forced"
+      export BRIK_LOG_FORCE_COLOR=1
+      When call log.success "yay"
+      The stderr should include $'\033'"[32mOK"$'\033'"[0m"
+      unset BRIK_LOG_FORCE_COLOR
+    End
+
+    It "uses yellow for warn when colors are forced"
+      export BRIK_LOG_FORCE_COLOR=1
+      When call log.warn "careful"
+      The stderr should include $'\033'"[33mWARN"$'\033'"[0m"
+      unset BRIK_LOG_FORCE_COLOR
+    End
+
+    It "respects NO_COLOR even when stderr would otherwise allow color"
+      export NO_COLOR=1
+      When call log.error "boom"
+      The stderr should not include $'\033'"["
+      unset NO_COLOR
+    End
+
+    It "BRIK_LOG_NO_COLOR=1 disables color even when GITLAB_CI=true"
+      export BRIK_LOG_NO_COLOR=1
+      export GITLAB_CI=true
+      When call log.error "boom"
+      The stderr should not include $'\033'"["
+      unset BRIK_LOG_NO_COLOR
+      unset GITLAB_CI
+    End
+
+    It "BRIK_LOG_FORCE_COLOR overrides BRIK_LOG_NO_COLOR"
+      export BRIK_LOG_NO_COLOR=1
+      export BRIK_LOG_FORCE_COLOR=1
+      When call log.warn "test"
+      The stderr should include $'\033'"[33m"
+      unset BRIK_LOG_NO_COLOR
+      unset BRIK_LOG_FORCE_COLOR
+    End
+
+    It "info level remains uncolored even when colors are forced"
+      export BRIK_LOG_FORCE_COLOR=1
+      When call log.info "neutral"
+      The stderr should not include $'\033'"["
+      unset BRIK_LOG_FORCE_COLOR
     End
   End
 End

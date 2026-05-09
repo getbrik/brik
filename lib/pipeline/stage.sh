@@ -362,7 +362,7 @@ stage.run() {
                 log.info "stage $stage_name skipped (no config detected)"
                 ;;
             *)
-                log.info "stage $stage_name completed successfully"
+                log.success "stage $stage_name completed successfully"
                 ;;
         esac
         hook.on_success "$stage_name" "$context_file" "$log_file" || true
