@@ -44,16 +44,17 @@ _resolve_path() {
 
 # Render markdown rows for a JSON object of properties (read from stdin).
 # Format type, default, description for each property. The full schema is
-# passed via --argfile so $refs can be resolved.
+# loaded via --slurpfile (a one-element array, hence $schema[0]) so $refs
+# can be resolved. --argfile was removed in jq 1.8.
 _render_rows() {
     local prefix="$1"
-    jq -r --arg prefix "$prefix" --argfile schema "${SCHEMA}" '
+    jq -r --arg prefix "$prefix" --slurpfile schema "${SCHEMA}" '
         # Resolve a $ref like "#/$defs/notifyEventList" to its target schema.
         def deref:
             if .["$ref"] then
                 .["$ref"] as $r
                 | $r | sub("^#/\\$defs/"; "") as $name
-                | $schema["$defs"][$name]
+                | $schema[0]["$defs"][$name]
             else .
             end;
         def fmt_type:

@@ -35,6 +35,12 @@ Tier 3 (stack default) pattern as `build` and `test`.
 | `quality.type_check.command` | string | -- | Type check command to execute. Overrides tool selection (Tier 1). |
 | `quality.type_check.tool` | string | -- | Type checker to use (e.g. tsc, mypy, pyright). Overrides auto-detection (Tier 2). |
 
+### `quality.findings`
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `quality.findings.policy` | enum (`pragmatic`, `strict`, `permissive`) | `pragmatic` | Built-in policy preset. pragmatic (default): ignores findings without an upstream fix or below the severity floor; fails the rest. strict: fails every finding at or above the severity floor, including no-fix entries. permissive: fails only critical findings that already have a fix. |
+
 <!-- END AUTO-GENERATED -->
 
 The type-check sub-stage runs only when `quality.type_check.command` or
