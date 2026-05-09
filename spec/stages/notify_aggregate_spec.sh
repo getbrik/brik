@@ -87,6 +87,25 @@ Describe "stages.notify - CI mode fragment aggregation"
       When call do_notify_artifact
       The status should be success
     End
+
+    It "also exposes aggregate-report.html under brik-artifacts/ for browser viewing"
+      do_notify_html() {
+        seed_ci_fragments
+        stages.notify "$NOTIFY_CONFIG" >/dev/null 2>&1
+        test -f "$NOTIFY_WORKSPACE/brik-artifacts/aggregate-report.html"
+      }
+      When call do_notify_html
+      The status should be success
+    End
+
+    It "logs the path to the html report when present"
+      do_notify_log_html() {
+        seed_ci_fragments
+        stages.notify "$NOTIFY_CONFIG" 2>&1 >/dev/null | grep -E "html report" || true
+      }
+      When call do_notify_log_html
+      The output should include "aggregate-report.html"
+    End
   End
 
   # ---------------------------------------------------------------------------

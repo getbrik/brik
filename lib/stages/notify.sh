@@ -359,7 +359,9 @@ stages.notify() {
     # artifact URL and removes the "no matching files" warning that fired
     # on every notify run. I/O failures are non-fatal (notify is best-effort)
     # but surfaced as warnings so operators do not lose visibility.
-    if [[ -n "${BRIK_WORKSPACE:-}" ]] && [[ -f "$_report_md" || -f "$_report_json" ]]; then
+    local _report_html="${_log_dir}/aggregate-report.html"
+    if [[ -n "${BRIK_WORKSPACE:-}" ]] && \
+       [[ -f "$_report_md" || -f "$_report_json" || -f "$_report_html" ]]; then
         local _artifacts_dir="${BRIK_WORKSPACE}/brik-artifacts"
         if ! mkdir -p "$_artifacts_dir" 2>/dev/null; then
             log.warn "could not create brik-artifacts/ at ${_artifacts_dir} (non-fatal)"
@@ -371,6 +373,14 @@ stages.notify() {
             if [[ -f "$_report_json" ]]; then
                 cp "$_report_json" "$_artifacts_dir/" 2>/dev/null || \
                     log.warn "could not copy aggregate-report.json to brik-artifacts/ (non-fatal)"
+            fi
+            if [[ -f "$_report_html" ]]; then
+                cp "$_report_html" "$_artifacts_dir/" 2>/dev/null || \
+                    log.warn "could not copy aggregate-report.html to brik-artifacts/ (non-fatal)"
+                # Surface the HTML location to operators reading CI logs.
+                # The path is workspace-relative so it matches the CI artifact
+                # download URL once the job uploads brik-artifacts/.
+                log.info "html report available at brik-artifacts/aggregate-report.html"
             fi
         fi
     fi
