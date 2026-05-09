@@ -132,6 +132,37 @@ Describe "stacks.install_deps"
       The stderr should include "pip install -r requirements.txt failed"
     End
 
+    It "scopes PYTHONUSERBASE per BRIK_LOG_SCOPE so parallel stages do not race"
+      run_py_userbase_isolation() {
+        export BRIK_LOG_SCOPE="lint"
+        pip() {
+          if [[ "$1" == "install" && "$2" == "--help" ]]; then echo "usage"; return 0; fi
+          return 0
+        }
+        _brik._install_deps_python "$DEPS_WS" dev >/dev/null 2>&1
+        printf '%s\n' "$PYTHONUSERBASE"
+        test -d "$PYTHONUSERBASE"
+      }
+      When call run_py_userbase_isolation
+      The status should be success
+      The output should equal "$DEPS_WS/.brik-stage/lint/python"
+    End
+
+    It "falls back to default scope when BRIK_LOG_SCOPE is unset"
+      run_py_userbase_default() {
+        unset BRIK_LOG_SCOPE
+        pip() {
+          if [[ "$1" == "install" && "$2" == "--help" ]]; then echo "usage"; return 0; fi
+          return 0
+        }
+        _brik._install_deps_python "$DEPS_WS" dev >/dev/null 2>&1
+        printf '%s\n' "$PYTHONUSERBASE"
+      }
+      When call run_py_userbase_default
+      The status should be success
+      The output should equal "$DEPS_WS/.brik-stage/default/python"
+    End
+
   End
 
   Describe "_brik._install_deps_rust"

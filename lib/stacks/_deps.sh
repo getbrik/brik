@@ -82,10 +82,22 @@ _brik._install_deps_node() {
 
 _brik._install_deps_python() {
     local workspace="$1" mode="$2"
-    export PATH="${HOME}/.local/bin:${PATH}"
     # Some runner images (scanner, analysis) do not ship pip. Skip silently
     # when the tool is missing -- those stages do not need installed deps.
     command -v pip >/dev/null 2>&1 || return 0
+
+    # Per-stage PYTHONUSERBASE so parallel verify branches (lint, test) do
+    # not race on the same site-packages directory. On Jenkins the parallel
+    # branches share $WORKSPACE via --volumes-from, so two concurrent
+    # `pip install -e ".[dev]"` calls writing to $HOME/.local can lose
+    # files mid-extraction. GitLab gets each branch its own ephemeral
+    # workspace already; the per-stage isolation is harmless there but
+    # gives both platforms identical install layout.
+    local stage_scope="${BRIK_LOG_SCOPE:-default}"
+    export PYTHONUSERBASE="${workspace}/.brik-stage/${stage_scope}/python"
+    mkdir -p "$PYTHONUSERBASE" 2>/dev/null || true
+    export PATH="${PYTHONUSERBASE}/bin:${HOME}/.local/bin:${PATH}"
+
     local pip_flags="--quiet"
     if pip install --help 2>&1 | grep -q -- '--break-system-packages'; then
         pip_flags="$pip_flags --break-system-packages"
