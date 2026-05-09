@@ -105,11 +105,17 @@ def call(Map params = [:]) {
             def deployDockerArgs = args.deployDockerArgs
             def envFile          = args.envFile
 
-            // Stash each stage's brik-artifacts/ directory so the Notify
+            // Stash each stage's brik-artifacts/ subdirectory so the Notify
             // stage can unstash and aggregate them via report.aggregate_fragments.
+            // The include glob is scoped to brik-artifacts/<stage>/** rather
+            // than the full tree so concurrent verify branches (lint/sast/scan
+            // /test share the same Jenkins workspace) cannot race on each
+            // other's mktemp/mv atomic writes -- e.g. Lint's stash walking the
+            // tree while Scan is mid-rename of scan.json.XXXXXX, which
+            // surfaces as java.nio.file.NoSuchFileException in TarArchiver.
             // allowEmpty:true tolerates skipped or report-disabled stages.
             def stashBrikArtifacts = { name ->
-                stash includes: 'brik-artifacts/**',
+                stash includes: "brik-artifacts/${name}/**",
                       name: "brik-artifacts-${name}",
                       allowEmpty: true
             }
