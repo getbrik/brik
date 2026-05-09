@@ -21,6 +21,10 @@ _BRIK_REPORT_LOADED=1
 [[ -z "${_BRIK_LOGGING_LOADED:-}" ]] && . "${BASH_SOURCE[0]%/*}/logging.sh"
 # shellcheck source=error.sh
 [[ -z "${_BRIK_ERROR_LOADED:-}" ]] && . "${BASH_SOURCE[0]%/*}/error.sh"
+# shellcheck source=../transverse/sarif.sh
+[[ -z "${_BRIK_TRANSVERSE_SARIF_LOADED:-}" ]] && . "${BASH_SOURCE[0]%/*}/../transverse/sarif.sh"
+# shellcheck source=report_html.sh
+[[ -z "${_BRIK_REPORT_HTML_LOADED:-}" ]] && . "${BASH_SOURCE[0]%/*}/report_html.sh"
 
 # Resolve the backend JSON path from BRIK_LOG_DIR.
 _report._backend_path() {
@@ -648,6 +652,13 @@ report.aggregate_fragments() {
         return "$BRIK_EXIT_IO_FAILURE"
     }
 
+    # Inline per-stage SARIF findings into business.findings.items so the
+    # aggregate document is self-sufficient for HTML/MD consumers (no need
+    # to fetch the SARIF separately). Non-fatal: a missing or malformed
+    # SARIF leaves the stage unchanged.
+    _report._enrich_findings_items "$backend" "$fragment_dir" 2>/dev/null || \
+        log.warn "could not enrich findings.items (non-fatal)"
+
     # Render the markdown alongside the JSON. Use the aggregate-shape
     # renderer because the aggregate document differs from the local
     # backend (.pipeline.id vs .pipeline_id, .stages[].stage vs .name,
@@ -655,7 +666,89 @@ report.aggregate_fragments() {
     _report._render_aggregate_md "$backend" > "${log_dir}/aggregate-report.md" 2>/dev/null || \
         log.warn "could not render aggregate-report.md (non-fatal)"
 
+    # Render the self-contained HTML view alongside the JSON + MD. Operators
+    # open this in a browser to drill into findings without leaving the
+    # archived CI artefact bundle. Non-fatal on failure.
+    _report._render_html "$backend" > "${log_dir}/aggregate-report.html" 2>/dev/null || \
+        log.warn "could not render aggregate-report.html (non-fatal)"
+
     log.debug "aggregate report written: $backend"
+    return 0
+}
+
+# Walk each stage in the aggregate JSON, find SARIF references inside its
+# business payload (any nested object shaped {format: "sarif", path: ...}),
+# load each SARIF via sarif.extract_items, and inject the union as
+# business.findings.items. Stages with zero referenced SARIFs (or where
+# every referenced file is missing) are left untouched, preserving the
+# additive contract documented on the aggregate schema.
+_report._enrich_findings_items() {
+    local backend="$1" fragment_dir="$2"
+    [[ -f "$backend" ]] || return 0
+
+    local workspace="${BRIK_WORKSPACE:-$(dirname "$fragment_dir")}"
+    local stage_count
+    stage_count="$(jq -r '.stages | length' "$backend" 2>/dev/null)" || return 0
+    [[ "$stage_count" =~ ^[0-9]+$ ]] || return 0
+    (( stage_count > 0 )) || return 0
+
+    local i=0
+    while (( i < stage_count )); do
+        # Collect SARIF paths declared in this stage's business (any nesting).
+        local paths_json
+        paths_json="$(jq -c --argjson i "$i" '
+            .stages[$i].business // {}
+            | [.. | objects | select(.format? == "sarif") | .path? // empty]
+            | unique
+        ' "$backend" 2>/dev/null)" || { i=$((i + 1)); continue; }
+
+        # Skip stage when no SARIF refs.
+        local paths_count
+        paths_count="$(printf '%s' "$paths_json" | jq -r 'length' 2>/dev/null)"
+        [[ "$paths_count" =~ ^[0-9]+$ ]] || paths_count=0
+        if (( paths_count == 0 )); then
+            i=$((i + 1))
+            continue
+        fi
+
+        # Walk paths, accumulate items from existing SARIFs only.
+        local items_json='[]'
+        local p_idx=0
+        while (( p_idx < paths_count )); do
+            local rel_path
+            rel_path="$(printf '%s' "$paths_json" | jq -r --argjson k "$p_idx" '.[$k]')"
+            p_idx=$((p_idx + 1))
+            [[ -z "$rel_path" || "$rel_path" == "null" ]] && continue
+            local abs_path="${workspace}/${rel_path}"
+            [[ -f "$abs_path" ]] || continue
+            local one
+            one="$(sarif.extract_items "$abs_path" 2>/dev/null)" || continue
+            [[ -n "$one" ]] || continue
+            items_json="$(printf '%s\n%s' "$items_json" "$one" \
+                | jq -cs 'add')" || items_json='[]'
+        done
+
+        local items_len
+        items_len="$(printf '%s' "$items_json" | jq -r 'length' 2>/dev/null)"
+        [[ "$items_len" =~ ^[0-9]+$ ]] || items_len=0
+        if (( items_len == 0 )); then
+            i=$((i + 1))
+            continue
+        fi
+
+        # Merge items into stage business.findings.items via temp file.
+        local tmp
+        tmp="$(mktemp "${backend}.enrich.XXXXXX")" || { i=$((i + 1)); continue; }
+        if jq -c --argjson i "$i" --argjson items "$items_json" '
+              .stages[$i].business.findings = ((.stages[$i].business.findings // {}) + {items: $items})
+            ' "$backend" > "$tmp" 2>/dev/null; then
+            mv "$tmp" "$backend" || rm -f "$tmp"
+        else
+            rm -f "$tmp"
+        fi
+
+        i=$((i + 1))
+    done
     return 0
 }
 
@@ -668,9 +761,70 @@ _report._render_aggregate_md() {
     local backend="$1"
     # KCOV_EXCL_START  -- jq script body is not bash code
     jq -r '
-        # Findings management sections (chantier 20260508 P6.B). Each
-        # section auto-skips when its source data is missing so the
-        # markdown stays terse for builds without policy / no L4 v2.
+        # ----- Phase 2 helpers --------------------------------------------
+        # Stage execution order: matches the documented fixed flow. Stages
+        # not on the list sort to the end (rank 99) but keep their input
+        # order via a stable secondary key.
+        def stage_rank($name):
+          ["init","release","build",
+           "lint","sast","scan","test",
+           "package","container-scan","deploy","notify"]
+          | index($name) // 99;
+
+        def severity_rank($s):
+          if   $s == "critical" then 4
+          elif $s == "high"     then 3
+          elif $s == "medium"   then 2
+          elif $s == "low"      then 1
+          else 0 end;
+
+        def status_glyph($s):
+          if   $s == "success" then "[OK]"
+          elif $s == "failed"  then "[FAIL]"
+          elif $s == "skipped" then "[SKIP]"
+          elif $s == "warning" then "[WARN]"
+          else "[?]" end;
+
+        def pad2($n):
+          ($n | tostring) | if length == 1 then "0" + . else . end;
+
+        # 80 -> "80ms", 1142 -> "1s", 33339 -> "33s", 141000 -> "2m21s".
+        def human_duration_ms($ms):
+          if $ms == null or (($ms | type) != "number") then "-"
+          elif $ms < 1000 then "\($ms)ms"
+          else
+            ($ms / 1000 | floor) as $s
+            | if $s < 60 then "\($s)s"
+              elif $s < 3600 then
+                ($s / 60 | floor) as $m | ($s % 60) as $sec
+                | "\($m)m\(pad2($sec))s"
+              else
+                ($s / 3600 | floor) as $h | (($s % 3600) / 60 | floor) as $m
+                | "\($h)h\(pad2($m))m"
+              end
+          end;
+
+        # Best-effort ISO 8601 to epoch seconds. Handles "...Z" and
+        # "...+0000" forms; returns null on anything else (renders as "-").
+        def parse_iso($s):
+          if $s == null then null
+          elif ($s | type) != "string" then null
+          elif ($s | test("Z$")) then
+            (try ($s | fromdateiso8601) catch null)
+          elif ($s | test("[+-][0-9]{4}$")) then
+            (try ($s | strptime("%Y-%m-%dT%H:%M:%S%z") | mktime) catch null)
+          else null end;
+
+        # Total pipeline duration in ms from started_at/finished_at, or null
+        # when either timestamp is missing or unparseable.
+        def total_duration_ms:
+          (parse_iso(.pipeline.started_at)) as $b
+          | (parse_iso(.pipeline.finished_at)) as $e
+          | if $b == null or $e == null then null
+            else (($e - $b) * 1000)
+            end;
+
+        # ----- Findings management sections (P6.B, unchanged) -------------
         def by_sev_summary($bs):
           [
             (if ($bs.critical // 0) > 0 then "C:\($bs.critical)" else empty end),
@@ -739,42 +893,113 @@ _report._render_aggregate_md() {
               ""
             end;
 
-        "# Pipeline Report",
-        "",
-        "- **Pipeline ID:** \(.pipeline.id // "-")",
-        "- **Project:** \(.pipeline.project // "-")",
-        "- **Platform:** \(.pipeline.platform // "-")",
-        "- **Status:** \(.pipeline.status // "-")",
-        "- **Started:** \(.pipeline.started_at // "-")",
-        "- **Finished:** \(.pipeline.finished_at // "-")",
-        "",
-        "## Stages",
-        "",
-        "| Stage | Status | Duration (ms) | Exit code |",
-        "|---|---|---|---|",
-        (.stages[] | "| \(.stage // "-") | \(.status // "-") | \(.duration_ms // "-") | \(.rc // "-") |"),
-        "",
-        "## Summary",
-        "",
-        "- **Total stages:** \(.summary.stages.total // 0)",
-        "- **Passed:** \(.summary.stages.passed // 0)",
-        "- **Failed:** \(.summary.stages.failed // 0)",
-        "- **Skipped:** \(.summary.stages.skipped // 0)",
-        "",
-        render_active_policy,
-        render_failing,
-        render_ignored,
-        render_expiring,
-        "## Business",
-        "",
-        (
-          .stages[]
-          | select(.business != null and (.business | length) > 0)
-          | ("### \(.stage)",
-             "",
-             (.business | to_entries[] | "- **\(.key):** \(.value)"),
-             "")
-        )
+        # ----- Phase 2: Top findings (most severe) ------------------------
+        # Aggregates business.findings.items[] across all stages, sorts by
+        # severity desc + score desc, caps at 20 rows. Auto-skips when no
+        # stage carries items (back-compat for builds before Phase 1).
+        def render_top_findings:
+          [.stages[]? | (.business.findings.items // [])[]] as $all
+          | if ($all | length) == 0 then empty
+            else
+              "## Top findings (most severe)",
+              "",
+              "| Severity | ID | Package | Fix | Tool |",
+              "|---|---|---|---|---|",
+              ($all
+               | sort_by([- severity_rank(.severity), - ((.score // 0))])
+               | .[0:20]
+               | .[]
+               | (
+                   "| " + (.severity // "info")
+                   + " | " + (if (.help_uri // "") != "" then "[\(.id)](\(.help_uri))" else (.id // "-") end)
+                   + " | " + (if .package != null then "\(.package.name) \(.package.version)" else "-" end)
+                   + " | " + (if (.fix.available // false) then "-> " + (.fix.versions | join(", ")) else "-" end)
+                   + " | " + (.tool.name // "-")
+                   + " |"
+                 )),
+              ""
+            end;
+
+        # ----- Phase 2: stages table (ordered, glyphed, human, linked) ----
+        def render_stages_table:
+          "## Stages",
+          "",
+          "| Stage | Status | Duration | Job |",
+          "|---|---|---|---|",
+          (.stages // []
+           | sort_by([stage_rank(.stage), .stage])
+           | .[]
+           | (
+               "| " + (.stage // "-")
+               + " | " + status_glyph(.status // "?") + " " + (.status // "-")
+               + " | " + human_duration_ms(.duration_ms)
+               + " | " + (if (.runner.job_url // "") != "" then "[job](\(.runner.job_url))" else "-" end)
+               + " |"
+             )),
+          "";
+
+        # ----- Phase 2: business as flat dotted scalars -------------------
+        # Per stage: walk paths to scalars, skip array-index paths, skip the
+        # findings sub-tree (covered by Failing/Ignored/Top sections above),
+        # render "- **dotted.key:** value". Skips stages with empty business.
+        def render_business_block($b):
+          ($b // {}) as $bb
+          | [
+              $bb | paths(scalars) as $p
+              | select(($p[0] // "") != "findings")
+              | select(all($p[]; type == "string"))
+              | { key: ($p | join(".")), value: ($bb | getpath($p)) }
+            ]
+          | map(select(.value != null and (.value | tostring) != ""))
+          | sort_by(.key);
+
+        def render_business_section:
+          (
+            .stages // []
+            | sort_by([stage_rank(.stage), .stage])
+            | map(select(.business != null))
+            | map(. + { _lines: render_business_block(.business) })
+            | map(select((._lines | length) > 0))
+          ) as $stages_with_business
+          | if ($stages_with_business | length) == 0 then empty
+            else
+              ("## Business", "",
+               ($stages_with_business[]
+                | ("### \(.stage)",
+                   "",
+                   (._lines[] | "- **\(.key):** \(.value)"),
+                   "")))
+            end;
+
+        # ----- Top-level render -------------------------------------------
+        (total_duration_ms) as $totms
+        | "# Pipeline Report",
+          "",
+          (if (.pipeline.url // "") != ""
+           then "- **Pipeline ID:** [\(.pipeline.id // "-")](\(.pipeline.url))"
+           else "- **Pipeline ID:** \(.pipeline.id // "-")"
+           end),
+          "- **Project:** \(.pipeline.project // "-")",
+          "- **Platform:** \(.pipeline.platform // "-")",
+          "- **Status:** \(status_glyph(.pipeline.status // "?")) \(.pipeline.status // "-")",
+          "- **Started:** \(.pipeline.started_at // "-")",
+          "- **Finished:** \(.pipeline.finished_at // "-")",
+          "- **Total duration:** \(human_duration_ms($totms))",
+          "",
+          render_stages_table,
+          "## Summary",
+          "",
+          "- **Total stages:** \(.summary.stages.total // 0)",
+          "- **Passed:** \(.summary.stages.passed // 0)",
+          "- **Failed:** \(.summary.stages.failed // 0)",
+          "- **Skipped:** \(.summary.stages.skipped // 0)",
+          "",
+          render_active_policy,
+          render_failing,
+          render_ignored,
+          render_expiring,
+          render_top_findings,
+          render_business_section
     ' "$backend"
     # KCOV_EXCL_STOP
 }
@@ -791,10 +1016,10 @@ report.render() {
         case "$1" in
             --format)
                 case "${2:-}" in
-                    md|json|both) format="$2" ;;
+                    md|json|html|both) format="$2" ;;
                     *)
                         error.raise "$BRIK_EXIT_INVALID_INPUT" \
-                            "report.render: unknown --format '${2:-}' (expected md|json|both)"
+                            "report.render: unknown --format '${2:-}' (expected md|json|html|both)"
                         return "$?"
                         ;;
                 esac
@@ -858,11 +1083,20 @@ report.render() {
                 }
             fi
             ;;
+        html)
+            local html_out="${output:-${log_dir}/aggregate-report.html}"
+            _report._render_html "$backend" > "$html_out" || {
+                log.error "cannot write html report: $html_out"
+                return "$BRIK_EXIT_IO_FAILURE"
+            }
+            ;;
         both)
             _report._render_md "$backend" > "${log_dir}/aggregate-report.md" || {
                 log.error "cannot write md report"
                 return "$BRIK_EXIT_IO_FAILURE"
             }
+            _report._render_html "$backend" > "${log_dir}/aggregate-report.html" || \
+                log.warn "could not render aggregate-report.html (non-fatal)"
             # JSON backend already lives at ${log_dir}/aggregate-report.json.
             ;;
     esac

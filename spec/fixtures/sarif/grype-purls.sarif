@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "grype",
+          "version": "0.111.1",
+          "rules": [
+            {
+              "id": "CVE-2026-42010-gnutls",
+              "name": "ApkMatcherExactDirectMatch",
+              "shortDescription": { "text": "CVE-2026-42010 high vulnerability for gnutls package" },
+              "fullDescription": { "text": "Version 3.8.12-r0 is affected with an available fix in versions 3.8.13-r0" },
+              "helpUri": "https://security.alpinelinux.org/vuln/CVE-2026-42010",
+              "help": {
+                "text": "Vulnerability CVE-2026-42010\nSeverity: high\nPackage: gnutls\nVersion: 3.8.12-r0\nFix Version: 3.8.13-r0\nType: apk\nLocation: /lib/apk/db/installed\nData Namespace: alpine:distro:alpine:3.23\nLink: [CVE-2026-42010](https://security.alpinelinux.org/vuln/CVE-2026-42010)"
+              },
+              "properties": {
+                "purls": ["pkg:apk/alpine/gnutls@3.8.12-r0?arch=aarch64&distro=alpine-3.23.4"],
+                "security-severity": "7.1"
+              }
+            },
+            {
+              "id": "CVE-2026-99999-libfoo",
+              "name": "ApkMatcherExactDirectMatch",
+              "shortDescription": { "text": "CVE-2026-99999 medium vulnerability for libfoo package (no fix yet)" },
+              "helpUri": "https://security.alpinelinux.org/vuln/CVE-2026-99999",
+              "help": {
+                "text": "Vulnerability CVE-2026-99999\nSeverity: medium\nPackage: libfoo\nVersion: 1.2.3\nFix Version: \nType: apk\nLocation: /lib/apk/db/installed"
+              },
+              "properties": {
+                "purls": ["pkg:apk/alpine/libfoo@1.2.3?arch=aarch64&distro=alpine-3.23.4"],
+                "security-severity": "5.5"
+              }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "CVE-2026-42010-gnutls",
+          "level": "error",
+          "message": { "text": "A high vulnerability in apk package: gnutls, version 3.8.12-r0 was found in image example:0.1.0 at: /lib/apk/db/installed" },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": { "uri": "example//lib/apk/db/installed" },
+                "region": { "startLine": 1, "startColumn": 1, "endLine": 1, "endColumn": 1 }
+              },
+              "logicalLocations": [
+                { "name": "/lib/apk/db/installed", "fullyQualifiedName": "example:0.1.0@sha256:abc:/lib/apk/db/installed" }
+              ]
+            }
+          ],
+          "partialFingerprints": { "primaryLocationLineHash": "deadbeef:1" }
+        },
+        {
+          "ruleId": "CVE-2026-99999-libfoo",
+          "level": "warning",
+          "message": { "text": "A medium vulnerability in apk package: libfoo, version 1.2.3 was found in image example:0.1.0 at: /lib/apk/db/installed" },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": { "uri": "example//lib/apk/db/installed" }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

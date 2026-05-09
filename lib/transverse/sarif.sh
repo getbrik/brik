@@ -166,6 +166,129 @@ sarif.extract_cwe() {
     # KCOV_EXCL_STOP
 }
 
+# sarif.extract_items <file>
+# Print a JSON array of canonical Brik finding items extracted from a SARIF
+# 2.1.0 document. Each item carries the operator-actionable subset that
+# aggregate-report.{json,md,html} surfaces:
+#   { id, severity, score, level, message, tool: {name, version},
+#     location: {uri, start_line, end_line, snippet, logical},
+#     package: {name, version, ecosystem} | null,
+#     fix:     {versions: [...], available: bool} | null,
+#     help_uri: string | null,
+#     cwe:      [string, ...] }
+# Severity bucket follows the same precedence as _SARIF_SEVERITY_PIPE but is
+# computed per item so the array stays one-to-one with results.
+sarif.extract_items() {
+    if [[ $# -lt 1 ]]; then
+        printf 'sarif.extract_items: missing file argument\n' >&2
+        return 2
+    fi
+    local _file="$1"
+    if [[ ! -f "$_file" ]]; then
+        printf 'sarif.extract_items: file does not exist: %s\n' "$_file" >&2
+        return 1
+    fi
+    # KCOV_EXCL_START -- inline jq script body, not bash code
+    jq -c '
+        def cvss_bucket(s):
+          (s | tonumber) as $v
+          | if   $v >= 9.0 then "critical"
+            elif $v >= 7.0 then "high"
+            elif $v >= 4.0 then "medium"
+            elif $v >  0   then "low"
+            else "info"
+            end;
+        def level_bucket(lvl):
+          if   lvl == "error"   then "high"
+          elif lvl == "warning" then "medium"
+          elif lvl == "note"    then "low"
+          else "info"
+          end;
+        def parse_purl(p):
+          if (p // "") == "" or ((p // "") | test("^pkg:") | not) then null
+          else
+            (p | capture("^pkg:(?<eco>[^/]+)/(?:(?<ns>[^/@]+)/)?(?<name>[^@/?]+)@(?<ver>[^?]+)")) as $m
+            | { name: $m.name, version: $m.ver, ecosystem: $m.eco }
+          end;
+        def parse_fix(help_text):
+          if (help_text // "") == "" or ((help_text // "") | test("Fix Version:") | not) then null
+          else
+            (help_text | capture("Fix Version:[ \\t]*(?<v>[^\\n]*)").v) as $line
+            | ($line | split(",") | map(gsub("^[ \\t]+|[ \\t]+$"; "")) | map(select(length > 0))) as $vs
+            | { versions: $vs, available: ($vs | length > 0) }
+          end;
+        def parse_cwe(tags):
+          ((tags // [])
+            | map(select(type == "string" and test("^CWE-[0-9]+")))
+            | map(capture("^(?<c>CWE-[0-9]+)").c)
+            | unique);
+        def first_present(xs):
+          (xs | map(select(. != null)) | first) // null;
+        def to_number(s):
+          if s == null then null
+          else (s | tostring | tonumber? // null)
+          end;
+
+        . as $sarif
+        | ($sarif.runs[0] // {}) as $run
+        | ($run.tool.driver // {}) as $drv
+        | ($drv.rules // []) as $rules
+        | { name: ($drv.name // ""), version: ($drv.version // null) } as $tool
+        | (
+            $run.results // []
+            | map(
+                . as $r
+                | ($r.ruleIndex // -1) as $idx
+                | (
+                    if $idx >= 0 and $idx < ($rules | length) then $rules[$idx]
+                    else (first($rules[]? | select(.id == $r.ruleId)) // null)
+                    end
+                  ) as $rule
+                | first_present([
+                    $r.properties["security-severity"]    // null,
+                    $rule.properties["security-severity"] // null
+                  ]) as $cvss_raw
+                | (to_number($cvss_raw)) as $score
+                | (
+                    if $score != null then cvss_bucket($score)
+                    elif ($r.level // null) != null then level_bucket($r.level)
+                    else
+                      first_present([
+                        $rule.defaultConfiguration.level // null
+                      ]) as $rl
+                      | if $rl != null then level_bucket($rl) else "info" end
+                    end
+                  ) as $sev
+                | (parse_purl($rule.properties.purls[0]? // "")) as $pkg
+                | (parse_fix($rule.help.text? // "")) as $fix
+                | (parse_cwe($rule.properties.tags? // [])) as $cwe
+                | ($r.locations[0].physicalLocation? // {}) as $phy
+                | ($r.locations[0].logicalLocations[0]? // {}) as $log
+                | {
+                    id:       ($r.ruleId // ""),
+                    severity: $sev,
+                    score:    $score,
+                    level:    ($r.level // null),
+                    message:  ($r.message.text // ""),
+                    tool:     $tool,
+                    location: {
+                      uri:        ($phy.artifactLocation.uri // null),
+                      start_line: ($phy.region.startLine // null),
+                      end_line:   ($phy.region.endLine // null),
+                      snippet:    ($phy.region.snippet.text // null),
+                      logical:    ($log.fullyQualifiedName // null)
+                    },
+                    package:  $pkg,
+                    fix:      $fix,
+                    help_uri: ($rule.helpUri // null),
+                    cwe:      $cwe
+                  }
+              )
+          )
+    ' "$_file"
+    # KCOV_EXCL_STOP
+}
+
 # sarif.is_valid <file>
 # Return rc=0 when the file is a valid SARIF 2.1.0 document, rc=1 otherwise.
 # Uses jv against the bundled OASIS schema when available; falls back to a

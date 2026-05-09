@@ -462,4 +462,134 @@ TXT
       The stderr should include "does not exist"
     End
   End
+
+  Describe "sarif.extract_items"
+    It "fails with rc=2 when no argument is given"
+      When call sarif.extract_items
+      The status should equal 2
+      The stderr should include "missing"
+    End
+
+    It "fails with rc=1 when file does not exist"
+      When call sarif.extract_items "${FIX}/does-not-exist.sarif"
+      The status should be failure
+      The stderr should include "does not exist"
+    End
+
+    It "returns [] for an empty SARIF (no results)"
+      When call sarif.extract_items "${FIX}/eslint-empty.sarif"
+      The output should equal "[]"
+      The status should be success
+    End
+
+    It "returns one item per result on grype fixture with 4 results"
+      result_count() { sarif.extract_items "${FIX}/grype-rule-help.sarif" | jq 'length'; }
+      When call result_count
+      The output should equal "4"
+      The status should be success
+    End
+
+    It "extracts canonical CVE id, severity, score, level, tool from grype-purls"
+      run_extract() {
+        sarif.extract_items "${FIX}/grype-purls.sarif" \
+          | jq -c '.[] | select(.id == "CVE-2026-42010-gnutls")
+                   | { id, severity, score, level, tool, help_uri }'
+      }
+      When call run_extract
+      The output should equal '{"id":"CVE-2026-42010-gnutls","severity":"high","score":7.1,"level":"error","tool":{"name":"grype","version":"0.111.1"},"help_uri":"https://security.alpinelinux.org/vuln/CVE-2026-42010"}'
+      The status should be success
+    End
+
+    It "extracts package name+version+ecosystem from grype PURL"
+      run_pkg() {
+        sarif.extract_items "${FIX}/grype-purls.sarif" \
+          | jq -c '.[] | select(.id == "CVE-2026-42010-gnutls").package'
+      }
+      When call run_pkg
+      The output should equal '{"name":"gnutls","version":"3.8.12-r0","ecosystem":"apk"}'
+      The status should be success
+    End
+
+    It "extracts fix info from grype help.text when present"
+      run_fix() {
+        sarif.extract_items "${FIX}/grype-purls.sarif" \
+          | jq -c '.[] | select(.id == "CVE-2026-42010-gnutls").fix'
+      }
+      When call run_fix
+      The output should equal '{"versions":["3.8.13-r0"],"available":true}'
+      The status should be success
+    End
+
+    It "marks fix unavailable when help.text Fix Version is empty"
+      run_fix() {
+        sarif.extract_items "${FIX}/grype-purls.sarif" \
+          | jq -c '.[] | select(.id == "CVE-2026-99999-libfoo").fix'
+      }
+      When call run_fix
+      The output should equal '{"versions":[],"available":false}'
+      The status should be success
+    End
+
+    It "extracts location uri and logical fully qualified name when present"
+      run_loc() {
+        sarif.extract_items "${FIX}/grype-purls.sarif" \
+          | jq -c '.[] | select(.id == "CVE-2026-42010-gnutls").location | {uri, logical}'
+      }
+      When call run_loc
+      The output should equal '{"uri":"example//lib/apk/db/installed","logical":"example:0.1.0@sha256:abc:/lib/apk/db/installed"}'
+      The status should be success
+    End
+
+    It "carries the result message text"
+      run_msg() {
+        sarif.extract_items "${FIX}/grype-purls.sarif" \
+          | jq -r '.[] | select(.id == "CVE-2026-42010-gnutls").message'
+      }
+      When call run_msg
+      The output should include "high vulnerability in apk package: gnutls"
+      The status should be success
+    End
+
+    It "extracts CWE tags from semgrep rule properties.tags"
+      run_cwe() {
+        sarif.extract_items "${FIX}/semgrep.sarif" \
+          | jq -c '[.[].cwe // [] | .[]] | unique | sort'
+      }
+      When call run_cwe
+      The output should include "CWE-"
+      The status should be success
+    End
+
+    It "preserves rule helpUri from semgrep"
+      run_uri() {
+        sarif.extract_items "${FIX}/semgrep.sarif" \
+          | jq -r 'first(.[] | select(.help_uri != null and .help_uri != "")).help_uri'
+      }
+      When call run_uri
+      The output should include "semgrep.dev"
+      The status should be success
+    End
+
+    It "extracts location with start_line/end_line/snippet from gitleaks"
+      run_loc() {
+        sarif.extract_items "${FIX}/gitleaks.sarif" \
+          | jq -c 'first(.[]).location | {uri, start_line, end_line, snippet_present: (.snippet != null and .snippet != "")}'
+      }
+      When call run_loc
+      The output should include '"start_line":44'
+      The output should include '"end_line":77'
+      The output should include '"snippet_present":true'
+      The status should be success
+    End
+
+    It "buckets gitleaks finding without level as info"
+      run_sev() {
+        sarif.extract_items "${FIX}/gitleaks.sarif" \
+          | jq -c 'first(.[]) | {severity, level}'
+      }
+      When call run_sev
+      The output should equal '{"severity":"info","level":null}'
+      The status should be success
+    End
+  End
 End

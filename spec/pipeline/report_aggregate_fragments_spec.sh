@@ -874,4 +874,135 @@ JSON
       The output should equal "false"
     End
   End
+
+  # ---------------------------------------------------------------------------
+  # SARIF findings.items enrichment: per-stage SARIF files referenced via
+  # business.{*.}report.path are loaded and inlined into business.findings.items
+  # so aggregate-report.json carries the exhaustive operator-actionable view
+  # without requiring readers to fetch the SARIF separately.
+  # ---------------------------------------------------------------------------
+  Describe "SARIF findings.items enrichment"
+    Before 'setup_dirs'
+    After  'cleanup_dirs'
+
+    # Helper: drop a small valid SARIF file at <fragment_dir>/<stage>/<basename>.
+    write_sarif_file() {
+      local _stage="$1" _name="$2" _tool="$3" _id="$4" _sev="$5"
+      mkdir -p "${FRAG_DIR}/${_stage}"
+      jq -n \
+        --arg tool "$_tool" --arg id "$_id" --arg sev "$_sev" \
+        '{
+          "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+          version: "2.1.0",
+          runs: [{
+            tool: { driver: { name: $tool, version: "1.0.0",
+              rules: [{
+                id: $id,
+                helpUri: "https://example.test/\($id)",
+                properties: { "security-severity": $sev }
+              }]
+            }},
+            results: [{
+              ruleId: $id,
+              level: "error",
+              message: { text: "synthetic finding for \($id)" },
+              locations: [{ physicalLocation: { artifactLocation: { uri: "/file" } } }]
+            }]
+          }]
+        }' > "${FRAG_DIR}/${_stage}/${_name}"
+    }
+
+    It "inlines findings.items from a stage's business.report.path SARIF"
+      run_check() {
+        write_sarif_file "container-scan" "findings.sarif" "grype" "CVE-2026-7777" "8.1"
+        write_fragment_file "container-scan" "failed" 10 \
+          '{"business":{"report":{"format":"sarif","path":"brik-artifacts/container-scan/findings.sarif"},"findings":{"total":1}}}'
+        export BRIK_WORKSPACE="$(dirname "$FRAG_DIR")"
+        ln -sfn "$FRAG_DIR" "${BRIK_WORKSPACE}/brik-artifacts"
+        report.aggregate_fragments "$FRAG_DIR" >/dev/null 2>&1 || return 1
+        jq -c '.stages[0].business.findings.items[0]
+               | { id, severity, score, level, tool: .tool.name, help_uri }' \
+          "$AGG_LOG_DIR/aggregate-report.json"
+      }
+      When call run_check
+      The output should equal '{"id":"CVE-2026-7777","severity":"high","score":8.1,"level":"error","tool":"grype","help_uri":"https://example.test/CVE-2026-7777"}'
+    End
+
+    It "concatenates items from multiple SARIFs referenced in one stage's business"
+      run_check() {
+        write_sarif_file "scan" "deps.sarif"   "osv-scanner" "CVE-2026-AAA" "9.1"
+        write_sarif_file "scan" "secret.sarif" "gitleaks"    "SECRET-001"   "0"
+        write_fragment_file "scan" "success" 0 \
+          '{"business":{"deps":{"vulnerabilities":{"total":1}},"report":{"format":"sarif","path":"brik-artifacts/scan/deps.sarif"},"secret":{"findings_count":1,"report":{"format":"sarif","path":"brik-artifacts/scan/secret.sarif"}}}}'
+        export BRIK_WORKSPACE="$(dirname "$FRAG_DIR")"
+        ln -sfn "$FRAG_DIR" "${BRIK_WORKSPACE}/brik-artifacts"
+        report.aggregate_fragments "$FRAG_DIR" >/dev/null 2>&1 || return 1
+        jq -c '[.stages[0].business.findings.items[] | .tool.name] | sort' \
+          "$AGG_LOG_DIR/aggregate-report.json"
+      }
+      When call run_check
+      The output should equal '["gitleaks","osv-scanner"]'
+    End
+
+    It "leaves business untouched when no SARIF report path is referenced"
+      run_check() {
+        write_fragment_file "build" "success" 0 \
+          '{"business":{"artifact":{"name":"dist","sha256":"abc"}}}'
+        export BRIK_WORKSPACE="$(dirname "$FRAG_DIR")"
+        ln -sfn "$FRAG_DIR" "${BRIK_WORKSPACE}/brik-artifacts"
+        report.aggregate_fragments "$FRAG_DIR" >/dev/null 2>&1 || return 1
+        jq -r '.stages[0].business | has("findings")' \
+          "$AGG_LOG_DIR/aggregate-report.json"
+      }
+      When call run_check
+      The output should equal "false"
+    End
+
+    It "ignores referenced SARIF paths whose file does not exist (no error, no items)"
+      run_check() {
+        write_fragment_file "sast" "success" 0 \
+          '{"business":{"report":{"format":"sarif","path":"brik-artifacts/sast/missing.sarif"},"findings":{"total":0}}}'
+        export BRIK_WORKSPACE="$(dirname "$FRAG_DIR")"
+        ln -sfn "$FRAG_DIR" "${BRIK_WORKSPACE}/brik-artifacts"
+        report.aggregate_fragments "$FRAG_DIR" >/dev/null 2>&1 || return 1
+        jq -r '.stages[0].business.findings | has("items")' \
+          "$AGG_LOG_DIR/aggregate-report.json"
+      }
+      When call run_check
+      The output should equal "false"
+    End
+  End
+
+  # ---------------------------------------------------------------------------
+  # HTML output: report.aggregate_fragments writes aggregate-report.html
+  # alongside the json + md for self-contained browser viewing of the report.
+  # ---------------------------------------------------------------------------
+  Describe "HTML output"
+    Before 'setup_dirs'
+    After  'cleanup_dirs'
+
+    It "writes aggregate-report.html alongside the json and md outputs"
+      run_check() {
+        write_fragment_file "init" "success" 0
+        report.aggregate_fragments "$FRAG_DIR" >/dev/null 2>&1 || return 1
+        [[ -f "$AGG_LOG_DIR/aggregate-report.html" ]] || return 1
+        head -1 "$AGG_LOG_DIR/aggregate-report.html"
+      }
+      When call run_check
+      The output should equal "<!DOCTYPE html>"
+    End
+
+    It "embeds the same pipeline id in the html data island as in the json"
+      run_check() {
+        write_fragment_file "init" "success" 0
+        export BRIK_RUN_ID="run-html-1"
+        report.aggregate_fragments "$FRAG_DIR" >/dev/null 2>&1 || return 1
+        awk '/<script type="application\/json" id="brik-report">/{p=1; next} /<\/script>/{p=0} p' \
+          "$AGG_LOG_DIR/aggregate-report.html" \
+          | jq -r '.pipeline.id'
+      }
+      When call run_check
+      The output should equal "run-html-1"
+    End
+  End
 End
