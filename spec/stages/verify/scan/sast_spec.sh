@@ -132,6 +132,25 @@ Describe "security/sast.sh"
         When call invoke_all_severity
         The status should be success
       End
+
+      It "excludes .brik-stage to avoid sibling-branch venv pollution"
+        invoke_exclude_brik_stage() {
+          verify.scan.sast.run "$TEST_WS" 2>/dev/null || return 1
+          grep -q -- "--exclude=.brik-stage" "$MOCK_LOG"
+        }
+        When call invoke_exclude_brik_stage
+        The status should be success
+      End
+
+      It "excludes .brik-stage even when severity=ALL"
+        invoke_exclude_brik_stage_all() {
+          export BRIK_SECURITY_SAST_SEVERITY="ALL"
+          verify.scan.sast.run "$TEST_WS" 2>/dev/null || return 1
+          grep -q -- "--exclude=.brik-stage" "$MOCK_LOG"
+        }
+        When call invoke_exclude_brik_stage_all
+        The status should be success
+      End
     End
 
     Describe "Tier 2: tool not found"

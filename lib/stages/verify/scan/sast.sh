@@ -28,11 +28,16 @@ _verify.scan.sast._build_command() {
     local severity="${BRIK_SECURITY_SAST_SEVERITY:-ERROR}"
     local out="${BRIK_SECURITY_SAST_OUTPUT_PATH:-brik-artifacts/sast/sast.sarif}"
     local out_dir; out_dir="$(dirname "$out")"
+    # Exclude Brik's per-stage scratch dir. Parallel verify branches
+    # materialize venvs under `.brik-stage/<stage>/...` in shared
+    # workspaces (e.g. Jenkins, local runs). Without this exclude,
+    # semgrep walks sibling branches' freshly-installed deps and reports
+    # findings on third-party code instead of project source.
     if [[ "$severity" == "ALL" ]]; then
-        printf 'mkdir -p %s && semgrep scan --error --config %s --sarif --output %s .' \
+        printf 'mkdir -p %s && semgrep scan --error --exclude=.brik-stage --config %s --sarif --output %s .' \
             "$out_dir" "$ruleset" "$out"
     else
-        printf 'mkdir -p %s && semgrep scan --error --severity %s --config %s --sarif --output %s .' \
+        printf 'mkdir -p %s && semgrep scan --error --severity %s --exclude=.brik-stage --config %s --sarif --output %s .' \
             "$out_dir" "$severity" "$ruleset" "$out"
     fi
 }
