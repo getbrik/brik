@@ -33,7 +33,7 @@ Describe "_report._render_aggregate_md - findings sections (P6.B)"
           "by_severity": {"critical":0,"high":0,"medium":3,"low":0,"info":0}
         }
       } } },
-    { "stage": "container_scan", "status": "success", "rc": 0,
+    { "stage": "container-scan", "status": "success", "rc": 0,
       "business": { "findings": {
         "total": 14, "failing": 0,
         "by_severity": {"critical":1,"high":2,"medium":10,"low":1,"info":0},
@@ -89,7 +89,7 @@ JSON
       When call run
       The output should include "## Failing findings"
       The output should include "| sast | 1 | 4 | H:1 M:3 |"
-      The output should not include "| container_scan | 0 | 14 |"
+      The output should not include "| container-scan | 0 | 14 |"
     End
 
     It "renders the Ignored findings table with by_source + by_severity"

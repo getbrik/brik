@@ -245,7 +245,7 @@ Describe "transverse/findings.sh"
       MERGE_WS="$(mktemp -d)"
       mkdir -p "$MERGE_WS/brik-artifacts/sast" \
                "$MERGE_WS/brik-artifacts/scan" \
-               "$MERGE_WS/brik-artifacts/container_scan" \
+               "$MERGE_WS/brik-artifacts/container-scan" \
                "$MERGE_WS/brik-artifacts/test"
 
       # sast: post-policy findings.sarif preferred over raw sast.sarif.
@@ -261,11 +261,11 @@ Describe "transverse/findings.sh"
       printf '%s\n' '{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"osv-scanner"}},"results":[{"ruleId":"GHSA-1","message":{"text":"dep finding"}}]}]}' \
         > "$MERGE_WS/brik-artifacts/scan/deps.sarif"
 
-      # container_scan: both raw and policy SARIF, only findings.sarif used
+      # container-scan: both raw and policy SARIF, only findings.sarif used
       printf '%s\n' '{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"grype-raw"}},"results":[]}]}' \
-        > "$MERGE_WS/brik-artifacts/container_scan/container_scan.sarif"
+        > "$MERGE_WS/brik-artifacts/container-scan/container-scan.sarif"
       printf '%s\n' '{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"grype"}},"results":[{"ruleId":"CVE-1","message":{"text":"cve"}}]}]}' \
-        > "$MERGE_WS/brik-artifacts/container_scan/findings.sarif"
+        > "$MERGE_WS/brik-artifacts/container-scan/findings.sarif"
 
       # test: P5 junit converter output (empty results -> green suite)
       printf '%s\n' '{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"junit"}},"results":[]}]}' \
@@ -780,7 +780,7 @@ Describe "transverse/findings.sh"
       export BRIK_QUALITY_FINDINGS_POLICY="pragmatic"
       unset BRIK_SECURITY_SEVERITY_THRESHOLD
       findings.apply_policy "$GRYPE" "$ANNOTATED" >/dev/null 2>&1
-      findings.aggregate "container_scan" "$ANNOTATED" >/dev/null 2>&1
+      findings.aggregate "container-scan" "$ANNOTATED" >/dev/null 2>&1
     }
     cleanup_l4v2() {
       rm -f "$ANNOTATED"
@@ -790,7 +790,7 @@ Describe "transverse/findings.sh"
     After 'cleanup_l4v2'
 
     read_findings() {
-      jq -c '.stages[] | select(.name == "container_scan") | .business.findings' \
+      jq -c '.stages[] | select(.name == "container-scan") | .business.findings' \
         "$BRIK_LOG_DIR/aggregate-report.json"
     }
 
@@ -1073,8 +1073,8 @@ Describe "transverse/findings.sh"
       export BRIK_WORKSPACE
       BRIK_WORKSPACE="$(mktemp -d)"
       export BRIK_RUN_ID="findings-process-spec"
-      mkdir -p "$BRIK_WORKSPACE/brik-artifacts/container_scan"
-      cp "$GRYPE" "$BRIK_WORKSPACE/brik-artifacts/container_scan/container_scan.sarif"
+      mkdir -p "$BRIK_WORKSPACE/brik-artifacts/container-scan"
+      cp "$GRYPE" "$BRIK_WORKSPACE/brik-artifacts/container-scan/container-scan.sarif"
       export BRIK_QUALITY_FINDINGS_POLICY="pragmatic"
       unset BRIK_SECURITY_SEVERITY_THRESHOLD BRIK_POLICY_CACHE_PATH
       report.init >/dev/null 2>&1 || true
@@ -1112,15 +1112,15 @@ Describe "transverse/findings.sh"
     End
 
     It "is a silent no-op when the tool SARIF is missing"
-      When call findings.process "container_scan" "/nonexistent.sarif"
+      When call findings.process "container-scan" "/nonexistent.sarif"
       The status should be success
     End
 
     It "writes brik-artifacts/<stage>/findings.sarif alongside the tool SARIF"
       run_proc() {
-        findings.process "container_scan" \
-          "$BRIK_WORKSPACE/brik-artifacts/container_scan/container_scan.sarif" >/dev/null 2>&1
-        test -f "$BRIK_WORKSPACE/brik-artifacts/container_scan/findings.sarif"
+        findings.process "container-scan" \
+          "$BRIK_WORKSPACE/brik-artifacts/container-scan/container-scan.sarif" >/dev/null 2>&1
+        test -f "$BRIK_WORKSPACE/brik-artifacts/container-scan/findings.sarif"
       }
       When call run_proc
       The status should be success
@@ -1128,9 +1128,9 @@ Describe "transverse/findings.sh"
 
     It "preserves the tool SARIF unchanged"
       run_proc() {
-        local in="$BRIK_WORKSPACE/brik-artifacts/container_scan/container_scan.sarif"
+        local in="$BRIK_WORKSPACE/brik-artifacts/container-scan/container-scan.sarif"
         local before; before="$(jq -S . "$in")"
-        findings.process "container_scan" "$in" >/dev/null 2>&1
+        findings.process "container-scan" "$in" >/dev/null 2>&1
         local after; after="$(jq -S . "$in")"
         [[ "$before" == "$after" ]]
       }
@@ -1140,14 +1140,14 @@ Describe "transverse/findings.sh"
 
     It "produces a findings.sarif annotated with policy.built-in.* suppressions"
       run_proc() {
-        findings.process "container_scan" \
-          "$BRIK_WORKSPACE/brik-artifacts/container_scan/container_scan.sarif" >/dev/null 2>&1
+        findings.process "container-scan" \
+          "$BRIK_WORKSPACE/brik-artifacts/container-scan/container-scan.sarif" >/dev/null 2>&1
         jq -r '
           [.runs[0].results[]
             | (.suppressions // [])[]
             | select((.properties.brikSource // "") | startswith("policy.built-in."))]
           | length
-        ' "$BRIK_WORKSPACE/brik-artifacts/container_scan/findings.sarif"
+        ' "$BRIK_WORKSPACE/brik-artifacts/container-scan/findings.sarif"
       }
       When call run_proc
       # Pragmatic on grype-fixstate: 2 no-upstream-fix + 1 vendor-wont-fix + 2 below-severity = 5 brik-tagged entries.
@@ -1156,9 +1156,9 @@ Describe "transverse/findings.sh"
 
     It "records L4 v2 business.findings.failing from the annotated SARIF"
       run_proc() {
-        findings.process "container_scan" \
-          "$BRIK_WORKSPACE/brik-artifacts/container_scan/container_scan.sarif" >/dev/null 2>&1
-        read_business "container_scan" "findings" | jq -r '.failing'
+        findings.process "container-scan" \
+          "$BRIK_WORKSPACE/brik-artifacts/container-scan/container-scan.sarif" >/dev/null 2>&1
+        read_business "container-scan" "findings" | jq -r '.failing'
       }
       When call run_proc
       # Pragmatic baseline on the fixture: 2 failing.
@@ -1167,9 +1167,9 @@ Describe "transverse/findings.sh"
 
     It "records L4 v2 business.findings.ignored.by_source from the annotated SARIF"
       run_proc() {
-        findings.process "container_scan" \
-          "$BRIK_WORKSPACE/brik-artifacts/container_scan/container_scan.sarif" >/dev/null 2>&1
-        read_business "container_scan" "findings" \
+        findings.process "container-scan" \
+          "$BRIK_WORKSPACE/brik-artifacts/container-scan/container-scan.sarif" >/dev/null 2>&1
+        read_business "container-scan" "findings" \
           | jq -r '.ignored.by_source["policy.built-in.no-upstream-fix"]'
       }
       When call run_proc
@@ -1179,12 +1179,12 @@ Describe "transverse/findings.sh"
     It "falls back to aggregate-only when the tool SARIF is structurally invalid"
       run_proc_bad_sarif() {
         local in
-        in="$BRIK_WORKSPACE/brik-artifacts/container_scan/container_scan.sarif"
+        in="$BRIK_WORKSPACE/brik-artifacts/container-scan/container-scan.sarif"
         printf '{"not":"sarif"}' > "$in"
-        findings.process "container_scan" "$in"
+        findings.process "container-scan" "$in"
         local rc=$?
         # No findings.sarif should be created on the policy-skipped path.
-        local out_sarif="$BRIK_WORKSPACE/brik-artifacts/container_scan/findings.sarif"
+        local out_sarif="$BRIK_WORKSPACE/brik-artifacts/container-scan/findings.sarif"
         if [[ -f "$out_sarif" ]]; then
           rc=99
         fi
@@ -1233,7 +1233,7 @@ Describe "transverse/findings.sh"
     It "returns 0 when no backend report exists yet (early pipeline)"
       no_backend() {
         rm -f "$BRIK_LOG_DIR/aggregate-report.json"
-        findings.gate "container_scan"
+        findings.gate "container-scan"
       }
       When call no_backend
       The status should be success
@@ -1242,7 +1242,7 @@ Describe "transverse/findings.sh"
     It "returns 0 when the stage has no business.findings recorded"
       empty_stage() {
         # Backend exists but stage entry is absent.
-        findings.gate "container_scan"
+        findings.gate "container-scan"
       }
       When call empty_stage
       The status should be success
@@ -1257,18 +1257,18 @@ Describe "transverse/findings.sh"
         local sarif
         sarif="$BRIK_WORKSPACE/x.sarif"
         cp "$GRYPE" "$sarif"
-        findings.process "container_scan" "$sarif" >/dev/null 2>&1
+        findings.process "container-scan" "$sarif" >/dev/null 2>&1
         # Override failing to 0 to simulate a fully-policy-ignored run.
         local backend="$BRIK_LOG_DIR/aggregate-report.json"
         local tmp; tmp="$(mktemp)"
         jq '
           .stages |= map(
-            if .name == "container_scan" then
+            if .name == "container-scan" then
               .business.findings.failing = 0
             else . end
           )
         ' "$backend" > "$tmp" && mv "$tmp" "$backend"
-        findings.gate "container_scan"
+        findings.gate "container-scan"
       }
       When call gate_pass
       The status should be success
@@ -1279,9 +1279,9 @@ Describe "transverse/findings.sh"
         local sarif
         sarif="$BRIK_WORKSPACE/x.sarif"
         cp "$GRYPE" "$sarif"
-        findings.process "container_scan" "$sarif" >/dev/null 2>&1
+        findings.process "container-scan" "$sarif" >/dev/null 2>&1
         # Pragmatic on the fixture leaves 2 results failing.
-        findings.gate "container_scan"
+        findings.gate "container-scan"
       }
       When call gate_fail
       The status should equal 10

@@ -12,10 +12,13 @@ brik.use transverse.tools
 
 # Build the grype command line emitting SARIF (no --fail-on; the policy
 # gate downstream decides pass/fail from business.findings.failing). The
-# SARIF lands at brik-artifacts/container_scan/container_scan.sarif so
-# findings.process can pick it up alongside the other stage outputs.
+# SARIF lands at brik-artifacts/container-scan/container-scan.sarif so
+# findings.process can pick it up alongside the other stage outputs and
+# the artifact dir matches the canonical kebab-case stage name shared by
+# the GitLab fragment dir, the Jenkins workspace layout, and the
+# .stages[].name entry that report.record writes from lib/stages/container_scan.sh.
 _verify.scan.container._build_grype_command() {
-    local out="${BRIK_WORKSPACE:-.}/${BRIK_SECURITY_CONTAINER_OUTPUT_PATH:-brik-artifacts/container_scan/container_scan.sarif}"
+    local out="${BRIK_WORKSPACE:-.}/${BRIK_SECURITY_CONTAINER_OUTPUT_PATH:-brik-artifacts/container-scan/container-scan.sarif}"
     local out_dir
     out_dir="$(dirname "$out")"
     printf 'mkdir -p %s && grype {image} -o sarif --file %s' "$out_dir" "$out"
@@ -83,8 +86,8 @@ verify.scan.container.run() {
     if ! declare -f findings.scan_gate >/dev/null 2>&1; then
         brik.use transverse.findings
     fi
-    local _sarif="${BRIK_WORKSPACE:-.}/${BRIK_SECURITY_CONTAINER_OUTPUT_PATH:-brik-artifacts/container_scan/container_scan.sarif}"
-    if ! findings.scan_gate "container_scan" 0 "$_sarif"; then
+    local _sarif="${BRIK_WORKSPACE:-.}/${BRIK_SECURITY_CONTAINER_OUTPUT_PATH:-brik-artifacts/container-scan/container-scan.sarif}"
+    if ! findings.scan_gate "container-scan" 0 "$_sarif"; then
         log.error "security container vulnerabilities found in: $image"
         return "$BRIK_EXIT_CHECK_FAILED"
     fi
