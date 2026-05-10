@@ -58,14 +58,45 @@
       }
     },
     "tech": {
-      "description": "Technical traceability payload. Open object: per-stage sub-chantiers (Phase 3) populate stack-specific fields without bumping schema_version.",
+      "description": "Technical traceability payload. Open object: per-stage sub-chantiers (Phase 3) populate stack-specific fields without bumping schema_version. v1.0 also recognises the typed v1.1 field tech.kind (forward-compat) so producers can opt into the new enum-constrained label without bumping schema_version.",
       "type": "object",
-      "additionalProperties": true
+      "additionalProperties": true,
+      "properties": {
+        "kind": {
+          "description": "Optional v1.1 forward-compat field. Human-readable label derived from rc, used in reports and recap.",
+          "type": "string",
+          "enum": [
+            "ok",
+            "failure",
+            "invalid-input",
+            "missing-dependency",
+            "invalid-environment",
+            "external-service-unavailable",
+            "io-failure",
+            "configuration-error",
+            "timeout",
+            "interrupted",
+            "check-failed",
+            "not-applicable"
+          ]
+        }
+      }
     },
     "business": {
-      "description": "Business outcome payload. Open object: per-stage sub-chantiers (Phase 3) populate domain-specific fields without bumping schema_version.",
+      "description": "Business outcome payload. Open object: per-stage sub-chantiers (Phase 3) populate domain-specific fields without bumping schema_version. v1.0 also recognises the typed v1.1 fields business.status and business.reason (forward-compat) so producers can opt into the new enum-constrained outcome without bumping schema_version.",
       "type": "object",
-      "additionalProperties": true
+      "additionalProperties": true,
+      "properties": {
+        "status": {
+          "description": "Optional v1.1 forward-compat field. Business outcome derived by lib/pipeline/business.sh.",
+          "type": "string",
+          "enum": ["success", "warning", "error"]
+        },
+        "reason": {
+          "description": "Optional v1.1 forward-compat field. Human-readable explanation of business.status when not 'success'.",
+          "type": "string"
+        }
+      }
     }
   }
 }

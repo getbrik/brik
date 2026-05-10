@@ -240,4 +240,124 @@ Describe "schemas/report/v1/fragment.schema.json"
       The status should be success
     End
   End
+
+  # ----------------------------------------------------------------------
+  # Additive v1.1 fields recognised under v1.0 (forward-compat)
+  #
+  # Sub-chantier 1 ships v1.1 schemas alongside v1.0 and lets producers
+  # that still claim schema_version=1.0 opt-in to the new typed shapes
+  # (business.status enum, business.reason, tech.kind enum). The fields
+  # remain optional under v1.0; legacy producers that omit them still
+  # validate. Producers that emit them with an out-of-enum value are
+  # rejected so consumers can rely on the contract during the transition
+  # to v1.1.
+  # ----------------------------------------------------------------------
+  Describe "additive v1.1 fields under v1.0 (forward-compat)"
+    It "accepts a v1.0 fragment that emits business.status=success"
+      Skip if "jv not installed" jv_missing
+      payload='{
+        "schema_version": "1.0",
+        "stage": "build",
+        "timestamp": "2026-05-10T10:00:00+0000",
+        "rc": 0,
+        "status": "success",
+        "runner": { "platform": "gitlab" },
+        "business": { "status": "success" }
+      }'
+      When call validate_fragment "$payload"
+      The status should be success
+    End
+
+    It "accepts a v1.0 fragment that emits business.status=warning with reason"
+      Skip if "jv not installed" jv_missing
+      payload='{
+        "schema_version": "1.0",
+        "stage": "container-scan",
+        "timestamp": "2026-05-10T10:00:00+0000",
+        "rc": 0,
+        "status": "success",
+        "runner": { "platform": "gitlab" },
+        "business": {
+          "status": "warning",
+          "reason": "14 findings ignored by policy"
+        }
+      }'
+      When call validate_fragment "$payload"
+      The status should be success
+    End
+
+    It "rejects a v1.0 fragment whose business.status is outside the enum"
+      Skip if "jv not installed" jv_missing
+      payload='{
+        "schema_version": "1.0",
+        "stage": "lint",
+        "timestamp": "2026-05-10T10:00:00+0000",
+        "rc": 0,
+        "status": "success",
+        "runner": { "platform": "gitlab" },
+        "business": { "status": "tolerated" }
+      }'
+      When call validate_fragment "$payload"
+      The status should not equal 0
+    End
+
+    It "accepts a v1.0 fragment that emits tech.kind=timeout"
+      Skip if "jv not installed" jv_missing
+      payload='{
+        "schema_version": "1.0",
+        "stage": "scan",
+        "timestamp": "2026-05-10T10:00:00+0000",
+        "rc": 8,
+        "status": "failed",
+        "runner": { "platform": "gitlab" },
+        "tech": { "kind": "timeout" }
+      }'
+      When call validate_fragment "$payload"
+      The status should be success
+    End
+
+    It "rejects a v1.0 fragment whose tech.kind is outside the enum"
+      Skip if "jv not installed" jv_missing
+      payload='{
+        "schema_version": "1.0",
+        "stage": "scan",
+        "timestamp": "2026-05-10T10:00:00+0000",
+        "rc": 8,
+        "status": "failed",
+        "runner": { "platform": "gitlab" },
+        "tech": { "kind": "panic-attack" }
+      }'
+      When call validate_fragment "$payload"
+      The status should not equal 0
+    End
+
+    It "still accepts a legacy v1.0 fragment that omits business and tech.kind"
+      Skip if "jv not installed" jv_missing
+      payload='{
+        "schema_version": "1.0",
+        "stage": "init",
+        "timestamp": "2026-05-10T10:00:00+0000",
+        "rc": 0,
+        "status": "success",
+        "runner": { "platform": "local" }
+      }'
+      When call validate_fragment "$payload"
+      The status should be success
+    End
+
+    It "preserves backward compat for legacy tech.warning"
+      Skip if "jv not installed" jv_missing
+      payload='{
+        "schema_version": "1.0",
+        "stage": "lint",
+        "timestamp": "2026-05-10T10:00:00+0000",
+        "rc": 0,
+        "status": "skipped",
+        "runner": { "platform": "gitlab" },
+        "tech": { "warning": true, "warning_reason": "lint disabled by config" }
+      }'
+      When call validate_fragment "$payload"
+      The status should be success
+    End
+  End
 End
