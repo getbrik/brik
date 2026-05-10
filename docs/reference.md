@@ -946,9 +946,16 @@ Callers must:
 - Persist the returned `status` and `reason` under the fragment's
   `business.{status, reason}` block.
 
-The runtime ships the module today; no production stage calls it yet.
-Wiring lands in a follow-up alongside the rc-driven `tech.status`
-finalisation.
+The runtime calls `business.evaluate` from
+`_stage._finalize_fragment` for every stage that runs through
+`stage.run`. Inputs are sourced from the report backend
+(`tech.status`, `tech.kind`, `business.findings.ignored.total`) and
+from the resolved pipeline context (`BRIK_COMMIT_TAG` =>
+snapshot|release). The result is persisted on the same backend under
+`business.{status, reason}` and snapshotted into the per-stage
+fragment by `report.write_fragment`. Stages running standalone (CI
+single-job path) and stages running under `pipeline.run` share this
+logic since both populate the backend before finalisation.
 
 ---
 
