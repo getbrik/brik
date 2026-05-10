@@ -271,4 +271,122 @@ Describe "schemas/report/v1/aggregate.schema.json"
       The status should be success
     End
   End
+
+  # ----------------------------------------------------------------------
+  # Additive v1.1 fields recognised under v1.0 (forward-compat)
+  # See sub-chantier 1 in docs/chantiers/20260510_tech-business-orthogonal-axes.md
+  # ----------------------------------------------------------------------
+  Describe "additive v1.1 fields under v1.0 (forward-compat)"
+    It "accepts pipeline.context=snapshot when emitted under v1.0"
+      Skip if "jv not installed" jv_missing
+      payload='{
+        "schema_version": "1.0",
+        "pipeline": {
+          "id": "1", "platform": "gitlab", "project": "demo",
+          "started_at": "2026-05-10T10:00:00+0000",
+          "finished_at": "2026-05-10T10:15:00+0000",
+          "status": "success",
+          "context": "snapshot"
+        },
+        "stages": [],
+        "summary": { "stages": { "total": 0, "passed": 0, "failed": 0, "skipped": 0 } }
+      }'
+      When call validate_aggregate "$payload"
+      The status should be success
+    End
+
+    It "rejects an unknown pipeline.context value under v1.0"
+      Skip if "jv not installed" jv_missing
+      payload='{
+        "schema_version": "1.0",
+        "pipeline": {
+          "id": "1", "platform": "gitlab", "project": "demo",
+          "started_at": "2026-05-10T10:00:00+0000",
+          "finished_at": "2026-05-10T10:15:00+0000",
+          "status": "success",
+          "context": "rehearsal"
+        },
+        "stages": [],
+        "summary": { "stages": { "total": 0, "passed": 0, "failed": 0, "skipped": 0 } }
+      }'
+      When call validate_aggregate "$payload"
+      The status should not equal 0
+    End
+
+    It "accepts pipeline.business={status:warning} under v1.0"
+      Skip if "jv not installed" jv_missing
+      payload='{
+        "schema_version": "1.0",
+        "pipeline": {
+          "id": "1", "platform": "gitlab", "project": "demo",
+          "started_at": "2026-05-10T10:00:00+0000",
+          "finished_at": "2026-05-10T10:15:00+0000",
+          "status": "success",
+          "business": { "status": "warning" }
+        },
+        "stages": [],
+        "summary": { "stages": { "total": 0, "passed": 0, "failed": 0, "skipped": 0 } }
+      }'
+      When call validate_aggregate "$payload"
+      The status should be success
+    End
+
+    It "rejects pipeline.business.status outside the enum under v1.0"
+      Skip if "jv not installed" jv_missing
+      payload='{
+        "schema_version": "1.0",
+        "pipeline": {
+          "id": "1", "platform": "gitlab", "project": "demo",
+          "started_at": "2026-05-10T10:00:00+0000",
+          "finished_at": "2026-05-10T10:15:00+0000",
+          "status": "success",
+          "business": { "status": "tolerated" }
+        },
+        "stages": [],
+        "summary": { "stages": { "total": 0, "passed": 0, "failed": 0, "skipped": 0 } }
+      }'
+      When call validate_aggregate "$payload"
+      The status should not equal 0
+    End
+
+    It "accepts summary.business when emitted under v1.0"
+      Skip if "jv not installed" jv_missing
+      payload='{
+        "schema_version": "1.0",
+        "pipeline": {
+          "id": "1", "platform": "gitlab", "project": "demo",
+          "started_at": "2026-05-10T10:00:00+0000",
+          "finished_at": "2026-05-10T10:15:00+0000",
+          "status": "success"
+        },
+        "stages": [],
+        "summary": {
+          "stages":   { "total": 9, "passed": 8, "failed": 0, "skipped": 1 },
+          "business": { "success_count": 7, "warning_count": 2, "error_count": 0 }
+        }
+      }'
+      When call validate_aggregate "$payload"
+      The status should be success
+    End
+
+    It "still accepts the legacy summary.warnings array"
+      Skip if "jv not installed" jv_missing
+      payload='{
+        "schema_version": "1.0",
+        "pipeline": {
+          "id": "1", "platform": "gitlab", "project": "demo",
+          "started_at": "2026-05-10T10:00:00+0000",
+          "finished_at": "2026-05-10T10:15:00+0000",
+          "status": "success"
+        },
+        "stages": [],
+        "summary": {
+          "stages":   { "total": 0, "passed": 0, "failed": 0, "skipped": 0 },
+          "warnings": [ { "stage": "lint", "reason": "disabled by config" } ]
+        }
+      }'
+      When call validate_aggregate "$payload"
+      The status should be success
+    End
+  End
 End

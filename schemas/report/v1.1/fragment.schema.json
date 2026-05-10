@@ -1,0 +1,153 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://brik.dev/schemas/report/v1.1/fragment.schema.json",
+  "title": "Brik Pipeline Report Fragment v1.1",
+  "description": "Per-stage report fragment emitted by stage.run after each stage completes. v1.1 introduces a typed business outcome (status, reason) and the tech.kind label, while removing the legacy tech.warning / tech.warning_reason fields that conflated technical and business concerns. See chantier docs/chantiers/20260510_tech-business-orthogonal-axes.md for the full rationale.",
+  "type": "object",
+  "required": ["schema_version", "stage", "timestamp", "rc", "status", "runner", "business"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "description": "Fragment schema version. Locked to '1.1'.",
+      "type": "string",
+      "const": "1.1"
+    },
+    "stage": {
+      "description": "Stage name (lower-case, kebab-case for multi-word names).",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$"
+    },
+    "timestamp": {
+      "description": "ISO-8601 timestamp with timezone offset, recorded when the fragment is written (after the stage logic returns).",
+      "type": "string"
+    },
+    "duration_ms": {
+      "description": "Stage wall-clock duration in milliseconds. Optional. Mirrors the value already recorded by summary.build.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "rc": {
+      "description": "Stage exit code as returned by the stage logic. 0 = success or skipped, non-zero = failure. Code 99 (SKIP_WITH_WARNING) is removed in v1.1.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "status": {
+      "description": "Technical stage status, derived from rc. 'skipped' covers auto-detected not-applicable cases. v1.1 no longer uses 'skipped' for user-disabled stages: that decision moves to the business layer.",
+      "type": "string",
+      "enum": ["success", "failed", "skipped"]
+    },
+    "runner": {
+      "description": "Provenance of the execution environment.",
+      "type": "object",
+      "required": ["platform"],
+      "additionalProperties": false,
+      "properties": {
+        "platform": {
+          "description": "CI platform on which this stage ran.",
+          "type": "string",
+          "enum": ["gitlab", "jenkins", "local", "github"]
+        },
+        "image": {
+          "description": "Docker image reference of the runner container, when applicable.",
+          "type": "string"
+        },
+        "job_url": {
+          "description": "Direct URL to the CI job log, when the platform exposes one.",
+          "type": "string"
+        }
+      }
+    },
+    "tech": {
+      "description": "Technical traceability payload. v1.1 closes the door on tech.warning / tech.warning_reason (those decisions are now expressed via business.status). Stage-specific runtime metadata lives under the listed known fields. Add new tech.* fields by bumping the schema version.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "description": "Mirror of the top-level status. Kept for producer convenience.",
+          "type": "string",
+          "enum": ["success", "failed", "skipped"]
+        },
+        "kind": {
+          "description": "Human-readable label derived from rc, used in reports and recap. Maps to the BRIK_EXIT_* table.",
+          "type": "string",
+          "enum": [
+            "ok",
+            "failure",
+            "invalid-input",
+            "missing-dependency",
+            "invalid-environment",
+            "external-service-unavailable",
+            "io-failure",
+            "configuration-error",
+            "timeout",
+            "interrupted",
+            "check-failed",
+            "not-applicable"
+          ]
+        },
+        "exit_code": {
+          "description": "Stage exit code as captured by the runtime. Mirror of top-level rc, kept for compatibility with v1.0 producers.",
+          "type": ["integer", "string"]
+        },
+        "duration_ms": {
+          "description": "Stage wall-clock duration in milliseconds. Mirror of top-level duration_ms.",
+          "type": ["integer", "string"]
+        },
+        "stack": {
+          "description": "Stack identifier (node, python, java, rust, dotnet, docker, ...).",
+          "type": "string"
+        },
+        "tool": {
+          "description": "Tool resolved by the stage logic (e.g. 'eslint', 'semgrep', 'jest').",
+          "type": "string"
+        },
+        "command": {
+          "description": "Command line invoked by the stage, with arguments. '<stack-default>' when the stage selected its default command.",
+          "type": "string"
+        }
+      }
+    },
+    "business": {
+      "description": "Business outcome payload. v1.1 makes status mandatory and typed (success / warning / error) so the runtime expresses outcomes the same way every consumer (notify, recap, harness E2E) reads them. Stage-specific business signals live under the known sub-blocks.",
+      "type": "object",
+      "required": ["status"],
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "description": "Business outcome. Derived by lib/pipeline/business.sh from (tech, side-band signals, pipeline.context).",
+          "type": "string",
+          "enum": ["success", "warning", "error"]
+        },
+        "reason": {
+          "description": "Human-readable explanation. Required by convention when status != success, but the schema does not enforce it (consumers fall back to tech.kind when absent).",
+          "type": "string"
+        },
+        "findings": {
+          "description": "Open sub-block carrying findings counts and metadata for security / quality stages.",
+          "type": "object",
+          "additionalProperties": true
+        },
+        "tests": {
+          "description": "Open sub-block carrying test counts and coverage data for the test stage.",
+          "type": "object",
+          "additionalProperties": true
+        },
+        "artifact": {
+          "description": "Open sub-block describing the build artifact produced by the build stage.",
+          "type": "object",
+          "additionalProperties": true
+        },
+        "image": {
+          "description": "Open sub-block describing the container image produced by the package stage.",
+          "type": "object",
+          "additionalProperties": true
+        },
+        "registry": {
+          "description": "Open sub-block describing the registry coordinates of a published artifact.",
+          "type": "object",
+          "additionalProperties": true
+        }
+      }
+    }
+  }
+}

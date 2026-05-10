@@ -86,6 +86,7 @@ Describe "schemas/report/v1.1/aggregate.schema.json"
       check_no_warnings() { jq -e '.properties.summary.properties | has("warnings") | not' "$AGGREGATE_V11_SCHEMA"; }
       When call check_no_warnings
       The status should be success
+      The output should equal "true"
     End
   End
 

@@ -1,21 +1,21 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://brik.dev/schemas/report/v1/aggregate.schema.json",
-  "title": "Brik Pipeline Report Aggregate v1",
-  "description": "Cross-stage aggregated pipeline report. Built by stages.notify (in CI mode) by aggregating per-stage fragments produced by report.write_fragment, or directly by pipeline.run in local mode. Lives at ${BRIK_LOG_DIR}/pipeline-report.json and is uploaded to brik-artifacts/ for CI artifact retention. Acts as the audit-grade artefact of pipeline execution: provenance (commit, image), security (sast/scan/container-scan critical findings), test outcomes, deployment target.",
+  "$id": "https://brik.dev/schemas/report/v1.1/aggregate.schema.json",
+  "title": "Brik Pipeline Report Aggregate v1.1",
+  "description": "Cross-stage aggregated pipeline report. v1.1 introduces pipeline.context (snapshot vs release) which drives the business filter, pipeline.business (overall outcome derived from per-stage business.status), and summary.business (counts of success / warning / error across stages). The legacy summary.warnings array is removed: warnings now live as business.status=warning on individual fragments. See chantier docs/chantiers/20260510_tech-business-orthogonal-axes.md.",
   "type": "object",
   "required": ["schema_version", "pipeline", "stages", "summary"],
   "additionalProperties": false,
   "properties": {
     "schema_version": {
-      "description": "Aggregate schema version. Locked to '1.0' for v1.",
+      "description": "Aggregate schema version. Locked to '1.1'.",
       "type": "string",
-      "const": "1.0"
+      "const": "1.1"
     },
     "pipeline": {
-      "description": "Pipeline-level metadata: identity, provenance, timing, overall status.",
+      "description": "Pipeline-level metadata: identity, provenance, timing, overall status, and the v1.1 business outcome.",
       "type": "object",
-      "required": ["id", "platform", "project", "started_at", "finished_at", "status"],
+      "required": ["id", "platform", "project", "started_at", "finished_at", "status", "context", "business"],
       "additionalProperties": false,
       "properties": {
         "id": {
@@ -36,7 +36,7 @@
           "type": "string"
         },
         "commit": {
-          "description": "Git commit metadata. Optional in v1 because each enrichment subchantier writes its slice via init.business.commit.*.",
+          "description": "Git commit metadata. Optional; populated by init when available. Presence of commit.tag flips pipeline.context to 'release'.",
           "type": "object",
           "additionalProperties": false,
           "properties": {
@@ -44,7 +44,11 @@
             "short_sha": { "type": "string" },
             "ref": { "type": "string" },
             "branch": { "type": "string" },
-            "tag": { "type": "string" }
+            "tag": { "type": "string" },
+            "author": { "type": "string" },
+            "author_email": { "type": "string" },
+            "timestamp": { "type": "string" },
+            "message_subject": { "type": "string" }
           }
         },
         "started_at": {
@@ -61,21 +65,17 @@
           "minimum": 0
         },
         "status": {
-          "description": "Overall pipeline status: 'failed' if any fragment has status=failed, 'skipped' if all stages were skipped, 'success' otherwise.",
+          "description": "Technical pipeline status: 'failed' if any fragment has status=failed, 'skipped' if all stages were skipped, 'success' otherwise. Read for technical analysis; see business.status for the user-facing verdict.",
           "type": "string",
           "enum": ["success", "failed", "skipped"]
         },
-        "triggered_by": {
-          "description": "Origin of the pipeline run: a user identifier, 'push', 'schedule', 'manual', etc.",
-          "type": "string"
-        },
         "context": {
-          "description": "Optional v1.1 forward-compat field. Pipeline execution context: 'release' when commit.tag is non-null, 'snapshot' otherwise. Drives the business filter and the continue_on_error default.",
+          "description": "Pipeline execution context. 'release' when the run carries a git tag (commit.tag non-null); 'snapshot' otherwise. Drives the business filter (snapshot is lenient, release is strict) and the continue_on_error default.",
           "type": "string",
           "enum": ["snapshot", "release"]
         },
         "business": {
-          "description": "Optional v1.1 forward-compat field. Pipeline-level business outcome aggregated from per-stage business.status values.",
+          "description": "Pipeline-level business outcome, computed from per-stage business.status values. error if any stage is error; warning if any stage is warning and no error; success otherwise.",
           "type": "object",
           "required": ["status"],
           "additionalProperties": false,
@@ -85,24 +85,28 @@
               "enum": ["success", "warning", "error"]
             }
           }
+        },
+        "triggered_by": {
+          "description": "Origin of the pipeline run: a user identifier, 'push', 'schedule', 'manual', etc.",
+          "type": "string"
         }
       }
     },
     "stages": {
-      "description": "Array of per-stage fragments, one per executed stage. Order matches CI stage order. Each item validates against the fragment schema.",
+      "description": "Array of per-stage fragments, one per executed stage. Order matches CI stage order. Each item validates against the v1.1 fragment schema (carries the typed business block).",
       "type": "array",
       "items": {
-        "$ref": "https://brik.dev/schemas/report/v1/fragment.schema.json"
+        "$ref": "https://brik.dev/schemas/report/v1.1/fragment.schema.json"
       }
     },
     "summary": {
-      "description": "Cross-stage aggregated metrics. Open object: keys may be absent when a stage did not run, and additional keys may be added in subchantiers without bumping schema_version.",
+      "description": "Cross-stage aggregated metrics. v1.1 closes additionalProperties to lock the contract; new summary blocks require a schema bump. summary.warnings is removed (legacy form replaced by per-stage business.reason).",
       "type": "object",
-      "required": ["stages"],
-      "additionalProperties": true,
+      "required": ["stages", "business"],
+      "additionalProperties": false,
       "properties": {
         "stages": {
-          "description": "Stage outcome counts.",
+          "description": "Stage outcome counts (technical axis).",
           "type": "object",
           "required": ["total", "passed", "failed", "skipped"],
           "additionalProperties": false,
@@ -113,17 +117,15 @@
             "skipped": { "type": "integer", "minimum": 0 }
           }
         },
-        "warnings": {
-          "description": "User-disabled stages outside a release context. One entry per fragment with tech.warning=true. Empty array when no stage was skipped with a warning.",
-          "type": "array",
-          "items": {
-            "type": "object",
-            "required": ["stage", "reason"],
-            "additionalProperties": false,
-            "properties": {
-              "stage":  { "type": "string" },
-              "reason": { "type": "string" }
-            }
+        "business": {
+          "description": "Stage outcome counts (business axis). Sums per-stage business.status values across the stages array.",
+          "type": "object",
+          "required": ["success_count", "warning_count", "error_count"],
+          "additionalProperties": false,
+          "properties": {
+            "success_count": { "type": "integer", "minimum": 0 },
+            "warning_count": { "type": "integer", "minimum": 0 },
+            "error_count":   { "type": "integer", "minimum": 0 }
           }
         },
         "security": {
@@ -166,7 +168,7 @@
           }
         },
         "policy": {
-          "description": "Findings management policy snapshot for this run. preset is the active built-in (pragmatic|strict|permissive); source records who picked it: brik.yml when the project's quality.findings.policy is in effect, org-policy when BRIK_POLICY_URL provided an override (P3+).",
+          "description": "Findings management policy snapshot for this run.",
           "type": "object",
           "additionalProperties": true,
           "required": ["preset", "source"],
@@ -180,16 +182,13 @@
               "enum": ["brik.yml", "org-policy"]
             },
             "org_policy_url": {
-              "description": "URL fetched for the active org policy. Present only when source = org-policy.",
               "type": "string"
             },
             "org_policy_loaded_at": {
-              "description": "ISO 8601 timestamp at which the org policy was fetched. Present only when source = org-policy.",
               "type": "string",
               "format": "date-time"
             },
             "expiring_soon": {
-              "description": "Org allowlist entries whose expires field falls within BRIK_FINDINGS_EXPIRING_SOON_DAYS (default 30). Present only when an org policy cache is loaded; each entry is either a cve {id, expires, reason} or a path {glob, expires, reason}.",
               "type": "array",
               "items": {
                 "type": "object",
@@ -209,7 +208,7 @@
       }
     },
     "proof": {
-      "description": "Optional proof envelope: hash of the report itself, links to retained artefacts, signature flag. v1 always emits signed=false; supply-chain signing is a Phase 4 concern.",
+      "description": "Optional proof envelope: hash of the report itself, links to retained artefacts, signature flag. v1.1 inherits the v1.0 contract; supply-chain signing remains a Phase 4 concern.",
       "type": "object",
       "additionalProperties": false,
       "properties": {
