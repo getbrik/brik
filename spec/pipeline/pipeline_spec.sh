@@ -137,15 +137,57 @@ Describe "pipeline.sh"
     Before 'setup_pipeline'
     After 'cleanup_pipeline'
 
-    It "fails fast by default: stops iteration after first failure"
-      fail_fast_stops_remaining() {
+    It "continues by default in snapshot context (no tag)"
+      snapshot_continues_after_failure() {
+        unset BRIK_COMMIT_TAG
         stages.build() { return 1; }
         pipeline.run >/dev/null 2>&1
         jq -r '.stages | map(select(.name == "lint" or .name == "sast" or .name == "scan" or .name == "test")) | map(.tech.status) | unique | join(",")' \
           "$PIPELINE_LOG_DIR/aggregate-report.json"
       }
-      When call fail_fast_stops_remaining
+      When call snapshot_continues_after_failure
+      The output should equal "success"
+    End
+
+    It "fails fast by default in release context (BRIK_COMMIT_TAG set)"
+      release_fail_fast() {
+        export BRIK_COMMIT_TAG="v9.9.9"
+        stages.build() { return 1; }
+        pipeline.run >/dev/null 2>&1
+        unset BRIK_COMMIT_TAG
+        jq -r '.stages | map(select(.name == "lint" or .name == "sast" or .name == "scan" or .name == "test")) | map(.tech.status) | unique | join(",")' \
+          "$PIPELINE_LOG_DIR/aggregate-report.json"
+      }
+      When call release_fail_fast
       The output should equal "skipped"
+    End
+
+    It "BRIK_CONTINUE_ON_ERROR=0 forces fail-fast even on snapshot"
+      snapshot_env_override_fail_fast() {
+        unset BRIK_COMMIT_TAG
+        export BRIK_CONTINUE_ON_ERROR=0
+        stages.build() { return 1; }
+        pipeline.run >/dev/null 2>&1
+        unset BRIK_CONTINUE_ON_ERROR
+        jq -r '.stages | map(select(.name == "lint" or .name == "sast" or .name == "scan" or .name == "test")) | map(.tech.status) | unique | join(",")' \
+          "$PIPELINE_LOG_DIR/aggregate-report.json"
+      }
+      When call snapshot_env_override_fail_fast
+      The output should equal "skipped"
+    End
+
+    It "BRIK_CONTINUE_ON_ERROR=1 forces continue even on release"
+      release_env_override_continue() {
+        export BRIK_COMMIT_TAG="v9.9.9"
+        export BRIK_CONTINUE_ON_ERROR=1
+        stages.build() { return 1; }
+        pipeline.run >/dev/null 2>&1
+        unset BRIK_COMMIT_TAG BRIK_CONTINUE_ON_ERROR
+        jq -r '.stages | map(select(.name == "lint" or .name == "sast" or .name == "scan" or .name == "test")) | map(.tech.status) | unique | join(",")' \
+          "$PIPELINE_LOG_DIR/aggregate-report.json"
+      }
+      When call release_env_override_continue
+      The output should equal "success"
     End
 
     It "returns BRIK_EXIT_FAILURE when a stage fails"
