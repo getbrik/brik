@@ -130,7 +130,7 @@ YAML
     }
     Before 'setup_no_checks'
 
-    It "returns 0 and records status not-applicable in the report"
+    It "returns 0 and records tech.status=skipped in the report"
       run_lint_no_checks() {
         brik.use() { :; }
         local ctx
@@ -140,6 +140,19 @@ YAML
       }
       When call run_lint_no_checks
       The status should be success
+      The output should equal "skipped"
+    End
+
+    It "records tech.kind=not-applicable for the stage"
+      run_lint_kind() {
+        brik.use() { :; }
+        local ctx
+        ctx="$(context.create "lint")" 2>/dev/null || ctx="$(mktemp)"
+        stages.lint "$ctx" >/dev/null 2>&1 || return $?
+        jq -r '.stages[] | select(.name=="lint") | .tech.kind // empty' \
+          "$BRIK_LOG_DIR/aggregate-report.json"
+      }
+      When call run_lint_kind
       The output should equal "not-applicable"
     End
   End
@@ -202,8 +215,8 @@ YAML
     End
   End
 
-  Describe "with lint disabled outside release"
-    setup_disabled() {
+  Describe "with legacy quality.lint.enabled=false (no other lint config)"
+    setup_legacy_disabled() {
       cat > "$BRIK_CONFIG_FILE" <<'YAML'
 version: 1
 project:
@@ -216,49 +229,60 @@ YAML
       config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
       unset BRIK_COMMIT_TAG
     }
-    Before 'setup_disabled'
+    Before 'setup_legacy_disabled'
 
-    It "skips with warning and records tech.status=skipped"
-      run_lint_disabled() {
+    It "ignores the legacy key and lets the stage run to completion"
+      run_lint_legacy() {
+        brik.use() { :; }
         local ctx
         ctx="$(context.create "lint")" 2>/dev/null || ctx="$(mktemp)"
         stages.lint "$ctx" >/dev/null 2>&1
-        local rc=$?
-        read_lint_status
-        return $rc
       }
-      When call run_lint_disabled
-      The status should equal 99
-      The output should equal "skipped"
+      When call run_lint_legacy
+      The status should be success
     End
 
-    It "records tech.warning=true on the backend"
-      run_lint_disabled_warning() {
+    It "records tech.status=skipped (auto, not lint.enabled-driven)"
+      run_lint_legacy_status() {
+        brik.use() { :; }
         local ctx
         ctx="$(context.create "lint")" 2>/dev/null || ctx="$(mktemp)"
         stages.lint "$ctx" >/dev/null 2>&1 || true
-        jq -r '.stages[] | select(.name=="lint") | .tech.warning' \
-            "$BRIK_LOG_DIR/aggregate-report.json"
+        read_lint_status
       }
-      When call run_lint_disabled_warning
-      The output should equal "true"
+      When call run_lint_legacy_status
+      The output should equal "skipped"
     End
 
-    It "logs a warn about lint being disabled outside release"
-      run_lint_disabled_log() {
+    It "records tech.kind=not-applicable (no checks configured)"
+      run_lint_legacy_kind() {
+        brik.use() { :; }
         local ctx
         ctx="$(context.create "lint")" 2>/dev/null || ctx="$(mktemp)"
-        stages.lint "$ctx"
+        stages.lint "$ctx" >/dev/null 2>&1 || true
+        jq -r '.stages[] | select(.name=="lint") | .tech.kind // empty' \
+          "$BRIK_LOG_DIR/aggregate-report.json"
       }
-      When call run_lint_disabled_log
-      The status should equal 99
-      The error should include "lint"
-      The error should include "outside release"
+      When call run_lint_legacy_kind
+      The output should equal "not-applicable"
+    End
+
+    It "does not write tech.warning=true (legacy SKIP_WITH_WARNING removed)"
+      run_lint_legacy_warning() {
+        brik.use() { :; }
+        local ctx
+        ctx="$(context.create "lint")" 2>/dev/null || ctx="$(mktemp)"
+        stages.lint "$ctx" >/dev/null 2>&1 || true
+        jq -r '.stages[] | select(.name=="lint") | .tech.warning // "absent"' \
+          "$BRIK_LOG_DIR/aggregate-report.json"
+      }
+      When call run_lint_legacy_warning
+      The output should equal "absent"
     End
   End
 
-  Describe "with lint disabled but on a release tag"
-    setup_disabled_on_tag() {
+  Describe "with legacy quality.lint.enabled=false AND a lint tool configured"
+    setup_legacy_disabled_with_tool() {
       cat > "$BRIK_CONFIG_FILE" <<'YAML'
 version: 1
 project:
@@ -267,29 +291,25 @@ project:
 quality:
   lint:
     enabled: false
+    tool: eslint
+    command: "eslint --max-warnings 0"
 YAML
       config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
-      export BRIK_COMMIT_TAG="v1.0.0"
-    }
-    cleanup_disabled_on_tag() {
       unset BRIK_COMMIT_TAG
     }
-    Before 'setup_disabled_on_tag'
-    After 'cleanup_disabled_on_tag'
+    Before 'setup_legacy_disabled_with_tool'
 
-    It "ignores enabled=false when running on a tag (forces lint)"
-      run_lint_force_on_tag() {
+    It "runs the configured tool anyway (legacy enabled=false is ignored)"
+      run_lint_legacy_runs() {
+        brik.use() { :; }
+        verify.run() { echo "verify-ran"; return 0; }
         local ctx
         ctx="$(context.create "lint")" 2>/dev/null || ctx="$(mktemp)"
-        stages.lint "$ctx"
+        stages.lint "$ctx" 2>/dev/null
       }
-      When call run_lint_force_on_tag
-      The error should include "forced on release"
-      # The forced lint actually runs prettier here and exits non-zero with
-      # a prettier stdout summary because no real eslint config is wired
-      # in this fixture; assert both side-effects so shellspec stops WARNING.
-      The output should be present
-      The status should be failure
+      When call run_lint_legacy_runs
+      The status should be success
+      The output should include "verify-ran"
     End
   End
 
