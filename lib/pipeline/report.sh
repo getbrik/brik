@@ -600,9 +600,13 @@ report.aggregate_fragments() {
               passed:  map(select(. == "success")) | length,
               failed:  map(select(. == "failed"))  | length,
               skipped: map(select(. == "skipped")) | length } ) as $counts
-        | ( $frags
-          | map(select((.tech.warning // false) == true)
-                | { stage: .stage, reason: (.tech.warning_reason // "") }) ) as $warnings
+        | ( $frags | map(.business.status // "success")
+          | { success_count: map(select(. == "success")) | length,
+              warning_count: map(select(. == "warning")) | length,
+              error_count:   map(select(. == "error"))   | length } ) as $business_summary
+        | ( if ($business_summary.error_count // 0)   > 0 then "error"
+            elif ($business_summary.warning_count // 0) > 0 then "warning"
+            else "success" end ) as $pipeline_business_status
         | ( if ($counts.failed // 0) > 0 then "failed" else "success" end ) as $pstatus
         | ( { preset: $policy_preset, source: $policy_source }
             + ( if $policy_org_url       != "" then { org_policy_url:       $policy_org_url       } else {} end )
@@ -625,6 +629,7 @@ report.aggregate_fragments() {
               platform: $platform,
               project: $project,
               context: $context,
+              business: { status: $pipeline_business_status },
               started_at: $started,
               finished_at: $finished_at,
               status: $pstatus
@@ -639,7 +644,7 @@ report.aggregate_fragments() {
             stages: $frags,
             summary: {
               stages: $counts,
-              warnings: $warnings,
+              business: $business_summary,
               policy: $policy
             }
           }
@@ -997,6 +1002,11 @@ _report._render_aggregate_md() {
           "- **Passed:** \(.summary.stages.passed // 0)",
           "- **Failed:** \(.summary.stages.failed // 0)",
           "- **Skipped:** \(.summary.stages.skipped // 0)",
+          "",
+          "## Business outcome",
+          "",
+          "- **Status:** \(status_glyph(.pipeline.business.status // "?")) \(.pipeline.business.status // "-")",
+          "- **Counts:** success=\(.summary.business.success_count // 0), warning=\(.summary.business.warning_count // 0), error=\(.summary.business.error_count // 0)",
           "",
           render_active_policy,
           render_failing,

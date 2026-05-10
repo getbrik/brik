@@ -404,20 +404,30 @@ stages.notify() {
     # see the per-stage rollup at a glance in the live CI log.
     _notify._emit_recap_table "$_report_json"
 
-    # Determine pipeline status from the aggregated pipeline report.
-    # Derives from any tech.status=failed in aggregate-report.json. Defaults
-    # to "success" when no report or no jq.
-    local pipeline_status="success"
+    # Read the gatekeeper signal from the aggregate. pipeline.business.status
+    # is the worst stage business status (error > warning > success); it is
+    # the canonical pipeline outcome. Defaults to "success" when no report,
+    # no jq, or no business field.
+    local business_status="success"
     if [[ -f "$_report_json" ]] && command -v jq >/dev/null 2>&1; then
-        local _failed_count
-        _failed_count="$(jq '[.stages[] | select(.tech.status == "failed")] | length' \
-            "$_report_json" 2>/dev/null || echo 0)"
-        [[ "$_failed_count" -gt 0 ]] && pipeline_status="failed"
+        local _bs
+        _bs="$(jq -r '.pipeline.business.status // empty' "$_report_json" 2>/dev/null)"
+        case "$_bs" in
+            success|warning|error) business_status="$_bs" ;;
+        esac
     fi
+
+    # Map business status to the legacy {success|failed} channel labels for
+    # downstream notification helpers (Slack/email/webhook subjects).
+    local pipeline_status="success"
+    [[ "$business_status" == "error" ]] && pipeline_status="failed"
 
     local summary_msg="Pipeline $pipeline_status for $project_name (${BRIK_COMMIT_REF:-unknown})"
     local level="info"
-    [[ "$pipeline_status" == "failed" ]] && level="error"
+    case "$business_status" in
+        warning) level="warn"  ;;
+        error)   level="error" ;;
+    esac
 
     # Copy pipeline report into workspace for CI artifact upload.
     # BRIK_LOG_DIR lives outside the workspace (/tmp/brik/logs by default),
@@ -479,6 +489,12 @@ stages.notify() {
         fi
     fi
 
+    # Gatekeeper: propagate a non-zero exit when the pipeline business
+    # outcome is error so the CI job (and pipeline.run when notify is
+    # invoked at end of run) reflects the real pipeline result.
+    if [[ "$business_status" == "error" ]]; then
+        return "$BRIK_EXIT_FAILURE"
+    fi
     return 0
 }
 
