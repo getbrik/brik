@@ -275,4 +275,64 @@ YAML
       The status should be success
     End
   End
+
+  # ---------------------------------------------------------------------------
+  # Gatekeeper exit code: stages.notify must exit non-zero iff
+  # pipeline.business.status == "error". Pre-populates an aggregate-report.json
+  # in BRIK_LOG_DIR; brik-artifacts/ stays absent so notify does not re-aggregate.
+  # ---------------------------------------------------------------------------
+  Describe "gatekeeper exit code"
+    write_aggregate_business() {
+      local pipeline_business_status="$1"
+      local s_count="$2" w_count="$3" e_count="$4"
+      jq -n \
+        --arg pbs "$pipeline_business_status" \
+        --argjson sc "$s_count" --argjson wc "$w_count" --argjson ec "$e_count" \
+        '{
+          schema_version: "1.0",
+          pipeline: { id: "p1", platform: "gitlab", project: "test-project",
+                      context: "snapshot", started_at: "2026-04-21T14:00:00+0000",
+                      finished_at: "2026-04-21T14:00:01+0000", status: "success",
+                      business: { status: $pbs } },
+          stages: [],
+          summary: {
+            stages:   { total: 0, passed: 0, failed: 0, skipped: 0 },
+            business: { success_count: $sc, warning_count: $wc, error_count: $ec }
+          }
+        }' > "${BRIK_LOG_DIR}/aggregate-report.json"
+    }
+
+    It "exits 0 when pipeline.business.status is success"
+      gate_success() {
+        write_aggregate_business "success" 3 0 0
+        local ctx
+        ctx="$(context.create "notify")" 2>/dev/null || ctx="$(mktemp)"
+        stages.notify "$ctx" >/dev/null 2>&1
+      }
+      When call gate_success
+      The status should equal 0
+    End
+
+    It "exits 0 when pipeline.business.status is warning"
+      gate_warning() {
+        write_aggregate_business "warning" 2 1 0
+        local ctx
+        ctx="$(context.create "notify")" 2>/dev/null || ctx="$(mktemp)"
+        stages.notify "$ctx" >/dev/null 2>&1
+      }
+      When call gate_warning
+      The status should equal 0
+    End
+
+    It "exits BRIK_EXIT_FAILURE when pipeline.business.status is error"
+      gate_error() {
+        write_aggregate_business "error" 1 1 1
+        local ctx
+        ctx="$(context.create "notify")" 2>/dev/null || ctx="$(mktemp)"
+        stages.notify "$ctx" >/dev/null 2>&1
+      }
+      When call gate_error
+      The status should equal "$BRIK_EXIT_FAILURE"
+    End
+  End
 End

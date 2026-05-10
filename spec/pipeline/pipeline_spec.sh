@@ -190,12 +190,27 @@ Describe "pipeline.sh"
       The output should equal "success"
     End
 
-    It "returns BRIK_EXIT_FAILURE when a stage fails"
-      stages.build() { return 1; }
-      When call pipeline.run
+    It "returns BRIK_EXIT_FAILURE when a stage fails in release context"
+      release_failure_rc() {
+        export BRIK_COMMIT_TAG="v9.9.9"
+        stages.build() { return 1; }
+        pipeline.run >/dev/null 2>&1
+        local rc=$?
+        unset BRIK_COMMIT_TAG
+        return "$rc"
+      }
+      When call release_failure_rc
       The status should equal 1
-      The output should be present
-      The error should be present
+    End
+
+    It "exits 0 in snapshot context when a stage fails (business=warning)"
+      snapshot_failure_rc() {
+        unset BRIK_COMMIT_TAG
+        stages.build() { return 1; }
+        pipeline.run >/dev/null 2>&1
+      }
+      When call snapshot_failure_rc
+      The status should equal 0
     End
 
     It "records the failed stage status"
@@ -220,12 +235,17 @@ Describe "pipeline.sh"
       The output should equal "success"
     End
 
-    It "with --continue-on-error still returns BRIK_EXIT_FAILURE if any failed"
-      stages.build() { return 1; }
-      When call pipeline.run --continue-on-error
+    It "with --continue-on-error still returns BRIK_EXIT_FAILURE on release failure"
+      release_continue_failure_rc() {
+        export BRIK_COMMIT_TAG="v9.9.9"
+        stages.build() { return 1; }
+        pipeline.run --continue-on-error >/dev/null 2>&1
+        local rc=$?
+        unset BRIK_COMMIT_TAG
+        return "$rc"
+      }
+      When call release_continue_failure_rc
       The status should equal 1
-      The output should be present
-      The error should be present
     End
 
     It "preserves a stage-recorded skipped status (config-skip)"
@@ -244,19 +264,21 @@ Describe "pipeline.sh"
       The output should equal "skipped"
     End
 
-    It "still marks pipeline as failed when a later stage fails after a self-skip"
+    It "marks pipeline as failed when a later stage fails after a self-skip in release context"
       self_skip_then_fail() {
+        export BRIK_COMMIT_TAG="v9.9.9"
         stages.lint() {
           report.record "lint" "tech" "status" "skipped"
           return 0
         }
         stages.test() { return 1; }
-        pipeline.run --continue-on-error
+        pipeline.run --continue-on-error >/dev/null 2>&1
+        local rc=$?
+        unset BRIK_COMMIT_TAG
+        return "$rc"
       }
       When call self_skip_then_fail
       The status should equal 1
-      The output should be present
-      The error should be present
     End
   End
 
