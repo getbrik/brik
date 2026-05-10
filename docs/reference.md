@@ -639,10 +639,47 @@ Bash Runtime (Layer 0) independently of the `hooks` section in `brik.yml`.
 
 Every pipeline run produces `aggregate-report.json` (and a Markdown rendering)
 under `${BRIK_LOG_DIR}` (local mode) or `${BRIK_WORKSPACE}/brik-artifacts/`
-(CI mode). The aggregator schema is locked at `schema_version: "1.0"` and
-opens both `tech` and `business` to `additionalProperties: true`, so the
-fields below extend without breaking older consumers. Consumers should match
-on `^1\.` to accept future minor 1.x evolutions.
+(CI mode). The fields below describe the v1.0 producer contract; producers
+emit `schema_version: "1.0"` today. Consumers should match on `^1\.` to
+accept future minor 1.x evolutions.
+
+### Schema versions
+
+Two schema versions coexist under [`schemas/report/`](../schemas/report/):
+
+| Version | Status | When to use |
+|---|---|---|
+| [`v1`](../schemas/report/v1/) | Active producer schema. `tech` and `business` stay open (`additionalProperties: true`) so legacy producers and stage-specific extensions continue to validate. v1.0 also recognises the typed v1.1 fields (`tech.kind`, `business.status`, `business.reason`, `pipeline.context`, `pipeline.business`) as optional additive constraints, so producers can opt into them without bumping the version. | Today (all producers) |
+| [`v1.1`](../schemas/report/v1.1/) | Strict future schema. `tech` and `business` close (`additionalProperties: false`); `business.{status, reason}` is required and typed; the legacy `tech.warning`, `tech.warning_reason`, and `summary.warnings` are rejected; `pipeline.context`, `pipeline.business`, and `summary.business` are required. | Targeted by future producer migration |
+
+The v1.1 deltas in detail:
+
+- **`business.status`** (enum `success | warning | error`) — outcome derived
+  by the business filter from the technical exit code, the pipeline context
+  (snapshot vs release), and stage-emitted side-band signals. Required on
+  every fragment.
+- **`business.reason`** (string) — human-readable explanation of why the
+  business outcome is not `success` (e.g., `"14 findings ignored by policy:
+  11 below severity, 3 no upstream fix"`). Optional but conventionally
+  required when `status != success`.
+- **`tech.kind`** (12-value enum: `ok`, `failure`, `invalid-input`,
+  `missing-dependency`, `invalid-environment`, `external-service-unavailable`,
+  `io-failure`, `configuration-error`, `timeout`, `interrupted`, `check-failed`,
+  `not-applicable`) — readable label derived from the stage exit code, used
+  in reports and recap output.
+- **`pipeline.context`** (enum `snapshot | release`) — `release` when
+  `pipeline.commit.tag` is non-null, `snapshot` otherwise. Drives the
+  business filter (snapshot is lenient, release is strict) and the
+  `continue_on_error` default.
+- **`pipeline.business.status`** — pipeline-wide outcome aggregated from
+  per-stage `business.status` values. `error` if any stage is `error`,
+  `warning` if any stage is `warning` and none are `error`, `success`
+  otherwise.
+- **`summary.business`** — typed counts `{success_count, warning_count,
+  error_count}` aggregated across the `stages` array.
+- The legacy `tech.warning` boolean and `summary.warnings[]` array are
+  rejected by v1.1; the same information lives in the per-stage
+  `business.{status, reason}` block instead.
 
 ### Top-level `pipeline.commit`
 
