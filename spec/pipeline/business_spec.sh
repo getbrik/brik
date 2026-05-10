@@ -254,7 +254,7 @@ Describe "lib/pipeline/business.sh"
         business.evaluate \
           --tech-status success \
           --context snapshot \
-          | jq -e .
+          | jq -e . >/dev/null
       }
       When call eval_json
       The status should be success
