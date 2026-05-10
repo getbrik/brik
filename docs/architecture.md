@@ -128,6 +128,69 @@ overrides. Only `version` and `project.name` are required.
 
 ---
 
+## Two orthogonal axes: tech and business
+
+Every stage outcome is split along two independent axes:
+
+- **Technical axis** -- what the stage logic actually returned. Captured
+  in `tech.status` (`success | failed | skipped`) and `tech.kind` (a
+  human-readable label derived from the exit code). Lives in
+  `<stage>.tech.*`.
+- **Business axis** -- what that technical outcome means for the user.
+  Captured in `business.status` (`success | warning | error`) and
+  `business.reason` (a string). Lives in `<stage>.business.*`.
+
+The translation is a pure function in
+[`lib/pipeline/business.sh`](../lib/pipeline/business.sh) that consumes
+four inputs (no shell state) and returns a JSON outcome on stdout.
+
+### Decision matrix
+
+| `tech.status` | side-band               | `pipeline.context` | `business.status` | `business.reason`                           |
+|---|---|---|---|---|
+| `success`     | none                    | *                  | `success`         | empty string                                |
+| `success`     | `findings.ignored > 0`  | *                  | `warning`         | `"<N> findings ignored by policy"`          |
+| `failed`      | *                       | `snapshot`         | `warning`         | `"failed in snapshot context (<kind>)"`     |
+| `failed`      | *                       | `release`          | `error`           | `"failed in release context (<kind>)"`      |
+| `skipped`     | *                       | *                  | `success`         | `"not applicable"`                          |
+
+`pipeline.context` resolves from `BRIK_COMMIT_TAG` (non-empty =>
+`release`, empty => `snapshot`); see
+[reference.md / Pipeline Context](reference.md#pipeline-context) for
+the override precedence (`BRIK_CONTINUE_ON_ERROR`, CLI flag, default).
+
+### Aggregation chain
+
+```
+per-stage tech.{status, kind, exit_code, duration_ms, ...}
+                 │
+                 │  business.evaluate(tech, side-band, context)
+                 ▼
+per-stage business.{status, reason, ...stage-specific blocks...}
+                 │
+                 │  worst-of(error > warning > success) over all stages
+                 ▼
+pipeline.business.status                + summary.business.{success_count,
+                                            warning_count, error_count}
+                 │
+                 │  pipeline.run rc / stages.notify exit code
+                 ▼
+0 if business.status != error,  BRIK_EXIT_FAILURE if error
+```
+
+The runtime exit code is a function of `pipeline.business.status`,
+not of `tech.status`. A failing stage in `snapshot` context maps to
+`business.warning` and the pipeline returns `0`; the same stage in
+`release` context maps to `business.error` and returns `1`. CI users
+that need fail-fast on snapshot pass `BRIK_CONTINUE_ON_ERROR=0`.
+
+The aggregate-report (Markdown / HTML / JSON) carries both axes side
+by side: a stage row shows `Status` (tech) and `Business`, and the
+pipeline header shows the `Business outcome` block with the per-bucket
+counts.
+
+---
+
 ## Stage Flow
 
 The pipeline executes 11 stages in a fixed order.
@@ -268,11 +331,15 @@ identically in local mode and multi-container CI:
   merge them into the canonical `aggregate-report.{md,json}` before printing
   / archiving.
 
-Fragments and aggregate are versioned. Both schemas live under
-`schemas/report/v1/` (`fragment.schema.json`, `aggregate.schema.json`),
-draft 2020-12, with `schema_version` const-locked to `"1.0"` for v1.
-Aggregator behavior on schema mismatch is **warn-and-skip** so a future
-`v2.0` fragment landing in a `v1.0` consumer does not abort the pipeline.
+Fragments and aggregate are versioned. Two schema directories coexist
+under `schemas/report/`: the active `v1.1/` (producers emit
+`schema_version: "1.1"`, drafts 2020-12, `business.status` required and
+typed, legacy `tech.warning` / `summary.warnings` rejected) and the
+read-only `v1/` legacy (still accepted on input by
+`report.aggregate_fragments` for the transition window). Aggregator
+behavior on unknown `schema_version` is **warn-and-skip** so a future
+`v2.0` fragment landing in a `v1.x` consumer does not abort the
+pipeline. See [reference.md / Schema versions](reference.md#schema-versions).
 
 Key decisions:
 - **Never `exit`**: stages return exit codes, they never call `exit` directly.
