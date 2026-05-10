@@ -2,7 +2,7 @@ Describe "report.write_fragment"
   Include "$BRIK_PIPELINE_LIB/report.sh"
   Include "$BRIK_HOME/spec/support/mock_helper.sh"
 
-  FRAGMENT_SCHEMA="${BRIK_HOME}/schemas/report/v1/fragment.schema.json"
+  FRAGMENT_SCHEMA="${BRIK_HOME}/schemas/report/v1.1/fragment.schema.json"
   jv_missing() { ! command -v jv >/dev/null 2>&1; }
 
   # Validates a fragment file against the v1 fragment schema using jv.
@@ -114,13 +114,13 @@ Describe "report.write_fragment"
       The file "$REPORT_WORKSPACE/brik-artifacts/build/build.json" should be exist
     End
 
-    It "writes a fragment with schema_version 1.0"
+    It "writes a fragment with schema_version 1.1"
       read_schema_version() {
         seed_full_build && report.write_fragment "build" || return 1
         jq -r '.schema_version' "$REPORT_WORKSPACE/brik-artifacts/build/build.json"
       }
       When call read_schema_version
-      The output should equal "1.0"
+      The output should equal "1.1"
     End
 
     It "writes a fragment with the requested stage name"
