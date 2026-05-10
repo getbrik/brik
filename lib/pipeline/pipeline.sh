@@ -196,7 +196,6 @@ pipeline.run() {
 
     local -a stages=(init release build lint sast scan test package container-scan deploy notify)
     local had_failure=false
-    local had_warning=false
     local stage stage_start_ms stage_end_ms duration_ms rc
 
     for stage in "${stages[@]}"; do
@@ -229,9 +228,7 @@ pipeline.run() {
             fi
         fi
 
-        if [[ $rc -eq "$BRIK_EXIT_SKIP_WITH_WARNING" ]]; then
-            had_warning=true
-        elif [[ $rc -ne 0 ]]; then
+        if [[ $rc -ne 0 ]]; then
             had_failure=true
         fi
     done

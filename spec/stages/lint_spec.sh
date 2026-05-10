@@ -270,19 +270,6 @@ YAML
       When call run_lint_legacy_kind
       The output should equal "not-applicable"
     End
-
-    It "does not write tech.warning=true (legacy SKIP_WITH_WARNING removed)"
-      run_lint_legacy_warning() {
-        brik.use() { :; }
-        local ctx
-        ctx="$(context.create "lint")" 2>/dev/null || ctx="$(mktemp)"
-        stages.lint "$ctx" >/dev/null 2>&1 || true
-        jq -r '.stages[] | select(.name=="lint") | .tech.warning // "absent"' \
-          "$BRIK_LOG_DIR/aggregate-report.json"
-      }
-      When call run_lint_legacy_warning
-      The output should equal "absent"
-    End
   End
 
   Describe "with legacy quality.lint.enabled=false AND a lint tool configured"

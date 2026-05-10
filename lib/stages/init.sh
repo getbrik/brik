@@ -145,10 +145,10 @@ _stages.init._resolve_git_identity() {
 
 # Warn the user when their brik.yml carries one of the legacy
 # *.enabled=false stage opt-outs. The stages used to honour these keys
-# (rc=99 SKIP_WITH_WARNING) outside a release context; the new runtime
-# ignores them and runs the stage unconditionally. Emitting the warning
-# at init-time gives the operator a chance to spot the silent behaviour
-# change before the stage runs.
+# outside a release context; the new runtime ignores them and runs the
+# stage unconditionally. Emitting the warning at init-time gives the
+# operator a chance to spot the silent behaviour change before the stage
+# runs.
 #
 # Silent when the key is absent or set to its default value (true).
 _stages.init._warn_legacy_enabled_keys() {
