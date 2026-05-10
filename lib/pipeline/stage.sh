@@ -294,9 +294,62 @@ _stage._finalize_fragment() {
         fi
     fi
 
+    _stage._record_business "$stage_name" "$backend" || true
+
     [[ "${BRIK_DISABLE_REPORT_FRAGMENTS:-}" == "1" ]] && return 0
     report.write_fragment "$stage_name" 2>/dev/null || \
         log.warn "fragment write failed for stage ${stage_name} (non-fatal)"
+    return 0
+}
+
+# Compute and persist business.{status, reason} for the stage by feeding
+# its tech.status, tech.kind, the resolved pipeline context, and the
+# side-band findings.ignored.total signal into business.evaluate. Reads
+# everything from the backend so a stage running standalone (CI single-job
+# path) and a stage running under pipeline.run share the same logic.
+#
+# Best-effort: silent on missing jq, on a malformed business.evaluate
+# payload, or on a missing tech.status. The caller already wraps this in
+# `|| true`.
+_stage._record_business() {
+    local stage_name="$1"
+    local backend="$2"
+
+    command -v jq >/dev/null 2>&1 || return 0
+    [[ -f "$backend" ]] || return 0
+
+    local tech_status tech_kind findings_ignored
+    tech_status="$(jq -r --arg s "$stage_name" \
+        '.stages[]? | select(.name == $s) | .tech.status // empty' \
+        "$backend" 2>/dev/null)" || tech_status=""
+    [[ -n "$tech_status" ]] || return 0
+
+    tech_kind="$(jq -r --arg s "$stage_name" \
+        '.stages[]? | select(.name == $s) | .tech.kind // empty' \
+        "$backend" 2>/dev/null)" || tech_kind=""
+
+    findings_ignored="$(jq -r --arg s "$stage_name" \
+        '.stages[]? | select(.name == $s) | .business.findings.ignored.total // 0' \
+        "$backend" 2>/dev/null)" || findings_ignored="0"
+    [[ "$findings_ignored" =~ ^[0-9]+$ ]] || findings_ignored="0"
+
+    local context="snapshot"
+    [[ -n "${BRIK_COMMIT_TAG:-}" ]] && context="release"
+
+    local payload status reason
+    payload="$(business.evaluate \
+        --tech-status "$tech_status" \
+        --context "$context" \
+        --findings-ignored "$findings_ignored" \
+        --tech-kind "$tech_kind" 2>/dev/null)" || return 0
+    [[ -n "$payload" ]] || return 0
+
+    status="$(jq -r '.status // empty' <<<"$payload" 2>/dev/null)" || status=""
+    reason="$(jq -r '.reason // ""' <<<"$payload" 2>/dev/null)" || reason=""
+    [[ -n "$status" ]] || return 0
+
+    report.record "$stage_name" "business" "status" "$status" 2>/dev/null || true
+    report.record "$stage_name" "business" "reason" "$reason" 2>/dev/null || true
     return 0
 }
 
