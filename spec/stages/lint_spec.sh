@@ -217,11 +217,15 @@ YAML
 
   Describe "with legacy quality.lint.enabled=false (no other lint config)"
     setup_legacy_disabled() {
+      # stack=auto avoids triggering per-stack auto-detection of a lint
+      # tool; this isolates the assertion to "the legacy enabled=false key
+      # no longer short-circuits the stage" without needing to mock the
+      # downstream verify / install_deps machinery.
       cat > "$BRIK_CONFIG_FILE" <<'YAML'
 version: 1
 project:
   name: test
-  stack: node
+  stack: auto
 quality:
   lint:
     enabled: false

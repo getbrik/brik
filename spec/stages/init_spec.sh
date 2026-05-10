@@ -411,6 +411,12 @@ Describe "stages.init"
   End
 
   Describe "deprecation warning for legacy *.enabled=false keys"
+    # Only quality.lint.enabled is exercised here: it is the single key the
+    # config schema declares. The runtime also reads .security.sast.enabled,
+    # .security.scan.enabled and .security.container_scan.enabled, but the
+    # schema does not declare them, so brik validate rejects any brik.yml
+    # that tries to set them. The warning helper still checks all four keys
+    # defensively in case a future schema iteration accepts them.
     It "logs a deprecation warning when quality.lint.enabled=false is present"
       cat > "$BRIK_CONFIG_FILE" <<'YAML'
 version: 1
@@ -429,69 +435,6 @@ YAML
       }
       When call run_init_legacy_lint
       The error should include "quality.lint.enabled"
-      The error should include "deprecated"
-    End
-
-    It "logs a deprecation warning when security.sast.enabled=false is present"
-      cat > "$BRIK_CONFIG_FILE" <<'YAML'
-version: 1
-project:
-  name: test
-  stack: node
-security:
-  sast:
-    enabled: false
-YAML
-      run_init_legacy_sast() {
-        config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
-        local ctx
-        ctx="$(context.create "init")" 2>/dev/null || ctx="$(mktemp)"
-        stages.init "$ctx" >/dev/null
-      }
-      When call run_init_legacy_sast
-      The error should include "security.sast.enabled"
-      The error should include "deprecated"
-    End
-
-    It "logs a deprecation warning when security.scan.enabled=false is present"
-      cat > "$BRIK_CONFIG_FILE" <<'YAML'
-version: 1
-project:
-  name: test
-  stack: node
-security:
-  scan:
-    enabled: false
-YAML
-      run_init_legacy_scan() {
-        config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
-        local ctx
-        ctx="$(context.create "init")" 2>/dev/null || ctx="$(mktemp)"
-        stages.init "$ctx" >/dev/null
-      }
-      When call run_init_legacy_scan
-      The error should include "security.scan.enabled"
-      The error should include "deprecated"
-    End
-
-    It "logs a deprecation warning when security.container_scan.enabled=false is present"
-      cat > "$BRIK_CONFIG_FILE" <<'YAML'
-version: 1
-project:
-  name: test
-  stack: node
-security:
-  container_scan:
-    enabled: false
-YAML
-      run_init_legacy_container_scan() {
-        config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
-        local ctx
-        ctx="$(context.create "init")" 2>/dev/null || ctx="$(mktemp)"
-        stages.init "$ctx" >/dev/null
-      }
-      When call run_init_legacy_container_scan
-      The error should include "security.container_scan.enabled"
       The error should include "deprecated"
     End
 

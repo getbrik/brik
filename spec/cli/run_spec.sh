@@ -140,20 +140,32 @@ Describe "brik run"
   End
 
   Describe "brik run stage lint"
+    Include "$BRIK_HOME/spec/support/mock_helper.sh"
+
     setup() {
+      mock.setup
+      mock.create_script "npm" 'echo "mock npm: $*"'
+      mock.create_exit "node" 0
+      for tool in eslint prettier tsc; do
+        mock.create_script "$tool" 'echo "mock ${0##*/}: $*"'
+      done
+      mock.activate
       WORKSPACE="$(mktemp -d)"
       CONFIG="$(mktemp)"
-      printf 'version: 1\nproject:\n  name: cli-test\n  stack: node\nquality:\n  lint:\n    enabled: false\n' > "$CONFIG"
+      printf 'version: 1\nproject:\n  name: cli-test\n  stack: node\n' > "$CONFIG"
     }
-    cleanup() { rm -rf "$WORKSPACE" "$CONFIG"; }
+    cleanup() {
+      mock.cleanup
+      rm -rf "$WORKSPACE" "$CONFIG"
+    }
     Before 'setup'
     After 'cleanup'
 
-    It "executes lint stage with skip-with-warning (disabled outside release)"
+    It "executes lint stage successfully"
       When run script "$BRIK_BIN" run stage lint --workspace "$WORKSPACE" --config "$CONFIG"
-      The status should equal 99
+      The status should be success
       The stdout should include "lint"
-      The stderr should include "exit code 99"
+      The stderr should be present
     End
   End
 

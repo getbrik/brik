@@ -232,9 +232,10 @@
           "additionalProperties": false,
           "properties": {
             "enabled": {
-              "description": "Whether linting is active. Set to false to skip lint checks entirely.",
+              "description": "DEPRECATED. The runtime no longer honours this key: lint always runs. Init emits a one-shot deprecation warning when 'false' is detected. The key is kept in the schema so legacy brik.yml files keep validating during the migration window; remove it from your config when convenient.",
               "type": "boolean",
-              "default": true
+              "default": true,
+              "deprecated": true
             },
             "command": {
               "description": "Lint command to execute. Overrides tool-based and stack-default lint commands (Tier 1).",

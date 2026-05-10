@@ -61,19 +61,10 @@ stages.container_scan() {
         return 0
     fi
 
-    # Shift-left contract: container-scan is mandatory on a release build
-    # whenever a Docker image was produced. A user-set
-    # security.container_scan.enabled=false is honored only when the build
-    # is not on a tag; on a tag it is forced and a log.info traces the override.
-    if [[ "${BRIK_CONTAINER_SCAN_ENABLED:-true}" != "true" ]]; then
-        if [[ -n "${BRIK_COMMIT_TAG:-}" ]]; then
-            log.info "container-scan disabled by config but forced on release (BRIK_COMMIT_TAG=${BRIK_COMMIT_TAG})"
-        else
-            stage.skip_with_warning "container-scan" \
-                "container-scan disabled by user (security.container_scan.enabled=false) outside release context"
-            return $?
-        fi
-    fi
+    # Shift-left contract: container-scan always runs whenever a Docker
+    # image was produced. The runtime no longer reads
+    # BRIK_CONTAINER_SCAN_ENABLED to gate the stage; opting out is a
+    # business-level decision and lives outside the technical layer.
 
     local image="${BRIK_SECURITY_CONTAINER_IMAGE:-${image_ref}}"
 
