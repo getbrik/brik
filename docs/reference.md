@@ -868,6 +868,90 @@ outcomes.
 
 ---
 
+## Business Filter
+
+The runtime separates two orthogonal axes for every stage outcome:
+
+- **Technical axis** -- what the stage logic returned. Captured in
+  `tech.status` (success / failed / skipped) and `tech.kind` (a
+  human-readable label derived from the exit code).
+- **Business axis** -- what the technical outcome means for the user.
+  Captured in `business.status` (success / warning / error) and
+  `business.reason` (an explanation string).
+
+The translation from technical to business is performed by
+[`lib/pipeline/business.sh`](../lib/pipeline/business.sh). It is a pure
+function: it reads its inputs from named flags, prints a JSON object on
+stdout, and never touches the report backend or shell state.
+
+### `business.evaluate`
+
+```
+business.evaluate \
+  --tech-status   success|failed|skipped \
+  --context       snapshot|release \
+  [--findings-ignored <integer>=0] \
+  [--tech-kind <string>=""]
+```
+
+Output on stdout:
+
+```json
+{"status":"success|warning|error","reason":"..."}
+```
+
+Exit code: `0` on success, `BRIK_EXIT_INVALID_INPUT` (`2`) on a
+malformed flag (missing required argument, unknown enum value, negative
+or non-integer `--findings-ignored`, unrecognised flag).
+
+### Decision matrix
+
+The mapping is fixed and centralised. Sub-chantiers that emit business
+outcomes call `business.evaluate` instead of hardcoding their own
+interpretation; consumers (notify, recap, harness) read the resulting
+fields back from the fragment.
+
+| `tech.status` | side-band               | context  | `business.status` | `business.reason`                           |
+|---|---|---|---|---|
+| `success`     | none                    | *        | `success`         | empty string                                |
+| `success`     | `findings.ignored > 0`  | *        | `warning`         | `"<N> findings ignored by policy"`          |
+| `failed`      | *                       | snapshot | `warning`         | `"failed in snapshot context (<kind>)"`     |
+| `failed`      | *                       | release  | `error`           | `"failed in release context (<kind>)"`      |
+| `skipped`     | *                       | *        | `success`         | `"not applicable"`                          |
+
+`<kind>` defaults to `failure` when `--tech-kind` is omitted.
+
+### Example call
+
+```bash
+result=$(business.evaluate \
+  --tech-status success \
+  --context snapshot \
+  --findings-ignored 14 \
+  --tech-kind ok)
+
+status=$(jq -r .status <<<"$result")  # warning
+reason=$(jq -r .reason <<<"$result")  # 14 findings ignored by policy
+```
+
+### Caller responsibilities
+
+Callers must:
+
+- Populate `--findings-ignored` from the stage's own side-band signal
+  (e.g. `business.findings.ignored.total` after a security scanner has
+  run).
+- Resolve `--context` from `pipeline.commit.tag` (release if non-empty,
+  snapshot otherwise).
+- Persist the returned `status` and `reason` under the fragment's
+  `business.{status, reason}` block.
+
+The runtime ships the module today; no production stage calls it yet.
+Wiring lands in a follow-up alongside the rc-driven `tech.status`
+finalisation.
+
+---
+
 ## Configuration Resolution
 
 When a value is not set in `brik.yml`, Brik resolves it through a three-tier hierarchy:
