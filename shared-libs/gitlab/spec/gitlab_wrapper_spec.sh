@@ -244,7 +244,7 @@ Describe "gitlab-wrapper.sh"
     setup_stage_env() {
       export BRIK_CONFIG_FILE
       BRIK_CONFIG_FILE="$(mktemp)"
-      printf "version: 1\nproject:\n  name: test-project\n  stack: node\nquality:\n  lint:\n    enabled: false\n" > "$BRIK_CONFIG_FILE"
+      printf "version: 1\nproject:\n  name: test-project\n  stack: node\n" > "$BRIK_CONFIG_FILE"
       export BRIK_LOG_DIR
       BRIK_LOG_DIR="$(mktemp -d)"
       export BRIK_WORKSPACE
@@ -259,7 +259,7 @@ Describe "gitlab-wrapper.sh"
 
       # Mock non-negotiable security tools
       MOCK_SEC_BIN="$(mktemp -d)"
-      for tool in semgrep osv-scanner gitleaks; do
+      for tool in semgrep osv-scanner gitleaks eslint prettier tsc; do
         printf '#!/usr/bin/env bash\nexit 0\n' > "${MOCK_SEC_BIN}/${tool}"
         chmod +x "${MOCK_SEC_BIN}/${tool}"
       done
@@ -343,7 +343,7 @@ Describe "gitlab-wrapper.sh"
 
     # --- Lint stage: verify side effects ---
 
-    It "runs lint stage and records tech.status=skipped with warning"
+    It "runs lint stage and records tech.status=success"
       run_lint_check_report() {
         brik.gitlab.run_stage "lint" >/dev/null 2>&1
         local report="${BRIK_LOG_DIR}/aggregate-report.json"
@@ -354,14 +354,14 @@ Describe "gitlab-wrapper.sh"
         fi
       }
       When call run_lint_check_report
-      The output should equal "skipped"
+      The output should equal "success"
     End
 
     It "runs lint stage and logs message"
-      # Fixture sets quality.lint.enabled=false outside a release, so lint
-      # skips with warning (exit 99) instead of running.
+      # Fixture has no quality.lint.* tool, so lint reaches the
+      # not-applicable auto-skip branch and returns 0.
       When call brik.gitlab.run_stage "lint"
-      The status should equal 99
+      The status should be success
       The output should include "lint"
       The error should be present
     End

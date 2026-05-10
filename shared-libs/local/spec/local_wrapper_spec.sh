@@ -362,7 +362,7 @@ Describe "local-wrapper.sh"
     setup_stage_env() {
       export BRIK_CONFIG_FILE
       BRIK_CONFIG_FILE="$(mktemp)"
-      printf "version: 1\nproject:\n  name: test-project\n  stack: node\nquality:\n  lint:\n    enabled: false\n" > "$BRIK_CONFIG_FILE"
+      printf "version: 1\nproject:\n  name: test-project\n  stack: node\n" > "$BRIK_CONFIG_FILE"
       export BRIK_LOG_DIR
       BRIK_LOG_DIR="$(mktemp -d)"
       export BRIK_WORKSPACE
@@ -372,7 +372,7 @@ Describe "local-wrapper.sh"
 
       # Mock non-negotiable security tools
       MOCK_SEC_BIN="$(mktemp -d)"
-      for tool in semgrep osv-scanner gitleaks; do
+      for tool in semgrep osv-scanner gitleaks eslint prettier tsc; do
         printf '#!/usr/bin/env bash\nexit 0\n' > "${MOCK_SEC_BIN}/${tool}"
         chmod +x "${MOCK_SEC_BIN}/${tool}"
       done
@@ -408,11 +408,11 @@ Describe "local-wrapper.sh"
       The error should be present
     End
 
-    It "runs lint stage (skipped with warning by fixture)"
-      # Fixture sets quality.lint.enabled=false outside a release, so lint
-      # skips with warning (exit 99) instead of running.
+    It "runs lint stage successfully (auto-skip when no checks configured)"
+      # Fixture has no quality.lint.* tool, so lint reaches the
+      # not-applicable auto-skip branch and returns 0.
       When call brik.local.run_stage "lint"
-      The status should equal 99
+      The status should be success
       The output should include "lint"
       The error should be present
     End
@@ -425,10 +425,10 @@ Describe "local-wrapper.sh"
     End
 
     It "dispatches quality to lint (backward compat)"
-      # Fixture sets quality.lint.enabled=false outside a release, so lint
-      # skips with warning (exit 99) instead of running.
+      # Fixture has no quality.lint.* tool, so lint reaches the
+      # not-applicable auto-skip branch and returns 0.
       When call brik.local.run_stage "quality"
-      The status should equal 99
+      The status should be success
       The output should include "lint"
       The error should be present
     End
@@ -509,7 +509,7 @@ Describe "local-wrapper.sh"
     setup_pipeline_env() {
       export BRIK_CONFIG_FILE
       BRIK_CONFIG_FILE="$(mktemp)"
-      printf "version: 1\nproject:\n  name: pipeline-test\n  stack: node\nquality:\n  lint:\n    enabled: false\ntest:\n  framework: npm\n" > "$BRIK_CONFIG_FILE"
+      printf "version: 1\nproject:\n  name: pipeline-test\n  stack: node\ntest:\n  framework: npm\n" > "$BRIK_CONFIG_FILE"
       export BRIK_LOG_DIR
       BRIK_LOG_DIR="$(mktemp -d)"
       export BRIK_WORKSPACE
@@ -536,7 +536,7 @@ exit 0
 MOCKEOF
       chmod +x "${MOCK_BIN}/npx"
       # Mock non-negotiable security tools
-      for tool in semgrep osv-scanner gitleaks; do
+      for tool in semgrep osv-scanner gitleaks eslint prettier tsc; do
         printf '#!/usr/bin/env bash\nexit 0\n' > "${MOCK_BIN}/${tool}"
         chmod +x "${MOCK_BIN}/${tool}"
       done
@@ -558,12 +558,12 @@ MOCKEOF
       The error should include "unknown flag"
     End
 
-    It "runs default pipeline and prints summary (lint disabled -> exit 99)"
-      # Fixture sets quality.lint.enabled=false outside a release, so lint
-      # exits 99 (skip-with-warning) and the pipeline propagates that rc.
-      # The Pipeline Summary header remains because Notify always runs.
+    It "runs default pipeline and prints summary"
+      # Fixture has no quality.lint.* tool, so lint reaches the
+      # not-applicable auto-skip branch and the pipeline succeeds.
+      # The Pipeline Summary header is emitted because Notify always runs.
       When call brik.local.run_pipeline
-      The status should equal 99
+      The status should be success
       The output should include "Pipeline Summary"
       The output should include "SKIP"
       The error should be present
@@ -757,7 +757,7 @@ MOCKEOF
     setup_pipeline_release() {
       export BRIK_CONFIG_FILE
       BRIK_CONFIG_FILE="$(mktemp)"
-      printf "version: 1\nproject:\n  name: pipeline-test\n  stack: node\nquality:\n  lint:\n    enabled: false\ntest:\n  framework: npm\n" > "$BRIK_CONFIG_FILE"
+      printf "version: 1\nproject:\n  name: pipeline-test\n  stack: node\ntest:\n  framework: npm\n" > "$BRIK_CONFIG_FILE"
       export BRIK_LOG_DIR
       BRIK_LOG_DIR="$(mktemp -d)"
       export BRIK_WORKSPACE
@@ -782,7 +782,7 @@ echo "mock npx: $*"
 exit 0
 MOCKEOF
       chmod +x "${MOCK_BIN}/npx"
-      for tool in semgrep osv-scanner gitleaks; do
+      for tool in semgrep osv-scanner gitleaks eslint prettier tsc; do
         printf '#!/usr/bin/env bash\nexit 0\n' > "${MOCK_BIN}/${tool}"
         chmod +x "${MOCK_BIN}/${tool}"
       done
@@ -820,10 +820,10 @@ MOCKEOF
       When call brik.local.run_pipeline --with-deploy
       The output should be present
       The error should include "review target environment before running"
-      # brik.local.run_pipeline returns the pipeline.run rc, which is 99
-      # (BRIK_EXIT_SKIP_WITH_WARNING) when stages skip with warning. Assert
-      # the failure status so shellspec stops WARNING about un-asserted exit.
-      The status should be failure
+      # The stage opt-out (--enabled=false) is gone; lint runs to completion
+      # via the auto-skip branch, the rest of the pipeline succeeds with
+      # mocked tools. Assert success status so shellspec stops WARNING.
+      The status should be success
     End
 
     It "returns exit code 1 when pipeline has failure"

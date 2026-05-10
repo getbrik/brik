@@ -6,7 +6,7 @@ Describe "brik run pipeline"
       mock.create_script "npm" 'echo "mock npm: $*"'
       mock.create_exit "node" 0
       mock.create_script "npx" 'echo "mock npx: $*"'
-      for tool in semgrep osv-scanner gitleaks; do
+      for tool in semgrep osv-scanner gitleaks eslint prettier tsc; do
         mock.create_script "$tool" 'echo "mock ${0##*/}: $*"'
       done
       mock.activate
@@ -14,7 +14,7 @@ Describe "brik run pipeline"
       printf '{"name":"cli-test","version":"1.0.0","scripts":{"build":"echo ok","test":"echo ok"}}\n' > "${WORKSPACE}/package.json"
       mkdir -p "${WORKSPACE}/node_modules"
       CONFIG="$(mktemp)"
-      printf 'version: 1\nproject:\n  name: cli-test\n  stack: node\nquality:\n  lint:\n    enabled: false\ntest:\n  framework: npm\n' > "$CONFIG"
+      printf 'version: 1\nproject:\n  name: cli-test\n  stack: node\ntest:\n  framework: npm\n' > "$CONFIG"
     }
     cleanup() {
       mock.cleanup
@@ -23,12 +23,12 @@ Describe "brik run pipeline"
     Before 'setup'
     After 'cleanup'
 
-    It "executes the full default pipeline (lint disabled -> exit 99)"
-      # Fixture sets quality.lint.enabled=false outside a release, so lint
-      # exits 99 (skip-with-warning) and the pipeline propagates the same
-      # rc. The Pipeline Summary header remains because Notify always runs.
+    It "executes the full default pipeline"
+      # Fixture has no quality.lint.* tool, so lint reaches the
+      # not-applicable auto-skip branch and the pipeline succeeds. The
+      # Pipeline Summary header is emitted because Notify always runs.
       When run script "$BRIK_BIN" run pipeline --workspace "$WORKSPACE" --config "$CONFIG"
-      The status should equal 99
+      The status should be success
       The stdout should include "Pipeline Summary"
       The stderr should be present
     End

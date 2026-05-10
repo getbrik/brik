@@ -52,6 +52,12 @@ stages.init() {
     export BRIK_BUILD_STACK="$stack"
     config.validate_coherence || return $?
 
+    # Surface deprecation of the legacy *.enabled=false stage opt-outs. The
+    # stages no longer honour these keys: lint, sast, scan, container-scan
+    # always run. The dotenv still exports BRIK_*_ENABLED for any external
+    # consumer that scrapes the pipeline env, but the runtime ignores them.
+    _stages.init._warn_legacy_enabled_keys
+
     # Load project-level env file (brik.yml .project.env or auto-detect brik.env).
     # Exports variables that subsequent stages can reference. Existing
     # environment values (CI secrets etc.) take precedence over file entries.
@@ -135,6 +141,29 @@ _stages.init._resolve_git_identity() {
 
     pipeline.env.set "BRIK_GIT_USER_EMAIL" "$git_email" 2>/dev/null || true
     pipeline.env.set "BRIK_GIT_USER_NAME"  "$git_name"  2>/dev/null || true
+}
+
+# Warn the user when their brik.yml carries one of the legacy
+# *.enabled=false stage opt-outs. The stages used to honour these keys
+# (rc=99 SKIP_WITH_WARNING) outside a release context; the new runtime
+# ignores them and runs the stage unconditionally. Emitting the warning
+# at init-time gives the operator a chance to spot the silent behaviour
+# change before the stage runs.
+#
+# Silent when the key is absent or set to its default value (true).
+_stages.init._warn_legacy_enabled_keys() {
+    local key val
+    for key in \
+        ".quality.lint.enabled" \
+        ".security.sast.enabled" \
+        ".security.scan.enabled" \
+        ".security.container_scan.enabled"
+    do
+        val="$(config.get "$key" 'true')"
+        if [[ "$val" == "false" ]]; then
+            log.warn "${key#.}=false is deprecated and ignored: the stage will run regardless"
+        fi
+    done
 }
 
 # Resolve the runner image to use for downstream jobs based on the active
