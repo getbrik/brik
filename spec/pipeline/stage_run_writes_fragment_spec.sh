@@ -2,7 +2,7 @@ Describe "stage.run wires report.write_fragment"
   Include "$BRIK_PIPELINE_LIB/stage.sh"
   Include "$BRIK_HOME/spec/support/mock_helper.sh"
 
-  FRAGMENT_SCHEMA="${BRIK_HOME}/schemas/report/v1/fragment.schema.json"
+  FRAGMENT_SCHEMA="${BRIK_HOME}/schemas/report/v1.1/fragment.schema.json"
   jv_missing() { ! command -v jv >/dev/null 2>&1; }
 
   validate_fragment_file() {

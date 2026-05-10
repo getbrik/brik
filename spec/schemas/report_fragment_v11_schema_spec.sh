@@ -144,20 +144,24 @@ Describe "schemas/report/v1.1/fragment.schema.json"
       The status should not equal 0
     End
 
-    It "rejects unknown keys under business"
+    It "accepts stage-specific business top-level scalars (open block)"
       Skip if "jv not installed" jv_missing
+      # release-stage business writes bump_type / new_version / previous_version
+      # as scalars; init writes platform / project_name / triggered_by. The
+      # block stays open so stages can land telemetry without bumping the
+      # schema, while status remains required and typed.
       payload='{
         "schema_version": "1.1",
-        "stage": "lint",
+        "stage": "release",
         "timestamp": "2026-05-10T10:00:00+0000",
         "rc": 0,
         "status": "success",
         "runner": { "platform": "gitlab" },
         "tech": { "kind": "ok" },
-        "business": { "status": "success", "garbage": "rejected" }
+        "business": { "status": "success", "bump_type": "minor", "new_version": "0.5.0" }
       }'
       When call validate_fragment_v11 "$payload"
-      The status should not equal 0
+      The status should be success
     End
   End
 

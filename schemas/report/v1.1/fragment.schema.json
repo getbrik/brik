@@ -114,10 +114,10 @@
       }
     },
     "business": {
-      "description": "Business outcome payload. v1.1 makes status mandatory and typed (success / warning / error) so the runtime expresses outcomes the same way every consumer (notify, recap, harness E2E) reads them. Stage-specific business signals live under the known sub-blocks.",
+      "description": "Business outcome payload. v1.1 makes status mandatory and typed (success / warning / error) so the runtime expresses outcomes the same way every consumer (notify, recap, harness E2E) reads them. Stage-specific business signals live under the known sub-blocks below; the block stays open (additionalProperties: true) so stages can also write top-level scalars (release.{bump_type, new_version, previous_version}, init.{platform, project_name, triggered_by}, ...) without bumping the schema.",
       "type": "object",
       "required": ["status"],
-      "additionalProperties": false,
+      "additionalProperties": true,
       "properties": {
         "status": {
           "description": "Business outcome. Derived by lib/pipeline/business.sh from (tech, side-band signals, pipeline.context).",

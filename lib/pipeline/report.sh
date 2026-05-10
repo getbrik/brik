@@ -350,8 +350,17 @@ report.write_fragment() {
         | ( $tech.status    // "skipped" ) as $status
         | ( ($tech.exit_code // 0) | tonumber? // 0 ) as $rc
         | ( $tech.duration_ms ) as $duration_raw
+        # v1.1 requires business.status. When the stage did not write one
+        # (legacy producer, stub fragment for a stage absent from the
+        # backend, ...), default from tech.status: success/skipped map to
+        # success, failed maps to error. _stage._record_business overrides
+        # this for stages that ran through the matrix.
+        | ( if ($business | type) == "object" and ($business | has("status"))
+            then $business
+            else $business + { status: ( if $status == "failed" then "error" else "success" end ) }
+            end ) as $business_v11
         | ( {
-            schema_version: "1.0",
+            schema_version: "1.1",
             stage: $stage_name,
             timestamp: $timestamp,
             rc: $rc,
@@ -360,7 +369,7 @@ report.write_fragment() {
                       + ( if $image   != "" then { image:   $image   } else {} end )
                       + ( if $job_url != "" then { job_url: $job_url } else {} end ) ),
             tech: $tech,
-            business: $business
+            business: $business_v11
           }
           + ( if $duration_raw == null or $duration_raw == "" then {}
               else { duration_ms: ($duration_raw | tonumber? // 0) } end ) )
@@ -392,8 +401,11 @@ report.write_fragment() {
 #   - Files that are not valid JSON are silently skipped.
 #   - Files lacking the fragment signature (.stage and .schema_version) are
 #     silently skipped (forward-compat with arbitrary brik-artifacts/ content).
-#   - Files with schema_version != "1.0" are warn-and-skipped (decision 7:
-#     forward-compat with future v2 fragments).
+#   - Files with schema_version not in {"1.0","1.1"} are warn-and-skipped
+#     (decision 7: forward-compat with future v2 fragments). v1.0 stays
+#     readable through the chantier 11 transition window so archived
+#     fragments and external producers keep aggregating cleanly while
+#     they migrate; the runtime itself emits v1.1.
 #
 # Pipeline metadata sources (decision 5: env-first in v1):
 #   - pipeline.id        := BRIK_RUN_ID
@@ -453,10 +465,13 @@ report.aggregate_fragments() {
         # Schema version gate: warn-and-skip on mismatch.
         local sv
         sv="$(jq -r '.schema_version' "$f" 2>/dev/null)"
-        if [[ "$sv" != "1.0" ]]; then
-            log.warn "fragment ${base}: unsupported schema_version '${sv}' (expected '1.0'), skipping"
-            continue
-        fi
+        case "$sv" in
+            1.0|1.1) ;;
+            *)
+                log.warn "fragment ${base}: unsupported schema_version '${sv}' (expected '1.0' or '1.1'), skipping"
+                continue
+                ;;
+        esac
         printf '%s\n' "$f" >> "$valid_list"
     done
     shopt -u nullglob
@@ -639,7 +654,7 @@ report.aggregate_fragments() {
             + ( if $triggered_by != "" then { triggered_by: $triggered_by } else {} end )
           ) as $pipeline
         | {
-            schema_version: "1.0",
+            schema_version: "1.1",
             pipeline: $pipeline,
             stages: $frags,
             summary: {

@@ -1,7 +1,7 @@
 Describe "report.aggregate_fragments"
   Include "$BRIK_PIPELINE_LIB/report.sh"
 
-  AGGREGATE_SCHEMA="${BRIK_HOME}/schemas/report/v1/aggregate.schema.json"
+  AGGREGATE_SCHEMA="${BRIK_HOME}/schemas/report/v1.1/aggregate.schema.json"
   jv_missing() { ! command -v jv >/dev/null 2>&1; }
 
   validate_aggregate_file() {
@@ -16,18 +16,34 @@ Describe "report.aggregate_fragments"
     local stage="$1" status="$2" rc="$3" extra_json="${4:-{\}}"
     mkdir -p "${FRAG_DIR}/${stage}"
     local path="${FRAG_DIR}/${stage}/${stage}.json"
+    # v1.1 fragment shape: business is required and tech.kind is the
+    # canonical label. Map tech-status to a plausible business outcome
+    # (success -> success, failed -> error, skipped -> success/not-applicable)
+    # so the fixture validates and exercises the aggregator's worst-of pick.
+    local biz_status biz_reason tech_kind
+    case "$status" in
+        success) biz_status="success"; biz_reason=""; tech_kind="ok" ;;
+        failed)  biz_status="error"; biz_reason="failed in release context (failure)"; tech_kind="failure" ;;
+        skipped) biz_status="success"; biz_reason="not applicable"; tech_kind="not-applicable" ;;
+        *)       biz_status="success"; biz_reason=""; tech_kind="ok" ;;
+    esac
     jq -n \
       --arg stage "$stage" \
       --arg status "$status" \
       --argjson rc "$rc" \
+      --arg biz_status "$biz_status" \
+      --arg biz_reason "$biz_reason" \
+      --arg tech_kind "$tech_kind" \
       --argjson extra "$extra_json" \
       '{
-        schema_version: "1.0",
+        schema_version: "1.1",
         stage: $stage,
         timestamp: "2026-04-21T14:00:00+0000",
         rc: $rc,
         status: $status,
-        runner: { platform: "gitlab" }
+        runner: { platform: "gitlab" },
+        tech: { kind: $tech_kind },
+        business: { status: $biz_status, reason: $biz_reason }
       } + $extra' > "$path"
   }
 
