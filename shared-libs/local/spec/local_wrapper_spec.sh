@@ -827,11 +827,17 @@ MOCKEOF
       The status should be success
     End
 
-    It "returns exit code 1 when pipeline has failure"
+    It "returns exit code 1 when pipeline has a release-context failure"
       check_fail_exit() {
+        # Release context maps tech-failure to business=error which gates
+        # the pipeline rc to BRIK_EXIT_FAILURE. Snapshot context (no tag)
+        # would map to business=warning and exit 0 instead.
+        export BRIK_COMMIT_TAG="v9.9.9"
         stages.build() { return 1; }
         brik.local.run_pipeline >/dev/null 2>&1
-        echo "$?"
+        local rc=$?
+        unset BRIK_COMMIT_TAG
+        echo "$rc"
       }
       When call check_fail_exit
       The output should equal "1"

@@ -66,6 +66,35 @@ _pipeline._resolve_continue_on_error() {
     fi
 }
 
+# Compute summary.business + pipeline.business.status on the local
+# backend. Reads each stage's business.status (defaulting to "success"
+# when absent), counts buckets, picks the worst (error > warning >
+# success), and writes both into the backend.
+_pipeline._compute_business_summary() {
+    local backend
+    backend="$(_report._backend_path)"
+    [[ -f "$backend" ]] || return 0
+    command -v jq >/dev/null 2>&1 || return 0
+
+    local tmp
+    tmp="$(mktemp "${backend}.XXXXXX")" || return 0
+    if jq '
+            ( .stages // [] | map(.business.status // "success") ) as $bs
+            | { success_count: ($bs | map(select(. == "success")) | length),
+                warning_count: ($bs | map(select(. == "warning")) | length),
+                error_count:   ($bs | map(select(. == "error"))   | length) } as $summary
+            | ( if   ($summary.error_count   // 0) > 0 then "error"
+                elif ($summary.warning_count // 0) > 0 then "warning"
+                else "success" end ) as $worst
+            | .summary  = ((.summary // {}) + { business: $summary })
+            | .pipeline = ((.pipeline // {}) + { business: { status: $worst } })
+        ' "$backend" > "$tmp" 2>/dev/null; then
+        mv "$tmp" "$backend" || rm -f "$tmp"
+    else
+        rm -f "$tmp"
+    fi
+}
+
 # Stamp pipeline.context onto the local backend so consumers (HTML/MD
 # renderers, CI aggregators) can read the resolved context the same way
 # regardless of execution mode. The flat pipeline_id field is left intact
@@ -207,6 +236,8 @@ pipeline.run() {
         fi
     done
 
+    _pipeline._compute_business_summary
+
     report.render || true
 
     # Archive the report into a workspace-relative dir so GitLab/Jenkins can
@@ -214,11 +245,21 @@ pipeline.run() {
     # Runs unconditionally (notify stage is opt-in, we cannot rely on it).
     _pipeline._archive_report || true
 
-    if $had_failure; then
-        return "$BRIK_EXIT_FAILURE"
+    # Gatekeeper: the pipeline return code reflects the business outcome
+    # rather than the raw tech outcome. Snapshot context with a failing
+    # stage maps to business=warning => rc=0; release context with a
+    # failing stage maps to business=error => BRIK_EXIT_FAILURE.
+    local _backend _worst="success"
+    _backend="$(_report._backend_path)"
+    if [[ -f "$_backend" ]] && command -v jq >/dev/null 2>&1; then
+        local _bs
+        _bs="$(jq -r '.pipeline.business.status // empty' "$_backend" 2>/dev/null)"
+        case "$_bs" in
+            success|warning|error) _worst="$_bs" ;;
+        esac
     fi
-    if $had_warning; then
-        return "$BRIK_EXIT_SKIP_WITH_WARNING"
+    if [[ "$_worst" == "error" ]]; then
+        return "$BRIK_EXIT_FAILURE"
     fi
     return 0
 }
