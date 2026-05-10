@@ -1018,6 +1018,58 @@ indirectly via `BRIK_CONTINUE_ON_ERROR`.
 
 ---
 
+## Pipeline Outcome
+
+Every aggregate carries a `pipeline.business.status` and a
+`summary.business` block derived from the per-stage `business.status`
+written by [`_stage._finalize_fragment`](#business-filter):
+
+```json
+{
+  "pipeline": { "business": { "status": "success|warning|error" } },
+  "summary":  { "business": { "success_count": 3, "warning_count": 1, "error_count": 0 } }
+}
+```
+
+The aggregation rules are fixed:
+
+- `pipeline.business.status` is the worst stage status, with the order
+  `error > warning > success`. Missing per-stage values default to
+  `success` (legacy fragments stay neutral).
+- `summary.business.<bucket>_count` counts stages whose
+  `business.status` matches the bucket name. Stages without a
+  `business.status` (legacy or pipeline-level skipped placeholders)
+  contribute to `success_count`.
+
+### Gatekeeper
+
+Two callers gate the pipeline exit code off `pipeline.business.status`:
+
+| Caller         | Behaviour                                                                |
+|---|---|
+| `pipeline.run` | Returns `BRIK_EXIT_FAILURE` when the worst status is `error`; `0` otherwise. The legacy `BRIK_EXIT_SKIP_WITH_WARNING` (99) is no longer produced. |
+| `stages.notify`| Same contract: returns `BRIK_EXIT_FAILURE` when the worst status is `error`; `0` for `warning` or `success`. CI jobs that wire notify as the final stage inherit the pipeline exit code through it. |
+
+The combination of context (snapshot vs release) and the matrix (see
+[`business.evaluate`](#businessevaluate)) is what produces this signal:
+a tech failure on snapshot maps to `business.status=warning` and lets
+the run end clean (rc=0); the same failure on release maps to
+`business.status=error` and surfaces as `rc=1`.
+
+### Markdown render
+
+`aggregate-report.md` (the canonical human-facing artefact) carries a
+**Business outcome** block right after **Summary**:
+
+```markdown
+## Business outcome
+
+- **Status:** [WARN] warning
+- **Counts:** success=2, warning=1, error=0
+```
+
+---
+
 ## Configuration Resolution
 
 When a value is not set in `brik.yml`, Brik resolves it through a three-tier hierarchy:
