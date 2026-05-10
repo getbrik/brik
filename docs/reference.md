@@ -952,6 +952,65 @@ finalisation.
 
 ---
 
+## Pipeline Context
+
+Every pipeline run resolves to one of two execution contexts:
+
+- `snapshot` -- short-lived run on a feature branch or unbound commit.
+  Default policy: keep going past failures so the operator gets a full
+  report.
+- `release` -- promotion run tied to a versioned commit. Default policy:
+  fail-fast so a broken stage cannot mask downstream issues.
+
+The context is derived from `BRIK_COMMIT_TAG`:
+
+| `BRIK_COMMIT_TAG`       | resolved context |
+|---|---|
+| unset or empty          | `snapshot`       |
+| any non-empty string    | `release`        |
+
+The resolved value is persisted under `pipeline.context` in
+`aggregate-report.json` (both local mode and CI aggregate). The local
+backend keeps its flat `pipeline_id` field for back-compat.
+
+### `continue_on_error` precedence
+
+Three layers, highest first:
+
+1. `BRIK_CONTINUE_ON_ERROR=0|1` -- explicit operator override. Wins
+   over everything else. Accepted truthy values: `1`, `true`, `yes`.
+   Accepted falsy values: `0`, `false`, `no`. Other values fall
+   through to the next layer.
+2. `--continue-on-error` CLI flag -- legacy back-compat shortcut,
+   equivalent to `BRIK_CONTINUE_ON_ERROR=1` when no env override is
+   set.
+3. Context default -- `snapshot` => `true`, `release` => `false`.
+
+Examples:
+
+```bash
+# Snapshot, keep going past failures (default).
+brik run pipeline
+
+# Snapshot, force fail-fast for a CI lane that wants strict gating.
+BRIK_CONTINUE_ON_ERROR=0 brik run pipeline
+
+# Release, force continue to collect every stage report (e.g. for
+# a post-mortem aggregator).
+BRIK_COMMIT_TAG=v1.2.3 BRIK_CONTINUE_ON_ERROR=1 brik run pipeline
+```
+
+### Pre-release tags
+
+Pre-release tags such as `v1.2.3-rc1` are treated as `release`. The
+runtime does not parse the tag string; the presence of any non-empty
+tag is enough. Refining this (e.g. only treating final tags as
+release, or distinguishing rc from beta) is intentionally out of
+scope -- callers that need a different policy override the context
+indirectly via `BRIK_CONTINUE_ON_ERROR`.
+
+---
+
 ## Configuration Resolution
 
 When a value is not set in `brik.yml`, Brik resolves it through a three-tier hierarchy:
