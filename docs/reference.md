@@ -639,8 +639,8 @@ Bash Runtime (Layer 0) independently of the `hooks` section in `brik.yml`.
 
 Every pipeline run produces `aggregate-report.json` (and a Markdown rendering)
 under `${BRIK_LOG_DIR}` (local mode) or `${BRIK_WORKSPACE}/brik-artifacts/`
-(CI mode). The fields below describe the v1.0 producer contract; producers
-emit `schema_version: "1.0"` today. Consumers should match on `^1\.` to
+(CI mode). The fields below describe the v1.1 producer contract; producers
+emit `schema_version: "1.1"` today. Consumers should match on `^1\.` to
 accept future minor 1.x evolutions.
 
 ### Schema versions
@@ -649,8 +649,8 @@ Two schema versions coexist under [`schemas/report/`](../schemas/report/):
 
 | Version | Status | When to use |
 |---|---|---|
-| [`v1`](../schemas/report/v1/) | Active producer schema. `tech` and `business` stay open (`additionalProperties: true`) so legacy producers and stage-specific extensions continue to validate. v1.0 also recognises the typed v1.1 fields (`tech.kind`, `business.status`, `business.reason`, `pipeline.context`, `pipeline.business`) as optional additive constraints, so producers can opt into them without bumping the version. | Today (all producers) |
-| [`v1.1`](../schemas/report/v1.1/) | Strict future schema. `tech` and `business` close (`additionalProperties: false`); `business.{status, reason}` is required and typed; the legacy `tech.warning`, `tech.warning_reason`, and `summary.warnings` are rejected; `pipeline.context`, `pipeline.business`, and `summary.business` are required. | Targeted by future producer migration |
+| [`v1.1`](../schemas/report/v1.1/) | **Active producer schema.** `business.status` is required and typed (`success / warning / error`); `pipeline.context`, `pipeline.business.status`, and `summary.business` are required on the aggregate; the legacy `tech.warning`, `tech.warning_reason`, and `summary.warnings` are explicitly rejected. `tech` and `business` keep `additionalProperties: true` so per-stage telemetry (build_duration_ms, framework, image_built, ...) and stage-specific business top-level scalars (release.{bump_type, new_version}, init.{platform, project_name}, ...) land without bumping the schema. | Today (all producers) |
+| [`v1`](../schemas/report/v1/) | **Read-only legacy schema.** Kept so archived fragments and external producers that have not yet migrated keep aggregating cleanly. The aggregator accepts both 1.0 and 1.1 fragments on input and always emits 1.1 on output. | Reading historical artefacts only |
 
 The v1.1 deltas in detail:
 

@@ -5,6 +5,78 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+Tech / business orthogonal axes refactor (chantier
+`docs/chantiers/20260510_tech-business-orthogonal-axes.md`).
+
+### Added
+
+- **Business outcome filter** (`lib/pipeline/business.sh`) -- pure function
+  `business.evaluate` computes the typed business outcome
+  (`status: success | warning | error`, `reason`) from the matrix
+  `(tech.status, side-band findings.ignored, pipeline.context, tech.kind)`.
+  Wired into `_stage._finalize_fragment` so every stage fragment now
+  carries `business.{status, reason}`.
+- **Pipeline context** -- `BRIK_COMMIT_TAG` resolves to
+  `pipeline.context = release` (non-empty) or `snapshot` (empty). Drives
+  the `continue_on_error` default (snapshot lenient, release strict) and
+  the business filter severity. Override via the new
+  `BRIK_CONTINUE_ON_ERROR=0|1` environment variable; the legacy
+  `--continue-on-error` CLI flag still works.
+- **Pipeline gatekeeper** -- `pipeline.run` aggregates per-stage
+  `business.status` into `summary.business.{success_count, warning_count,
+  error_count}` and `pipeline.business.status` (worst-of). The pipeline
+  return code is now derived from `pipeline.business.status`:
+  `error` => `BRIK_EXIT_FAILURE`, anything else => `0`. `stages.notify`
+  gates the same way at the end of CI runs.
+- **Renderers** -- `aggregate-report.md` carries a "Business outcome"
+  section (status + per-bucket counts); `aggregate-report.html` adds a
+  "Business outcome" kvCard; the live notify recap table prints a
+  `Business` column alongside the existing `Status`.
+
+### Changed (BREAKING)
+
+- **Schema bumped to 1.1.** Producers now emit `schema_version: "1.1"`
+  on both fragments (`report.write_fragment`) and the aggregate
+  (`report.aggregate_fragments`). The aggregator's input filter accepts
+  both `1.0` and `1.1` so archived fragments and external producers can
+  keep aggregating cleanly while they migrate.
+
+  Migration for external consumers (dashboards, exporters):
+  1. **Loose validators** (consume the JSON, accept extra fields):
+     no change required. The shape is additive.
+  2. **Strict validators** (validate against the published schema):
+     point at `schemas/report/v1.1/{fragment,aggregate}.schema.json`
+     instead of `v1`. The `v1` schema stays available for reading
+     historical artefacts only.
+  3. **Field consumers**: the legacy `tech.warning`,
+     `tech.warning_reason`, and `summary.warnings` are gone. The
+     equivalent signal lives in per-stage `business.{status, reason}`
+     and aggregate `summary.business`.
+- **`pipeline.run` rc semantics**. A failing stage in `snapshot` context
+  now resolves to `business.warning` and the pipeline returns `0`
+  instead of `1`. Release context (with `BRIK_COMMIT_TAG` set) keeps
+  fail-fast and returns `1`. CI users that need the previous
+  fail-fast-on-snapshot behaviour pass `BRIK_CONTINUE_ON_ERROR=0`.
+- **Wrapper UI**. GitLab no longer paints a "yellow warning" job for
+  the legacy code 99 path (`allow_failure: { exit_codes: [99] }` removed
+  from lint / sast / scan / container-scan templates). Jenkins no
+  longer marks the stage `UNSTABLE` on rc=99. A real stage failure
+  still paints red as before; a `business.warning` (e.g. findings
+  ignored by policy) is reported via `aggregate-report.{md,json,html}`
+  only.
+
+### Removed
+
+- `BRIK_EXIT_SKIP_WITH_WARNING` (exit code 99) from
+  `lib/pipeline/error.sh`.
+- `stage.skip_with_warning` helper from `lib/pipeline/stage.sh`.
+- `summary.warnings` aggregation from `report.aggregate_fragments`.
+- The `*.enabled=false` opt-out for `lint / sast / scan / container_scan`
+  in `brik.yml` (deprecation warning emitted at init time).
+- `E2E_OPTIONAL_JOBS` convention from the briklab E2E harness.
+
 ## [0.4.0] - 2026-05-05
 
 Release focused on the unified `brik-artifacts/<stage>/` layout, L4 business
