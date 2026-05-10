@@ -595,12 +595,13 @@ MOCKEOF
     # spec/pipeline/pipeline_spec.sh (has_status guard preserves stage-reported
     # status so wrapper-level integration checks are redundant here).
 
-    It "stops at first failure without --continue-on-error"
+    It "stops at first failure when BRIK_CONTINUE_ON_ERROR=0 (snapshot fail-fast)"
       check_stop_on_failure() {
-        # Override stages.build to fail
+        # Override stages.build to fail. Snapshot context now defaults to
+        # continue-on-error=true; force fail-fast via the explicit override.
         stages.build() { return 1; }
         local output
-        output="$(brik.local.run_pipeline 2>/dev/null)"
+        output="$(BRIK_CONTINUE_ON_ERROR=0 brik.local.run_pipeline 2>/dev/null)"
         local build_line test_line
         build_line="$(echo "$output" | grep -F "build")"
         test_line="$(echo "$output" | grep -F "test")"

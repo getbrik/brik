@@ -25,6 +25,69 @@ _BRIK_PIPELINE_LOADED=1
 # shellcheck source=report.sh
 [[ -z "${_BRIK_REPORT_LOADED:-}" ]] && . "${BASH_SOURCE[0]%/*}/report.sh"
 
+# Resolve the pipeline context from BRIK_COMMIT_TAG.
+# Empty/unset tag => "snapshot"; any non-empty tag => "release".
+# Pre-release tags (v1.2.3-rc1) are treated as release; refining this
+# is intentionally out of scope (no regex parsing).
+_pipeline._resolve_context() {
+    if [[ -n "${BRIK_COMMIT_TAG:-}" ]]; then
+        printf '%s' "release"
+    else
+        printf '%s' "snapshot"
+    fi
+}
+
+# Resolve continue_on_error policy.
+# Precedence (highest first):
+#   1. BRIK_CONTINUE_ON_ERROR=0|1 (explicit operator override)
+#   2. CLI --continue-on-error flag (legacy back-compat, equivalent to "1")
+#   3. Context default: snapshot => true, release => false
+# Usage: _pipeline._resolve_continue_on_error <context> <cli_flag>
+_pipeline._resolve_continue_on_error() {
+    local context="$1"
+    local cli_flag="${2:-false}"
+
+    if [[ -n "${BRIK_CONTINUE_ON_ERROR:-}" ]]; then
+        case "$BRIK_CONTINUE_ON_ERROR" in
+            1|true|yes) printf '%s' "true";  return 0 ;;
+            0|false|no) printf '%s' "false"; return 0 ;;
+        esac
+    fi
+
+    if [[ "$cli_flag" == "true" ]]; then
+        printf '%s' "true"
+        return 0
+    fi
+
+    if [[ "$context" == "release" ]]; then
+        printf '%s' "false"
+    else
+        printf '%s' "true"
+    fi
+}
+
+# Stamp pipeline.context onto the local backend so consumers (HTML/MD
+# renderers, CI aggregators) can read the resolved context the same way
+# regardless of execution mode. The flat pipeline_id field is left intact
+# for back-compat.
+_pipeline._stamp_context() {
+    local context="$1"
+    local backend
+    backend="$(_report._backend_path)"
+    [[ -f "$backend" ]] || return 0
+    command -v jq >/dev/null 2>&1 || return 0
+
+    local tmp
+    tmp="$(mktemp "${backend}.XXXXXX")" || return 0
+    if jq --arg ctx "$context" \
+            '. + { pipeline: ((.pipeline // {}) + { context: $ctx }) }' \
+            "$backend" > "$tmp" 2>/dev/null; then
+        mv "$tmp" "$backend" || rm -f "$tmp"
+    else
+        rm -f "$tmp"
+    fi
+}
+
 # Decide whether a stage should be skipped based on opt-in flags.
 # Returns 0 (true) if the stage should be skipped, 1 otherwise.
 # Usage: _pipeline._should_skip <stage> <with_release> <with_package> <with_deploy>
@@ -54,14 +117,14 @@ _pipeline._should_skip() {
 #          BRIK_EXIT_FAILURE when at least one executed stage failed,
 #          BRIK_EXIT_INVALID_INPUT on unknown flag.
 pipeline.run() {
-    local continue_on_error=false
+    local cli_continue_on_error=false
     local with_release=false
     local with_package=false
     local with_deploy=false
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
-            --continue-on-error) continue_on_error=true; shift ;;
+            --continue-on-error) cli_continue_on_error=true; shift ;;
             --with-release)      with_release=true; shift ;;
             --with-package)      with_package=true; shift ;;
             --with-deploy)       with_deploy=true; shift ;;
@@ -76,7 +139,21 @@ pipeline.run() {
         log.warn "deploy stage enabled - review target environment before running"
     fi
 
+    local pipeline_context
+    pipeline_context="$(_pipeline._resolve_context)"
+    local continue_on_error_str
+    continue_on_error_str="$(_pipeline._resolve_continue_on_error \
+        "$pipeline_context" "$cli_continue_on_error")"
+    local continue_on_error
+    if [[ "$continue_on_error_str" == "true" ]]; then
+        continue_on_error=true
+    else
+        continue_on_error=false
+    fi
+    log.info "pipeline context: ${pipeline_context} (continue_on_error=${continue_on_error_str})"
+
     report.init || return "$?"
+    _pipeline._stamp_context "$pipeline_context"
 
     # Local mode treats per-stage fragments as a CI-only mechanism: pipeline.run
     # produces the canonical aggregate-report.{md,json} directly via report.render

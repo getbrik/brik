@@ -466,6 +466,8 @@ report.aggregate_fragments() {
     local project="${BRIK_PROJECT_NAME:-unnamed}"
     local finished_at
     finished_at="$(date +"%Y-%m-%dT%H:%M:%S%z")"
+    local pipeline_context="snapshot"
+    [[ -n "${BRIK_COMMIT_TAG:-}" ]] && pipeline_context="release"
 
     # Findings policy projection (chantier 20260508 P1.5 / P3.F). The active
     # built-in preset comes from BRIK_QUALITY_FINDINGS_POLICY (export config
@@ -568,6 +570,7 @@ report.aggregate_fragments() {
         --arg pid "$pipeline_id" \
         --arg platform "$platform" \
         --arg project "$project" \
+        --arg context "$pipeline_context" \
         --arg finished_at "$finished_at" \
         --arg pipeline_url "$pipeline_url" \
         --arg commit_sha "$commit_sha" \
@@ -621,6 +624,7 @@ report.aggregate_fragments() {
               id: $pid,
               platform: $platform,
               project: $project,
+              context: $context,
               started_at: $started,
               finished_at: $finished_at,
               status: $pstatus
