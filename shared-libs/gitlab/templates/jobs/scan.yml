@@ -39,9 +39,3 @@ brik-scan:
         - brik-artifacts/scan/sbom.cdx.json
     paths:
       - brik-artifacts/
-  # exit 99 = stage.skip_with_warning (Brik): user disabled scan outside
-  # a release context. Surfaced as "passed with warnings" in the GitLab UI.
-  # Scan always runs on a release tag regardless of the user flag.
-  allow_failure:
-    exit_codes:
-      - 99
