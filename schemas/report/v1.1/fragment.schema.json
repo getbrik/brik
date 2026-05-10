@@ -58,9 +58,15 @@
       }
     },
     "tech": {
-      "description": "Technical traceability payload. v1.1 closes the door on tech.warning / tech.warning_reason (those decisions are now expressed via business.status). Stage-specific runtime metadata lives under the listed known fields. Add new tech.* fields by bumping the schema version.",
+      "description": "Technical traceability payload. v1.1 explicitly rejects the legacy tech.warning / tech.warning_reason fields (those decisions are now expressed via business.status), but keeps the block open (additionalProperties: true) so per-stage runtime telemetry (build_duration_ms, framework, image_built, ...) can land without bumping the schema. The known fields below describe the shape consumers can rely on.",
       "type": "object",
-      "additionalProperties": false,
+      "additionalProperties": true,
+      "not": {
+        "anyOf": [
+          { "required": ["warning"] },
+          { "required": ["warning_reason"] }
+        ]
+      },
       "properties": {
         "status": {
           "description": "Mirror of the top-level status. Kept for producer convenience.",
