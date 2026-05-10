@@ -54,12 +54,21 @@ Describe "report renderers expose business outcome"
     It "embeds the pipeline.business.status value in the JSON data island"
       do_render() {
         write_aggregate "warning" 1 1 0
+        # Extract the JSON island between the brik-report script open/close
+        # tags, undo the </ -> <\/ escape applied by the renderer, then read
+        # pipeline.business.status via jq -- avoids depending on whitespace
+        # formatting of the embedded payload.
         _report._render_html "${RB_LOG_DIR}/aggregate-report.json" \
-          | grep -F '"business":{"status":"warning"}'
+          | awk '
+              /<script type="application\/json" id="brik-report">/ {capture=1; next}
+              /<\/script>/ {if (capture) {capture=0; exit}}
+              capture {print}
+            ' \
+          | sed 's|<\\/|</|g' \
+          | jq -r '.pipeline.business.status'
       }
       When call do_render
-      The status should be success
-      The output should be present
+      The output should equal "warning"
     End
   End
 
