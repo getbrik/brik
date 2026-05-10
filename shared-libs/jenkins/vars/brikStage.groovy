@@ -7,11 +7,11 @@
  * Sources jenkins-wrapper.sh, runs setup, then dispatches to the
  * portable stage logic via brik.jenkins.run_stage. Maps the bash exit
  * code into Jenkins outcomes:
- *   - 0  : success
- *   - 99 : stage.skip_with_warning. Marks the stage UNSTABLE in the
- *          stage view and sets currentBuild.result = 'UNSTABLE'.
- *   - else: error() so the surrounding try/catch in brikPipeline marks
- *          the build FAILURE.
+ *   - 0    : success
+ *   - else : error() so the surrounding try/catch in brikPipeline marks
+ *            the build FAILURE. The stage's business outcome
+ *            (success / warning / error) is reported separately via
+ *            aggregate-report.json; warnings do not fail the job.
  */
 def call(String stageName, String brikHome) {
     def validStages = ['init', 'release', 'build', 'lint', 'sast', 'scan', 'test', 'package', 'container-scan', 'deploy', 'notify']
@@ -31,9 +31,7 @@ def call(String stageName, String brikHome) {
         )
     }
 
-    if (rc == 99) {
-        unstable("Stage ${stageName} skipped with warning (user disabled outside release)")
-    } else if (rc != 0) {
+    if (rc != 0) {
         error("Stage ${stageName} failed with exit code ${rc}")
     }
 }
