@@ -798,6 +798,14 @@ _report._render_html_tail() {
       ['failed',  stages.failed  || 0],
       ['skipped', stages.skipped || 0]
     ]));
+    const business = (data.summary || {}).business || {};
+    const pipelineBiz = ((data.pipeline || {}).business || {}).status || '-';
+    grid.appendChild(kvCard('Business outcome', [
+      ['status',  pipelineBiz],
+      ['success', business.success_count || 0],
+      ['warning', business.warning_count || 0],
+      ['error',   business.error_count   || 0]
+    ]));
     if ((policy && (policy.expiring_soon || []).length > 0)) {
       const lines = policy.expiring_soon.map((e) => [e.id || e.glob || 'entry', e.expires || '-']);
       grid.appendChild(kvCard('Expiring soon', lines));

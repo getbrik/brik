@@ -59,10 +59,14 @@ _notify._emit_recap_table() {
           elif (b.commit.short_sha // null) != null then
             "commit \(b.commit.short_sha)"
           else "-" end ;
+        def biz_label(b):
+          if b == null then "-"
+          elif b.status == null then "-"
+          else b.status end ;
         .stages
         | sort_by([stage_rank(.stage), .stage])
-        | ["Stage|Status|Duration|Metrics"]
-          + map("\(.stage)|\(status_glyph(.status))|\(human_dur(.duration_ms))|\(metrics_for(.business // null))")
+        | ["Stage|Status|Business|Duration|Metrics"]
+          + map("\(.stage)|\(status_glyph(.status))|\(biz_label(.business // null))|\(human_dur(.duration_ms))|\(metrics_for(.business // null))")
         | .[]'
 
     local data
