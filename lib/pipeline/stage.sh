@@ -40,6 +40,8 @@ _stage._load_runtime() {
     [[ -z "${_BRIK_BANNER_LOADED:-}" ]] && . "${runtime_dir}/banner.sh"
     # shellcheck source=report.sh
     [[ -z "${_BRIK_REPORT_LOADED:-}" ]] && . "${runtime_dir}/report.sh"
+    # shellcheck source=business.sh
+    [[ -z "${_BRIK_BUSINESS_LOADED:-}" ]] && . "${runtime_dir}/business.sh"
 }
 
 _stage._load_runtime
