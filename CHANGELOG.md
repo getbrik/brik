@@ -77,6 +77,39 @@ Tech / business orthogonal axes refactor (chantier
   in `brik.yml` (deprecation warning emitted at init time).
 - `E2E_OPTIONAL_JOBS` convention from the briklab E2E harness.
 
+### Migration from 0.4.x
+
+Four checkpoints to verify when upgrading from a 0.4.x install:
+
+1. **Drop `*.enabled=false` from your `brik.yml`** -- the runtime no
+   longer reads `quality.lint.enabled`, `security.sast.enabled`,
+   `security.scan.enabled`, or `security.container_scan.enabled`. The
+   stage runs unconditionally; if you want a stage to skip, do it via
+   project shape (no lint config => auto-skip with `tech.kind=not-applicable`).
+   The `init` stage logs a deprecation warning when it sees one of the
+   legacy keys, so you can spot leftovers in the CI output.
+2. **Stop expecting exit code 99** -- `BRIK_EXIT_SKIP_WITH_WARNING` is
+   gone. Wrappers (GitLab `allow_failure: { exit_codes: [99] }`,
+   Jenkins `unstable()` on rc=99) no longer translate it. CI lanes
+   that used `if [ $rc -eq 99 ]` must switch to reading
+   `aggregate-report.json`'s `pipeline.business.status`
+   (`success | warning | error`) or `summary.business.warning_count`.
+3. **Update strict schema validators to v1.1** -- producers now emit
+   `schema_version: "1.1"`. Loose validators that accept extra fields
+   stay compatible (the shape is additive). Strict validators must
+   point at `schemas/report/v1.1/{fragment,aggregate}.schema.json`.
+   The aggregator still accepts `1.0` fragments on input for the
+   transition window, so archived fragments remain readable.
+4. **Adjust to the new snapshot rc semantics** -- a failing stage on
+   a feature branch (no git tag) no longer fails the pipeline:
+   `business.warning` -> rc=0. Release runs (with a git tag) keep the
+   old fail-fast behaviour: `business.error` -> rc=1. CI lanes that
+   need fail-fast on snapshot lanes pass `BRIK_CONTINUE_ON_ERROR=0`.
+
+See [docs/architecture.md / Two orthogonal axes](docs/architecture.md#two-orthogonal-axes-tech-and-business)
+and [docs/reference.md / Pipeline Outcome](docs/reference.md#pipeline-outcome)
+for the model behind these changes.
+
 ## [0.4.0] - 2026-05-05
 
 Release focused on the unified `brik-artifacts/<stage>/` layout, L4 business

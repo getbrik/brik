@@ -216,6 +216,24 @@ conditions from `brik.yml`.
 Users do not define pipeline structure. They configure behavior within each stage
 via `brik.yml`.
 
+### Snapshot vs release context
+
+Every pipeline run resolves to one of two contexts, derived automatically
+from the git tag:
+
+- **snapshot** (no tag, e.g. a feature branch). Lenient defaults: a
+  failing stage maps to `business.warning`, the pipeline keeps going,
+  and the whole run exits `0`. You still see the failing stage in the
+  report; it just does not block the lane.
+- **release** (a tag is set, e.g. `v1.2.3`). Strict defaults: a failing
+  stage maps to `business.error`, the pipeline fail-fasts on it, and
+  the run exits `1`.
+
+Override the default with `BRIK_CONTINUE_ON_ERROR=0` (force fail-fast
+on snapshot) or `BRIK_CONTINUE_ON_ERROR=1` (force continue on release).
+The `aggregate-report.md` carries a Business outcome block summarizing
+how the run was scored.
+
 ### Test reports
 
 When `quality.test.reports.enabled: true`, brik injects per-stack coverage and
