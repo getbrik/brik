@@ -255,11 +255,21 @@ hooks:
 
 | Key | Type | Required | Default | Description |
 |-----|------|----------|---------|-------------|
+| `release.trigger.on-tag` | boolean | no | `true` | Run release on a tagged commit (SC20). Exported as `BRIK_RELEASE_TRIGGER_ON_TAG`. |
+| `release.trigger.on-main` | boolean | no | `false` | Run release on push to the default branch. Exported as `BRIK_RELEASE_TRIGGER_ON_MAIN`. |
+| `release.trigger.manual` | boolean | no | `false` | Run release only when manually triggered (`BRIK_TRIGGER_MANUAL=true`). Exported as `BRIK_RELEASE_TRIGGER_MANUAL`. |
 | `release.strategy` | string | no | `semver` | Release strategy: `semver`, `calver`, `custom`. |
 | `release.tag_prefix` | string | no | `v` | Prefix for release tags (e.g. `v1.2.3`). |
 | `release.changelog.enabled` | boolean | no | `true` | Whether to generate a changelog on release. |
 | `release.changelog.format` | string | no | `conventional` | Changelog format: `conventional`, `keep-a-changelog`. Exported but not yet consumed by the release stage. |
 | `release.changelog.file` | string | no | `CHANGELOG.md` | Path to the changelog file. |
+
+Trigger gating semantics: when the `release.trigger` block is **absent**, the
+stage always runs (legacy behaviour, preserved by `BRIK_RELEASE_TRIGGER_CONFIGURED`
+being unset). When **present**, the stage runs as soon as at least one flag matches
+the current pipeline context; otherwise it is short-circuited with
+`tech.status=skipped` and `tech.kind=not-applicable`. The same flag semantics
+apply to `package.trigger` and `deploy.trigger`.
 
 ---
 
@@ -469,6 +479,17 @@ Scans container images using `grype` (primary) or `dockle` (fallback).
 
 ### `package`
 
+#### `package.trigger`
+
+| Key | Type | Required | Default | Description |
+|-----|------|----------|---------|-------------|
+| `package.trigger.on-tag` | boolean | no | `true` | Run package on a tagged commit (SC20). Exported as `BRIK_PACKAGE_TRIGGER_ON_TAG`. |
+| `package.trigger.on-main` | boolean | no | `false` | Run on push to the default branch. Exported as `BRIK_PACKAGE_TRIGGER_ON_MAIN`. |
+| `package.trigger.on-feature` | boolean | no | `false` | Run on push to any non-default branch (typical use: dev images per feature). Exported as `BRIK_PACKAGE_TRIGGER_ON_FEATURE`. |
+| `package.trigger.manual` | boolean | no | `false` | Run only when manually triggered. Exported as `BRIK_PACKAGE_TRIGGER_MANUAL`. |
+
+Block absent in brik.yml = legacy always-run. See the `release.trigger` note above.
+
 #### `package.docker`
 
 | Key | Type | Required | Default | Description |
@@ -539,6 +560,17 @@ For details on how credential indirection works and platform setup examples, see
 ---
 
 ### `deploy`
+
+#### `deploy.trigger`
+
+| Key | Type | Required | Default | Description |
+|-----|------|----------|---------|-------------|
+| `deploy.trigger.on-tag` | boolean | no | `true` | Run deploy on a tagged commit (SC20). Exported as `BRIK_DEPLOY_TRIGGER_ON_TAG`. |
+| `deploy.trigger.on-main` | boolean | no | `false` | Run on push to the default branch. Exported as `BRIK_DEPLOY_TRIGGER_ON_MAIN`. |
+| `deploy.trigger.on-feature` | boolean | no | `false` | Run on push to any non-default branch (typical use: review apps). Exported as `BRIK_DEPLOY_TRIGGER_ON_FEATURE`. |
+| `deploy.trigger.manual` | boolean | no | `false` | Run only when manually triggered. Exported as `BRIK_DEPLOY_TRIGGER_MANUAL`. |
+
+Block absent in brik.yml = legacy always-run. See the `release.trigger` note above.
 
 | Key | Type | Required | Default | Description |
 |-----|------|----------|---------|-------------|

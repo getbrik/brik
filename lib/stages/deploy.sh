@@ -19,6 +19,20 @@ stages.deploy() {
 
     config.export_deploy_vars
 
+    # SC20: honour deploy.trigger.{on-tag, on-main, on-feature, manual}.
+    # Legacy compat preserved: unconfigured trigger -> always run.
+    # Defensive: a test harness stubbing brik.use as a no-op leaves
+    # gating.should_run_stage undefined; treat that as "run".
+    brik.use transverse.gating 2>/dev/null || true
+    if declare -f gating.should_run_stage >/dev/null 2>&1; then
+        if ! gating.should_run_stage DEPLOY; then
+            log.info "deploy stage skipped: trigger conditions not met"
+            report.record "deploy" "tech" "status" "skipped"         2>/dev/null || true
+            report.record "deploy" "tech" "kind"   "not-applicable"  2>/dev/null || true
+            return 0
+        fi
+    fi
+
     brik.use conditions
     brik.use transverse.env
 
