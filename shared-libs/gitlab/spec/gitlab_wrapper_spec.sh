@@ -386,16 +386,14 @@ Describe "gitlab-wrapper.sh"
     It "dispatches quality to lint (backward compat)"
       run_compat_quality() {
         brik.gitlab.run_stage "quality" >/dev/null 2>&1
-        local context_file
-        context_file="$(ls "${BRIK_LOG_DIR}"/context-quality-* 2>/dev/null | head -1)"
-        if [[ -n "$context_file" ]]; then
-          echo "has_context"
+        if [[ -f "${BRIK_LOG_DIR}/quality-summary.json" ]]; then
+          echo "has_summary"
         else
-          echo "no_context"
+          echo "no_summary"
         fi
       }
       When call run_compat_quality
-      The output should equal "has_context"
+      The output should equal "has_summary"
     End
 
     # --- Backward compat: security -> scan ---
@@ -403,16 +401,14 @@ Describe "gitlab-wrapper.sh"
     It "dispatches security to scan (backward compat)"
       run_compat_security() {
         brik.gitlab.run_stage "security" >/dev/null 2>&1
-        local context_file
-        context_file="$(ls "${BRIK_LOG_DIR}"/context-security-* 2>/dev/null | head -1)"
-        if [[ -n "$context_file" ]]; then
-          echo "has_context"
+        if [[ -f "${BRIK_LOG_DIR}/security-summary.json" ]]; then
+          echo "has_summary"
         else
-          echo "no_context"
+          echo "no_summary"
         fi
       }
       When call run_compat_security
-      The output should equal "has_context"
+      The output should equal "has_summary"
     End
 
     # --- Package stub ---

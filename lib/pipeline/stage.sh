@@ -217,11 +217,20 @@ stage.execute() {
 }
 
 # Cleanup after stage execution.
+# Per SC17: the per-stage context file is scratch state used to pass values
+# between hooks; once summary.build has consumed it (always invoked before
+# stage.cleanup), it must be deleted so brik-artifacts/ contains only the
+# canonical summary fragment per stage. Leaving context-*-XXXXXX behind
+# would force downstream consumers (E2E harness, CI artifact aggregators)
+# to guess which file carries the source of truth.
 stage.cleanup() {
     local context_file="$1"
     local log_file="$2"
     # best-effort: cleanup hook must not abort the stage
     hook.on_cleanup "${BRIK_LOG_SCOPE:-brik}" "$context_file" "$log_file" || true
+    if [[ -n "$context_file" && -f "$context_file" ]]; then
+        rm -f "$context_file" || true
+    fi
     log.debug "stage cleanup complete"
     return 0
 }

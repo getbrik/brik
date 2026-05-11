@@ -156,6 +156,42 @@ HOOKEOF
         The stderr should include "starting stage: build"
       End
     End
+
+    Describe "fragment uniformity (SC17)"
+      success_logic() { return 0; }
+      failure_logic() { return 1; }
+
+      It "leaves no context-<stage>-XXXXXX file behind after a successful run"
+        verify_clean() {
+          stage.run "build" "success_logic" >/dev/null 2>&1
+          local count
+          count="$(find "$BRIK_LOG_DIR" -maxdepth 1 -name 'context-build-*' 2>/dev/null | wc -l)"
+          [[ "$count" -eq 0 ]]
+        }
+        When call verify_clean
+        The status should be success
+      End
+
+      It "leaves no context file behind after a failed run"
+        verify_clean_fail() {
+          stage.run "build" "failure_logic" >/dev/null 2>&1 || true
+          local count
+          count="$(find "$BRIK_LOG_DIR" -maxdepth 1 -name 'context-build-*' 2>/dev/null | wc -l)"
+          [[ "$count" -eq 0 ]]
+        }
+        When call verify_clean_fail
+        The status should be success
+      End
+
+      It "still emits the summary fragment as the canonical artifact"
+        verify_summary_remains() {
+          stage.run "build" "success_logic" >/dev/null 2>&1
+          [[ -f "${BRIK_LOG_DIR}/build-summary.json" ]]
+        }
+        When call verify_summary_remains
+        The status should be success
+      End
+    End
   End
 
   Describe "stage.create_log_file"
