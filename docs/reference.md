@@ -1151,6 +1151,46 @@ CVSS bands map to Brik buckets:
 | > 0     | low      |
 | 0 / N/A | info     |
 
+#### Tool-native severity (`lib/transverse/severity.sh`)
+
+`severity.normalize <tool> <tool_severity>` maps a tool-native severity to
+the canonical 5-bucket Brik scale `{critical, high, medium, low, info}`.
+`severity.is_tool_blocking <tool> <tool_severity>` returns `true` when
+the tool itself treats the finding as blocking by default.
+
+| Tool          | Severity (tool-native)     | Bucket   | Blocking |
+|---------------|----------------------------|----------|----------|
+| eslint        | `error` / `2`              | high     | yes      |
+| eslint        | `warn` / `warning` / `1`   | low      | no       |
+| eslint        | `off` / `0` / other        | info     | no       |
+| ruff          | `error` / `E.*` / `F.*`    | high     | yes      |
+| ruff          | `warning` / `W.*` / `I.*`  | low      | no       |
+| ruff          | `info` / `note` / other    | info     | no       |
+| checkstyle    | `error`                    | high     | yes      |
+| checkstyle    | `warning`                  | low      | no       |
+| checkstyle    | `info` / `ignore`          | info     | no       |
+| dotnet-format | `error`                    | high     | yes      |
+| dotnet-format | `warning`                  | low      | no       |
+| dotnet-format | `info` / `silent` / `hidden` / `suggestion` | info | no |
+| semgrep       | `ERROR`                    | high     | yes      |
+| semgrep       | `WARNING`                  | medium   | no       |
+| semgrep       | `INFO`                     | info     | no       |
+| grype         | `Critical`                 | critical | yes      |
+| grype         | `High`                     | high     | yes      |
+| grype         | `Medium`                   | medium   | no       |
+| grype         | `Low`                      | low      | no       |
+| grype         | `Negligible` / `Unknown`   | info     | no       |
+| osv-scanner   | `CRITICAL`                 | critical | yes      |
+| osv-scanner   | `HIGH`                     | high     | yes      |
+| osv-scanner   | `MODERATE`                 | medium   | no       |
+| osv-scanner   | `LOW`                      | low      | no       |
+| gitleaks      | any (no native scale)      | high     | yes      |
+
+Unknown tools fall back to the SARIF level vocabulary
+(`error|warning|note|none`) and the canonical bucket names. Empty inputs
+collapse to `info` / non-blocking. The module is pure (no IO, no jq) so
+it is safe to invoke from any pipeline hook.
+
 ### Per-stage artifacts layout
 
 Each stage that emits findings writes two files side-by-side:
