@@ -93,7 +93,7 @@ Describe "quality/lint.sh"
         mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock_ruff.log"
-        printf '[project]\nname = "test"\n' > "${TEST_WS}/pyproject.toml"
+        printf '[project]\nname = "test"\n[tool.ruff]\nline-length = 100\n' > "${TEST_WS}/pyproject.toml"
         mock.create_logging "ruff" "$MOCK_LOG"
         mock.activate
       }
@@ -127,7 +127,7 @@ Describe "quality/lint.sh"
       setup_no_ruff() {
         mock.setup
         TEST_WS="$(mktemp -d)"
-        printf '[project]\nname = "test"\n' > "${TEST_WS}/pyproject.toml"
+        printf '[project]\nname = "test"\n[tool.ruff]\nline-length = 100\n' > "${TEST_WS}/pyproject.toml"
         mock.isolate
       }
       cleanup_no_ruff() {
@@ -175,6 +175,7 @@ Describe "quality/lint.sh"
         mock.setup
         TEST_WS="$(mktemp -d)"
         printf '<project/>\n' > "${TEST_WS}/pom.xml"
+        printf '<module name="Checker"/>\n' > "${TEST_WS}/checkstyle.xml"
         mock.isolate
       }
       cleanup_java_lint() {
