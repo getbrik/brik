@@ -7,7 +7,98 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-Tech / business orthogonal axes refactor (chantier
+Pipeline behavior model (master chantier
+`docs/chantiers/20260511_pipeline-behavior-model.md`, sub-chantiers 1-21).
+Builds on the tech / business orthogonal axes refactor by adding the
+fix-exists axis, per-tool blocking semantics, tool resolution,
+coverage-as-finding, brik.yml trigger gating, and final documentation.
+
+### Added
+
+- **Fix-exists annotation** (`lib/transverse/fix_classifier.sh`) -- every
+  SARIF result gets a `brikFixClassification` property
+  (`has_fix | no_fix | unknown`) before policy application. Per-stage
+  heuristics cover container-scan (grype `fixState`), sast (semgrep
+  `Fix Version`), scan-deps (`fixes[]`), secret/lint/format/test
+  (always `has_fix`).
+- **Tool-blocking annotation** (SC19) -- lint and format SARIFs gain a
+  `brikToolBlocking` property based on the SARIF tool driver name + the
+  per-result severity input (eslint `error` -> true, `warn` -> false;
+  ruff `E*/F*` -> true, `I*/W*` -> false; checkstyle / dotnet-format
+  `error` -> true). `findings.aggregate` filters `failing.has_fix` and
+  `failing.no_fix` to the tool-blocking subset only.
+- **Severity normalization** (`lib/transverse/severity.sh`) -- pure
+  mapping from tool-native severity (eslint, ruff, checkstyle,
+  dotnet-format, semgrep, grype, osv-scanner, gitleaks) onto the
+  canonical 5-bucket scale `{critical, high, medium, low, info}`.
+- **Tool resolution** (`lib/transverse/tool_resolver.sh`) --
+  `tool_resolver.resolve <tool>` walks workspace `node_modules/.bin/`,
+  then `$PATH`, then `<BRIK_HOME>/tools/`, emitting a
+  `{path, version, provenance}` JSON descriptor. Missing tools become
+  typed findings instead of generic stage failures.
+- **Coverage SARIF emission** (`lib/transverse/coverage.sh`) -- the
+  existing `brik.coverage.gate` legacy hard-fail is now paired with
+  `brik.coverage.emit_sarif` which produces a SARIF result (rule
+  `brik-coverage-below-threshold`, `level=error`) when measured
+  coverage falls below `test.coverage.threshold`. The finding flows
+  through `findings.process` so it is classified, policy-checked, and
+  surfaced via `business.findings.failing`. LCOV (`lcov.info`) parsing
+  added alongside Cobertura and Jacoco, completing coverage for the
+  five canonical stack toolchains.
+- **Trigger gating** (`lib/transverse/gating.sh`) -- new
+  `release.trigger`, `package.trigger`, `deploy.trigger` blocks in
+  `brik.yml` decouple the on-tag / on-main / on-feature / manual
+  behaviours. `gating.should_run_stage <PREFIX>` answers whether the
+  current pipeline context satisfies any of the configured flags.
+  When the block is absent, the stage runs as before (legacy compat
+  preserved by the `BRIK_<PREFIX>_TRIGGER_CONFIGURED` sentinel).
+- **Business matrix extension** -- `business.evaluate` now accepts
+  `--findings-failing-{has-fix, no-fix, unknown}` flags and applies a
+  10-row matrix that consumes the fix-exists axis. Reasons are typed
+  (`"<kind> (fix available, not applied)"` etc.) so aggregate-report
+  rows are self-documenting.
+- **Schema v1.1 typed counters** --
+  `stages[].business.findings.failing` migrates from scalar int to
+  `{total, has_fix, no_fix}` object, strictly typed with
+  `additionalProperties: false`. Readers (`findings.gate`,
+  `lib/pipeline/report.sh`, `lib/stages/notify.sh`,
+  `_stage._record_business`) use a `(objects | .total) // (numbers)
+  // 0` fallback chain to accept both shapes during the transition.
+- **Fragment uniformity** (SC17) -- `stage.cleanup` now unconditionally
+  removes the per-stage `context-<stage>-XXXXXX` scratch file after
+  `summary.build` consumes it. The `<stage>-summary.json` /
+  `brik-artifacts/<stage>/<stage>.json` fragment is the sole source of
+  truth for downstream consumers (E2E harness, CI artifact aggregators).
+- **DSI risk-management guide** (`docs/risk-management.md`) -- new
+  operating handbook explaining when to allowlist in
+  `brik-policy.yml`, what to record (`reason`, `expires`, scope),
+  review cadence, and the anti-patterns the schema refuses.
+
+### Changed
+
+- `docs/architecture.md` "Decision matrix" rebuilt around the 10-row
+  fix-exists matrix that mirrors `lib/pipeline/business.sh`. New
+  "Supporting modules" table enumerates fix_classifier, severity,
+  tool_resolver, coverage, gating with their roles.
+- `docs/reference.md` gains chapter additions for tool-native severity,
+  tool-blocking annotation pipeline (SC19), tool resolver,
+  `release.trigger` / `package.trigger` / `deploy.trigger` blocks, and
+  the updated `test.coverage.threshold` semantic (SARIF flow).
+- `docs/policy.md` references the new risk-management guide.
+
+### Removed
+
+- Legacy `BRIK_*_ENABLED` dotenv exports for `lint`, `format`, `sast`,
+  `scan`, `secret`, `container-scan`, `test` -- the shift-left contract
+  means these stages always run; explicit opt-outs go through the
+  trigger block (release/package/deploy) or the policy preset
+  (findings stages). `quality.lint.enabled` in `brik.yml` is still
+  accepted by the schema but no longer honoured at runtime; the
+  legacy key is documented as deprecated.
+
+### Tech / business orthogonal axes refactor
+
+Original SC0 work (chantier
 `docs/chantiers/20260510_tech-business-orthogonal-axes.md`).
 
 ### Added

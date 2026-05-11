@@ -369,6 +369,32 @@ brik version --verbose
 For a detailed explanation of the architecture, design principles, stage lifecycle,
 and how to extend Brik, see [docs/architecture.md](docs/architecture.md).
 
+### Pipeline behavior model
+
+Stage outcomes are split along two orthogonal axes:
+
+- **Technical** -- what the stage logic returned (`tech.status` is one
+  of `success | failed | skipped`, `tech.kind` carries the human label).
+- **Business** -- what the technical outcome means for the user, given
+  the current pipeline context. `business.evaluate` produces a typed
+  status (`success | warning | error`) by combining four inputs: tech
+  status, fix-exists counters (`findings.failing.{has_fix, no_fix}`),
+  side-band signals (`findings.ignored`), and pipeline context
+  (`snapshot` vs `release`).
+
+The fix-exists axis is what differentiates "the dependency has a CVE we
+can upgrade" (`has_fix`, blocks release) from "the vendor wont fix
+this and we have a mitigation in place" (`no_fix`, stays warning even
+in release). Tools that emit warnings vs errors (eslint, ruff,
+checkstyle, dotnet-format) feed the `brikToolBlocking` annotation so
+warnings do not push release pipelines to error.
+
+Practical guide for managing the accept-with-traceability path:
+[docs/risk-management.md](docs/risk-management.md). Schema reference
+for `brik-policy.yml`: [docs/policy.md](docs/policy.md). Full module
+overview and the 10-row decision matrix:
+[docs/architecture.md](docs/architecture.md#decision-matrix).
+
 ## Development
 
 ### Prerequisites
