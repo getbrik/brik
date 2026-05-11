@@ -1191,6 +1191,27 @@ Unknown tools fall back to the SARIF level vocabulary
 collapse to `info` / non-blocking. The module is pure (no IO, no jq) so
 it is safe to invoke from any pipeline hook.
 
+#### Tool resolution (`lib/transverse/tool_resolver.sh`)
+
+`tool_resolver.resolve <tool>` walks three layers in priority order and
+emits a JSON descriptor `{path, version, provenance}`. Provenance is one
+of `project`, `image`, `bundled`, `missing`.
+
+| Priority | Source                                            | Provenance |
+|----------|---------------------------------------------------|------------|
+| 1        | `<BRIK_WORKSPACE>/node_modules/.bin/<tool>`       | `project`  |
+| 2        | `command -v <tool>` (current `$PATH`)             | `image`    |
+| 3        | `<BRIK_HOME>/tools/<tool>`                        | `bundled`  |
+| 4        | not found anywhere                                | `missing`  |
+
+Version detection is best-effort: the resolver invokes `<path> --version`
+(then `-v` as a fallback), strips ANSI sequences, and keeps the first
+dotted numeric token from the first line. Silent tools or missing
+binaries report `version=unknown`.
+
+`tool_resolver.is_available <tool>` returns `true` / `false` without
+running `--version`, for hot paths where only existence matters.
+
 ### Per-stage artifacts layout
 
 Each stage that emits findings writes two files side-by-side:
