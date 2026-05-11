@@ -604,13 +604,22 @@ YAML
       The output should equal "jest"
     End
 
-    It "exports quality vars"
+    It "exports quality tool selection (lint tool) and no longer emits the legacy BRIK_LINT_ENABLED gate"
       export_and_check() {
+        unset BRIK_LINT_ENABLED BRIK_QUALITY_LINT_TOOL
         config.export_all "$TEMP_CONFIG"
-        printf '%s' "$BRIK_LINT_ENABLED"
+        # BRIK_LINT_ENABLED is removed post-SC3; assert the new contract:
+        # tool selection survives, the gate var does not.
+        local gate
+        if [[ -n "${BRIK_LINT_ENABLED+x}" ]]; then
+          gate="unexpected:${BRIK_LINT_ENABLED}"
+        else
+          gate="unset"
+        fi
+        printf 'gate=%s tool=%s' "$gate" "$BRIK_QUALITY_LINT_TOOL"
       }
       When call export_and_check
-      The output should equal "true"
+      The output should equal "gate=unset tool=eslint"
     End
 
     It "exports security vars"

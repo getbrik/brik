@@ -62,9 +62,10 @@ stages.container_scan() {
     fi
 
     # Shift-left contract: container-scan always runs whenever a Docker
-    # image was produced. The runtime no longer reads
-    # BRIK_CONTAINER_SCAN_ENABLED to gate the stage; opting out is a
-    # business-level decision and lives outside the technical layer.
+    # image was produced. The legacy security.container_scan.enabled opt-out
+    # is no longer honoured (init surfaces a deprecation warning when it sees
+    # the key); opting out is a business-level decision and lives outside the
+    # technical layer.
 
     local image="${BRIK_SECURITY_CONTAINER_IMAGE:-${image_ref}}"
 

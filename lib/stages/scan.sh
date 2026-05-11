@@ -15,9 +15,10 @@ stages.scan() {
 
     config.export_security_vars
 
-    # Shift-left contract: scan always runs. The runtime no longer reads
-    # BRIK_SCAN_ENABLED to gate the stage; opting out is a business-level
-    # decision and lives outside the technical layer.
+    # Shift-left contract: scan always runs. The legacy security.scan.enabled
+    # opt-out is no longer honoured (init surfaces a deprecation warning when
+    # it sees the key); opting out is a business-level decision and lives
+    # outside the technical layer.
 
     log.info "scan stage - running dependency and secret scans"
 
