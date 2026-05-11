@@ -10,6 +10,7 @@ Describe "quality/format.sh - Tier 2 tool selection"
         mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock.log"
+        printf '{}\n' > "${TEST_WS}/biome.json"
         mock.create_logging "npx" "$MOCK_LOG"
         mock.activate
         export BRIK_QUALITY_FORMAT_TOOL="biome"
@@ -36,6 +37,7 @@ Describe "quality/format.sh - Tier 2 tool selection"
       setup_biome_no_npx() {
         mock.setup
         TEST_WS="$(mktemp -d)"
+        printf '{}\n' > "${TEST_WS}/biome.json"
         mock.isolate
         export BRIK_QUALITY_FORMAT_TOOL="biome"
       }
@@ -59,6 +61,7 @@ Describe "quality/format.sh - Tier 2 tool selection"
         mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock.log"
+        printf '[tool.black]\nline-length = 100\n' > "${TEST_WS}/pyproject.toml"
         mock.create_logging "black" "$MOCK_LOG"
         mock.activate
         export BRIK_QUALITY_FORMAT_TOOL="black"
@@ -85,6 +88,7 @@ Describe "quality/format.sh - Tier 2 tool selection"
       setup_no_black() {
         mock.setup
         TEST_WS="$(mktemp -d)"
+        printf '[tool.black]\nline-length = 100\n' > "${TEST_WS}/pyproject.toml"
         mock.isolate
         export BRIK_QUALITY_FORMAT_TOOL="black"
       }
@@ -107,6 +111,7 @@ Describe "quality/format.sh - Tier 2 tool selection"
       setup_no_ruff() {
         mock.setup
         TEST_WS="$(mktemp -d)"
+        printf 'line-length = 88\n' > "${TEST_WS}/ruff.toml"
         mock.isolate
         export BRIK_QUALITY_FORMAT_TOOL="ruff-format"
       }
@@ -129,6 +134,7 @@ Describe "quality/format.sh - Tier 2 tool selection"
       setup_no_cargo() {
         mock.setup
         TEST_WS="$(mktemp -d)"
+        printf 'edition = "2021"\n' > "${TEST_WS}/rustfmt.toml"
         mock.isolate
         export BRIK_QUALITY_FORMAT_TOOL="rustfmt"
       }
@@ -152,6 +158,7 @@ Describe "quality/format.sh - Tier 2 tool selection"
         mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock.log"
+        printf 'root = true\n' > "${TEST_WS}/.editorconfig"
         mock.create_logging "dotnet" "$MOCK_LOG"
         mock.activate
         export BRIK_QUALITY_FORMAT_TOOL="dotnet-format"
@@ -178,6 +185,7 @@ Describe "quality/format.sh - Tier 2 tool selection"
       setup_no_dotnet() {
         mock.setup
         TEST_WS="$(mktemp -d)"
+        printf 'root = true\n' > "${TEST_WS}/.editorconfig"
         mock.isolate
         export BRIK_QUALITY_FORMAT_TOOL="dotnet-format"
       }
@@ -244,6 +252,7 @@ Describe "quality/format.sh - Tier 2 tool selection"
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock.log"
         printf '<Project Sdk="Microsoft.NET.Sdk"></Project>\n' > "${TEST_WS}/Test.csproj"
+        printf 'root = true\n' > "${TEST_WS}/.editorconfig"
         mock.create_logging "dotnet" "$MOCK_LOG"
         mock.activate
       }
@@ -297,7 +306,7 @@ Describe "quality/format.sh - Tier 2 tool selection"
       setup_node_no_npx() {
         mock.setup
         TEST_WS="$(mktemp -d)"
-        printf '{"name":"test"}\n' > "${TEST_WS}/package.json"
+        printf '{"name":"test","prettier":{}}\n' > "${TEST_WS}/package.json"
         mock.isolate
       }
       cleanup_node_no_npx() {
@@ -318,7 +327,7 @@ Describe "quality/format.sh - Tier 2 tool selection"
       setup_fail() {
         mock.setup
         TEST_WS="$(mktemp -d)"
-        printf '{"name":"test"}\n' > "${TEST_WS}/package.json"
+        printf '{"name":"test","prettier":{}}\n' > "${TEST_WS}/package.json"
         mock.create_exit "npx" 1
         mock.activate
       }
