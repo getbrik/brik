@@ -129,9 +129,21 @@
           "type": "string"
         },
         "findings": {
-          "description": "Open sub-block carrying findings counts and metadata for security / quality stages.",
+          "description": "Open sub-block carrying findings counts and metadata for security / quality stages. The block stays open (additionalProperties: true) so FMF L4 fields (total, by_severity, ignored.*) continue to land without a schema bump. The 'failing' sub-block is typed strict: it carries the fix-exists classification counters introduced in v1.1 by the master pipeline-behavior-model chantier.",
           "type": "object",
-          "additionalProperties": true
+          "additionalProperties": true,
+          "properties": {
+            "failing": {
+              "description": "Fix-exists classification counters for the failing subset. Optional: a stage that produces no failing findings is not required to write this block. When present, total / has_fix / no_fix are non-negative integers. has_fix counts findings with an upstream fix available; no_fix counts findings without one (no-upstream-fix, vendor-wont-fix); total counts all failing findings (equals has_fix + no_fix + unknown-classification entries).",
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "total":   { "type": "integer", "minimum": 0 },
+                "has_fix": { "type": "integer", "minimum": 0 },
+                "no_fix":  { "type": "integer", "minimum": 0 }
+              }
+            }
+          }
         },
         "tests": {
           "description": "Open sub-block carrying test counts and coverage data for the test stage.",
