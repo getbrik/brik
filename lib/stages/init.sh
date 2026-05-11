@@ -272,15 +272,10 @@ _stages.init._write_dotenv() {
         printf 'BRIK_BUILD_STACK_VERSION=%s\n' "$(config.get '.project.stack_version' '')"
         printf 'BRIK_CI_IMAGE=%s\n' "$(_stages.init._resolve_runner_image)"
 
-        # Quality gating consumed by CI rules.
-        printf 'BRIK_LINT_ENABLED=%s\n'       "$(config.get '.quality.lint.enabled' 'true')"
-        printf 'BRIK_FORMAT_ENABLED=%s\n'     "$(config.get '.quality.format.enabled' 'true')"
-        printf 'BRIK_TYPE_CHECK_ENABLED=%s\n' "$(config.get '.quality.type_check.enabled' 'true')"
-
-        # Security gating.
-        printf 'BRIK_SAST_ENABLED=%s\n'           "$(config.get '.security.sast.enabled' 'true')"
-        printf 'BRIK_SCAN_ENABLED=%s\n'           "$(config.get '.security.scan.enabled' 'true')"
-        printf 'BRIK_CONTAINER_SCAN_ENABLED=%s\n' "$(config.get '.security.container_scan.enabled' 'true')"
+        # Legacy quality and security gating env vars (BRIK_LINT_ENABLED,
+        # BRIK_SAST_ENABLED, ...) are no longer emitted: stages always run
+        # and the *.enabled=false opt-outs are surfaced as deprecation
+        # warnings by _stages.init._warn_legacy_enabled_keys instead.
 
         # Git identity (already resolved + exported by _resolve_git_identity).
         printf 'BRIK_GIT_USER_EMAIL=%s\n' "${BRIK_GIT_USER_EMAIL:-brik-ci@brik.local}"

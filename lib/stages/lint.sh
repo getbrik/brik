@@ -26,9 +26,10 @@ stages.lint() {
     #                      by verify.lint.run on Tier 3 fall-through).
     #   - passed/failed  : recorded by pipeline.run from the verify.run rc.
     #
-    # Shift-left contract: lint always runs. The runtime no longer reads
-    # BRIK_LINT_ENABLED to gate the stage; opting out is a business-level
-    # decision and lives outside the technical layer.
+    # Shift-left contract: lint always runs. The legacy quality.lint.enabled
+    # opt-out is no longer honoured (init surfaces a deprecation warning when
+    # it sees the key); opting out is a business-level decision and lives
+    # outside the technical layer.
 
     brik.use verify.verify
 

@@ -262,12 +262,11 @@ config.export_test_vars() {
 }
 
 # Export quality-related variables from brik.yml.
-# Sets: BRIK_LINT_ENABLED, BRIK_QUALITY_LINT_TOOL, BRIK_QUALITY_FORMAT_TOOL
+# Sets: BRIK_QUALITY_LINT_TOOL, BRIK_QUALITY_FORMAT_TOOL.
+# The legacy BRIK_LINT_ENABLED gate is no longer exported: the stage runs
+# unconditionally, business decisions live in the business layer
+# (lib/pipeline/business.sh) and the org policy file.
 config.export_quality_vars() {
-    local enabled
-    enabled="$(config.get '.quality.lint.enabled' 'true')"
-    export BRIK_LINT_ENABLED="$enabled"
-
     local stack
     stack="$(config.get '.project.stack' 'auto')"
 

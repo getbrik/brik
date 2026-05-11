@@ -13,9 +13,10 @@ stages.sast() {
 
     config.export_security_vars
 
-    # Shift-left contract: sast always runs. The runtime no longer reads
-    # BRIK_SAST_ENABLED to gate the stage; opting out is a business-level
-    # decision and lives outside the technical layer.
+    # Shift-left contract: sast always runs. The legacy security.sast.enabled
+    # opt-out is no longer honoured (init surfaces a deprecation warning when
+    # it sees the key); opting out is a business-level decision and lives
+    # outside the technical layer.
 
     log.info "sast stage - running static analysis scans"
 

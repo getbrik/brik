@@ -184,13 +184,22 @@ YAML
       Before 'setup_config'
       After 'cleanup_config'
 
-      It "exports BRIK_LINT_ENABLED as true"
+      It "no longer exports the legacy BRIK_LINT_ENABLED gate"
         export_and_check() {
+          unset BRIK_LINT_ENABLED
           config.export_quality_vars
-          printf '%s' "$BRIK_LINT_ENABLED"
+          # SC3 of the pipeline-behavior-model master removed the legacy
+          # *.enabled=false opt-out. BRIK_LINT_ENABLED is not emitted; the
+          # stage runs unconditionally and business decisions live in the
+          # business layer.
+          if [[ -n "${BRIK_LINT_ENABLED+x}" ]]; then
+            printf 'unexpected-export:%s' "$BRIK_LINT_ENABLED"
+          else
+            printf 'unset'
+          fi
         }
         When call export_and_check
-        The output should equal "true"
+        The output should equal "unset"
       End
 
       It "exports BRIK_QUALITY_LINT_TOOL"
