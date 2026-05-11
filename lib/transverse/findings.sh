@@ -33,6 +33,15 @@ if [[ -z "${_BRIK_TRANSVERSE_SARIF_LOADED:-}" ]]; then
     fi
 fi
 
+# Source the fix-exists classifier so findings.process can annotate the
+# SARIF before apply_policy. Defensive, same pattern as sarif.sh above.
+if [[ -z "${_BRIK_FIX_CLASSIFIER_LOADED:-}" ]]; then
+    if [[ -f "${BASH_SOURCE[0]%/*}/fix_classifier.sh" ]]; then
+        # shellcheck source=fix_classifier.sh
+        . "${BASH_SOURCE[0]%/*}/fix_classifier.sh"
+    fi
+fi
+
 # Validate a tool's SARIF report. Entry point of the ingest stage of the
 # pipeline; downstream callers (apply_policy, aggregate) assume the file
 # has already been vetted.
@@ -520,6 +529,14 @@ findings.process() {
         # (total/by_severity/cwe) still records what we could parse.
         findings.aggregate "$stage" "$tool_sarif" 2>/dev/null || true
         return 0
+    fi
+
+    # SC13: annotate fix-exists classification on every result before policy
+    # application. Best-effort: a failure here (jq error, classifier module
+    # absent) leaves the SARIF unannotated; apply_policy keeps working and
+    # business.evaluate falls back to the conservative has_fix default.
+    if declare -f fix_classifier.classify_sarif >/dev/null 2>&1; then
+        fix_classifier.classify_sarif "$tool_sarif" "$stage" 2>/dev/null || true
     fi
 
     local findings_sarif

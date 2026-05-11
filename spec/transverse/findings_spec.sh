@@ -1127,16 +1127,24 @@ Describe "transverse/findings.sh"
       The status should be success
     End
 
-    It "preserves the tool SARIF unchanged"
+    It "annotates the tool SARIF with brikFixClassification (fix-exists axis from SC13)"
       run_proc() {
         local in="$BRIK_WORKSPACE/brik-artifacts/container-scan/container-scan.sarif"
-        local before; before="$(jq -S . "$in")"
         findings.process "container-scan" "$in" >/dev/null 2>&1
-        local after; after="$(jq -S . "$in")"
-        [[ "$before" == "$after" ]]
+        # Every result must carry brikFixClassification (has_fix | no_fix | unknown).
+        # The legacy "preserves the tool SARIF unchanged" contract is intentionally
+        # relaxed by SC13: the classifier needs the canonical SARIF as its working
+        # surface so apply_policy can read both the policy suppressions and the
+        # fix-classification annotations from a single document.
+        jq -r '
+          [.runs[0].results[] | (.properties.brikFixClassification // "absent")]
+          | unique
+          | map(select(. != "has_fix" and . != "no_fix" and . != "unknown"))
+          | length
+        ' "$in"
       }
       When call run_proc
-      The status should be success
+      The output should equal "0"
     End
 
     It "produces a findings.sarif annotated with policy.built-in.* suppressions"
