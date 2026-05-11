@@ -13,6 +13,23 @@ stages.release() {
 
     config.export_release_vars
 
+    # SC20: honour release.trigger.{on-tag, on-main, manual}. When the
+    # block is absent in brik.yml, gating.should_run_stage returns 0
+    # (legacy always-run). When present and no flag matches the current
+    # pipeline context, mark the stage skipped + not-applicable so
+    # business.evaluate yields success and downstream stages keep
+    # running. Defensive: a test harness that stubs brik.use as a no-op
+    # leaves gating.should_run_stage undefined; treat that as "run".
+    brik.use transverse.gating 2>/dev/null || true
+    if declare -f gating.should_run_stage >/dev/null 2>&1; then
+        if ! gating.should_run_stage RELEASE; then
+            log.info "release stage skipped: trigger conditions not met"
+            report.record "release" "tech" "status" "skipped"   2>/dev/null || true
+            report.record "release" "tech" "kind"   "not-applicable" 2>/dev/null || true
+            return 0
+        fi
+    fi
+
     log.info "release stage - computing version"
 
     brik.use version

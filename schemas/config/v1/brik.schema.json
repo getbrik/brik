@@ -93,6 +93,16 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "trigger": {
+          "description": "When the release stage should run (SC20). At least one of the flags must be true for the stage to execute. When the entire block is absent, the legacy always-run behaviour is preserved.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "on-tag":  { "type": "boolean", "default": true,  "description": "Run when the current commit carries a git tag." },
+            "on-main": { "type": "boolean", "default": false, "description": "Run on push to the default branch." },
+            "manual":  { "type": "boolean", "default": false, "description": "Run only when the pipeline was triggered manually (BRIK_TRIGGER_MANUAL=true)." }
+          }
+        },
         "strategy": {
           "description": "Release strategy.",
           "type": "string",
@@ -479,6 +489,17 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "trigger": {
+          "description": "When the package stage should run (SC20). At least one of the flags must be true for the stage to execute. When the entire block is absent, the legacy always-run behaviour is preserved.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "on-tag":     { "type": "boolean", "default": true,  "description": "Run when the current commit carries a git tag." },
+            "on-main":    { "type": "boolean", "default": false, "description": "Run on push to the default branch." },
+            "on-feature": { "type": "boolean", "default": false, "description": "Run on push to a branch other than the default (typical use: dev images per feature branch)." },
+            "manual":     { "type": "boolean", "default": false, "description": "Run only when the pipeline was triggered manually (BRIK_TRIGGER_MANUAL=true)." }
+          }
+        },
         "docker": {
           "description": "Docker image build and push configuration.",
           "type": "object",
@@ -676,6 +697,17 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "trigger": {
+          "description": "When the deploy stage should run (SC20). At least one of the flags must be true for the stage to execute. When the entire block is absent, the legacy always-run behaviour is preserved.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "on-tag":     { "type": "boolean", "default": true,  "description": "Run when the current commit carries a git tag." },
+            "on-main":    { "type": "boolean", "default": false, "description": "Run on push to the default branch." },
+            "on-feature": { "type": "boolean", "default": false, "description": "Run on push to a branch other than the default (typical use: review apps per feature branch)." },
+            "manual":     { "type": "boolean", "default": false, "description": "Run only when the pipeline was triggered manually (BRIK_TRIGGER_MANUAL=true)." }
+          }
+        },
         "workflow": {
           "description": "Git workflow convention for automatic environment mapping. When set, Brik loads a built-in profile that pre-configures environments based on branch/tag patterns. User-defined environments override profile defaults.",
           "type": "string",

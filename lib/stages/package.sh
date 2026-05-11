@@ -14,6 +14,20 @@ stages.package() {
 
     config.export_package_vars
 
+    # SC20: honour package.trigger.{on-tag, on-main, on-feature, manual}.
+    # Legacy compat preserved: unconfigured trigger -> always run.
+    # Defensive: a test harness stubbing brik.use as a no-op leaves
+    # gating.should_run_stage undefined; treat that as "run".
+    brik.use transverse.gating 2>/dev/null || true
+    if declare -f gating.should_run_stage >/dev/null 2>&1; then
+        if ! gating.should_run_stage PACKAGE; then
+            log.info "package stage skipped: trigger conditions not met"
+            report.record "package" "tech" "status" "skipped"          2>/dev/null || true
+            report.record "package" "tech" "kind"   "not-applicable"   2>/dev/null || true
+            return 0
+        fi
+    fi
+
     brik.use stacks.docker
 
     log.info "package stage - container build"
