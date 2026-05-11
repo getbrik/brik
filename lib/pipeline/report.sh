@@ -877,15 +877,21 @@ _report._render_aggregate_md() {
               ""
             end;
 
+        def failing_count(s):
+          ((s.business.findings.failing | objects | .total)
+           // (s.business.findings.failing | numbers)
+           // 0);
+
         def render_failing:
-          (any(.stages[]?; (.business.findings.failing // 0) > 0)) as $has
+          (any(.stages[]?; failing_count(.) > 0)) as $has
           | "## Failing findings",
             "",
             (if $has then
               ("| Stage | Failing | Total | Severities |", "|---|---|---|---|"),
               (.stages[]?
-               | select((.business.findings.failing // 0) > 0)
-               | "| \(.stage) | \(.business.findings.failing // 0) | \(.business.findings.total // 0) | \(by_sev_summary(.business.findings.by_severity // {})) |")
+               | . as $s
+               | select(failing_count($s) > 0)
+               | "| \(.stage) | \(failing_count($s)) | \(.business.findings.total // 0) | \(by_sev_summary(.business.findings.by_severity // {})) |")
              else
               "_No failing findings._"
              end),

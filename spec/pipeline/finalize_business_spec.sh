@@ -144,6 +144,114 @@ Describe "_stage._finalize_fragment writes business.{status,reason}"
     End
   End
 
+  Describe "fix_classification axis (SC16 acceptance)"
+    Before 'setup_dirs'
+    After 'cleanup_dirs'
+
+    # Logic helpers that pre-populate business.findings.failing with the
+    # fix-class shape used by SC1 schema v1.1 before signalling tech.failed.
+
+    # Each helper pre-populates business.findings.failing with the v1.1
+    # shape, then returns 1 to make the stage tech.status=failed (the
+    # branch where business.evaluate consumes fix_class).
+
+    fail_with_has_fix_logic() {
+      report.record_object "scan" "business" "findings" \
+        '{"failing":{"total":1,"has_fix":1,"no_fix":0}}'
+      return 1
+    }
+    fail_with_no_fix_logic() {
+      report.record_object "scan" "business" "findings" \
+        '{"failing":{"total":1,"has_fix":0,"no_fix":1}}'
+      return 1
+    }
+    fail_with_unknown_logic() {
+      report.record_object "scan" "business" "findings" \
+        '{"failing":{"total":1,"has_fix":0,"no_fix":0}}'
+      return 1
+    }
+
+    It "snapshot + has_fix: business.status=warning"
+      do_run() {
+        stage.run "scan" "fail_with_has_fix_logic" >/dev/null 2>&1 || true
+        read_business_status "scan"
+      }
+      When call do_run
+      The output should equal "warning"
+    End
+
+    It "snapshot + has_fix: business.reason mentions 'fix available'"
+      do_run() {
+        stage.run "scan" "fail_with_has_fix_logic" >/dev/null 2>&1 || true
+        read_business_reason "scan"
+      }
+      When call do_run
+      The output should include "fix available"
+    End
+
+    It "snapshot + no_fix only: business.status=warning"
+      do_run() {
+        stage.run "scan" "fail_with_no_fix_logic" >/dev/null 2>&1 || true
+        read_business_status "scan"
+      }
+      When call do_run
+      The output should equal "warning"
+    End
+
+    It "snapshot + no_fix only: business.reason mentions 'no fix available'"
+      do_run() {
+        stage.run "scan" "fail_with_no_fix_logic" >/dev/null 2>&1 || true
+        read_business_reason "scan"
+      }
+      When call do_run
+      The output should include "no fix available"
+    End
+
+    It "release + has_fix: business.status=error"
+      do_run() {
+        export BRIK_COMMIT_TAG="v9.9.9"
+        stage.run "scan" "fail_with_has_fix_logic" >/dev/null 2>&1 || true
+        read_business_status "scan"
+      }
+      When call do_run
+      The output should equal "error"
+    End
+
+    It "release + has_fix: business.reason mentions 'fix available' AND 'not applied'"
+      do_run() {
+        export BRIK_COMMIT_TAG="v9.9.9"
+        stage.run "scan" "fail_with_has_fix_logic" >/dev/null 2>&1 || true
+        read_business_reason "scan"
+      }
+      When call do_run
+      The output should include "fix available"
+      The output should include "not applied"
+    End
+
+    It "release + no_fix only: business.status=warning (no upstream fix to apply)"
+      do_run() {
+        export BRIK_COMMIT_TAG="v9.9.9"
+        stage.run "scan" "fail_with_no_fix_logic" >/dev/null 2>&1 || true
+        read_business_status "scan"
+      }
+      When call do_run
+      The output should equal "warning"
+    End
+
+    It "release + unknown remainder behaves like has_fix (conservative default)"
+      do_run() {
+        export BRIK_COMMIT_TAG="v9.9.9"
+        stage.run "scan" "fail_with_unknown_logic" >/dev/null 2>&1 || true
+        read_business_status "scan"
+      }
+      When call do_run
+      # The matrix prefers has_fix when failing_unknown > 0 and
+      # failing_has_fix == 0: priority chain in business.sh
+      # has_fix > unknown > no_fix.
+      The output should equal "error"
+    End
+  End
+
   Describe "tech.* preservation (no regression)"
     Before 'setup_dirs'
     After 'cleanup_dirs'

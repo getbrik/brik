@@ -302,6 +302,25 @@ _stage._record_business() {
         "$backend" 2>/dev/null)" || findings_ignored="0"
     [[ "$findings_ignored" =~ ^[0-9]+$ ]] || findings_ignored="0"
 
+    local failing_has_fix failing_no_fix failing_total failing_unknown
+    failing_has_fix="$(jq -r --arg s "$stage_name" \
+        '.stages[]? | select(.name == $s) | ((.business.findings.failing | objects | .has_fix) // 0)' \
+        "$backend" 2>/dev/null)" || failing_has_fix="0"
+    [[ "$failing_has_fix" =~ ^[0-9]+$ ]] || failing_has_fix="0"
+    failing_no_fix="$(jq -r --arg s "$stage_name" \
+        '.stages[]? | select(.name == $s) | ((.business.findings.failing | objects | .no_fix) // 0)' \
+        "$backend" 2>/dev/null)" || failing_no_fix="0"
+    [[ "$failing_no_fix" =~ ^[0-9]+$ ]] || failing_no_fix="0"
+    failing_total="$(jq -r --arg s "$stage_name" \
+        '.stages[]? | select(.name == $s) | ((.business.findings.failing | objects | .total) // (.business.findings.failing | numbers) // 0)' \
+        "$backend" 2>/dev/null)" || failing_total="0"
+    [[ "$failing_total" =~ ^[0-9]+$ ]] || failing_total="0"
+    # Conservative default: any failing finding not annotated has_fix or
+    # no_fix is unknown, which business.evaluate treats as has_fix (BLOCK
+    # in release context).
+    failing_unknown=$(( failing_total - failing_has_fix - failing_no_fix ))
+    (( failing_unknown < 0 )) && failing_unknown=0
+
     local context="snapshot"
     [[ -n "${BRIK_COMMIT_TAG:-}" ]] && context="release"
 
@@ -310,6 +329,9 @@ _stage._record_business() {
         --tech-status "$tech_status" \
         --context "$context" \
         --findings-ignored "$findings_ignored" \
+        --findings-failing-has-fix "$failing_has_fix" \
+        --findings-failing-no-fix  "$failing_no_fix" \
+        --findings-failing-unknown "$failing_unknown" \
         --tech-kind "$tech_kind" 2>/dev/null)" || return 0
     [[ -n "$payload" ]] || return 0
 

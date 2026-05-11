@@ -813,12 +813,23 @@ Describe "transverse/findings.sh"
       The output should include "medium"
     End
 
-    It "exposes business.findings.failing"
+    It "exposes business.findings.failing.total"
       check_failing() {
-        read_findings | jq -r '.failing'
+        read_findings | jq -r '.failing.total'
       }
       When call check_failing
       The output should equal "2"
+    End
+
+    It "exposes business.findings.failing.has_fix and no_fix counters"
+      check_classes() {
+        read_findings | jq -r '"\(.failing.has_fix),\(.failing.no_fix)"'
+      }
+      When call check_classes
+      # findings.aggregate runs without the fix_classifier in this setup
+      # (apply_policy + aggregate only), so both counters default to 0
+      # and the 2 failing entries land in the "unknown" remainder.
+      The output should equal "0,0"
     End
 
     It "exposes business.findings.ignored.total"
@@ -871,9 +882,9 @@ Describe "transverse/findings.sh"
       The output should include "medium"
     End
 
-    It "balances total = failing + ignored.total"
+    It "balances total = failing.total + ignored.total"
       check_balance() {
-        read_findings | jq -r '.total - (.failing + .ignored.total)'
+        read_findings | jq -r '.total - (.failing.total + .ignored.total)'
       }
       When call check_balance
       The output should equal "0"
@@ -1163,15 +1174,28 @@ Describe "transverse/findings.sh"
       The output should equal "5"
     End
 
-    It "records L4 v2 business.findings.failing from the annotated SARIF"
+    It "records L4 v2 business.findings.failing.total from the annotated SARIF"
       run_proc() {
         findings.process "container-scan" \
           "$BRIK_WORKSPACE/brik-artifacts/container-scan/container-scan.sarif" >/dev/null 2>&1
-        read_business "container-scan" "findings" | jq -r '.failing'
+        read_business "container-scan" "findings" | jq -r '.failing.total'
       }
       When call run_proc
       # Pragmatic baseline on the fixture: 2 failing.
       The output should equal "2"
+    End
+
+    It "splits failing findings by fix_classifier annotation"
+      run_proc() {
+        findings.process "container-scan" \
+          "$BRIK_WORKSPACE/brik-artifacts/container-scan/container-scan.sarif" >/dev/null 2>&1
+        read_business "container-scan" "findings" \
+          | jq -r '"\(.failing.has_fix),\(.failing.no_fix)"'
+      }
+      When call run_proc
+      # findings.process runs the classifier on the grype-fixstate fixture.
+      # The 2 failing rows on that fixture carry fixState=fixed -> has_fix.
+      The output should equal "2,0"
     End
 
     It "records L4 v2 business.findings.ignored.by_source from the annotated SARIF"
@@ -1273,7 +1297,7 @@ Describe "transverse/findings.sh"
         jq '
           .stages |= map(
             if .name == "container-scan" then
-              .business.findings.failing = 0
+              .business.findings.failing = { total: 0, has_fix: 0, no_fix: 0 }
             else . end
           )
         ' "$backend" > "$tmp" && mv "$tmp" "$backend"
