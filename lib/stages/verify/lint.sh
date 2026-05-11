@@ -7,6 +7,9 @@
 [[ -n "${_BRIK_VERIFY_LINT_LOADED:-}" ]] && return 0
 _BRIK_VERIFY_LINT_LOADED=1
 
+# shellcheck source=_cfg.sh
+. "$(dirname "${BASH_SOURCE[0]}")/_cfg.sh"
+
 # Run linting on a workspace.
 # Usage: verify.lint.run <workspace> [--fix]
 verify.lint.run() {
@@ -96,6 +99,10 @@ verify.lint.run() {
                 fi
                 ;;
             ruff)
+                if ! _verify_cfg.has_ruff "$workspace"; then
+                    log.warn "no ruff config found - skipping lint"
+                    return 0
+                fi
                 if command -v ruff >/dev/null 2>&1; then
                     lint_cmd="ruff check ."
                     [[ "$fix" == "true" ]] && lint_cmd="$lint_cmd --fix"
@@ -113,6 +120,10 @@ verify.lint.run() {
                 fi
                 ;;
             checkstyle)
+                if ! _verify_cfg.has_checkstyle "$workspace"; then
+                    log.warn "no checkstyle config found - skipping lint"
+                    return 0
+                fi
                 if command -v mvn >/dev/null 2>&1; then
                     lint_cmd="mvn -B checkstyle:check"
                 elif command -v gradle >/dev/null 2>&1; then
@@ -123,6 +134,10 @@ verify.lint.run() {
                 fi
                 ;;
             dotnet-format)
+                if ! _verify_cfg.has_dotnet_format "$workspace"; then
+                    log.warn "no dotnet-format config found - skipping lint"
+                    return 0
+                fi
                 if command -v dotnet >/dev/null 2>&1; then
                     lint_cmd="dotnet format --verify-no-changes"
                 else
@@ -157,6 +172,10 @@ verify.lint.run() {
                 return "$BRIK_EXIT_MISSING_DEP"
             fi
         elif [[ -f "${workspace}/pyproject.toml" || -f "${workspace}/setup.py" ]]; then
+            if ! _verify_cfg.has_ruff "$workspace"; then
+                log.warn "no ruff config found - skipping lint"
+                return 0
+            fi
             if command -v ruff >/dev/null 2>&1; then
                 lint_cmd="ruff check ."
                 [[ "$fix" == "true" ]] && lint_cmd="$lint_cmd --fix"
@@ -172,6 +191,10 @@ verify.lint.run() {
                 return "$BRIK_EXIT_MISSING_DEP"
             fi
         elif [[ -f "${workspace}/pom.xml" ]]; then
+            if ! _verify_cfg.has_checkstyle "$workspace"; then
+                log.warn "no checkstyle config found - skipping lint"
+                return 0
+            fi
             if command -v mvn >/dev/null 2>&1; then
                 lint_cmd="mvn -B checkstyle:check"
             else
@@ -179,6 +202,10 @@ verify.lint.run() {
                 return 0
             fi
         elif [[ -f "${workspace}/build.gradle" || -f "${workspace}/build.gradle.kts" ]]; then
+            if ! _verify_cfg.has_checkstyle "$workspace"; then
+                log.warn "no checkstyle config found - skipping lint"
+                return 0
+            fi
             if command -v gradle >/dev/null 2>&1; then
                 lint_cmd="gradle checkstyleMain"
             else
@@ -186,6 +213,10 @@ verify.lint.run() {
                 return 0
             fi
         elif compgen -G "${workspace}/*.csproj" >/dev/null 2>&1 || compgen -G "${workspace}/*.sln" >/dev/null 2>&1; then
+            if ! _verify_cfg.has_dotnet_format "$workspace"; then
+                log.warn "no dotnet-format config found - skipping lint"
+                return 0
+            fi
             if command -v dotnet >/dev/null 2>&1; then
                 lint_cmd="dotnet format --verify-no-changes"
             else

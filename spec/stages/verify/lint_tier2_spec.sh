@@ -238,6 +238,7 @@ EOF
         mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock.log"
+        printf 'line-length = 88\n' > "${TEST_WS}/ruff.toml"
         mock.create_logging "ruff" "$MOCK_LOG"
         mock.activate
         export BRIK_QUALITY_LINT_TOOL="ruff"
@@ -264,6 +265,7 @@ EOF
       setup_no_ruff_tool() {
         mock.setup
         TEST_WS="$(mktemp -d)"
+        printf 'line-length = 88\n' > "${TEST_WS}/ruff.toml"
         mock.isolate
         export BRIK_QUALITY_LINT_TOOL="ruff"
       }
@@ -336,6 +338,7 @@ EOF
         mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock.log"
+        printf '<module name="Checker"/>\n' > "${TEST_WS}/checkstyle.xml"
         mock.create_logging "mvn" "$MOCK_LOG"
         mock.activate
         export BRIK_QUALITY_LINT_TOOL="checkstyle"
@@ -364,6 +367,7 @@ EOF
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock.log"
         SAFE_BIN="$(mktemp -d)"
+        printf '<module name="Checker"/>\n' > "${TEST_WS}/checkstyle.xml"
         mock.create_logging "gradle" "$MOCK_LOG"
         # Build a clean PATH without mvn (CI runners have /usr/bin/mvn)
         local cmd cmd_path
@@ -395,6 +399,7 @@ EOF
       setup_no_checkstyle() {
         mock.setup
         TEST_WS="$(mktemp -d)"
+        printf '<module name="Checker"/>\n' > "${TEST_WS}/checkstyle.xml"
         mock.isolate
         export BRIK_QUALITY_LINT_TOOL="checkstyle"
       }
@@ -418,6 +423,7 @@ EOF
         mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock.log"
+        printf 'root = true\n' > "${TEST_WS}/.editorconfig"
         mock.create_logging "dotnet" "$MOCK_LOG"
         mock.activate
         export BRIK_QUALITY_LINT_TOOL="dotnet-format"
@@ -444,6 +450,7 @@ EOF
       setup_no_dotnet_tool() {
         mock.setup
         TEST_WS="$(mktemp -d)"
+        printf 'root = true\n' > "${TEST_WS}/.editorconfig"
         mock.isolate
         export BRIK_QUALITY_LINT_TOOL="dotnet-format"
       }

@@ -63,6 +63,7 @@ exit 0'
       TEST_WS="$(mktemp -d)"
       MOCK_LOG="${TEST_WS}/mock.log"
       printf '<project/>\n' > "${TEST_WS}/pom.xml"
+      printf '<module name="Checker"/>\n' > "${TEST_WS}/checkstyle.xml"
       mock.create_logging "mvn" "$MOCK_LOG"
       mock.activate
     }
@@ -89,6 +90,7 @@ exit 0'
       TEST_WS="$(mktemp -d)"
       MOCK_LOG="${TEST_WS}/mock.log"
       printf '<Project Sdk="Microsoft.NET.Sdk"></Project>\n' > "${TEST_WS}/Test.csproj"
+      printf 'root = true\n' > "${TEST_WS}/.editorconfig"
       mock.create_logging "dotnet" "$MOCK_LOG"
       mock.activate
     }

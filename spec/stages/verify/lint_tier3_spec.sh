@@ -10,7 +10,7 @@ Describe "quality/lint.sh - Tier 3 auto-detect edge cases"
         mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock.log"
-        printf 'apply plugin: "java"\n' > "${TEST_WS}/build.gradle"
+        printf 'apply plugin: "java"\napply plugin: "checkstyle"\n' > "${TEST_WS}/build.gradle"
         mock.create_logging "gradle" "$MOCK_LOG"
         mock.activate
       }
@@ -35,7 +35,7 @@ Describe "quality/lint.sh - Tier 3 auto-detect edge cases"
       setup_gradle_missing() {
         mock.setup
         TEST_WS="$(mktemp -d)"
-        printf 'apply plugin: "java"\n' > "${TEST_WS}/build.gradle"
+        printf 'apply plugin: "java"\napply plugin: "checkstyle"\n' > "${TEST_WS}/build.gradle"
         mock.isolate
       }
       cleanup_gradle_missing() {
@@ -57,6 +57,7 @@ Describe "quality/lint.sh - Tier 3 auto-detect edge cases"
         mock.setup
         TEST_WS="$(mktemp -d)"
         printf '<Project Sdk="Microsoft.NET.Sdk"></Project>\n' > "${TEST_WS}/Test.csproj"
+        printf 'root = true\n' > "${TEST_WS}/.editorconfig"
         mock.isolate
       }
       cleanup_dotnet_missing() {
@@ -100,6 +101,7 @@ Describe "quality/lint.sh - Tier 3 auto-detect edge cases"
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock.log"
         printf 'from setuptools import setup\n' > "${TEST_WS}/setup.py"
+        printf 'line-length = 88\n' > "${TEST_WS}/ruff.toml"
         mock.create_logging "ruff" "$MOCK_LOG"
         mock.activate
       }
