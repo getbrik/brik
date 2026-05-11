@@ -54,7 +54,7 @@ exit 0'
         mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock.log"
-        printf '{"name":"test"}\n' > "${TEST_WS}/package.json"
+        printf '{"name":"test","prettier":{}}\n' > "${TEST_WS}/package.json"
         mock.create_logging "npx" "$MOCK_LOG"
         mock.activate
         export BRIK_QUALITY_FORMAT_TOOL="prettier"
@@ -82,7 +82,7 @@ exit 0'
         mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock.log"
-        printf '{"name":"test"}\n' > "${TEST_WS}/package.json"
+        printf '{"name":"test","prettier":{}}\n' > "${TEST_WS}/package.json"
         mock.create_logging "npx" "$MOCK_LOG"
         mock.activate
       }
@@ -108,7 +108,7 @@ exit 0'
         mock.setup
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock.log"
-        printf '[project]\nname = "test"\n' > "${TEST_WS}/pyproject.toml"
+        printf '[project]\nname = "test"\n[tool.ruff]\nline-length = 100\n' > "${TEST_WS}/pyproject.toml"
         mock.create_logging "ruff" "$MOCK_LOG"
         mock.activate
       }
@@ -135,6 +135,7 @@ exit 0'
         TEST_WS="$(mktemp -d)"
         MOCK_LOG="${TEST_WS}/mock.log"
         printf '[package]\nname = "test"\n' > "${TEST_WS}/Cargo.toml"
+        printf 'edition = "2021"\n' > "${TEST_WS}/rustfmt.toml"
         mock.create_logging "cargo" "$MOCK_LOG"
         mock.activate
       }
@@ -182,7 +183,7 @@ exit 0'
       setup_check() {
         mock.setup
         TEST_WS="$(mktemp -d)"
-        printf '{"name":"test"}\n' > "${TEST_WS}/package.json"
+        printf '{"name":"test","prettier":{}}\n' > "${TEST_WS}/package.json"
         mock.create_exit "npx" 0
         mock.activate
       }

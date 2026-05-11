@@ -7,6 +7,9 @@
 [[ -n "${_BRIK_VERIFY_FORMAT_LOADED:-}" ]] && return 0
 _BRIK_VERIFY_FORMAT_LOADED=1
 
+# shellcheck source=_cfg.sh
+. "$(dirname "${BASH_SOURCE[0]}")/_cfg.sh"
+
 # Run format check on a workspace.
 # Usage: verify.format.run <workspace> [--check]
 verify.format.run() {
@@ -56,6 +59,10 @@ verify.format.run() {
 
     case "$tool" in
         prettier)
+            if ! _verify_cfg.has_prettier "$workspace"; then
+                log.warn "no prettier config found - skipping format"
+                return 0
+            fi
             if command -v npx >/dev/null 2>&1; then
                 # Make prettier ignore Brik-managed directories. On Jenkins
                 # the workspace is shared across stages, so the parallel
@@ -80,6 +87,10 @@ verify.format.run() {
             fi
             ;;
         biome)
+            if ! _verify_cfg.has_biome "$workspace"; then
+                log.warn "no biome config found - skipping format"
+                return 0
+            fi
             if command -v npx >/dev/null 2>&1; then
                 fmt_cmd="npx biome format . --check"
             else
@@ -88,6 +99,10 @@ verify.format.run() {
             fi
             ;;
         ruff-format|ruff|"ruff format")
+            if ! _verify_cfg.has_ruff "$workspace"; then
+                log.warn "no ruff config found - skipping format"
+                return 0
+            fi
             if command -v ruff >/dev/null 2>&1; then
                 fmt_cmd="ruff format --check ."
             else
@@ -96,6 +111,10 @@ verify.format.run() {
             fi
             ;;
         black)
+            if ! _verify_cfg.has_black "$workspace"; then
+                log.warn "no black config found - skipping format"
+                return 0
+            fi
             if command -v black >/dev/null 2>&1; then
                 fmt_cmd="black --check ."
             else
@@ -104,6 +123,10 @@ verify.format.run() {
             fi
             ;;
         rustfmt)
+            if ! _verify_cfg.has_rustfmt "$workspace"; then
+                log.warn "no rustfmt config found - skipping format"
+                return 0
+            fi
             if command -v cargo >/dev/null 2>&1; then
                 fmt_cmd="cargo fmt -- --check"
             else
@@ -112,6 +135,10 @@ verify.format.run() {
             fi
             ;;
         dotnet-format)
+            if ! _verify_cfg.has_dotnet_format "$workspace"; then
+                log.warn "no dotnet-format config found - skipping format"
+                return 0
+            fi
             if command -v dotnet >/dev/null 2>&1; then
                 fmt_cmd="dotnet format --verify-no-changes"
             else
