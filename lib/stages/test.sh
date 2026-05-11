@@ -113,12 +113,26 @@ stages.test() {
             if [[ "$gate_rc" -ne 0 && "$exit_code2" -eq 0 ]]; then
                 exit_code2=$gate_rc
             fi
+
+            # SC18: emit the breach as a SARIF result so it flows through the
+            # unified findings pipeline (fix_classifier annotates it has_fix
+            # per the "test" stage rule, then apply_policy honours DSI
+            # opt-out via brik-policy.yml). Non-fatal: business.evaluate
+            # owns the snapshot/release decision.
+            local _cov_sarif="${BRIK_WORKSPACE:-.}/brik-artifacts/test/coverage.sarif"
+            (cd "${BRIK_WORKSPACE}" \
+                && brik.coverage.emit_sarif "$BRIK_TEST_COVERAGE_THRESHOLD" \
+                       "$_cov_dir" "$_cov_sarif" >/dev/null 2>&1) || true
         fi
     fi
 
     # Record test counts from JUnit XML (when present). Run regardless of
     # test pass/fail so a partial report still surfaces counts.
     _stages.test._record_junit_business
+
+    # SC18: merge any coverage SARIF into the test stage findings pipeline
+    # so the breach is classified + policy-checked alongside JUnit results.
+    _stages.test._integrate_coverage_findings
 
     if [[ "$exit_code2" -ne 0 ]]; then
         log.error "tests failed with exit code $exit_code2"
@@ -166,4 +180,51 @@ _stages.test._record_junit_business() {
             fi
         fi
     fi
+}
+
+# Merge the optional coverage SARIF into the test stage findings pipeline.
+# Called after _record_junit_business so any JUnit-converted SARIF is
+# already on disk and we can concatenate results[] (and the rule entry)
+# before re-running the unified findings pipeline. When no JUnit SARIF
+# exists, the coverage SARIF flies alone through findings.process.
+#
+# Silent-skip pattern: missing module, missing coverage SARIF, missing jq,
+# or zero coverage results all return 0 with no side-effects.
+_stages.test._integrate_coverage_findings() {
+    local _cov_sarif="${BRIK_WORKSPACE:-.}/brik-artifacts/test/coverage.sarif"
+    [[ -f "$_cov_sarif" ]] || return 0
+    command -v jq >/dev/null 2>&1 || return 0
+
+    local cov_count
+    cov_count="$(jq -r '(.runs[0].results // []) | length' "$_cov_sarif" 2>/dev/null)" \
+        || cov_count="0"
+    [[ "$cov_count" =~ ^[0-9]+$ ]] || cov_count="0"
+    (( cov_count > 0 )) || return 0
+
+    brik.use transverse.findings 2>/dev/null || return 0
+    declare -f findings.process >/dev/null 2>&1 || return 0
+
+    local _sarif_rel="${BRIK_TEST_FINDINGS_OUTPUT_PATH:-brik-artifacts/test/findings.sarif}"
+    local _sarif_abs="$_sarif_rel"
+    [[ "$_sarif_abs" != /* ]] && _sarif_abs="${BRIK_WORKSPACE:-.}/${_sarif_abs}"
+
+    local target_sarif
+    if [[ -f "$_sarif_abs" ]]; then
+        # Merge coverage results + rule into the JUnit-converted SARIF.
+        local tmp; tmp="$(mktemp)" || return 0
+        if jq --slurpfile cov "$_cov_sarif" '
+            .runs[0].results = ((.runs[0].results // []) + ($cov[0].runs[0].results // []))
+            | .runs[0].tool.driver.rules = ((.runs[0].tool.driver.rules // []) + (($cov[0].runs[0].tool.driver.rules // [])))
+        ' "$_sarif_abs" > "$tmp" 2>/dev/null; then
+            mv "$tmp" "$_sarif_abs"
+            target_sarif="$_sarif_abs"
+        else
+            rm -f "$tmp"
+            target_sarif="$_cov_sarif"
+        fi
+    else
+        target_sarif="$_cov_sarif"
+    fi
+
+    findings.process "test" "$target_sarif" 2>/dev/null || true
 }

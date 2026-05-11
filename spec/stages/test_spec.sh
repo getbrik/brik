@@ -670,6 +670,91 @@ XML
       The output should equal "$BRIK_EXIT_INVALID_INPUT"
     End
   End
+
+  # SC18: end-to-end coverage SARIF emission, classifier annotation,
+  # and per-stage business.findings recording.
+  Describe "SC18 coverage SARIF emission"
+    _stub_tier2_success_e2e() {
+      brik.use() { :; }
+      stacks.detect_from_framework() { printf 'node'; return 0; }
+      stacks.detect() { printf 'node'; return 0; }
+      stacks.node.test_cmd() { printf 'true'; return 0; }
+      stacks.node.test() { printf 'true'; return 0; }
+      stacks.install_deps() { :; }
+    }
+
+    _seed_below_threshold_report() {
+      export BRIK_TEST_REPORTS_ENABLED="true"
+      export BRIK_TEST_COVERAGE_THRESHOLD="80"
+      export BRIK_TEST_COVERAGE_DIR="$BRIK_WORKSPACE/brik-artifacts/test/coverage"
+      mkdir -p "$BRIK_TEST_COVERAGE_DIR"
+      printf '<?xml version="1.0"?>\n<coverage line-rate="0.6500" />\n' \
+        > "$BRIK_TEST_COVERAGE_DIR/coverage.xml"
+      # Source the real coverage + findings helpers (brik.use is stubbed
+      # by _stub_tier2_success_e2e so lazy loading does not happen).
+      # shellcheck source=/dev/null
+      . "$BRIK_HOME/lib/transverse/coverage.sh"  2>/dev/null || true
+      # shellcheck source=/dev/null
+      . "$BRIK_HOME/lib/transverse/findings.sh"  2>/dev/null || true
+    }
+
+    It "writes brik-artifacts/test/coverage.sarif when coverage < threshold"
+      run_emits() {
+        _stub_tier2_success_e2e
+        _seed_below_threshold_report
+        local ctx
+        ctx="$(context.create "test")" 2>/dev/null || ctx="$(mktemp)"
+        stages.test "$ctx" >/dev/null 2>&1
+        [[ -f "$BRIK_WORKSPACE/brik-artifacts/test/coverage.sarif" ]] \
+          && echo "wrote" || echo "missing"
+      }
+      When call run_emits
+      The output should equal "wrote"
+    End
+
+    It "carries the brik-coverage-below-threshold rule in the SARIF"
+      run_rule() {
+        _stub_tier2_success_e2e
+        _seed_below_threshold_report
+        local ctx
+        ctx="$(context.create "test")" 2>/dev/null || ctx="$(mktemp)"
+        stages.test "$ctx" >/dev/null 2>&1
+        jq -r '.runs[0].results[0].ruleId' \
+          "$BRIK_WORKSPACE/brik-artifacts/test/coverage.sarif"
+      }
+      When call run_rule
+      The output should equal "brik-coverage-below-threshold"
+    End
+
+    It "records the coverage finding under business.findings.failing with has_fix"
+      run_business() {
+        _stub_tier2_success_e2e
+        _seed_below_threshold_report
+        local ctx
+        ctx="$(context.create "test")" 2>/dev/null || ctx="$(mktemp)"
+        stages.test "$ctx" >/dev/null 2>&1
+        jq -r '.stages[] | select(.name == "test") | .business.findings.failing.has_fix // 0' \
+          "$BRIK_LOG_DIR/aggregate-report.json"
+      }
+      When call run_business
+      The output should equal "1"
+    End
+
+    It "does not write coverage.sarif when threshold is unset"
+      run_no_threshold() {
+        _stub_tier2_success_e2e
+        export BRIK_TEST_REPORTS_ENABLED="true"
+        unset BRIK_TEST_COVERAGE_THRESHOLD
+        local ctx
+        ctx="$(context.create "test")" 2>/dev/null || ctx="$(mktemp)"
+        stages.test "$ctx" >/dev/null 2>&1
+        [[ -f "$BRIK_WORKSPACE/brik-artifacts/test/coverage.sarif" ]] \
+          && echo "wrote" || echo "skipped"
+      }
+      When call run_no_threshold
+      The output should equal "skipped"
+    End
+  End
 End
 
 Describe "stacks.install_deps (test mode)"

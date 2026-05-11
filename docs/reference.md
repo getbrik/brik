@@ -288,7 +288,7 @@ hooks:
 
 | Key | Type | Required | Default | Description |
 |-----|------|----------|---------|-------------|
-| `test.coverage.threshold` | integer | no | `80` | Coverage threshold (0-100). Exported as `BRIK_TEST_COVERAGE_THRESHOLD` but **not yet enforced** -- the test stage does not fail on a low score today. |
+| `test.coverage.threshold` | integer | no | `80` | Coverage threshold (0-100). Exported as `BRIK_TEST_COVERAGE_THRESHOLD`. When set and `test.reports.enabled=true`, a breach is emitted as a SARIF result (rule `brik-coverage-below-threshold`, level=error) into `brik-artifacts/test/coverage.sarif`. The result flows through `findings.process` (fix_classifier annotates it `has_fix` per the `test` stage rule, then `apply_policy` honours DSI allowlists), and `business.evaluate` decides snapshot/release outcome. The legacy hard-gate path (`brik.coverage.gate`) is still invoked for backward compat. |
 | `test.coverage.report` | string | no | -- | Path to Cobertura XML coverage report. Exported as `BRIK_TEST_COVERAGE_REPORT` but not yet consumed. |
 
 #### `test.reports`
