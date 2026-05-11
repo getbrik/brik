@@ -1191,6 +1191,37 @@ Unknown tools fall back to the SARIF level vocabulary
 collapse to `info` / non-blocking. The module is pure (no IO, no jq) so
 it is safe to invoke from any pipeline hook.
 
+#### Tool-blocking annotation pipeline (SC19)
+
+For the `lint` and `format` stages, `fix_classifier.classify_sarif`
+adds a second property next to `brikFixClassification`:
+
+| Property | Source | Effect |
+|----------|--------|--------|
+| `brikFixClassification` | per-stage heuristic | drives the SC16 has_fix/no_fix matrix |
+| `brikToolBlocking`      | tool name + severity input | filters which findings count in `business.findings.failing.has_fix` / `no_fix` |
+
+`findings.aggregate` consumes the annotation by skipping any failing
+result with `brikToolBlocking == false` when counting `has_fix` and
+`no_fix` (the value is preserved in `failing.total`). Other stages do
+not receive the annotation, so the legacy semantic stands: every
+non-suppressed result counts.
+
+Per-tool blocking decisions (driver name lowercased):
+
+| Tool          | Blocking when                                   |
+|---------------|-------------------------------------------------|
+| eslint        | `result.level == "error"`                       |
+| ruff          | `ruleId` starts with `E` / `F`, OR `level=error` and `ruleId` is not `I*`/`W*` |
+| checkstyle    | `result.level == "error"`                       |
+| dotnet-format | `result.level == "error"`                       |
+| other         | `result.level == "error"` (default fallback)    |
+
+Consequence: a project with eslint `error` produces `failing.has_fix > 0`
+and `business.evaluate` returns `error` in release. A project with only
+eslint `warning` produces `failing.has_fix == 0` and stays at `success`
+or `warning` (depending on side-band signals) even in release.
+
 #### Tool resolution (`lib/transverse/tool_resolver.sh`)
 
 `tool_resolver.resolve <tool>` walks three layers in priority order and

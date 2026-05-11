@@ -109,12 +109,39 @@ def classify($r; $rules; $stage):
     "unknown"
   end;
 
+# SC19: per-result tool-blocking decision based on tool name + severity
+# input. Only meaningful for lint/format stages where tool-native
+# warning vs error is the gating signal. Other stages let the legacy
+# semantic stand (every failing result counts).
+def tool_blocking($r; $tool):
+  ($tool // "" | ascii_downcase) as $t
+  | if $t == "ruff" then
+      (($r.ruleId // "" | ascii_downcase) as $rid
+       | if   ($rid | test("^[wi][0-9]"))   then false
+         elif ($rid | test("^[ef][0-9]"))   then true
+         else (($r.level // "" | ascii_downcase) == "error") end)
+    elif ($t | test("eslint")) then
+      (($r.level // "" | ascii_downcase) == "error")
+    elif ($t == "checkstyle" or $t == "dotnet-format") then
+      (($r.level // "" | ascii_downcase) == "error")
+    else
+      (($r.level // "" | ascii_downcase) == "error")
+    end;
+
 .runs |= map(
   . as $run
   | ($run.tool.driver.rules // []) as $rules
+  | ($run.tool.driver.name // "") as $tool_name
   | $run | .results = ([($run.results // [])[] |
       . as $r
-      | . + { properties: ((.properties // {}) + { brikFixClassification: classify($r; $rules; $stage) }) }
+      | (
+          { brikFixClassification: classify($r; $rules; $stage) }
+          + ( if ($stage == "lint" or $stage == "format")
+              then { brikToolBlocking: tool_blocking($r; $tool_name) }
+              else {}
+              end )
+        ) as $brik_props
+      | . + { properties: ((.properties // {}) + $brik_props) }
     ])
 )'
 

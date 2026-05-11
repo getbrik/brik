@@ -451,8 +451,18 @@ findings.aggregate() {
         | (.runs[0].results // []) as $results
         | ($results | map(select(((.suppressions // []) | length) == 0))) as $fail
         | ($fail | length) as $failing_total
-        | ($fail | map(select((.properties.brikFixClassification // "unknown") == "has_fix")) | length) as $failing_has_fix
-        | ($fail | map(select((.properties.brikFixClassification // "unknown") == "no_fix"))  | length) as $failing_no_fix
+        # SC19: when fix_classifier annotates brikToolBlocking (lint/format
+        # only today), count only the tool-blocking subset in has_fix /
+        # no_fix. Other stages leave brikToolBlocking absent, in which
+        # case we default to true (legacy semantic: every failing entry
+        # counts).
+        # Note: jq `// true` would treat an explicit `false` value as
+        # missing and fall through to true. Compare against != false so
+        # absent/null/true all keep their entries (legacy semantic).
+        | ($fail | map(select((.properties.brikToolBlocking != false) and
+                              ((.properties.brikFixClassification // "unknown") == "has_fix"))) | length) as $failing_has_fix
+        | ($fail | map(select((.properties.brikToolBlocking != false) and
+                              ((.properties.brikFixClassification // "unknown") == "no_fix")))  | length) as $failing_no_fix
         | ($results | map(select(((.suppressions // []) | length) > 0))) as $ign
         | (
             $ign
