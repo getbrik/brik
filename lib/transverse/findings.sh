@@ -449,7 +449,10 @@ findings.aggregate() {
 
         . as $sarif
         | (.runs[0].results // []) as $results
-        | ($results | map(select(((.suppressions // []) | length) == 0)) | length) as $failing
+        | ($results | map(select(((.suppressions // []) | length) == 0))) as $fail
+        | ($fail | length) as $failing_total
+        | ($fail | map(select((.properties.brikFixClassification // "unknown") == "has_fix")) | length) as $failing_has_fix
+        | ($fail | map(select((.properties.brikFixClassification // "unknown") == "no_fix"))  | length) as $failing_no_fix
         | ($results | map(select(((.suppressions // []) | length) > 0))) as $ign
         | (
             $ign
@@ -463,10 +466,10 @@ findings.aggregate() {
                                 .[$s] += 1)
           ) as $ign_by_sev
         | {
-            failing: $failing,
+            failing: { total: $failing_total, has_fix: $failing_has_fix, no_fix: $failing_no_fix },
             ignored: { total: ($ign | length), by_source: $by_source, by_severity: $ign_by_sev }
           }
-    ' "$sarif_path" 2>/dev/null || printf '{"failing":0,"ignored":{"total":0,"by_source":{},"by_severity":{"critical":0,"high":0,"medium":0,"low":0,"info":0}}}')"
+    ' "$sarif_path" 2>/dev/null || printf '{"failing":{"total":0,"has_fix":0,"no_fix":0},"ignored":{"total":0,"by_source":{},"by_severity":{"critical":0,"high":0,"medium":0,"low":0,"info":0}}}')"
     # KCOV_EXCL_STOP
 
     local findings_obj
@@ -643,13 +646,13 @@ findings.gate() {
             {
                 flock -s 9
                 jq -r --arg s "$stage" \
-                    '.stages[] | select(.name == $s) | .business.findings.failing // 0' \
+                    '.stages[] | select(.name == $s) | ((.business.findings.failing | objects | .total) // (.business.findings.failing | numbers) // 0)' \
                     "$backend"
             } 9>>"$lock_file" 2>/dev/null
         )"
     else
         failing="$(jq -r --arg s "$stage" \
-            '.stages[] | select(.name == $s) | .business.findings.failing // 0' \
+            '.stages[] | select(.name == $s) | ((.business.findings.failing | objects | .total) // (.business.findings.failing | numbers) // 0)' \
             "$backend" 2>/dev/null)"
     fi
     failing="${failing:-0}"

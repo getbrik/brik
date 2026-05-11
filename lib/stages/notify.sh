@@ -49,7 +49,7 @@ _notify._emit_recap_table() {
         def metrics_for(b):
           if b == null then "-"
           elif (b.findings.total // null) != null then
-            "findings \(b.findings.failing // 0)/\(b.findings.total)"
+            "findings \((b.findings.failing | objects | .total) // (b.findings.failing | numbers) // 0)/\(b.findings.total)"
           elif (b.tests.total // null) != null then
             "\(b.tests.passed // 0)/\(b.tests.total) passed"
           elif (b.artifact.size_bytes // null) != null then
