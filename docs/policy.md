@@ -152,3 +152,5 @@ For each converter ship a synthetic JSON fixture under
 - Aggregator   : `lib/transverse/findings.sh` (`findings.merge_pipeline`)
 - Exporter     : `lib/transverse/findings/exporters/gitlab.sh`
 - User-side guide: [`docs/reference.md`](reference.md#findings-management)
+- Operating discipline (when to allowlist, cadence, anti-patterns):
+  [`docs/risk-management.md`](risk-management.md)

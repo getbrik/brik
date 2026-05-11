@@ -146,18 +146,49 @@ four inputs (no shell state) and returns a JSON outcome on stdout.
 
 ### Decision matrix
 
-| `tech.status` | side-band               | `pipeline.context` | `business.status` | `business.reason`                           |
+`business.evaluate` consumes four inputs (tech status + fix-exists
+counters + side-band signals + pipeline context) and emits the row
+below. The fix-exists axis comes from `fix_classifier` annotations on
+each finding (`brikFixClassification` ∈ `{has_fix, no_fix, unknown}`),
+optionally filtered by `severity.is_tool_blocking` for lint/format
+stages.
+
+| `tech.status` | side-band                     | `pipeline.context` | `business.status` | `business.reason`                            |
 |---|---|---|---|---|
-| `success`     | none                    | *                  | `success`         | empty string                                |
-| `success`     | `findings.ignored > 0`  | *                  | `warning`         | `"<N> findings ignored by policy"`          |
-| `failed`      | *                       | `snapshot`         | `warning`         | `"failed in snapshot context (<kind>)"`     |
-| `failed`      | *                       | `release`          | `error`           | `"failed in release context (<kind>)"`      |
-| `skipped`     | *                       | *                  | `success`         | `"not applicable"`                          |
+| `success`                | none                              | *        | `success` | empty string |
+| `success`                | `findings.ignored.total > 0`      | *        | `warning` | `"findings accepted by policy"` |
+| `success`                | `findings.failing.no_fix > 0`     | *        | `warning` | `"findings without upstream fix"` |
+| `failed`                 | `fix_class = has_fix`             | snapshot | `warning` | `"<kind> (fix available)"` |
+| `failed`                 | `fix_class = has_fix`             | release  | `error`   | `"<kind> (fix available, not applied)"` |
+| `failed`                 | `fix_class = no_fix`              | snapshot | `warning` | `"<kind> (no fix available)"` |
+| `failed`                 | `fix_class = no_fix`              | release  | `warning` | `"<kind> (no fix available, accepted)"` |
+| `failed`                 | `fix_class = unknown`             | snapshot | `warning` | `"<kind> (fix classification unknown)"` |
+| `failed`                 | `fix_class = unknown`             | release  | `error`   | `"<kind> (fix classification unknown, strict)"` |
+| `skipped` (not-applicable) | *                                 | *        | `success` | `"not applicable"` |
+
+`fix_class` priority when several counters are non-zero:
+`has_fix > unknown > no_fix-only`. When all three are zero, the
+default is `has_fix` (conservative: BLOCK in release).
 
 `pipeline.context` resolves from `BRIK_COMMIT_TAG` (non-empty =>
 `release`, empty => `snapshot`); see
 [reference.md / Pipeline Context](reference.md#pipeline-context) for
 the override precedence (`BRIK_CONTINUE_ON_ERROR`, CLI flag, default).
+
+### Supporting modules (annotation pipeline)
+
+| Module                                  | Role                                                                                                   |
+|-----------------------------------------|--------------------------------------------------------------------------------------------------------|
+| `lib/transverse/fix_classifier.sh`      | Annotates each SARIF result with `brikFixClassification` (per-stage heuristic) and, for lint/format, `brikToolBlocking`. |
+| `lib/transverse/severity.sh`            | Pure mapping: tool-native severity → canonical 5-bucket scale `{critical, high, medium, low, info}` + `is_tool_blocking` boolean. |
+| `lib/transverse/tool_resolver.sh`       | Locates a CLI binary in workspace `node_modules/.bin/`, then `$PATH`, then `BRIK_HOME/tools/`. Emits `{path, version, provenance}` so missing tools become typed findings instead of generic failures. |
+| `lib/transverse/coverage.sh`            | Parses Cobertura, Jacoco and LCOV reports; `emit_sarif` turns a threshold breach into a SARIF result that flows through the same classifier + policy pipeline. |
+| `lib/transverse/gating.sh`              | Reads `release.trigger` / `package.trigger` / `deploy.trigger` from `brik.yml` and decides whether each schedulable stage runs given the current pipeline context. Absent block ⇒ legacy always-run. |
+
+Findings flow: tool SARIF → `fix_classifier.classify_sarif` → annotated
+SARIF → `findings.apply_policy` (DSI / built-in suppressions) →
+`findings.aggregate` (`business.findings.failing.{total, has_fix,
+no_fix}` counters) → `business.evaluate`.
 
 ### Aggregation chain
 
