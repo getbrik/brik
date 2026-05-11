@@ -71,13 +71,13 @@ Describe "_stage._finalize_fragment writes business.{status,reason}"
       The output should equal "warning"
     End
 
-    It "success with side-band findings.ignored.total=3: business.reason mentions ignored"
+    It "success with side-band findings.ignored.total=3: business.reason mentions 'accepted by policy'"
       do_run() {
         stage.run "lint" "success_with_ignored_logic" >/dev/null 2>&1
         read_business_reason "lint"
       }
       When call do_run
-      The output should include "3 findings ignored"
+      The output should include "accepted by policy"
     End
 
     It "failed: business.status=warning (snapshot lets it through)"
@@ -89,13 +89,13 @@ Describe "_stage._finalize_fragment writes business.{status,reason}"
       The output should equal "warning"
     End
 
-    It "failed: business.reason mentions snapshot context"
+    It "failed: business.reason mentions 'fix available' (default conservative classification)"
       do_run() {
         stage.run "build" "fail_logic" >/dev/null 2>&1 || true
         read_business_reason "build"
       }
       When call do_run
-      The output should include "snapshot"
+      The output should include "fix available"
     End
 
     It "self-skipped (not-applicable): business.status=success"
@@ -133,14 +133,14 @@ Describe "_stage._finalize_fragment writes business.{status,reason}"
       The output should equal "error"
     End
 
-    It "failed: business.reason mentions release context"
+    It "failed: business.reason mentions 'not applied' (release-strict default)"
       do_run() {
         export BRIK_COMMIT_TAG="v9.9.9"
         stage.run "build" "fail_logic" >/dev/null 2>&1 || true
         read_business_reason "build"
       }
       When call do_run
-      The output should include "release"
+      The output should include "not applied"
     End
   End
 
