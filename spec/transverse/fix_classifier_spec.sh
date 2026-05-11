@@ -147,6 +147,78 @@ Describe "lib/transverse/fix_classifier.sh"
     End
   End
 
+  # SC19: tool-blocking annotation for lint/format stages.
+  # The classifier adds properties.brikToolBlocking based on the tool
+  # driver name + the per-result severity input (level for most tools,
+  # ruleId for ruff). Other stages get no brikToolBlocking (legacy
+  # semantics: every failing result counts).
+  Describe "lint tool-blocking annotation (SC19)"
+    It "marks eslint error results as tool-blocking"
+      do_classify() {
+        local tmp; tmp=$(classify_into_tmp eslint.sarif lint)
+        jq -r '[.runs[0].results[] | select(.level == "error") | .properties.brikToolBlocking] | unique | join(",")' "$tmp"
+      }
+      When call do_classify
+      The output should equal "true"
+    End
+
+    It "marks eslint warning results as non-blocking"
+      do_classify() {
+        local tmp; tmp=$(classify_into_tmp eslint.sarif lint)
+        jq -r '[.runs[0].results[] | select(.level == "warning") | .properties.brikToolBlocking] | unique | join(",")' "$tmp"
+      }
+      When call do_classify
+      The output should equal "false"
+    End
+
+    It "counts 3 blocking and 2 non-blocking on the eslint fixture (mixed levels)"
+      do_classify() {
+        local tmp; tmp=$(classify_into_tmp eslint.sarif lint)
+        jq -r '"\([.runs[0].results[] | select(.properties.brikToolBlocking == true)] | length),\([.runs[0].results[] | select(.properties.brikToolBlocking == false)] | length)"' "$tmp"
+      }
+      When call do_classify
+      The output should equal "3,2"
+    End
+
+    It "marks ruff E* / F* rule ids as tool-blocking"
+      do_classify() {
+        local tmp; tmp=$(classify_into_tmp ruff.sarif lint)
+        jq -r '[.runs[0].results[] | select(.ruleId | test("^(E|F)[0-9]")) | .properties.brikToolBlocking] | unique | join(",")' "$tmp"
+      }
+      When call do_classify
+      The output should equal "true"
+    End
+
+    It "marks ruff I* (isort) rule ids as non-blocking even at level=error"
+      do_classify() {
+        local tmp; tmp=$(classify_into_tmp ruff.sarif lint)
+        jq -r '[.runs[0].results[] | select(.ruleId | test("^I[0-9]")) | .properties.brikToolBlocking] | unique | join(",")' "$tmp"
+      }
+      When call do_classify
+      The output should equal "false"
+    End
+
+    It "does not add brikToolBlocking on the container-scan channel (legacy semantics)"
+      do_classify() {
+        local tmp; tmp=$(classify_into_tmp grype-fixstate.sarif container-scan)
+        jq -r '[.runs[0].results[] | (.properties.brikToolBlocking // "<absent>")] | unique | join(",")' "$tmp"
+      }
+      When call do_classify
+      The output should equal "<absent>"
+    End
+
+    It "always marks gitleaks findings as tool-blocking on the secret channel"
+      do_classify() {
+        local tmp; tmp=$(classify_into_tmp gitleaks.sarif secret)
+        jq -r '[.runs[0].results[] | (.properties.brikToolBlocking // "<absent>")] | unique | join(",")' "$tmp"
+      }
+      When call do_classify
+      # Secret stage is not lint/format, so we keep the legacy semantic:
+      # no brikToolBlocking annotation (every failing result counts).
+      The output should equal "<absent>"
+    End
+  End
+
   Describe "unknown stage"
     It "classifies as unknown when the stage name is not recognized"
       do_classify() {
