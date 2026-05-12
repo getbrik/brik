@@ -37,7 +37,17 @@ brik.gitlab.setup() {
     export BRIK_BRANCH="${CI_COMMIT_BRANCH:-}"
     export BRIK_TAG="${CI_COMMIT_TAG:-}"
     export BRIK_COMMIT_SHA="${CI_COMMIT_SHA:-}"
-    export BRIK_COMMIT_SHORT_SHA="${CI_COMMIT_SHORT_SHA:-}"
+    # Derive from the full SHA rather than CI_COMMIT_SHORT_SHA. GitLab's
+    # CI_COMMIT_SHORT_SHA is 8 chars by default while git's `--short` and
+    # the Jenkins wrapper emit 7. Image tags and finding messages embed
+    # this value, so divergent widths break GitLab/Jenkins parity on the
+    # same commit. Fall back to CI_COMMIT_SHORT_SHA when CI_COMMIT_SHA is
+    # not set so test fixtures that only stub the short var keep working.
+    if [[ -n "${CI_COMMIT_SHA:-}" ]]; then
+        export BRIK_COMMIT_SHORT_SHA="${CI_COMMIT_SHA:0:7}"
+    else
+        export BRIK_COMMIT_SHORT_SHA="${CI_COMMIT_SHORT_SHA:-}"
+    fi
     export BRIK_COMMIT_REF="${CI_COMMIT_REF_NAME:-}"
     export BRIK_PIPELINE_SOURCE="${CI_PIPELINE_SOURCE:-}"
     export BRIK_MERGE_REQUEST_ID="${CI_MERGE_REQUEST_IID:-}"
