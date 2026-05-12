@@ -155,14 +155,28 @@ Describe "gitlab-wrapper.sh"
         The output should equal "abc123def456"
       End
 
-      It "exports BRIK_COMMIT_SHORT_SHA from CI_COMMIT_SHORT_SHA"
+      It "derives BRIK_COMMIT_SHORT_SHA from the first 7 hex chars of CI_COMMIT_SHA"
+        # CI_COMMIT_SHORT_SHA is GitLab's 8-char default, which diverges
+        # from git's 7-char `--short` and the Jenkins wrapper. Truncating
+        # the full SHA keeps short_sha aligned across platforms.
         setup_and_check() {
-          export CI_COMMIT_SHORT_SHA="abc123d"
+          export CI_COMMIT_SHA="abc123def456"
           brik.gitlab.setup "$BRIK_HOME" >/dev/null 2>&1
           printf '%s' "$BRIK_COMMIT_SHORT_SHA"
         }
         When call setup_and_check
         The output should equal "abc123d"
+      End
+
+      It "falls back to CI_COMMIT_SHORT_SHA when CI_COMMIT_SHA is unset"
+        setup_and_check() {
+          unset CI_COMMIT_SHA
+          export CI_COMMIT_SHORT_SHA="deadbee"
+          brik.gitlab.setup "$BRIK_HOME" >/dev/null 2>&1
+          printf '%s' "$BRIK_COMMIT_SHORT_SHA"
+        }
+        When call setup_and_check
+        The output should equal "deadbee"
       End
 
       It "exports BRIK_COMMIT_REF from CI_COMMIT_REF_NAME"
