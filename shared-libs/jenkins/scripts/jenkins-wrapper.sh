@@ -39,7 +39,15 @@ brik.jenkins.setup() {
     local raw_branch="${GIT_BRANCH:-}"
     export BRIK_BRANCH="${raw_branch#origin/}"
 
-    export BRIK_TAG="${TAG_NAME:-}"
+    # Resolution order for BRIK_TAG, in priority:
+    #   1. Pre-existing BRIK_TAG env (e.g. passed via buildWithParameters --
+    #      this is how pipelineJob-based projects signal a tag trigger when
+    #      there's no native Multibranch tag-scan).
+    #   2. TAG_NAME (set automatically by Jenkins Multibranch on tag-scan
+    #      builds).
+    #   3. git describe --exact-match (only for true tag-scan builds where
+    #      neither signal is available -- see the guard below).
+    export BRIK_TAG="${BRIK_TAG:-${TAG_NAME:-}}"
     # Recover BRIK_TAG from git only on true tag-scan builds (TAG_NAME and
     # GIT_BRANCH both empty). A Multibranch branch build whose HEAD happens
     # to coincide with a tag (e.g. `main` pushed with `v0.1.0` at the same
