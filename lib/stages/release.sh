@@ -46,11 +46,24 @@ stages.release() {
     [[ "${BRIK_DRY_RUN:-}" == "true" ]] && _dry_run_bool="true"
     report.record_object "release" "tech" "dry_run" "$_dry_run_bool" 2>/dev/null || true
 
+    # When BRIK_TAG is set (CI_COMMIT_TAG on GitLab, TAG_NAME or explicit
+    # BRIK_TAG parameter on Jenkins), use it as the source of truth for
+    # the version. Without this, brik falls back to `git describe --tags`
+    # which Jenkins Multibranch tag-scan checkouts return as
+    # "origin/v0.2.0" instead of "v0.2.0" -- a name that contains a slash
+    # and is rejected by Docker as an invalid image tag. BRIK_TAG carries
+    # the platform's normalized tag intent and matches the configured tag
+    # prefix, so prefer it whenever present.
     local current_version
-    current_version="$(version.current --from-git-tag --prefix "$tag_prefix")" || {
-        log.info "no git tag found, using 0.0.0"
-        current_version="0.0.0"
-    }
+    if [[ -n "${BRIK_TAG:-}" ]]; then
+        current_version="${BRIK_TAG#"$tag_prefix"}"
+        log.info "using BRIK_TAG as version source"
+    else
+        current_version="$(version.current --from-git-tag --prefix "$tag_prefix")" || {
+            log.info "no git tag found, using 0.0.0"
+            current_version="0.0.0"
+        }
+    fi
 
     log.info "current version: $current_version"
     export BRIK_APP_VERSION="$current_version"
