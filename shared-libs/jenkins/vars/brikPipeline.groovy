@@ -28,12 +28,28 @@ def call(Map params = [:]) {
     node(label) {
         // Declare job parameters up-front: Jenkins's buildWithParameters API
         // rejects triggers carrying unknown parameters.
+        //
+        // BRIK_TAG is the explicit "this build represents a tag trigger"
+        // signal. Multibranch jobs set TAG_NAME automatically for tag-scan
+        // builds, but pipelineJob-based projects (e.g. the briklab test
+        // fixtures) always build the configured branch -- there's no native
+        // way to say "act as if a tag was pushed". Passing BRIK_TAG via
+        // buildWithParameters makes the trigger-side intent reach the
+        // brik runtime (jenkins-wrapper exports BRIK_TAG -> stage.sh maps
+        // it to BRIK_COMMIT_TAG -> context resolves to "release"). For
+        // snapshot triggers, the harness omits the parameter or passes an
+        // empty value, matching GitLab's CI_COMMIT_TAG semantics.
         properties([
             parameters([
                 booleanParam(
                     name: 'BRIK_DRY_RUN',
                     defaultValue: false,
                     description: 'Skip destructive deploy actions (compose up, k8s apply, helm upgrade, argocd sync, rsync). Print what would run instead.'
+                ),
+                string(
+                    name: 'BRIK_TAG',
+                    defaultValue: '',
+                    description: 'Release tag to associate with this build (e.g. v0.1.0). Leave empty for snapshot builds. Mirrors GitLab CI_COMMIT_TAG.'
                 )
             ])
         ])
@@ -202,11 +218,18 @@ def call(Map params = [:]) {
                     docker.image(resolvedImage).pull()
                 }
 
-                // release: gate-at-platform on tag presence. Multibranch
-                // sets env.TAG_NAME on tag-scan builds. Skipping at this
-                // level avoids pulling the stack runner just to short-
-                // circuit in stages.release.
-                if (env.TAG_NAME?.trim()) {
+                // release: gate-at-platform on tag presence. Two routes:
+                //   - Multibranch tag-scan: Jenkins sets env.TAG_NAME on
+                //     the build automatically.
+                //   - pipelineJob (briklab fixtures): the harness passes
+                //     BRIK_TAG via buildWithParameters; Jenkins exposes
+                //     parameters as env vars to subsequent steps but the
+                //     `params` map is only populated after this build's
+                //     `properties([parameters(...)])` block completes, so
+                //     params.BRIK_TAG reads null on the first stage even
+                //     when env.BRIK_TAG is already "v0.1.0". Check env
+                //     directly to cover both routes.
+                if (env.TAG_NAME?.trim() || env.BRIK_TAG?.trim()) {
                     runStageWithReporting('Release') { runStage('release') }
                 }
                 runStageWithReporting('Build')          { runStage('build') }
