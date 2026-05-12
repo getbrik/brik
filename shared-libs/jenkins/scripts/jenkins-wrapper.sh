@@ -40,10 +40,14 @@ brik.jenkins.setup() {
     export BRIK_BRANCH="${raw_branch#origin/}"
 
     export BRIK_TAG="${TAG_NAME:-}"
-    # Multibranch only sets TAG_NAME on tag-scan builds; branch builds with
-    # HEAD on a tag (e.g. push of v0.1.0 to main) leave it empty. Recover
-    # from git so release/notify see the same tag GitLab does.
-    if [[ -z "$BRIK_TAG" ]] && command -v git >/dev/null 2>&1; then
+    # Recover BRIK_TAG from git only on true tag-scan builds (TAG_NAME and
+    # GIT_BRANCH both empty). A Multibranch branch build whose HEAD happens
+    # to coincide with a tag (e.g. `main` pushed with `v0.1.0` at the same
+    # SHA) must stay classified as a snapshot, matching GitLab where
+    # CI_COMMIT_TAG is set only on tag-triggered pipelines. Without this
+    # guard, brik would emit context=release on a regular `main` push as
+    # soon as a release tag exists at HEAD.
+    if [[ -z "$BRIK_TAG" ]] && [[ -z "$BRIK_BRANCH" ]] && command -v git >/dev/null 2>&1; then
         BRIK_TAG="$(git -C "$BRIK_PROJECT_DIR" describe --tags --exact-match HEAD 2>/dev/null || echo "")"
         export BRIK_TAG
     fi
