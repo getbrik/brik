@@ -41,12 +41,28 @@ def call(Map config = [:]) {
     ).trim()
     def networkArg = network ? "--network ${network}" : ''
 
+    // Discover the host source path of /etc/brik/policy mounted into this
+    // Jenkins container. Docker-in-Docker mounts use host paths, so we
+    // cannot just forward /etc/brik/policy from inside the container; the
+    // nested runner container would try to bind a path that does not exist
+    // on the host. Inspect our own container to recover the original
+    // source. When BRIK_POLICY_URL is unset or the file is not mounted,
+    // policyArg stays empty and the runtime falls back to the built-in
+    // policy presets (pragmatic/strict/permissive).
+    def policyHost = sh(
+        script: '''CID=$(grep -oP 'containers/\\K[a-f0-9]+' /proc/self/mountinfo 2>/dev/null | head -1)
+            [ -n "$CID" ] && docker inspect "$CID" --format '{{range .Mounts}}{{if eq .Destination "/etc/brik/policy"}}{{.Source}}{{end}}{{end}}' 2>/dev/null | head -1 || echo ''
+        ''',
+        returnStdout: true
+    ).trim()
+    def policyArg = policyHost ? "-v ${policyHost}:/etc/brik/policy:ro" : ''
+
     def envFile = "/tmp/brik-env-${env.BUILD_TAG}"
     sh """env | grep -E '^(NEXUS_|BRIK_|REGISTRY_|ARGOCD_|CARGO_|SSH_)' > '${envFile}' 2>/dev/null || true"""
     def envFileArg = fileExists(envFile) && readFile(envFile).trim() ? "--env-file ${envFile}" : ''
 
     def javaEnvArgs = "-e MAVEN_OPTS=\"-Dmaven.repo.local=${env.WORKSPACE}/.m2/repository\" -e GRADLE_USER_HOME=${env.WORKSPACE}/.gradle"
-    def dockerArgs = "-e HOME=${env.WORKSPACE} ${javaEnvArgs} --memory=4g -v /var/run/docker.sock:/var/run/docker.sock ${networkArg} ${envFileArg}"
+    def dockerArgs = "-e HOME=${env.WORKSPACE} ${javaEnvArgs} --memory=4g -v /var/run/docker.sock:/var/run/docker.sock ${networkArg} ${envFileArg} ${policyArg}"
 
     return [
         dockerArgs:       dockerArgs,
