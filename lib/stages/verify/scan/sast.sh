@@ -28,17 +28,32 @@ _verify.scan.sast._build_command() {
     local severity="${BRIK_SECURITY_SAST_SEVERITY:-ERROR}"
     local out="${BRIK_SECURITY_SAST_OUTPUT_PATH:-brik-artifacts/sast/sast.sarif}"
     local out_dir; out_dir="$(dirname "$out")"
-    # Exclude Brik's per-stage scratch dir. Parallel verify branches
-    # materialize venvs under `.brik-stage/<stage>/...` in shared
-    # workspaces (e.g. Jenkins, local runs). Without this exclude,
-    # semgrep walks sibling branches' freshly-installed deps and reports
-    # findings on third-party code instead of project source.
+    # Workspace pollution excludes. GitLab spawns a fresh container per
+    # job so each verify stage only sees the project source via the
+    # initial git clone. Jenkins shares a single workspace across all
+    # stages, so by the time SAST runs the workspace contains:
+    #   - brik scratch     : .brik-stage/, .brik-logs/, brik-artifacts/
+    #   - tool caches      : .cache/, .npm/, .m2/, .gradle/, .cargo/,
+    #                        .nuget/, .pytest_cache/, .semgrep/
+    #   - user/build       : .local/ (HOME=$WORKSPACE makes pip --user
+    #                        write here), node_modules/, build/, dist/,
+    #                        target/, bin/
+    # Without these excludes semgrep scans hundreds of files of
+    # third-party code, build artifacts, and Brik internals -- producing
+    # findings the project owner has no control over.
+    local excludes
+    excludes='--exclude=.brik-stage --exclude=.brik-logs --exclude=brik-artifacts'
+    excludes+=' --exclude=.cache --exclude=.npm --exclude=.m2'
+    excludes+=' --exclude=.gradle --exclude=.cargo --exclude=.nuget'
+    excludes+=' --exclude=.pytest_cache --exclude=.semgrep --exclude=.local'
+    excludes+=' --exclude=node_modules --exclude=build --exclude=dist'
+    excludes+=' --exclude=target --exclude=bin'
     if [[ "$severity" == "ALL" ]]; then
-        printf 'mkdir -p %s && semgrep scan --error --exclude=.brik-stage --config %s --sarif --output %s .' \
-            "$out_dir" "$ruleset" "$out"
+        printf 'mkdir -p %s && semgrep scan --error %s --config %s --sarif --output %s .' \
+            "$out_dir" "$excludes" "$ruleset" "$out"
     else
-        printf 'mkdir -p %s && semgrep scan --error --severity %s --exclude=.brik-stage --config %s --sarif --output %s .' \
-            "$out_dir" "$severity" "$ruleset" "$out"
+        printf 'mkdir -p %s && semgrep scan --error --severity %s %s --config %s --sarif --output %s .' \
+            "$out_dir" "$severity" "$excludes" "$ruleset" "$out"
     fi
 }
 
