@@ -275,8 +275,15 @@ _stage._finalize_fragment() {
     _stage._record_business "$stage_name" "$backend" || true
 
     [[ "${BRIK_DISABLE_REPORT_FRAGMENTS:-}" == "1" ]] && return 0
-    report.write_fragment "$stage_name" 2>/dev/null || \
-        log.warn "fragment write failed for stage ${stage_name} (non-fatal)"
+    # Capture stderr so the underlying jq/mkdir/mv error surfaces in the
+    # build log. Silent swallowing here previously hid real bugs (notably
+    # Jenkins parallel-verify producing fragments that never made it into
+    # the aggregate report).
+    local _wf_err
+    _wf_err="$(report.write_fragment "$stage_name" 2>&1 1>/dev/null)" && _wf_err=""
+    if [[ -n "$_wf_err" ]]; then
+        log.warn "fragment write failed for stage ${stage_name} (non-fatal): ${_wf_err//$'\n'/ | }"
+    fi
     return 0
 }
 
