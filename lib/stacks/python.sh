@@ -50,6 +50,23 @@ stacks.python.build() {
     # Auto-detect package manager if not specified
     [[ -z "$pm" ]] && pm="$(_stacks.python._detect_pm "$workspace")"
 
+    # Pin SOURCE_DATE_EPOCH to the HEAD commit timestamp so wheel/sdist
+    # builds are byte-reproducible across CI environments. Without this,
+    # bdist_wheel embeds the wallclock time into ZIP entry mtimes and
+    # the same source produces a different artifact sha256 on GitLab vs
+    # Jenkins (or between any two builds of the same commit). All four
+    # builders below honour SOURCE_DATE_EPOCH via setuptools / hatchling
+    # / flit-core / poetry-core. Skip silently if git is unavailable or
+    # the workspace is not a git repo -- the build still runs, just
+    # without the reproducibility guarantee.
+    if command -v git >/dev/null 2>&1; then
+        local _src_date_epoch
+        _src_date_epoch="$(cd "$workspace" && git log -1 --format=%ct HEAD 2>/dev/null || echo '')"
+        if [[ -n "$_src_date_epoch" ]]; then
+            export SOURCE_DATE_EPOCH="$_src_date_epoch"
+        fi
+    fi
+
     case "$pm" in
         uv)
             pipeline.require_tool uv || return "$BRIK_EXIT_MISSING_DEP"
