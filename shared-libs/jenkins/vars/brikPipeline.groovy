@@ -295,7 +295,23 @@ def call(Map params = [:]) {
                                 echo "[brik] no stash for ${s} (likely skipped)"
                             }
                         }
-                        runInBase('notify')
+                        try {
+                            runInBase('notify')
+                        } catch (Exception ne) {
+                            // The notify stage doubles as the pipeline
+                            // gatekeeper: it exits non-zero whenever the
+                            // aggregate-report's business.status is
+                            // "error" (a real product failure). Catch
+                            // that here so the archiveArtifacts call
+                            // below still runs -- without it, the
+                            // brik-artifacts/aggregate-report.json that
+                            // proves the failure is never published,
+                            // which makes CI parity diffs against GitLab
+                            // (where artifacts upload regardless of job
+                            // exit code) impossible.
+                            echo "[brik] notify stage signalled failure: ${ne.message}"
+                            currentBuild.result = 'FAILURE'
+                        }
                         archiveArtifacts artifacts: 'brik-artifacts/**/*',
                             allowEmptyArchive: true,
                             fingerprint: false
