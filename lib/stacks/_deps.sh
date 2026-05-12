@@ -55,9 +55,11 @@ _brik._install_deps_node() {
     # package-lock.json. npm ci writes node_modules/.package-lock.json as
     # a copy of the project's lockfile after a successful install; if the
     # two files match byte-for-byte we know the deps on disk are current.
-    # Without this check, Jenkins workspaces (which exclude node_modules
-    # from cleanWs to keep the cache hot) reuse stale installs across
-    # builds when package.json changes.
+    # This keeps the helper idempotent when called multiple times in one
+    # build -- the parallel Jenkins verify stages (lint, sast, scan, test)
+    # share a workspace via --volumes-from and would otherwise race on
+    # npm ci. The first caller in the pipeline (brik-build) does the real
+    # install; the rest fast-path through the sync check.
     if [[ -d "${workspace}/node_modules/.bin" ]] \
         && [[ -f "${workspace}/package-lock.json" ]] \
         && [[ -f "${workspace}/node_modules/.package-lock.json" ]] \

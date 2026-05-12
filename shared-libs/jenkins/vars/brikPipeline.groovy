@@ -40,8 +40,33 @@ def call(Map params = [:]) {
 
         ansiColor('xterm') {
         timeout(time: timeoutMinutes, unit: 'MINUTES') {
-            // Selective cleanup: drop build outputs, keep dependency caches
-            // for inter-build performance. checkout scm restores sources.
+            // Rescue any root-owned files left over from a prior aborted
+            // build before cleanWs runs. The deploy stage runs as root
+            // (brik-runner-deploy lacks a uid-1000 user) and writes
+            // .ssh/.kube into the workspace. The post-deploy chown at
+            // the end of runInDeploy normally restores ownership, but
+            // if the build crashed mid-deploy or the user aborted it,
+            // those root-owned paths persist and the next cleanWs --
+            // running as the jenkins uid -- cannot delete them, which
+            // wedges the project until manual intervention. Chown the
+            // entire workspace via a throwaway alpine container so the
+            // next cleanWs always has permission to proceed.
+            def rescueUid = sh(script: 'id -u', returnStdout: true).trim()
+            def rescueGid = sh(script: 'id -g', returnStdout: true).trim()
+            sh """
+                docker run --rm -u 0:0 \
+                    -v "\${WORKSPACE}:/ws" \
+                    alpine:latest \
+                    chown -R ${rescueUid}:${rescueGid} /ws 2>/dev/null \
+                    || true
+            """
+            // Selective cleanup: drop build outputs and materialised dep
+            // trees (node_modules, .venv, ...), keep tool-level caches
+            // (.npm, .m2, .cache/pip, ...) so the install step on the
+            // next build stays fast. Materialised installs are the output
+            // of `npm ci` / `pip install` and must be regenerated when
+            // their inputs change; keeping them across builds requires
+            // every consumer to detect drift, which is a leaky contract.
             cleanWs(
                 deleteDirs: true,
                 patterns: [
@@ -51,9 +76,7 @@ def call(Map params = [:]) {
                     [pattern: '.gradle/**', type: 'EXCLUDE'],
                     [pattern: '.cargo/**', type: 'EXCLUDE'],
                     [pattern: '.nuget/**', type: 'EXCLUDE'],
-                    [pattern: '.venv/**', type: 'EXCLUDE'],
                     [pattern: '.git/**', type: 'EXCLUDE'],
-                    [pattern: 'node_modules/**', type: 'EXCLUDE'],
                 ]
             )
             def scmVars = checkout scm
