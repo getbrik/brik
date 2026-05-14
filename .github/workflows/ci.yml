@@ -52,6 +52,17 @@ jobs:
           make -j$(nproc)
           sudo make install
 
+      - name: Install jv (JSON Schema validator)
+        run: |
+          # jv is the schema validator brik prefers (check-jsonschema is the
+          # fallback). Without it on PATH, every `Skip if jv_missing` spec
+          # block is skipped and the jv-gated lib code (org_policy.load,
+          # schema-emit paths, ...) drops out of the coverage report.
+          # cmd/jv is a separate Go module; v0.7.0 is the latest published
+          # cmd/jv tag and pulls in jsonschema/v6 transitively.
+          go install github.com/santhosh-tekuri/jsonschema/cmd/jv@v0.7.0
+          echo "$HOME/go/bin" >> "$GITHUB_PATH"
+
       - name: Install ShellSpec
         run: |
           curl -fsSL https://git.io/shellspec | sh -s -- --yes

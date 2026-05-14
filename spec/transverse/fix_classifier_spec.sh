@@ -287,5 +287,32 @@ Describe "lib/transverse/fix_classifier.sh"
       The status should equal 2
       The error should include "stage name is required"
     End
+
+    It "fails with BRIK_EXIT_FAILURE when jq cannot process the input"
+      do_run() {
+        local tmp="$WORKDIR/not-json.sarif"
+        printf 'definitely not json {{{' > "$tmp"
+        fix_classifier.classify_sarif "$tmp" lint
+      }
+      When call do_run
+      The status should equal 1
+      The error should include "jq processing failed"
+    End
+
+    It "fails with BRIK_EXIT_MISSING_DEP when jq is not available"
+      do_run() {
+        # Shadow `command -v jq` only; everything else passes through.
+        command() {
+          [[ "$1" == "-v" && "$2" == "jq" ]] && return 1
+          builtin command "$@"
+        }
+        local tmp="$WORKDIR/needs-jq.sarif"
+        cp "$FIXTURES/eslint.sarif" "$tmp"
+        fix_classifier.classify_sarif "$tmp" lint
+      }
+      When call do_run
+      The status should equal 3
+      The error should include "jq is required"
+    End
   End
 End

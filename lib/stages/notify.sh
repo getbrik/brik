@@ -24,6 +24,7 @@ _notify._emit_recap_table() {
     brik.use transverse.format 2>/dev/null || return 0
 
     local jq_filter
+    # KCOV_EXCL_START -- jq filter body is not bash code
     jq_filter='
         def stage_rank($name):
           ["init","release","build",
@@ -68,6 +69,7 @@ _notify._emit_recap_table() {
         | ["Stage|Status|Business|Duration|Metrics"]
           + map("\(.stage)|\(status_glyph(.status))|\(biz_label(.business // null))|\(human_dur(.duration_ms))|\(metrics_for(.business // null))")
         | .[]'
+    # KCOV_EXCL_STOP
 
     local data
     data="$(jq -r "$jq_filter" "$report" 2>/dev/null)" || return 0
@@ -149,6 +151,7 @@ _notify._build_notify_metadata() {
     local decision="pass"
     [[ "$business_status" == "error" ]] && decision="fail"
 
+    # KCOV_EXCL_START -- jq metadata body is not bash code
     jq -c -n \
         --arg slack_on "$slack_on" --argjson slack_cfg "$slack_configured" --argjson slack_send "$slack_would" \
         --arg email_on "$email_on" --argjson email_cfg "$email_configured" --argjson email_send "$email_would" \
@@ -162,6 +165,7 @@ _notify._build_notify_metadata() {
             ],
             gatekeeper: {decision:$decision, business_status:$bstatus}
         }'
+    # KCOV_EXCL_STOP
 }
 
 # Patch aggregate-report.json with .pipeline.notify = <metadata blob> and

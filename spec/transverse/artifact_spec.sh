@@ -116,5 +116,130 @@ Describe "transverse/artifact.sh"
       The status should not equal 0
       The stderr should not be blank
     End
+
+    It "returns non-zero on an unsupported path type (fifo)"
+      run_fifo() {
+        mkfifo "$ART_WS/pipe"
+        artifact.summarize "$ART_WS/pipe" 2>/dev/null
+      }
+      When call run_fifo
+      The status should not equal 0
+    End
+
+    It "returns BRIK_EXIT_MISSING_DEP when jq is unavailable"
+      run_no_jq() {
+        command() {
+          [[ "$1" == "-v" && "$2" == "jq" ]] && return 1
+          builtin command "$@"
+        }
+        printf 'data' > "$ART_WS/x.tgz"
+        artifact.summarize "$ART_WS/x.tgz"
+      }
+      When call run_no_jq
+      The status should equal 3
+      The stderr should include "jq is required"
+    End
+  End
+
+  Describe "artifact.summarize stack-aware main file detection"
+    It "picks the .jar for a java directory"
+      run_java() {
+        mkdir -p "$ART_WS/target"
+        printf 'JARDATA' > "$ART_WS/target/app.jar"
+        printf 'noise' > "$ART_WS/target/pom.xml"
+        artifact.summarize "$ART_WS/target" java | jq -r '.main_file'
+      }
+      When call run_java
+      The output should equal "app.jar"
+    End
+
+    It "reports size_bytes of the main file, not the directory total"
+      run_java_size() {
+        mkdir -p "$ART_WS/target"
+        printf '1234567' > "$ART_WS/target/app.jar"
+        printf 'aaaaaaaaaaaaaaaaaaaa' > "$ART_WS/target/extra.txt"
+        artifact.summarize "$ART_WS/target" java | jq -r '.size_bytes'
+      }
+      When call run_java_size
+      The output should equal "7"
+    End
+
+    It "picks the .whl for a python directory"
+      run_python() {
+        mkdir -p "$ART_WS/dist"
+        printf 'WHEEL' > "$ART_WS/dist/pkg-1.0.whl"
+        artifact.summarize "$ART_WS/dist" python | jq -r '.main_file'
+      }
+      When call run_python
+      The output should equal "pkg-1.0.whl"
+    End
+
+    It "picks the .tgz for a node directory"
+      run_node() {
+        mkdir -p "$ART_WS/out"
+        printf 'TGZ' > "$ART_WS/out/bundle.tgz"
+        artifact.summarize "$ART_WS/out" node | jq -r '.main_file'
+      }
+      When call run_node
+      The output should equal "bundle.tgz"
+    End
+
+    It "picks the .nupkg for a dotnet directory"
+      run_dotnet() {
+        mkdir -p "$ART_WS/bin"
+        printf 'NUPKG' > "$ART_WS/bin/lib.nupkg"
+        artifact.summarize "$ART_WS/bin" dotnet | jq -r '.main_file'
+      }
+      When call run_dotnet
+      The output should equal "lib.nupkg"
+    End
+
+    It "prefers the project-name-prefixed artifact when several match"
+      run_proj_match() {
+        mkdir -p "$ART_WS/dist"
+        printf 'DEP' > "$ART_WS/dist/pytest-7.0.whl"
+        printf 'MAIN' > "$ART_WS/dist/my_app-1.0.whl"
+        BRIK_PROJECT_NAME="my-app" artifact.summarize "$ART_WS/dist" python | jq -r '.main_file'
+      }
+      When call run_proj_match
+      The output should equal "my_app-1.0.whl"
+    End
+
+    It "falls back to the largest binary for a rust directory"
+      run_rust() {
+        mkdir -p "$ART_WS/release"
+        printf 'tiny' > "$ART_WS/release/small"
+        printf 'a much larger binary blob here' > "$ART_WS/release/mybin"
+        artifact.summarize "$ART_WS/release" rust | jq -r '.main_file'
+      }
+      When call run_rust
+      The output should equal "mybin"
+    End
+
+    It "treats a single non-empty file in a directory as the main artifact"
+      run_single() {
+        mkdir -p "$ART_WS/onefile"
+        printf 'bundled output' > "$ART_WS/onefile/index.js"
+        artifact.summarize "$ART_WS/onefile" auto | jq -r '.main_file'
+      }
+      When call run_single
+      The output should equal "index.js"
+    End
+
+    It "produces a non-blank sha256 for an empty directory"
+      run_empty_dir() {
+        mkdir -p "$ART_WS/empty"
+        artifact.summarize "$ART_WS/empty" | jq -r '.sha256'
+      }
+      When call run_empty_dir
+      The output should not be blank
+    End
+  End
+
+  Describe "_artifact._size_bytes"
+    It "prints 0 for a path that is neither a file nor a directory"
+      When call _artifact._size_bytes "$ART_WS/no-such-path"
+      The output should equal "0"
+    End
   End
 End
