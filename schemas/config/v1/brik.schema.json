@@ -540,6 +540,18 @@
               }
             }
           }
+        },
+        "registry": {
+          "description": "Metadata about the registry that hosts the published image. Optional; used to enrich the pipeline report.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "ui_url": {
+              "description": "Browseable registry UI URL, distinct from the docker push endpoint (Nexus 3 splits these on ports 8081 vs 8082). Surfaced as business.registry.ui_url so the HTML report links to the image page. The BRIK_PACKAGE_REGISTRY_UI_URL env var set on the runner takes precedence over this value.",
+              "type": "string",
+              "minLength": 1
+            }
+          }
         }
       }
     },

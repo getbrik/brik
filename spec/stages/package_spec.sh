@@ -226,6 +226,20 @@ YAML
       When call parse_registry "nexus.briklab.test:8082/brik/node-complete"
       The output should equal '{"host":"nexus.briklab.test:8082","namespace":"brik","repository":"node-complete"}'
     End
+
+    It "carries BRIK_PACKAGE_REGISTRY_UI_URL through as business.registry.ui_url"
+      export BRIK_PACKAGE_REGISTRY_UI_URL="http://nexus.briklab.test:8081"
+      When call parse_registry "nexus.briklab.test:8082/brik/node-complete"
+      The output should include '"ui_url":"http://nexus.briklab.test:8081"'
+      The output should include '"host":"nexus.briklab.test:8082"'
+      unset BRIK_PACKAGE_REGISTRY_UI_URL
+    End
+
+    It "omits ui_url when BRIK_PACKAGE_REGISTRY_UI_URL is not set"
+      unset BRIK_PACKAGE_REGISTRY_UI_URL
+      When call parse_registry "ghcr.io/getbrik/brik-runner-node"
+      The output should equal '{"host":"ghcr.io","namespace":"getbrik","repository":"brik-runner-node"}'
+    End
   End
 
   It "records status skipped in the pipeline report when no docker image"

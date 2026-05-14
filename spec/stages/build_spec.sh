@@ -378,6 +378,98 @@ YAML
       The output should equal "target"
     End
 
+    It "prefers target/ over dist/ when stack=java even when both exist"
+      run_build_artifact_java_target_over_dist() {
+        mkdir -p "$BRIK_WORKSPACE/dist" "$BRIK_WORKSPACE/target"
+        printf 'JAR contents synthetic\n' > "$BRIK_WORKSPACE/target/app-1.0.jar"
+        brik.use() { :; }
+        stacks.java.build() { return 0; }
+        cat > "$BRIK_CONFIG_FILE" <<'YAML'
+version: 1
+project:
+  name: test
+  stack: java
+YAML
+        config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
+        local ctx
+        ctx="$(context.create "build")" 2>/dev/null || ctx="$(mktemp)"
+        stages.build "$ctx" >/dev/null 2>&1
+        jq -r '.stages[] | select(.name == "build") | .business.artifact.name // "<missing>"' \
+          "$BRIK_LOG_DIR/aggregate-report.json"
+      }
+      When call run_build_artifact_java_target_over_dist
+      The output should equal "target"
+    End
+
+    It "prefers dist/ over target/ when stack=python even when both exist"
+      run_build_artifact_python_dist_over_target() {
+        mkdir -p "$BRIK_WORKSPACE/dist" "$BRIK_WORKSPACE/target"
+        printf 'wheel synthetic\n' > "$BRIK_WORKSPACE/dist/pkg-1.0-py3-none-any.whl"
+        printf 'maven leftover\n' > "$BRIK_WORKSPACE/target/extra.bin"
+        brik.use() { :; }
+        stacks.python.build() { return 0; }
+        cat > "$BRIK_CONFIG_FILE" <<'YAML'
+version: 1
+project:
+  name: test
+  stack: python
+YAML
+        config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
+        local ctx
+        ctx="$(context.create "build")" 2>/dev/null || ctx="$(mktemp)"
+        stages.build "$ctx" >/dev/null 2>&1
+        jq -r '.stages[] | select(.name == "build") | .business.artifact.name // "<missing>"' \
+          "$BRIK_LOG_DIR/aggregate-report.json"
+      }
+      When call run_build_artifact_python_dist_over_target
+      The output should equal "dist"
+    End
+
+    It "falls back to first existing dir when all stack candidates are empty"
+      run_build_artifact_all_empty() {
+        mkdir -p "$BRIK_WORKSPACE/target" "$BRIK_WORKSPACE/build/libs"
+        brik.use() { :; }
+        stacks.java.build() { return 0; }
+        cat > "$BRIK_CONFIG_FILE" <<'YAML'
+version: 1
+project:
+  name: test
+  stack: java
+YAML
+        config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
+        local ctx
+        ctx="$(context.create "build")" 2>/dev/null || ctx="$(mktemp)"
+        stages.build "$ctx" >/dev/null 2>&1
+        jq -r '.stages[] | select(.name == "build") | .business.artifact.name // "<missing>"' \
+          "$BRIK_LOG_DIR/aggregate-report.json"
+      }
+      When call run_build_artifact_all_empty
+      The output should equal "target"
+    End
+
+    It "skips artifact recording entirely when stack=docker"
+      run_build_artifact_docker_skip() {
+        mkdir -p "$BRIK_WORKSPACE/dist"
+        printf 'should be ignored for docker\n' > "$BRIK_WORKSPACE/dist/leftover"
+        brik.use() { :; }
+        stacks.docker.build() { return 0; }
+        cat > "$BRIK_CONFIG_FILE" <<'YAML'
+version: 1
+project:
+  name: test
+  stack: docker
+YAML
+        config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
+        local ctx
+        ctx="$(context.create "build")" 2>/dev/null || ctx="$(mktemp)"
+        stages.build "$ctx" >/dev/null 2>&1
+        jq -r '[.stages[] | select(.name == "build") | .business.artifact // null | select(. != null)] | length' \
+          "$BRIK_LOG_DIR/aggregate-report.json"
+      }
+      When call run_build_artifact_docker_skip
+      The output should equal "0"
+    End
+
     It "omits build.business.artifact when no conventional dir exists"
       run_build_artifact_omit() {
         brik.use() { :; }

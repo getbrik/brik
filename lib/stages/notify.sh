@@ -106,6 +106,110 @@ _notify._is_ci_aggregation_mode() {
     return 1
 }
 
+# Build the pipeline.notify metadata blob from the live env vars and the
+# pipeline business outcome. Surfaces channel configuration intent, the
+# BRIK_NOTIFY_*_ON policy each channel uses, and a `would_send` flag
+# computed against the pipeline_status derived from business_status. The
+# blob captures intent (not delivery confirmation): a `true` would_send
+# means stages.notify will attempt the send, regardless of any later
+# network or transport failure.
+#
+# Usage: _notify._build_notify_metadata <business_status>
+# business_status: success|warning|error (from .pipeline.business.status)
+# Emits: JSON {channels:[...], gatekeeper:{...}} on stdout.
+_notify._build_notify_metadata() {
+    local business_status="$1"
+    local pipeline_status="success"
+    [[ "$business_status" == "error" ]] && pipeline_status="failed"
+
+    local slack_chan="${BRIK_NOTIFY_SLACK_CHANNEL:-}"
+    local slack_on="${BRIK_NOTIFY_SLACK_ON:-always}"
+    local slack_configured=false slack_would=false
+    if [[ -n "$slack_chan" ]]; then
+        slack_configured=true
+        _notify._should_send "$slack_on" "$pipeline_status" && slack_would=true
+    fi
+
+    local email_to="${BRIK_NOTIFY_EMAIL_TO:-}"
+    local email_on="${BRIK_NOTIFY_EMAIL_ON:-always}"
+    local email_configured=false email_would=false
+    if [[ -n "$email_to" ]]; then
+        email_configured=true
+        _notify._should_send "$email_on" "$pipeline_status" && email_would=true
+    fi
+
+    local webhook_url="${BRIK_NOTIFY_WEBHOOK_URL:-}"
+    local webhook_on="${BRIK_NOTIFY_WEBHOOK_ON:-always}"
+    local webhook_configured=false webhook_would=false
+    if [[ -n "$webhook_url" ]]; then
+        webhook_configured=true
+        _notify._should_send "$webhook_on" "$pipeline_status" && webhook_would=true
+    fi
+
+    local decision="pass"
+    [[ "$business_status" == "error" ]] && decision="fail"
+
+    jq -c -n \
+        --arg slack_on "$slack_on" --argjson slack_cfg "$slack_configured" --argjson slack_send "$slack_would" \
+        --arg email_on "$email_on" --argjson email_cfg "$email_configured" --argjson email_send "$email_would" \
+        --arg webhook_on "$webhook_on" --argjson webhook_cfg "$webhook_configured" --argjson webhook_send "$webhook_would" \
+        --arg decision "$decision" --arg bstatus "$business_status" '
+        {
+            channels: [
+                {type:"slack",   configured:$slack_cfg,   on:$slack_on,   would_send:$slack_send},
+                {type:"email",   configured:$email_cfg,   on:$email_on,   would_send:$email_send},
+                {type:"webhook", configured:$webhook_cfg, on:$webhook_on, would_send:$webhook_send}
+            ],
+            gatekeeper: {decision:$decision, business_status:$bstatus}
+        }'
+}
+
+# Patch aggregate-report.json with .pipeline.notify = <metadata blob> and
+# re-render the HTML view so the notify panel reflects the dispatch
+# decision. Best-effort: a missing report, missing jq, or any I/O failure
+# logs a non-fatal warning and leaves the on-disk artefacts intact.
+# Returns 0 in every recoverable case so notify's gatekeeper exit stays
+# the single source of truth for stage success.
+#
+# Usage: _notify._inject_notify_metadata <aggregate_json> <business_status>
+_notify._inject_notify_metadata() {
+    local report="$1"
+    local business_status="$2"
+    [[ -f "$report" ]] || return 0
+    command -v jq >/dev/null 2>&1 || return 0
+
+    local meta
+    meta="$(_notify._build_notify_metadata "$business_status")" || {
+        log.warn "could not build notify metadata (non-fatal)"
+        return 0
+    }
+
+    local tmp
+    tmp="$(mktemp)" || return 0
+    if jq -c --argjson meta "$meta" '.pipeline.notify = $meta' "$report" > "$tmp" 2>/dev/null; then
+        mv "$tmp" "$report" || {
+            rm -f "$tmp"
+            log.warn "could not write patched aggregate-report.json (non-fatal)"
+            return 0
+        }
+    else
+        rm -f "$tmp"
+        log.warn "could not patch aggregate-report.json with notify metadata (non-fatal)"
+        return 0
+    fi
+
+    # Re-render the HTML so the notify panel reflects the patched JSON.
+    # _report._render_html is sourced via report.sh; declare -f guards
+    # against test contexts that source notify.sh in isolation.
+    local html="${report%.json}.html"
+    if declare -f _report._render_html >/dev/null 2>&1; then
+        _report._render_html "$report" > "$html" 2>/dev/null || \
+            log.warn "could not re-render aggregate-report.html after notify injection (non-fatal)"
+    fi
+
+    return 0
+}
+
 # Check if a notification should be sent based on the 'on' condition and
 # pipeline status.
 # Usage: _notify._should_send <on_condition> <pipeline_status>
@@ -388,6 +492,25 @@ stages.notify() {
         _notify._export_gitlab_sast "${BRIK_WORKSPACE}"
     fi
 
+    # Read the gatekeeper signal from the aggregate before any side effect
+    # uses it. pipeline.business.status is the worst stage business status
+    # (error > warning > success); it is the canonical pipeline outcome.
+    # Defaults to "success" when no report, no jq, or no business field.
+    local business_status="success"
+    if [[ -f "$_report_json" ]] && command -v jq >/dev/null 2>&1; then
+        local _bs
+        _bs="$(jq -r '.pipeline.business.status // empty' "$_report_json" 2>/dev/null)"
+        case "$_bs" in
+            success|warning|error) business_status="$_bs" ;;
+        esac
+    fi
+
+    # Inject pipeline.notify metadata (channel intent + gatekeeper) into the
+    # aggregate JSON and re-render the HTML so archived artefacts surface
+    # the notification dispatch decision. Runs before the md/html copy into
+    # brik-artifacts/ so the published report is the patched one.
+    _notify._inject_notify_metadata "$_report_json" "$business_status"
+
     # Emit the rendered aggregate-report.md on stdout so the full stage table +
     # business section are visible in CI job logs. Falls back to a minimal
     # banner if the report is absent (e.g. single-stage run outside pipeline.run).
@@ -407,19 +530,6 @@ stages.notify() {
     # Compact recap table on stderr alongside the MD on stdout so operators
     # see the per-stage rollup at a glance in the live CI log.
     _notify._emit_recap_table "$_report_json"
-
-    # Read the gatekeeper signal from the aggregate. pipeline.business.status
-    # is the worst stage business status (error > warning > success); it is
-    # the canonical pipeline outcome. Defaults to "success" when no report,
-    # no jq, or no business field.
-    local business_status="success"
-    if [[ -f "$_report_json" ]] && command -v jq >/dev/null 2>&1; then
-        local _bs
-        _bs="$(jq -r '.pipeline.business.status // empty' "$_report_json" 2>/dev/null)"
-        case "$_bs" in
-            success|warning|error) business_status="$_bs" ;;
-        esac
-    fi
 
     # Map business status to the legacy {success|failed} channel labels for
     # downstream notification helpers (Slack/email/webhook subjects).

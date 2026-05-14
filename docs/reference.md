@@ -669,9 +669,12 @@ Bash Runtime (Layer 0) independently of the `hooks` section in `brik.yml`.
 
 ## Pipeline Report Fields
 
-Every pipeline run produces `aggregate-report.json` (and a Markdown rendering)
-under `${BRIK_LOG_DIR}` (local mode) or `${BRIK_WORKSPACE}/brik-artifacts/`
-(CI mode). The fields below describe the v1.1 producer contract; producers
+Every pipeline run produces `aggregate-report.json` plus Markdown and
+self-contained HTML renderings (`aggregate-report.{md,html}`) under
+`${BRIK_LOG_DIR}` (local mode) or `${BRIK_WORKSPACE}/brik-artifacts/`
+(CI mode). The HTML view inlines its CSS/JS and the Brik logo so it stays
+browseable as a standalone CI artifact. The fields below describe the
+v1.1 producer contract; producers
 emit `schema_version: "1.1"` today. Consumers should match on `^1\.` to
 accept future minor 1.x evolutions.
 
@@ -730,6 +733,7 @@ walking the stages array.
 | `author_email` | parsed from `CI_COMMIT_AUTHOR` or `git log -1 --format=%ae` | -- |
 | `timestamp` | `CI_COMMIT_TIMESTAMP` or `git log -1 --format=%aI` | ISO-8601 strict |
 | `message_subject` | `CI_COMMIT_TITLE` or `git log -1 --format=%s` | first line only |
+| `repo_url` | `CI_PROJECT_URL` / `GIT_URL` / `git config remote.origin.url` | browseable HTTPS URL; credentials stripped, SSH forms converted to HTTPS, `.git` suffix dropped. Used by the HTML renderer to deep-link commits, branches and tags on the hosting forge. |
 
 ### Per-stage fields
 
@@ -746,6 +750,7 @@ fields (`stage`, `status`, `rc`, `runner`, `duration_ms`, `timestamp`).
 | `tech.config_file` | string | path to active `brik.yml` |
 | `tech.config_valid` | bool | JSON Schema validation result |
 | `tech.prereqs_present` | object | `{yq, jq, jv}` booleans |
+| `tech.tool_versions` | object | `{yq, jq, jv}` semver strings; a tool absent from the runner is omitted (no key) so the consumer can tell "missing" from "present, version unknown". Omitted entirely when no tool version could be captured. |
 | `business.project_name` | string | `.project.name` |
 | `business.platform` | string | `gitlab` / `jenkins` / `local` |
 | `business.commit.*` | object | same shape as `pipeline.commit` |
@@ -773,7 +778,8 @@ fields (`stage`, `status`, `rc`, `runner`, `duration_ms`, `timestamp`).
 | `tech.tool` | string | `.build.tool` or `auto` |
 | `tech.command` | string | `.build.command` or `<stack-default>` |
 | `tech.cache_hit` | bool | `BRIK_BUILD_CACHE_HIT` (when set by stack module / wrapper) |
-| `business.artifact.{type, name, size_bytes, sha256, path}` | object | first existing of `dist/`, `target/release`, `target`, `build/libs`, `build`, `bin/Release`, `out` |
+| `business.artifact.{type, name, size_bytes, sha256, path}` | object | first non-empty build output directory, probed in a stack-aware order (java: `target`, `build/libs`, `build`; rust: `target/release`, `target`; dotnet: `src/*/bin/{Release,Debug}/*/`, `bin/Release`, `bin/Debug`, `out`, `build`; node: `dist`, `build`, `out`; python: `dist`, `build`; docker: skipped). Empty candidates are skipped; if every candidate is empty the first existing one is still recorded so the report shows a `0 B` warning. |
+| `business.artifact.main_file` | string | path (relative to the artifact dir) of the representative shipped file when a stack-aware match succeeds (`*.jar`/`*.war`/`*.ear` for java, `*.whl`/`*.tar.gz` for python, `*.tgz` for node, `*.nupkg`/`*.dll`/`*.exe` for dotnet, largest binary for rust, or a lone top-level file). When present, `size_bytes` and `sha256` describe that file -- not the directory total, which would include build intermediates. Omitted for unknown stacks and bare directories. |
 
 #### `test`
 
@@ -866,6 +872,7 @@ resolves them in this order, then maps:
 | `tech.build_duration_ms` | int string | wraps `stacks.docker.build` |
 | `business.image.{name, tag, full_name, digest}` | object | `digest` from `docker inspect --format='{{index .RepoDigests 0}}'` post-push |
 | `business.registry.{host, namespace, repository}` | object | parsed from the configured image reference (preserves `:port` in host) |
+| `business.registry.ui_url` | string | browseable registry UI URL, distinct from the docker push endpoint (Nexus 3 splits these on ports 8081 vs 8082). Sourced from `BRIK_PACKAGE_REGISTRY_UI_URL` (set in the runner, wins) or `.package.registry.ui_url` in `brik.yml`. Omitted when neither is set. The HTML renderer turns it into a clickable link to the image page. |
 
 #### `container-scan`
 
@@ -892,11 +899,31 @@ actually executed.
 
 #### `notify`
 
-`notify` is a meta-stage that produces the report itself; its content is
-intentionally excluded from `aggregate-report.json` to avoid a double-pass
-aggregation. The notify job's own job log (Slack / email / webhook
-delivery confirmations) remains the source of truth for notification
-outcomes.
+`notify` is a meta-stage that produces the report itself, so it never
+emits a per-stage fragment into `stages[]` (that would need a double-pass
+aggregation). Instead, after the aggregate is built, `stages.notify`
+patches it in place with a top-level [`pipeline.notify`](#top-level-pipelinenotify)
+block and re-renders `aggregate-report.html` so the archived artefacts
+carry the dispatch decision. The notify job's own job log (Slack / email
+/ webhook delivery confirmations) remains the source of truth for actual
+delivery outcomes.
+
+### Top-level `pipeline.notify`
+
+Notification dispatch metadata, injected by `stages.notify` after the
+aggregate is assembled. Captures *intent*, not delivery confirmation: a
+`would_send: true` means notify will attempt the send regardless of any
+later transport failure. Absent in pre-notify-v2 archives, so consumers
+must treat it as optional.
+
+| Field | Type | Notes |
+|---|---|---|
+| `channels[].type` | enum | `slack` / `email` / `webhook` |
+| `channels[].configured` | bool | `true` when the channel trigger var (`BRIK_NOTIFY_SLACK_CHANNEL` / `BRIK_NOTIFY_EMAIL_TO` / `BRIK_NOTIFY_WEBHOOK_URL`) is set at run time |
+| `channels[].on` | string | dispatch policy `BRIK_NOTIFY_*_ON`; defaults to `always` when the channel is configured without an explicit policy |
+| `channels[].would_send` | bool | `true` when the channel was configured and its policy matched the pipeline outcome for this run |
+| `gatekeeper.decision` | enum | `pass` / `fail` -- `fail` when `pipeline.business.status` is `error`, `pass` otherwise |
+| `gatekeeper.business_status` | enum | `success` / `warning` / `error`, mirrored from `pipeline.business.status` |
 
 ---
 

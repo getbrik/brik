@@ -12,15 +12,103 @@ Describe "_pipeline.detect_metadata"
     unset BRIK_COMMIT_BRANCH BRIK_COMMIT_TAG
     unset BRIK_COMMIT_AUTHOR BRIK_COMMIT_AUTHOR_EMAIL
     unset BRIK_COMMIT_TIMESTAMP BRIK_COMMIT_MESSAGE_SUBJECT
+    unset BRIK_COMMIT_REPO_URL
     unset BRIK_TRIGGERED_BY BRIK_WORKSPACE
     unset CI_PIPELINE_ID CI_PIPELINE_URL CI_COMMIT_SHA CI_COMMIT_SHORT_SHA
     unset CI_COMMIT_REF_NAME CI_COMMIT_BRANCH CI_COMMIT_TAG
     unset CI_COMMIT_AUTHOR CI_COMMIT_TIMESTAMP CI_COMMIT_TITLE
+    unset CI_PROJECT_URL GIT_URL
     unset GITLAB_USER_LOGIN CI_PIPELINE_SOURCE
     unset BUILD_TAG BUILD_NUMBER BUILD_URL
     unset GIT_COMMIT GIT_BRANCH GIT_TAG
     unset BUILD_USER_ID BUILD_CAUSE
   }
+
+  Describe "_normalize_remote_url helper"
+    It "strips .git suffix from HTTPS URL"
+      check() { _pipeline._normalize_remote_url "https://github.com/foo/bar.git"; }
+      When call check
+      The output should equal "https://github.com/foo/bar"
+    End
+    It "preserves HTTP scheme and port"
+      check() { _pipeline._normalize_remote_url "http://gitea.briklab.test:3000/brik/node-complete.git"; }
+      When call check
+      The output should equal "http://gitea.briklab.test:3000/brik/node-complete"
+    End
+    It "strips embedded credentials"
+      check() { _pipeline._normalize_remote_url "https://alice:t0k3n@gitlab.example.com/group/project.git"; }
+      When call check
+      The output should equal "https://gitlab.example.com/group/project"
+    End
+    It "converts SSH short form to HTTPS"
+      check() { _pipeline._normalize_remote_url "git@github.com:foo/bar.git"; }
+      When call check
+      The output should equal "https://github.com/foo/bar"
+    End
+    It "converts ssh:// URL form to HTTPS"
+      check() { _pipeline._normalize_remote_url "ssh://git@gitea.example.com/foo/bar.git"; }
+      When call check
+      The output should equal "https://gitea.example.com/foo/bar"
+    End
+    It "preserves deeply nested GitLab paths"
+      check() { _pipeline._normalize_remote_url "git@gitlab.com:group/subgroup/project.git"; }
+      When call check
+      The output should equal "https://gitlab.com/group/subgroup/project"
+    End
+    It "returns empty string for empty input"
+      check() { _pipeline._normalize_remote_url ""; }
+      When call check
+      The output should equal ""
+    End
+    It "passes unknown forms through unchanged"
+      check() { _pipeline._normalize_remote_url "weird-not-a-url"; }
+      When call check
+      The output should equal "weird-not-a-url"
+    End
+  End
+
+  Describe "BRIK_COMMIT_REPO_URL resolution"
+    Before 'reset_env'
+    After  'reset_env'
+
+    It "is set from CI_PROJECT_URL when present"
+      check() {
+        export CI_PROJECT_URL="https://gitlab.com/group/project"
+        _pipeline.detect_metadata
+        printf '%s' "$BRIK_COMMIT_REPO_URL"
+      }
+      When call check
+      The output should equal "https://gitlab.com/group/project"
+    End
+    It "is set from GIT_URL when CI_PROJECT_URL is absent"
+      check() {
+        export GIT_URL="https://github.com/foo/bar.git"
+        _pipeline.detect_metadata
+        printf '%s' "$BRIK_COMMIT_REPO_URL"
+      }
+      When call check
+      The output should equal "https://github.com/foo/bar"
+    End
+    It "normalizes credentials out of GIT_URL"
+      check() {
+        export GIT_URL="https://alice:t0k3n@gitea.example.com/foo/bar.git"
+        _pipeline.detect_metadata
+        printf '%s' "$BRIK_COMMIT_REPO_URL"
+      }
+      When call check
+      The output should equal "https://gitea.example.com/foo/bar"
+    End
+    It "prefers a preset BRIK_COMMIT_REPO_URL (wrappers can override)"
+      check() {
+        export BRIK_COMMIT_REPO_URL="https://override.example/project"
+        export CI_PROJECT_URL="https://gitlab.com/group/project"
+        _pipeline.detect_metadata
+        printf '%s' "$BRIK_COMMIT_REPO_URL"
+      }
+      When call check
+      The output should equal "https://override.example/project"
+    End
+  End
 
   Describe "GitLab platform"
     Before 'reset_env'

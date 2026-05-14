@@ -90,9 +90,108 @@ _artifact._abs_path() {
     # KCOV_EXCL_STOP
 }
 
+# Find the most representative single file inside a directory.
+# Strategy: stack-aware extension priority. Java picks *.jar > *.war > *.ear,
+# Python picks *.whl > *.tar.gz, etc. - the file's individual size is
+# incidental (a 2 KB JAR can sit next to MBs of build intermediates under
+# target/classes/). For rust (binaries have no extension on Unix) the
+# fallback is the largest file > 1 byte. For unknown stacks no main_file
+# is reported - the directory size is what the consumer gets, which keeps
+# the contract for non-Brik-managed paths.
+#
+# Usage: _artifact._find_main_file <dir> [<stack>]
+# Prints the file's path relative to <dir>, or nothing.
+_artifact._find_main_file() {
+    local _dir="$1"
+    local _stack="${2:-${BRIK_BUILD_STACK:-auto}}"
+    local _project="${3:-${BRIK_PROJECT_NAME:-}}"
+    [[ -d "$_dir" ]] || return 0
+
+    local -a _patterns
+    case "$_stack" in
+        java)   _patterns=("*.jar" "*.war" "*.ear") ;;
+        python) _patterns=("*.whl" "*.tar.gz") ;;
+        node)   _patterns=("*.tgz") ;;
+        dotnet) _patterns=("*.nupkg" "*.dll" "*.exe") ;;
+        rust)   _patterns=() ;;
+        *)      _patterns=() ;;
+    esac
+
+    local _pat _f
+
+    # Project-name-prefixed match first. Some build tools wheel deps into
+    # the same dir as the project (e.g. 'pip wheel . -w dist/' produces
+    # both python_complete-*.whl AND pytest-*.whl). Without this filter
+    # find -head would return whichever happens to come first in the
+    # directory entry order. Try kebab and snake-case forms of the
+    # project name to cover both filename conventions.
+    if [[ -n "$_project" && ${#_patterns[@]} -gt 0 ]]; then
+        local _proj_snake="${_project//-/_}"
+        local _name
+        for _pat in "${_patterns[@]}"; do
+            local _ext="${_pat#\*}"
+            for _name in "$_project" "$_proj_snake"; do
+                _f="$(find "$_dir" -maxdepth 3 -type f -name "${_name}${_ext}" -size +1c 2>/dev/null | head -1)"
+                [[ -n "$_f" ]] || _f="$(find "$_dir" -maxdepth 3 -type f -name "${_name}-*${_ext}" -size +1c 2>/dev/null | head -1)"
+                if [[ -n "$_f" ]]; then
+                    printf '%s' "${_f#"${_dir}"/}"
+                    return 0
+                fi
+            done
+        done
+    fi
+
+    # Bare extension match: first file with the right extension wins.
+    for _pat in "${_patterns[@]}"; do
+        _f="$(find "$_dir" -maxdepth 3 -type f -name "$_pat" -size +1c 2>/dev/null | head -1)"
+        if [[ -n "$_f" ]]; then
+            printf '%s' "${_f#"${_dir}"/}"
+            return 0
+        fi
+    done
+
+    # Rust binary fallback (no extension on Unix) - largest file wins.
+    if [[ "$_stack" == "rust" ]]; then
+        local _best="" _best_size=0 _sz
+        while IFS= read -r -d '' _f; do
+            _sz="$(_artifact._size_bytes "$_f" 2>/dev/null)" || continue
+            [[ "$_sz" =~ ^[0-9]+$ ]] || continue
+            (( _sz <= 1 )) && continue
+            if (( _sz > _best_size )); then
+                _best_size=$_sz
+                _best="$_f"
+            fi
+        done < <(find "$_dir" -maxdepth 3 -type f -print0 2>/dev/null)
+        if [[ -n "$_best" ]]; then
+            printf '%s' "${_best#"${_dir}"/}"
+            return 0
+        fi
+    fi
+
+    # Single-file-directory fallback: when a directory holds exactly one
+    # non-empty regular file at top level, treat it as the main artifact.
+    # Catches bundle outputs like dist/index.js for Node TS projects that
+    # don't go through 'npm pack'. Skipped when the dir has 0 or 2+ files
+    # to avoid mis-identification in multi-output builds.
+    local _count
+    _count=$(find "$_dir" -maxdepth 1 -type f -size +1c 2>/dev/null | wc -l | tr -d ' ')
+    if [[ "$_count" == "1" ]]; then
+        _f="$(find "$_dir" -maxdepth 1 -type f -size +1c 2>/dev/null | head -1)"
+        if [[ -n "$_f" ]]; then
+            printf '%s' "${_f#"${_dir}"/}"
+            return 0
+        fi
+    fi
+    return 0
+}
+
 # Summarize an artifact path into a JSON object.
-# Usage: artifact.summarize <path>
-# Prints {type, name, size_bytes, sha256, path} to stdout.
+# Usage: artifact.summarize <path> [<stack>]
+# Prints {type, name, size_bytes, sha256, path[, main_file]} to stdout.
+# main_file is added when path is a directory and a stack-aware extension
+# match (or rust binary heuristic) identified a representative file inside
+# it - in that case size_bytes and sha256 describe THAT file, not the
+# directory total (which would include build intermediates).
 # Returns non-zero on missing path or missing required tools.
 artifact.summarize() {
     if [[ $# -lt 1 ]]; then
@@ -100,6 +199,7 @@ artifact.summarize() {
         return 2
     fi
     local _p="$1"
+    local _stack="${2:-${BRIK_BUILD_STACK:-auto}}"
     if [[ ! -e "$_p" ]]; then
         printf 'artifact.summarize: path does not exist: %s\n' "$_p" >&2
         return 1
@@ -115,11 +215,24 @@ artifact.summarize() {
         return 1
     fi
 
-    local _name _size _sha _abs
+    local _name _size _sha _abs _main_file=""
     _name="$(basename "$_p")"
-    _size="$(_artifact._size_bytes "$_p")"
-    _sha="$(_artifact._sha256 "$_p")"
     _abs="$(_artifact._abs_path "$_p" || printf '%s' "$_p")"
+    if [[ "$_type" == "directory" ]]; then
+        _main_file="$(_artifact._find_main_file "$_p" "$_stack" "${BRIK_PROJECT_NAME:-}" 2>/dev/null)"
+    fi
+    # When a representative file was identified inside the directory, size
+    # and sha describe THAT file - the directory total would include build
+    # intermediates (target/classes/, pom.xml, .pyc files, ...) that are not
+    # part of the shipped artifact. Without a main file, fall back to the
+    # whole directory.
+    if [[ -n "$_main_file" && -f "$_p/$_main_file" ]]; then
+        _size="$(_artifact._size_bytes "$_p/$_main_file")"
+        _sha="$(_artifact._sha256 "$_p/$_main_file")"
+    else
+        _size="$(_artifact._size_bytes "$_p")"
+        _sha="$(_artifact._sha256 "$_p")"
+    fi
 
     if ! command -v jq >/dev/null 2>&1; then
         printf 'artifact.summarize: jq is required\n' >&2
@@ -128,11 +241,13 @@ artifact.summarize() {
 
     # KCOV_EXCL_START -- inline jq script body, not bash code
     jq -nc \
-        --arg type "$_type" \
-        --arg name "$_name" \
-        --argjson size "${_size:-0}" \
-        --arg sha    "${_sha:-}" \
-        --arg path   "$_abs" \
-        '{type: $type, name: $name, size_bytes: $size, sha256: $sha, path: $path}'
+        --arg type      "$_type" \
+        --arg name      "$_name" \
+        --argjson size  "${_size:-0}" \
+        --arg sha       "${_sha:-}" \
+        --arg path      "$_abs" \
+        --arg main_file "$_main_file" \
+        '{type: $type, name: $name, size_bytes: $size, sha256: $sha, path: $path}
+         + ( if $main_file != "" then { main_file: $main_file } else {} end )'
     # KCOV_EXCL_STOP
 }

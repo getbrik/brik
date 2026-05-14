@@ -163,7 +163,66 @@ _pipeline.detect_metadata() {
     _helpers.set_if_unset BRIK_COMMIT_TIMESTAMP       "${CI_COMMIT_TIMESTAMP:-}" "$_git_timestamp"
     _helpers.set_if_unset BRIK_COMMIT_MESSAGE_SUBJECT "${CI_COMMIT_TITLE:-}"     "$_git_subject"
 
+    # Browseable repository URL. Resolution priority: CI_PROJECT_URL (GitLab),
+    # GIT_URL (Jenkins Git plugin), then git config remote.origin.url. The raw
+    # URL is normalized to HTTPS, credentials stripped, .git suffix dropped.
+    local _git_remote_url=""
+    if command -v git >/dev/null 2>&1; then
+        local _ws_remote="${BRIK_WORKSPACE:-.}"
+        if git -C "$_ws_remote" rev-parse --git-dir >/dev/null 2>&1; then
+            _git_remote_url="$(git -C "$_ws_remote" config --get remote.origin.url 2>/dev/null || true)"
+        fi
+    fi
+    local _raw_repo_url="${CI_PROJECT_URL:-${GIT_URL:-${_git_remote_url}}}"
+    local _normalized_repo_url=""
+    if [[ -n "$_raw_repo_url" ]]; then
+        _normalized_repo_url="$(_pipeline._normalize_remote_url "$_raw_repo_url")"
+    fi
+    _helpers.set_if_unset BRIK_COMMIT_REPO_URL "$_normalized_repo_url"
+
     return 0
+}
+
+# Convert an arbitrary git remote URL to a browseable HTTPS form.
+# Inputs (raw):
+#   git@host:owner/repo.git
+#   ssh://git@host/owner/repo.git
+#   https://host/owner/repo.git
+#   https://user:token@host/owner/repo.git
+#   http://host:port/owner/repo.git
+# Output: scheme://host[:port]/owner/repo (no credentials, no .git suffix).
+# Unknown forms are returned unchanged. Always succeeds.
+_pipeline._normalize_remote_url() {
+    local url="$1"
+    [[ -z "$url" ]] && { printf ''; return 0; }
+    local scheme="" host="" path=""
+
+    # SSH short form: git@host:owner/repo[.git]
+    if [[ "$url" =~ ^[^@[:space:]]+@([^:/]+):(.+)$ ]]; then
+        host="${BASH_REMATCH[1]}"
+        path="${BASH_REMATCH[2]}"
+        path="${path%.git}"
+        printf 'https://%s/%s' "$host" "$path"
+        return 0
+    fi
+    # SSH URL form: ssh://[user@]host/path[.git]
+    if [[ "$url" =~ ^ssh://([^@/]+@)?([^/]+)/(.+)$ ]]; then
+        host="${BASH_REMATCH[2]}"
+        path="${BASH_REMATCH[3]}"
+        path="${path%.git}"
+        printf 'https://%s/%s' "$host" "$path"
+        return 0
+    fi
+    # HTTPS/HTTP form, optionally with embedded credentials
+    if [[ "$url" =~ ^(https?)://(([^@/]+)@)?(.+)$ ]]; then
+        scheme="${BASH_REMATCH[1]}"
+        path="${BASH_REMATCH[4]}"
+        path="${path%.git}"
+        path="${path%/}"
+        printf '%s://%s' "$scheme" "$path"
+        return 0
+    fi
+    printf '%s' "$url"
 }
 
 # Create a log file for a stage. Prints the path on stdout.
