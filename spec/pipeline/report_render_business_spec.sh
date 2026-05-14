@@ -60,8 +60,11 @@ Describe "report renderers expose business outcome"
         # formatting of the embedded payload.
         _report._render_html "${RB_LOG_DIR}/aggregate-report.json" \
           | awk '
+              # Do not exit on the closing tag: the renderers heredoc cats
+              # keep writing, and an early awk exit closes the pipe (SIGPIPE
+              # -> Broken pipe on stderr). Read to EOF, just stop capturing.
               /<script type="application\/json" id="brik-report">/ {capture=1; next}
-              /<\/script>/ {if (capture) {capture=0; exit}}
+              /<\/script>/ {if (capture) capture=0}
               capture {print}
             ' \
           | sed 's|<\\/|</|g' \

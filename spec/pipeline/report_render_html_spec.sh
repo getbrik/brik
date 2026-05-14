@@ -95,9 +95,12 @@ JSON
     Before 'write_minimal_aggregate'
 
     It "starts with a valid HTML5 doctype"
-      run() { _report._render_html "$BACKEND" | head -1; }
+      # Consume the full render: piping to `head -1` closes the pipe early
+      # and the heredoc `cat`s in _render_html get SIGPIPE (Broken pipe on
+      # stderr). `The line 1 of output` reads everything, then asserts.
+      run() { _report._render_html "$BACKEND"; }
       When call run
-      The output should equal "<!DOCTYPE html>"
+      The line 1 of output should equal "<!DOCTYPE html>"
     End
 
     It "declares utf-8 charset and a viewport meta"
