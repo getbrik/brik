@@ -96,6 +96,54 @@ coverage-as-finding, brik.yml trigger gating, and final documentation.
   accepted by the schema but no longer honoured at runtime; the
   legacy key is documented as deprecated.
 
+### HTML report v2
+
+Brands the self-contained HTML aggregate report and deepens per-stage
+telemetry. Chantier `docs/chantiers/20260502_pipeline-report-followups.md`.
+
+### Added
+
+- **Branded HTML report** (`lib/pipeline/_branding.sh`) -- the HTML
+  aggregate report carries the Brik logo (base64-embedded, 128x128) and
+  a link to the project. CSS, JS, and the logo are inlined so the report
+  stays browseable straight from a CI artifact with no external fetches.
+- **Repository deep links** -- `pipeline.commit.repo_url` is detected by
+  init from `CI_PROJECT_URL` / `GIT_URL` / `git remote` and normalised to
+  a credential-free HTTPS form (SSH forms converted, `.git` suffix
+  dropped). The HTML renderer turns it into deep links to commits,
+  branches, and tags on the hosting forge (GitLab, GitHub, Gitea,
+  Bitbucket).
+- **Notify dispatch panel** -- `pipeline.notify` (per-channel
+  configuration intent + gatekeeper decision) is injected into the
+  aggregate by `stages.notify` after aggregation, and the HTML view is
+  re-rendered so the archived report surfaces which channels would fire
+  and the final pass / fail decision.
+- **`init.tech.tool_versions`** -- the semver of each prerequisite tool
+  (`yq`, `jq`, `jv`) present on the runner, surfaced in the init panel; a
+  tool absent from the runner is omitted so consumers can tell "missing"
+  from "present, version unknown".
+- **`build.business.artifact.main_file`** -- the build artifact probe is
+  now stack-aware (per-stack candidate directory order, empty candidates
+  skipped) and records the representative shipped file (`*.jar`, `*.whl`,
+  `*.tgz`, `*.nupkg`, rust binary, ...). When set, `size_bytes` and
+  `sha256` describe that file rather than the directory total.
+- **`package.business.registry.ui_url`** -- a browseable registry UI URL,
+  distinct from the docker push endpoint (Nexus 3 splits these on ports
+  8081 vs 8082), sourced from `BRIK_PACKAGE_REGISTRY_UI_URL` or the new
+  `package.registry.ui_url` block in `brik.yml`. The HTML report links to
+  the image page.
+- README "Pipeline report" section with a screenshot linking to a
+  committed `node-complete` sample report.
+
+### Changed
+
+- Report schema v1.1 gains `pipeline.commit.repo_url` and
+  `pipeline.notify` (both optional, additive -- no `schema_version` bump).
+- Config schema gains the `package.registry` block (`ui_url`).
+- `docs/reference.md` and `docs/architecture.md` document the new report
+  fields, the `pipeline.notify` injection, and the HTML rendering
+  alongside the Markdown and JSON outputs.
+
 ### Tech / business orthogonal axes refactor
 
 Original SC0 work (chantier
