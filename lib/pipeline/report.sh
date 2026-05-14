@@ -547,6 +547,7 @@ report.aggregate_fragments() {
     local commit_author_email="${BRIK_COMMIT_AUTHOR_EMAIL:-}"
     local commit_timestamp="${BRIK_COMMIT_TIMESTAMP:-}"
     local commit_message_subject="${BRIK_COMMIT_MESSAGE_SUBJECT:-}"
+    local commit_repo_url="${BRIK_COMMIT_REPO_URL:-}"
     local triggered_by="${BRIK_TRIGGERED_BY:-}"
 
     local backend="${log_dir}/aggregate-report.json"
@@ -597,6 +598,7 @@ report.aggregate_fragments() {
         --arg commit_author_email "$commit_author_email" \
         --arg commit_timestamp "$commit_timestamp" \
         --arg commit_message_subject "$commit_message_subject" \
+        --arg commit_repo_url "$commit_repo_url" \
         --arg triggered_by "$triggered_by" \
         --arg policy_preset "$policy_preset" \
         --arg policy_source "$policy_source" \
@@ -638,6 +640,7 @@ report.aggregate_fragments() {
             + ( if $commit_author_email    != "" then { author_email:    $commit_author_email    } else {} end )
             + ( if $commit_timestamp       != "" then { timestamp:       $commit_timestamp       } else {} end )
             + ( if $commit_message_subject != "" then { message_subject: $commit_message_subject } else {} end )
+            + ( if $commit_repo_url        != "" then { repo_url:        $commit_repo_url        } else {} end )
           ) as $commit
         | ( {
               id: $pid,

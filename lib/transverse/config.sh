@@ -418,6 +418,19 @@ config.export_package_vars() {
     build_args="$(config.get '.package.docker.build_args' '')"
     [[ -n "$build_args" ]] && export BRIK_PACKAGE_DOCKER_BUILD_ARGS="$build_args"
 
+    # Optional UI URL for the registry that hosts the published image.
+    # The CI/CD push endpoint (e.g. nexus.example.com:8082) is rarely the
+    # same as the human-browseable UI (e.g. nexus.example.com:8081 for
+    # Nexus 3). This URL is propagated into business.registry.ui_url so
+    # the HTML report can produce a clickable link to the image page.
+    # Env var BRIK_PACKAGE_REGISTRY_UI_URL set in the runner wins over
+    # brik.yml so platform teams can configure it once at the CI level.
+    if [[ -z "${BRIK_PACKAGE_REGISTRY_UI_URL:-}" ]]; then
+        local ui_url
+        ui_url="$(config.get '.package.registry.ui_url' '')"
+        [[ -n "$ui_url" ]] && export BRIK_PACKAGE_REGISTRY_UI_URL="$ui_url"
+    fi
+
     _config._export_trigger_vars package PACKAGE
 
     return 0

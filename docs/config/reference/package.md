@@ -13,6 +13,15 @@ notify) still runs.
 ## Quick reference
 
 <!-- BEGIN AUTO-GENERATED: quick-reference -->
+### `package.trigger`
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `package.trigger.on-tag` | boolean | `true` | Run when the current commit carries a git tag. |
+| `package.trigger.on-main` | boolean | `false` | Run on push to the default branch. |
+| `package.trigger.on-feature` | boolean | `false` | Run on push to a branch other than the default (typical use: dev images per feature branch). |
+| `package.trigger.manual` | boolean | `false` | Run only when the pipeline was triggered manually (BRIK_TRIGGER_MANUAL=true). |
+
 ### `package.docker`
 
 | Field | Type | Default | Description |
@@ -22,6 +31,12 @@ notify) still runs.
 | `package.docker.context` | string | `.` | Docker build context path. |
 | `package.docker.platforms` | array of strings | -- | Target platforms for multi-arch builds (e.g. linux/amd64, linux/arm64). |
 | `package.docker.build_args` | object | -- | Docker build arguments passed as --build-arg. Keys and values must be strings. |
+
+### `package.registry`
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `package.registry.ui_url` | string | -- | Browseable registry UI URL, distinct from the docker push endpoint (Nexus 3 splits these on ports 8081 vs 8082). Surfaced as business.registry.ui_url so the HTML report links to the image page. The BRIK_PACKAGE_REGISTRY_UI_URL env var set on the runner takes precedence over this value. |
 
 <!-- END AUTO-GENERATED -->
 
@@ -49,6 +64,21 @@ non-release builds.
 the runner; otherwise the wrapper falls back to legacy `docker build`
 with a warning. The image is loaded into the local Docker daemon by
 default so the subsequent `publish.docker` stage can push it.
+
+## Registry UI link
+
+`package.registry.ui_url` is purely cosmetic: it lets the pipeline
+report link to the human-browseable registry page. Many registries
+expose a push endpoint that differs from their UI -- Nexus 3, for
+instance, serves the docker API on port 8082 and the web browser on
+port 8081 -- so the URL parsed out of `package.docker.image` is not the
+one a human would open.
+
+Set it in `brik.yml`, or override it once at the CI level with the
+`BRIK_PACKAGE_REGISTRY_UI_URL` env var on the runner (the env var
+wins). When neither is set, `business.registry.ui_url` is omitted and
+the report falls back to a best-effort URL derived from the image
+host.
 
 ## Examples
 
@@ -99,6 +129,23 @@ package:
 
 The schema validates the value, but the multi-arch build is a runtime
 gap -- track it via a future chantier.
+
+### Registry with a separate UI host
+
+```yaml
+version: 1
+project:
+  name: my-app
+  stack: node
+package:
+  docker:
+    image: nexus.example.com:8082/my-app
+  registry:
+    ui_url: https://nexus.example.com:8081/#browse/browse:docker-hosted
+```
+
+The image is pushed to `nexus.example.com:8082` but the report links
+to the Nexus web UI on port 8081.
 
 ### Build args
 

@@ -484,4 +484,112 @@ cat >> \"$MOCK_LOG\""
       The status should equal 1
     End
   End
+
+  Describe "_notify._build_notify_metadata"
+    clear_notify_env() {
+      unset BRIK_NOTIFY_SLACK_CHANNEL BRIK_NOTIFY_SLACK_ON
+      unset BRIK_NOTIFY_EMAIL_TO BRIK_NOTIFY_EMAIL_ON
+      unset BRIK_NOTIFY_WEBHOOK_URL BRIK_NOTIFY_WEBHOOK_ON
+    }
+    Before 'clear_notify_env'
+
+    It "reports every channel as not configured when no env var is set"
+      When call _notify._build_notify_metadata "success"
+      The status should be success
+      The output should include '"configured":false'
+      The output should include '"would_send":false'
+      # Three channels emitted in fixed order: slack, email, webhook.
+      The output should include '"type":"slack"'
+      The output should include '"type":"email"'
+      The output should include '"type":"webhook"'
+    End
+
+    It "marks slack as configured + would_send when the channel env var is set on a success run"
+      export BRIK_NOTIFY_SLACK_CHANNEL="#brik-ci"
+      When call _notify._build_notify_metadata "success"
+      The status should be success
+      The output should include '"type":"slack","configured":true,"on":"always","would_send":true'
+      unset BRIK_NOTIFY_SLACK_CHANNEL
+    End
+
+    It "marks email as configured + would_send filtered by on=failure on an error run"
+      export BRIK_NOTIFY_EMAIL_TO="ops@example.test"
+      export BRIK_NOTIFY_EMAIL_ON="failure"
+      When call _notify._build_notify_metadata "error"
+      The status should be success
+      The output should include '"type":"email","configured":true,"on":"failure","would_send":true'
+      unset BRIK_NOTIFY_EMAIL_TO BRIK_NOTIFY_EMAIL_ON
+    End
+
+    It "marks webhook configured but would_send=false when on=failure on a success run"
+      export BRIK_NOTIFY_WEBHOOK_URL="https://hooks.example.test/n"
+      export BRIK_NOTIFY_WEBHOOK_ON="failure"
+      When call _notify._build_notify_metadata "success"
+      The status should be success
+      The output should include '"type":"webhook","configured":true,"on":"failure","would_send":false'
+      unset BRIK_NOTIFY_WEBHOOK_URL BRIK_NOTIFY_WEBHOOK_ON
+    End
+
+    It "emits gatekeeper.decision=pass on success"
+      When call _notify._build_notify_metadata "success"
+      The status should be success
+      The output should include '"gatekeeper":{"decision":"pass","business_status":"success"}'
+    End
+
+    It "emits gatekeeper.decision=pass on warning (warning is not error)"
+      When call _notify._build_notify_metadata "warning"
+      The status should be success
+      The output should include '"decision":"pass"'
+      The output should include '"business_status":"warning"'
+    End
+
+    It "emits gatekeeper.decision=fail when business_status is error"
+      When call _notify._build_notify_metadata "error"
+      The status should be success
+      The output should include '"decision":"fail"'
+      The output should include '"business_status":"error"'
+    End
+  End
+
+  Describe "_notify._inject_notify_metadata"
+    setup_aggregate() {
+      INJ_TMP="$(mktemp -d)"
+      AGG="$INJ_TMP/aggregate-report.json"
+      cat > "$AGG" <<'JSON'
+{"schema_version":"1.1",
+ "pipeline":{"id":"42","platform":"local","project":"demo",
+   "started_at":"2026-05-14T10:00:00+0000","finished_at":"2026-05-14T10:05:00+0000",
+   "status":"success","context":"snapshot","business":{"status":"success"}},
+ "stages":[],
+ "summary":{"stages":{"total":0,"passed":0,"failed":0,"skipped":0},
+            "business":{"success_count":0,"warning_count":0,"error_count":0}}}
+JSON
+    }
+    cleanup_aggregate() { rm -rf "$INJ_TMP"; }
+    Before 'setup_aggregate'
+    After  'cleanup_aggregate'
+
+    It "patches the aggregate JSON with pipeline.notify when invoked"
+      unset BRIK_NOTIFY_SLACK_CHANNEL BRIK_NOTIFY_EMAIL_TO BRIK_NOTIFY_WEBHOOK_URL
+      When call _notify._inject_notify_metadata "$AGG" "success"
+      The status should be success
+      # The patched JSON now carries .pipeline.notify with channels[] and gatekeeper.
+      The contents of file "$AGG" should include '"notify"'
+      The contents of file "$AGG" should include '"channels"'
+      The contents of file "$AGG" should include '"gatekeeper"'
+      The contents of file "$AGG" should include '"decision":"pass"'
+    End
+
+    It "marks decision=fail when business_status is error"
+      When call _notify._inject_notify_metadata "$AGG" "error"
+      The status should be success
+      The contents of file "$AGG" should include '"decision":"fail"'
+      The contents of file "$AGG" should include '"business_status":"error"'
+    End
+
+    It "no-ops gracefully when the aggregate file is missing"
+      When call _notify._inject_notify_metadata "/nonexistent/path.json" "success"
+      The status should be success
+    End
+  End
 End

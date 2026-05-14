@@ -44,6 +44,11 @@ stages.init() {
     report.record_object "init" "tech" "config_valid" "true" 2>/dev/null || true
     report.record_object "init" "tech" "prereqs_present" \
         "$(_stages.init._collect_prereqs)" 2>/dev/null || true
+    local _tool_versions
+    _tool_versions="$(_stages.init._collect_tool_versions 2>/dev/null)"
+    if [[ -n "$_tool_versions" && "$_tool_versions" != "{}" ]]; then
+        report.record_object "init" "tech" "tool_versions" "$_tool_versions" 2>/dev/null || true
+    fi
 
     # Export config and override stack with the runtime-resolved value.
     # config.export_build_vars re-reads .project.stack from brik.yml, which may
@@ -199,6 +204,43 @@ _stages.init._collect_prereqs() {
     printf '{"yq":%s,"jq":%s,"jv":%s}' "$_p_yq" "$_p_jq" "$_p_jv"
 }
 
+# Emit a JSON object with the semver of each prerequisite tool that is
+# present on the runner. Tools that are absent are omitted from the object
+# so the consumer can distinguish "tool missing" (no key) from "tool
+# present, version capture failed" (empty string).
+# Output shape: {"yq": "4.45.1", "jq": "1.7.1", "jv": "0.5.0"}
+# Used by stages.init for tech.tool_versions, surfaced in the init panel
+# of the HTML report.
+_stages.init._collect_tool_versions() {
+    local _v_yq="" _v_jq="" _v_jv=""
+    if command -v yq >/dev/null 2>&1; then
+        # yq Go (Mike Farah): "yq (...) version v4.45.1"; yq python: "yq 3.2.3"
+        _v_yq="$(yq --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -1)"
+    fi
+    if command -v jq >/dev/null 2>&1; then
+        # jq prints "jq-1.7.1"
+        _v_jq="$(jq --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -1)"
+    fi
+    if command -v jv >/dev/null 2>&1; then
+        # jv (Santhosh Kumar's go-yaml validator) prints "jv version 0.5.0"
+        _v_jv="$(jv --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -1)"
+    fi
+    if command -v jq >/dev/null 2>&1; then
+        # KCOV_EXCL_START -- inline jq script body, not bash code
+        jq -nc \
+            --arg yq "$_v_yq" \
+            --arg jq "$_v_jq" \
+            --arg jv "$_v_jv" \
+            '{}
+             + ( if $yq != "" then { yq: $yq } else {} end )
+             + ( if $jq != "" then { jq: $jq } else {} end )
+             + ( if $jv != "" then { jv: $jv } else {} end )'
+        # KCOV_EXCL_STOP
+    else
+        printf '{}'
+    fi
+}
+
 # Build a JSON object of the populated BRIK_COMMIT_* fields. Returns
 # "{}" when no commit metadata is set so the caller can omit the
 # business.commit key entirely.
@@ -216,6 +258,7 @@ _stages.init._build_commit_object() {
             --arg author_email    "${BRIK_COMMIT_AUTHOR_EMAIL:-}" \
             --arg timestamp       "${BRIK_COMMIT_TIMESTAMP:-}" \
             --arg message_subject "${BRIK_COMMIT_MESSAGE_SUBJECT:-}" \
+            --arg repo_url        "${BRIK_COMMIT_REPO_URL:-}" \
             '{}
              + ( if $sha             != "" then { sha:             $sha }             else {} end )
              + ( if $short_sha       != "" then { short_sha:       $short_sha }       else {} end )
@@ -225,7 +268,8 @@ _stages.init._build_commit_object() {
              + ( if $author          != "" then { author:          $author }          else {} end )
              + ( if $author_email    != "" then { author_email:    $author_email }    else {} end )
              + ( if $timestamp       != "" then { timestamp:       $timestamp }       else {} end )
-             + ( if $message_subject != "" then { message_subject: $message_subject } else {} end )')"
+             + ( if $message_subject != "" then { message_subject: $message_subject } else {} end )
+             + ( if $repo_url        != "" then { repo_url:        $repo_url }        else {} end )')"
         # KCOV_EXCL_STOP
     fi
     printf '%s' "$_p_obj"

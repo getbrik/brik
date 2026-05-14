@@ -48,7 +48,11 @@
             "author": { "type": "string" },
             "author_email": { "type": "string" },
             "timestamp": { "type": "string" },
-            "message_subject": { "type": "string" }
+            "message_subject": { "type": "string" },
+            "repo_url": {
+              "description": "Browseable HTTPS URL of the source repository, captured by init from CI_PROJECT_URL (GitLab), GIT_URL (Jenkins), or 'git config remote.origin.url' as a fallback. Credentials are stripped and SSH forms are converted to HTTPS. Used by the HTML renderer to build deep links to commits, branches and tags on the hosting forge (GitLab, GitHub, Gitea, Bitbucket).",
+              "type": "string"
+            }
           }
         },
         "started_at": {
@@ -89,6 +93,57 @@
         "triggered_by": {
           "description": "Origin of the pipeline run: a user identifier, 'push', 'schedule', 'manual', etc.",
           "type": "string"
+        },
+        "notify": {
+          "description": "Notification dispatch metadata, injected by stages.notify after the aggregate is built. Surfaces which channels were configured at run time, the policy each one used (BRIK_NOTIFY_*_ON), whether the policy matched this run, and the pipeline gatekeeper decision. Absent in pre-notify-v2 archives; renderers must treat it as optional.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "channels": {
+              "description": "Per-channel configuration snapshot. Order matches the dispatch order in stages.notify (slack, email, webhook).",
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["type", "configured", "on", "would_send"],
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "description": "Channel kind.",
+                    "type": "string",
+                    "enum": ["slack", "email", "webhook"]
+                  },
+                  "configured": {
+                    "description": "True when the channel trigger env var (BRIK_NOTIFY_SLACK_CHANNEL / BRIK_NOTIFY_EMAIL_TO / BRIK_NOTIFY_WEBHOOK_URL) is set at run time.",
+                    "type": "boolean"
+                  },
+                  "on": {
+                    "description": "Dispatch policy: BRIK_NOTIFY_*_ON. Defaults to 'always' when the channel is configured without an explicit policy.",
+                    "type": "string"
+                  },
+                  "would_send": {
+                    "description": "True when the channel was configured and the policy matched the pipeline outcome for this run, regardless of any delivery error. Captures intent, not delivery confirmation.",
+                    "type": "boolean"
+                  }
+                }
+              }
+            },
+            "gatekeeper": {
+              "description": "Final pipeline outcome decision derived by stages.notify from pipeline.business.status. 'fail' when business_status is 'error'; 'pass' otherwise.",
+              "type": "object",
+              "required": ["decision", "business_status"],
+              "additionalProperties": false,
+              "properties": {
+                "decision": {
+                  "type": "string",
+                  "enum": ["pass", "fail"]
+                },
+                "business_status": {
+                  "type": "string",
+                  "enum": ["success", "warning", "error"]
+                }
+              }
+            }
+          }
         }
       }
     },

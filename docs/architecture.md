@@ -343,13 +343,13 @@ stage.run("build", stages.build)
 
 ### Pipeline report in CI mode
 
-The fragment / aggregate split makes `aggregate-report.{md,json}` work
-identically in local mode and multi-container CI:
+The fragment / aggregate split makes `aggregate-report.{md,json,html}`
+work identically in local mode and multi-container CI:
 
 - **Local mode** (`brik run pipeline`). One process, one `$BRIK_LOG_DIR`.
   `pipeline.run` calls `report.init`, every stage records into the same
   `aggregate-report.json` backend, and `report.render` produces the final
-  Markdown / JSON pair. Each `stage.run` invocation also writes a
+  Markdown, JSON and HTML triple. Each `stage.run` invocation also writes a
   `brik-artifacts/<stage>/<stage>.json` fragment (harmless side effect, used as
   CI artifact when the same workspace is uploaded).
 - **CI mode** (GitLab, Jenkins). Each stage runs in its own container with
@@ -359,8 +359,10 @@ identically in local mode and multi-container CI:
   declares `needs: artifacts: true` (or `unstash`-es each upstream stash),
   invokes `stages.notify`, which detects "CI aggregation mode" by the
   presence of valid fragments and calls `report.aggregate_fragments` to
-  merge them into the canonical `aggregate-report.{md,json}` before printing
-  / archiving.
+  merge them into the canonical `aggregate-report.{md,json,html}` before
+  printing / archiving. `stages.notify` then patches `pipeline.notify`
+  into the JSON and re-renders the HTML so the archived report carries
+  the notification dispatch decision.
 
 Fragments and aggregate are versioned. Two schema directories coexist
 under `schemas/report/`: the active `v1.1/` (producers emit

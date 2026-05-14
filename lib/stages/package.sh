@@ -71,7 +71,7 @@ stages.package() {
         report.record_object "package" "business" "image" "$_img_obj" 2>/dev/null || true
 
         local _reg_obj
-        _reg_obj="$(_stages.package._parse_registry "$BRIK_PACKAGE_DOCKER_IMAGE")"
+        _reg_obj="$(_stages.package._parse_registry "$BRIK_PACKAGE_DOCKER_IMAGE" "${BRIK_PACKAGE_REGISTRY_UI_URL:-}")"
         if [[ -n "$_reg_obj" ]]; then
             report.record_object "package" "business" "registry" "$_reg_obj" 2>/dev/null || true
         fi
@@ -173,11 +173,14 @@ stages.package() {
 # Parse a Docker image reference into {host, namespace, repository}. Mirrors
 # Docker CLI's normalization: bare names default to docker.io/library, and
 # a 2-segment ref without a "." or ":" in the first segment is treated as
-# a Docker Hub user/repo pair.
-# Usage: _stages.package._parse_registry <image_ref>
+# a Docker Hub user/repo pair. When a non-empty <ui_url> is provided, the
+# emitted JSON also carries a "ui_url" field (browseable URL distinct from
+# the docker push endpoint -- Nexus 3 splits these on ports 8081 vs 8082).
+# Usage: _stages.package._parse_registry <image_ref> [<ui_url>]
 # Prints the JSON object on stdout, or empty on error.
 _stages.package._parse_registry() {
     local _ref="$1"
+    local _ui_url="${2:-}"
     [[ -z "$_ref" ]] && return 0
     command -v jq >/dev/null 2>&1 || return 0
 
@@ -226,5 +229,7 @@ _stages.package._parse_registry() {
         --arg host       "$_host" \
         --arg namespace  "$_namespace" \
         --arg repository "$_repo" \
-        '{host: $host, namespace: $namespace, repository: $repository}'
+        --arg ui_url     "$_ui_url" \
+        '{host: $host, namespace: $namespace, repository: $repository}
+         + (if $ui_url == "" then {} else {ui_url: $ui_url} end)'
 }

@@ -47,7 +47,7 @@ stages.build() {
         log.info "using custom build command: $BRIK_BUILD_COMMAND"
         (cd "${BRIK_WORKSPACE}" && eval "$BRIK_BUILD_COMMAND") || result=$?
         if [[ "$result" -eq 0 ]]; then
-            _stages.build._record_artifact "${BRIK_WORKSPACE}"
+            _stages.build._record_artifact "${BRIK_WORKSPACE}" "$stack"
         fi
         return "$result"
     fi
@@ -74,7 +74,7 @@ stages.build() {
     result=$?
 
     if [[ "$result" -eq 0 ]]; then
-        _stages.build._record_artifact "${BRIK_WORKSPACE}"
+        _stages.build._record_artifact "${BRIK_WORKSPACE}" "$stack"
     fi
     return "$result"
 }
@@ -82,30 +82,75 @@ stages.build() {
 # Locate the conventional build artifact directory and record its summary
 # under business.artifact. Skipped silently when no recognized output
 # directory exists (libraries, source-only repos, custom output paths).
-# Probe order favours JS/Python first ("dist"), then JVM ("target",
-# "build/libs"), then Rust ("target/release"), then .NET ("bin/Release").
+#
+# Probe order is stack-aware so JVM builds don't get caught by an empty
+# dist/ left over from prior tooling. For each candidate the directory
+# must exist AND contain at least one regular file > 1 byte; otherwise
+# the loop continues. If every candidate exists but is empty, the first
+# existing one is recorded so users still see "0 B (empty)" in the UI
+# rather than nothing.
+#
+# Usage: _stages.build._record_artifact <workspace> [<stack>]
 _stages.build._record_artifact() {
     local _ws="$1"
-    local _candidates=(
-        "dist"
-        "target/release"
-        "target"
-        "build/libs"
-        "build"
-        "bin/Release"
-        "out"
-    )
-    local _c _abs
+    local _stack="${2:-${BRIK_BUILD_STACK:-auto}}"
+
+    local -a _candidates
+    case "$_stack" in
+        java)   _candidates=("target" "build/libs" "build") ;;
+        rust)   _candidates=("target/release" "target") ;;
+        dotnet)
+            # .NET solutions often nest output under src/<project>/bin/<config>/<TFM>/
+            # so the workspace-root bin/ stays empty. Expand the multi-project
+            # glob before falling back to the conventional single-project paths.
+            # Strip trailing slashes so that ${_best#"${_dir}/"} in
+            # _find_main_file produces a relative main_file (not absolute).
+            _candidates=()
+            local _d _rel
+            for _d in "$_ws"/src/*/bin/Release/*/; do
+                [[ -d "$_d" ]] || continue
+                _rel="${_d%/}"
+                _candidates+=("${_rel#"$_ws/"}")
+            done
+            for _d in "$_ws"/src/*/bin/Debug/*/; do
+                [[ -d "$_d" ]] || continue
+                _rel="${_d%/}"
+                _candidates+=("${_rel#"$_ws/"}")
+            done
+            _candidates+=("bin/Release" "bin/Debug" "out" "build")
+            ;;
+        node)   _candidates=("dist" "build" "out") ;;
+        python) _candidates=("dist" "build") ;;
+        docker) return 0 ;;
+        *)      _candidates=("dist" "target/release" "target" "build/libs" "build" "bin/Release" "out") ;;
+    esac
+
+    local _c _abs _first_existing=""
     for _c in "${_candidates[@]}"; do
         _abs="${_ws}/${_c}"
-        if [[ -d "$_abs" ]]; then
+        [[ -d "$_abs" ]] || continue
+        [[ -z "$_first_existing" ]] && _first_existing="$_abs"
+        # Skip empty / placeholder-only directories so the loop can fall
+        # through to a real artifact dir (e.g. Java's empty dist/ -> target/).
+        if [[ -n "$(find "$_abs" -maxdepth 3 -type f -size +1c -print -quit 2>/dev/null)" ]]; then
             brik.use transverse.artifact 2>/dev/null || return 0
             local _summary
-            _summary="$(artifact.summarize "$_abs" 2>/dev/null)" || return 0
+            _summary="$(artifact.summarize "$_abs" "$_stack" 2>/dev/null)" || return 0
             [[ -z "$_summary" ]] && return 0
             report.record_object "build" "business" "artifact" "$_summary" 2>/dev/null || true
             return 0
         fi
     done
+
+    # All candidates are empty (or absent). Record the first existing one
+    # so the UI surfaces a 0 B warning rather than silently dropping the
+    # field. Skipped entirely when nothing exists at all.
+    if [[ -n "$_first_existing" ]]; then
+        brik.use transverse.artifact 2>/dev/null || return 0
+        local _summary
+        _summary="$(artifact.summarize "$_first_existing" "$_stack" 2>/dev/null)" || return 0
+        [[ -z "$_summary" ]] && return 0
+        report.record_object "build" "business" "artifact" "$_summary" 2>/dev/null || true
+    fi
     return 0
 }
