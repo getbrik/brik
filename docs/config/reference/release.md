@@ -15,6 +15,14 @@ SemVer + Conventional Commits + `CHANGELOG.md` workflow.
 | `release.strategy` | enum (`semver`, `calver`, `custom`) | `semver` | Release strategy. |
 | `release.tag_prefix` | string | `v` | Prefix for release tags (e.g. 'v'). |
 
+### `release.trigger`
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `release.trigger.on-tag` | boolean | `true` | Run when the current commit carries a git tag. |
+| `release.trigger.on-main` | boolean | `false` | Run on push to the default branch. |
+| `release.trigger.manual` | boolean | `false` | Run only when the pipeline was triggered manually (BRIK_TRIGGER_MANUAL=true). |
+
 ### `release.changelog`
 
 | Field | Type | Default | Description |
