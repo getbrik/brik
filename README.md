@@ -256,6 +256,35 @@ Jenkins JUnit publisher.
 For java's jacoco-format coverage, override `coverage_report` at the project
 level; full recipe in [`shared-libs/gitlab/README.md#coverage-reports`](shared-libs/gitlab/README.md#coverage-reports).
 
+### Pipeline report
+
+Every run produces an **aggregate report** in three formats under
+`brik-artifacts/aggregate-report.{json,md,html}` -- machine-readable JSON,
+a Markdown rendering for CI job logs, and a self-contained HTML view. The
+HTML inlines its own CSS, JS, and the Brik logo, so it stays browseable
+straight from the CI artifact with no external fetches.
+
+<p align="center">
+  <a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/getbrik/brik/main/docs/aggregate-report.html"><img src="docs/report.png" alt="Brik HTML pipeline report" width="900"></a>
+</p>
+
+<p align="center">
+  <em><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/getbrik/brik/main/docs/aggregate-report.html">Open the full interactive HTML report</a> (sample from a <code>node-complete</code> run)</em>
+</p>
+
+The HTML view carries:
+
+- a branded header with the commit identity and the snapshot/release context
+- the lifecycle timeline of all 11 stages, with the parallel verify group
+- a policy / coverage / business-outcome summary row
+- per-stage panels splitting `tech` (what ran) from `business` (what it means)
+- severity-coded findings from the SAST, dependency, secret, and container scans
+- a notification dispatch panel (channels, policy, gatekeeper decision)
+- deep links to commits, branches, and tags on the hosting forge
+
+See [`docs/reference.md#pipeline-report-fields`](docs/reference.md#pipeline-report-fields)
+for the full field contract.
+
 ## Supported Stacks
 
 | Stack | Detection | Build | Test | Lint |
