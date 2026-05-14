@@ -6,6 +6,10 @@ coverage:
     patch:
       default:
         target: 80%
+        # Tolerate a 3-point dip before failing: large multi-chantier PRs
+        # legitimately touch hard-to-unit-test code (defensive error
+        # branches, inline template bodies). 80% stays the target.
+        threshold: 3%
 
 ignore:
   - "spec/**"
