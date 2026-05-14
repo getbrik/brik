@@ -18,6 +18,15 @@ is skipped.
 | `deploy.workflow` | enum (`trunk-based`, `git-flow`, `github-flow`) | -- | Git workflow convention for automatic environment mapping. When set, Brik loads a built-in profile that pre-configures environments based on branch/tag patterns. User-defined environments override profile defaults. |
 | `deploy.environments` | object | -- | Named deployment environments. Each key is an environment name (e.g. staging, production). Each value defines the deployment condition and target. |
 
+### `deploy.trigger`
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `deploy.trigger.on-tag` | boolean | `true` | Run when the current commit carries a git tag. |
+| `deploy.trigger.on-main` | boolean | `false` | Run on push to the default branch. |
+| `deploy.trigger.on-feature` | boolean | `false` | Run on push to a branch other than the default (typical use: review apps per feature branch). |
+| `deploy.trigger.manual` | boolean | `false` | Run only when the pipeline was triggered manually (BRIK_TRIGGER_MANUAL=true). |
+
 <!-- END AUTO-GENERATED -->
 
 `deploy.environments` is a map: each key is an environment name and

@@ -14,7 +14,7 @@ Tier 3 (stack default) pattern as `build` and `test`.
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `quality.lint.enabled` | boolean | `true` | Whether linting is active. Set to false to skip lint checks entirely. |
+| `quality.lint.enabled` | boolean | `true` | DEPRECATED. The runtime no longer honours this key: lint always runs. Init emits a one-shot deprecation warning when 'false' is detected. The key is kept in the schema so legacy brik.yml files keep validating during the migration window; remove it from your config when convenient. |
 | `quality.lint.command` | string | -- | Lint command to execute. Overrides tool-based and stack-default lint commands (Tier 1). |
 | `quality.lint.tool` | string | -- | Lint tool to use (e.g. eslint, biome, oxlint, checkstyle, ruff, flake8, pylint, clippy, dotnet-format). Overrides the stack default (Tier 2). |
 | `quality.lint.config` | string | -- | Path to the lint configuration file (e.g. .eslintrc.yml). |
