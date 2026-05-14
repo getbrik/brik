@@ -81,6 +81,7 @@ fix_classifier.classify_sarif() {
     local tmp
     tmp="$(mktemp "${sarif_path}.XXXXXX")" || return "$BRIK_EXIT_IO_FAILURE"
 
+    # KCOV_EXCL_START -- jq filter body is not bash code
     local filter='
 def rule_help($rid; $rules):
   ($rules | map(select(.id == $rid)) | first | (.help.text // ""));
@@ -144,6 +145,7 @@ def tool_blocking($r; $tool):
       | . + { properties: ((.properties // {}) + $brik_props) }
     ])
 )'
+    # KCOV_EXCL_STOP
 
     if jq --arg stage "$stage" "$filter" "$sarif_path" > "$tmp" 2>/dev/null; then
         mv "$tmp" "$sarif_path"

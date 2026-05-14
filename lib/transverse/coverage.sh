@@ -224,6 +224,7 @@ brik.coverage.emit_sarif() {
     if [[ "$below" == "1" ]]; then
         local msg
         msg=$(printf 'Coverage %s%% is below the configured threshold %s%%.' "$pct" "$threshold")
+        # KCOV_EXCL_START -- jq SARIF body is not bash code
         jq -n \
             --arg pct "$pct" \
             --arg threshold "$threshold" \
@@ -252,10 +253,12 @@ brik.coverage.emit_sarif() {
                     }]
                 }]
             }' > "$sarif_out"
+        # KCOV_EXCL_STOP
     else
         # Above threshold, missing report, or malformed: emit an empty
         # SARIF so the per-stage findings pipeline still sees a valid
         # document and downstream apply_policy keeps working.
+        # KCOV_EXCL_START -- jq SARIF body is not bash code
         jq -n \
             '{
                 "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
@@ -265,6 +268,7 @@ brik.coverage.emit_sarif() {
                     results: []
                 }]
             }' > "$sarif_out"
+        # KCOV_EXCL_STOP
     fi
     return 0
 }

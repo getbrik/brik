@@ -13,3 +13,6 @@
 ## Exclude multi-line jq/yq/awk script bodies from coverage counting.
 ## Wrap with `# KCOV_EXCL_START` / `# KCOV_EXCL_STOP` comments in source.
 --kcov-options "--exclude-region=KCOV_EXCL_START:KCOV_EXCL_STOP"
+## Single-line escape hatch for unreachable-on-CI lines (BSD/macOS stat/tar
+## fallbacks, defensive guards). Marker: a trailing `# KCOV_EXCL_LINE`.
+--kcov-options "--exclude-line=KCOV_EXCL_LINE"
