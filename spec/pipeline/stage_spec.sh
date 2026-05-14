@@ -161,6 +161,16 @@ HOOKEOF
       success_logic() { return 0; }
       failure_logic() { return 1; }
 
+      # These examples assert on the *contents* of BRIK_LOG_DIR (the
+      # presence of context-build-* scratch files). spec_helper exports a
+      # single BRIK_LOG_DIR shared by every example in a ShellSpec worker,
+      # so a sibling example's stage.run would pollute the find and make
+      # the assertion flaky under --jobs. Give each example its own dir.
+      sc17_isolate_log_dir() { BRIK_LOG_DIR="$(mktemp -d)"; }
+      sc17_cleanup_log_dir() { [[ -n "${BRIK_LOG_DIR:-}" ]] && rm -rf "$BRIK_LOG_DIR"; }
+      Before 'sc17_isolate_log_dir'
+      After 'sc17_cleanup_log_dir'
+
       It "leaves no context-<stage>-XXXXXX file behind after a successful run"
         verify_clean() {
           stage.run "build" "success_logic" >/dev/null 2>&1

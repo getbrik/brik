@@ -438,8 +438,17 @@ stage.run() {
 
     # Create execution context
     context_file="$(context.create "$stage_name")" || return "$BRIK_EXIT_INVALID_ENV"
-    log_file="$(stage.create_log_file "$stage_name")" || return "$BRIK_EXIT_IO_FAILURE"
-    _context._set "$context_file" "BRIK_LOG_FILE" "$log_file" || return "$BRIK_EXIT_IO_FAILURE"
+    # context_file now exists; the early-return paths below must remove it
+    # so the SC17 contract (no context-<stage>-XXXXXX left behind) holds on
+    # every exit path, not just the ones that reach stage.cleanup.
+    log_file="$(stage.create_log_file "$stage_name")" || {
+        rm -f "$context_file"
+        return "$BRIK_EXIT_IO_FAILURE"
+    }
+    _context._set "$context_file" "BRIK_LOG_FILE" "$log_file" || {
+        rm -f "$context_file"
+        return "$BRIK_EXIT_IO_FAILURE"
+    }
 
     # Pre-stage hook (can abort)
     hook.pre_stage "$stage_name" "$context_file" "$log_file" || {
