@@ -7,7 +7,7 @@ override the built-in preset, and document why an exception exists -- all
 without touching individual project configuration.
 
 For project-side knobs and the SARIF pipeline overview, see
-[`docs/reference.md`](reference.md#findings-management).
+[`findings.md`](findings.md).
 
 ## How it fits
 
@@ -151,6 +151,6 @@ For each converter ship a synthetic JSON fixture under
 - Apply policy : `lib/transverse/findings.sh` (`findings.apply_policy`)
 - Aggregator   : `lib/transverse/findings.sh` (`findings.merge_pipeline`)
 - Exporter     : `lib/transverse/findings/exporters/gitlab.sh`
-- User-side guide: [`docs/reference.md`](reference.md#findings-management)
+- User-side guide: [`findings.md`](findings.md)
 - Operating discipline (when to allowlist, cadence, anti-patterns):
-  [`docs/risk-management.md`](risk-management.md)
+  [`risk-management.md`](risk-management.md)

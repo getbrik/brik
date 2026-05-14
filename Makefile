@@ -25,7 +25,7 @@ validate: ## Validate example brik.yml files
 	bin/brik validate --config examples/python-pytest/brik.yml
 	bin/brik validate --config examples/mono-dotnet/brik.yml
 
-validate-docs: ## Validate every fenced ```yaml block in docs/config/**/*.md
+validate-docs: ## Validate every fenced ```yaml block in docs/configuration/**/*.md
 	./scripts/validate-docs.sh
 
 regen-docs: ## Regenerate the auto-managed Quick reference tables from the schema

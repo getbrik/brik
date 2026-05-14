@@ -6,8 +6,7 @@ vocabulary. Each notion maps to one directory under `lib/`. Functions are named
 `transverse.wait.until`, `cli.validate.run`).
 
 This document is the layout reference. For design rationale see
-[architecture.md](architecture.md); for per-function signatures see
-[reference.md](reference.md).
+[architecture.md](../concepts/architecture.md).
 
 ## Mindmap
 
@@ -129,18 +128,18 @@ for consistency with the loader:
 
 Dependencies flow downward. Every arrow reads "uses".
 
-```
-  Execution environment (shared-libs/*)
-           │
-           ▼
-        Stages  ──────┬──────┬──────┬──────┐
-           │          ▼      ▼      ▼      ▼
-           │        Stack  Pkg Mgr  Deploy  Transverse
-           │                                   │
-           ▼                                   │
-        Execution ◄─────── all notions ────────┘
-                           (logging, stage.run, pipeline.run,
-                            loader, tools, report)
+```mermaid
+flowchart TD
+    EE["Execution environment<br/>shared-libs/*"] --> ST["Stages"]
+    ST --> SK["Stack"]
+    ST --> PM["Package managers"]
+    ST --> DP["Deployments"]
+    ST --> TR["Transverse"]
+    ST --> EX["Execution<br/>logging, stage.run, pipeline.run, loader, tools, report"]
+    SK --> EX
+    PM --> EX
+    DP --> EX
+    TR --> EX
 ```
 
 Key relations:
