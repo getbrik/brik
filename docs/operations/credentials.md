@@ -35,7 +35,7 @@ Publish credentials authenticate artifact uploads to package registries.
 matching CI variable at publish time.
 
 For the full `publish` configuration reference, see
-[`config/reference/publish.md`](config/reference/publish.md).
+[`reference/publish.md`](../configuration/reference/publish.md).
 
 ### How the indirection works
 

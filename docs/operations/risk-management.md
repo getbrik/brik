@@ -153,7 +153,6 @@ mode this entire framework exists to prevent.
 ## References
 
 - [policy.md](policy.md) -- schema reference for `brik-policy.yml`.
-- [reference.md / Findings Management](reference.md#findings-management)
-  -- runtime behaviour, presets, gating semantics.
-- [architecture.md / Decision matrix](architecture.md#decision-matrix)
+- [findings.md](findings.md) -- runtime behaviour, presets, gating semantics.
+- [business-outcome.md / Decision matrix](../concepts/business-outcome.md#decision-matrix)
   -- the 10-row business.evaluate matrix that consumes policy outputs.

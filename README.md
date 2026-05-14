@@ -17,6 +17,7 @@
 </p>
 
 <p align="center">
+  <a href="docs/README.md">Documentation</a> -
   <a href="https://github.com/getbrik/brik/issues">Issues</a> -
   <a href="https://github.com/getbrik/briklab">Briklab</a>
 </p>
@@ -29,14 +30,14 @@ CI/CD pipelines are:
 - Tied to specific platforms
 - Hard to maintain and evolve
 
-Even though… they all do the same thing.
+Even though... they all do the same thing.
 
 ## The solution: Brik
 
 Brik provides a **ready-to-use CI/CD pipeline** that works out of the box.
 
-- No need to write pipeline logic  
-- No need to learn platform-specific syntax  
+- No need to write pipeline logic
+- No need to learn platform-specific syntax
 
 You just describe your project in `brik.yml`.
 
@@ -64,7 +65,8 @@ deploy:
       chart: ./charts/my-app
 ```
 
-That’s it. Brik gives you build, test, lint, security scanning, and deployment (with sensible defaults you can override).
+That's it. Brik gives you build, test, lint, security scanning, and deployment,
+with sensible defaults you can override.
 
 ## How it works
 
@@ -86,77 +88,14 @@ flowchart LR
     LO --> C
 ```
 
-1. **Describe your project** -- stack, tools, thresholds in `brik.yml`
-2. **Run `brik init` once** -- generates a thin bootstrap file for your platform (`.gitlab-ci.yml`, `Jenkinsfile`). You can also run locally with `brik run`.
-3. **Your pipeline runs** -- build, test, lint, security scan, deploy. Same behavior on every platform.
+1. **Describe your project** -- stack, tools, thresholds in `brik.yml`.
+2. **Run `brik init` once** -- it generates a thin bootstrap file for your
+   platform (`.gitlab-ci.yml`, `Jenkinsfile`). You can also run locally with
+   `brik run`.
+3. **Your pipeline runs** -- build, test, lint, security scan, deploy. Same
+   behavior on every platform.
 
-## Getting started
-
-### GitLab CI
-
-1. Clone the Brik repo onto your GitLab instance (`brik/brik`)
-2. Push the GitLab templates as a separate project (`brik/gitlab-templates`)
-3. Add a `.gitlab-ci.yml` to your project:
-
-```yaml
-include:
-  - project: 'brik/gitlab-templates'
-    ref: v0.4.0
-    file: '/templates/pipeline.yml'
-```
-
-Requires a Runner with Docker executor. Use [brik-images](https://github.com/getbrik/brik-images)
-as runner images or ensure your images have bash, git, yq, jq, and your stack tools.
-
-See [shared-libs/gitlab/README.md](shared-libs/gitlab/README.md) for the full setup guide
-(runner configuration, image requirements, troubleshooting).
-
-### Jenkins
-
-1. Clone the Brik repo to a Git server accessible by Jenkins (GitHub, Gitea, etc.)
-2. Add it as a **trusted** Global Pipeline Library in Jenkins (via CasC or UI)
-3. Add a `Jenkinsfile` to your project:
-
-```groovy
-@Library('brik') _
-brikPipeline()
-```
-
-Agents must have bash 4+, yq, jq, and your stack tools. Use [brik-images](https://github.com/getbrik/brik-images)
-as Docker agents or install the tools on your nodes.
-
-See [shared-libs/jenkins/README.md](shared-libs/jenkins/README.md) for the full setup guide
-(CasC configuration, sandbox settings, variable mapping, troubleshooting).
-
-### Local (CLI)
-
-For running pipelines locally or validating your `brik.yml`:
-
-```bash
-# One-liner
-curl -fsSL https://raw.githubusercontent.com/getbrik/brik/main/scripts/install.sh | bash
-
-# or Homebrew (macOS/Linux)
-brew install getbrik/tap/brik
-```
-
-Then run `brik doctor` to check your environment.
-
-On CI, [brik-images](https://github.com/getbrik/brik-images) (`ghcr.io/getbrik/brik-runner-*`)
-provide pre-built runner images with all prerequisites and stack tools included.
-The shared library handles image selection automatically (see Getting started above).
-
-For local usage, install the required tools:
-
-| Brik core | Stack tools |
-|-----------|-------------|
-| bash 4+, [yq](https://github.com/mikefarah/yq), [jq](https://jqlang.github.io/jq/), [jv](https://github.com/santhosh-tekuri/jsonschema) | **node**: node, npm/yarn/pnpm |
-| | **java**: java, mvn/gradle |
-| | **python**: python3, pip3/poetry/uv |
-| | **rust**: rustc, cargo |
-| | **dotnet**: dotnet |
-
-## Pipeline Flow
+## Pipeline flow
 
 Every Brik pipeline follows a fixed stage sequence:
 
@@ -190,102 +129,22 @@ flowchart LR
     deploy --> notify
 ```
 
-Lint, SAST, Scan, and Test all run **in parallel** after Build (GitLab `verify` stage).
-The quality gate effect applies at **Package**: it waits for Test to pass and for
-Lint/SAST/Scan to succeed (or be skipped).
+Lint, SAST, Scan, and Test all run **in parallel** after Build. The quality gate
+applies at **Package**: it waits for Test to pass and for Lint/SAST/Scan to
+succeed. See [the fixed flow](docs/concepts/fixed-flow.md) for the full stage
+table and behavior.
 
-| Stage | Purpose | Default behavior |
-|-------|---------|------------------|
-| Init | Setup | Validate config, detect stack, export variables |
-| Release | Versioning | Compute semantic version from git tags; finalize on tag push only |
-| Build | Compile | Stack-specific build (npm, mvn, pip, dotnet, cargo) |
-| Lint | Code quality | Lint, format check, type checking |
-| SAST | Static analysis | SAST scan, plus license and IaC scans when configured |
-| Scan | Dependency scan | Dependency audit and secret scan |
-| Test | Test suite | Runs in parallel with Lint/SAST/Scan; emits JUnit + coverage reports when `test.reports.enabled: true` |
-| Package | Artifacts | Docker image build + artifact publishing (npm, maven, pypi, cargo, nuget) |
-| Container Scan | Image security | Scan built container images for vulnerabilities |
-| Deploy | Deployment | Multi-environment with Git workflow profiles, condition-based (branch/tag) |
-| Notify | Notifications | Pipeline summary (always runs on CI; included locally when using `--with-deploy`) |
+## Getting started
 
-The pipeline is fully deterministic -- no manual triggers. Release runs unconditionally
-(computes version), but only finalizes on tag pushes. Package runs on tag pushes
-(GitLab) or opt-in locally (`--with-package`). Deploy evaluates per-environment
-conditions from `brik.yml`.
+| Platform | Start here |
+|----------|------------|
+| GitLab CI | [docs/getting-started/gitlab.md](docs/getting-started/gitlab.md) |
+| Jenkins | [docs/getting-started/jenkins.md](docs/getting-started/jenkins.md) |
+| Local (CLI) | [docs/getting-started/local.md](docs/getting-started/local.md) |
 
-Users do not define pipeline structure. They configure behavior within each stage
-via `brik.yml`.
+Full documentation lives in **[docs/README.md](docs/README.md)**.
 
-### Snapshot vs release context
-
-Every pipeline run resolves to one of two contexts, derived automatically
-from the git tag:
-
-- **snapshot** (no tag, e.g. a feature branch). Lenient defaults: a
-  failing stage maps to `business.warning`, the pipeline keeps going,
-  and the whole run exits `0`. You still see the failing stage in the
-  report; it just does not block the lane.
-- **release** (a tag is set, e.g. `v1.2.3`). Strict defaults: a failing
-  stage maps to `business.error`, the pipeline fail-fasts on it, and
-  the run exits `1`.
-
-Override the default with `BRIK_CONTINUE_ON_ERROR=0` (force fail-fast
-on snapshot) or `BRIK_CONTINUE_ON_ERROR=1` (force continue on release).
-The `aggregate-report.md` carries a Business outcome block summarizing
-how the run was scored.
-
-### Test reports
-
-When `quality.test.reports.enabled: true`, brik injects per-stack coverage and
-JUnit reporter flags so the test stage produces real artifacts:
-
-| Stack | JUnit | Coverage |
-|-------|-------|----------|
-| node (jest) | jest-junit | jest cobertura reporter -> `coverage/coverage.xml` |
-| python (pytest) | pytest --junitxml | pytest-cov cobertura -> `coverage/coverage.xml` |
-| java (maven surefire) | surefire XMLs flattened to `reports/junit/` | jacoco plugin -> `coverage/jacoco.xml` |
-| rust (cargo nextest) | nextest.toml ci profile -> `reports/junit.xml` | cargo-llvm-cov cobertura -> `coverage/coverage.xml` |
-| dotnet | JunitXml.TestLogger | XPlat Code Coverage flattened -> `coverage/coverage.xml` |
-
-The GitLab template (`shared-libs/gitlab/templates/jobs/test.yml`) ships a generic
-`coverage:` regex that picks up the canonical `[brik] coverage: XX.XX%` line emitted
-by the test stage, so the **coverage badge is wired automatically** -- no
-per-project regex needed. The JUnit XML feeds the GitLab `Tests` tab and the
-Jenkins JUnit publisher.
-
-For java's jacoco-format coverage, override `coverage_report` at the project
-level; full recipe in [`shared-libs/gitlab/README.md#coverage-reports`](shared-libs/gitlab/README.md#coverage-reports).
-
-### Pipeline report
-
-Every run produces an **aggregate report** in three formats under
-`brik-artifacts/aggregate-report.{json,md,html}` -- machine-readable JSON,
-a Markdown rendering for CI job logs, and a self-contained HTML view. The
-HTML inlines its own CSS, JS, and the Brik logo, so it stays browseable
-straight from the CI artifact with no external fetches.
-
-<p align="center">
-  <a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/getbrik/brik/main/docs/aggregate-report.html"><img src="docs/report.png" alt="Brik HTML pipeline report" width="900"></a>
-</p>
-
-<p align="center">
-  <em><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/getbrik/brik/main/docs/aggregate-report.html">Open the full interactive HTML report</a> (sample from a <code>node-complete</code> run)</em>
-</p>
-
-The HTML view carries:
-
-- a branded header with the commit identity and the snapshot/release context
-- the lifecycle timeline of all 11 stages, with the parallel verify group
-- a policy / coverage / business-outcome summary row
-- per-stage panels splitting `tech` (what ran) from `business` (what it means)
-- severity-coded findings from the SAST, dependency, secret, and container scans
-- a notification dispatch panel (channels, policy, gatekeeper decision)
-- deep links to commits, branches, and tags on the hosting forge
-
-See [`docs/reference.md#pipeline-report-fields`](docs/reference.md#pipeline-report-fields)
-for the full field contract.
-
-## Supported Stacks
+## Supported stacks
 
 | Stack | Detection | Build | Test | Lint |
 |-------|-----------|-------|------|------|
@@ -297,45 +156,18 @@ for the full field contract.
 
 Stack is auto-detected from project files when not specified in `brik.yml`.
 
-## Deploy
+## Platform support
 
-Brik supports multi-environment deployment driven by Git workflow conventions.
-Choose a workflow profile and Brik provides sensible per-environment defaults
-(branch/tag conditions, target, namespace). Your `brik.yml` overrides any default.
+| Platform | Status | Integration |
+|----------|--------|-------------|
+| **GitLab CI** | Functional | Shared library with pipeline template |
+| **Jenkins** | Functional | Jenkins shared library (CasC + Gitea) |
+| **GitHub Actions** | `brik init --platform github` scaffolds a bootstrap; reusable workflows in progress | Reusable workflows |
 
-| Workflow | Environments | Trigger |
-|----------|--------------|---------|
-| **trunk-based** | staging, production | `main` branch, `v*` tags |
-| **git-flow** | dev, staging, production | `develop`, `release/*`, `v*` tags |
-| **github-flow** | preview, production | `feature/*`, `main` branch |
+## Configuration
 
-Deploy targets:
-
-| Target | Description |
-|--------|-------------|
-| **k8s** | `kubectl apply` with optional kustomize |
-| **gitops** | Clone config repo, update image tag, push (controller: `argocd`) |
-| **helm** | `helm upgrade --install` with values and namespace |
-| **compose** | `docker compose up` locally or via SSH |
-| **ssh** | rsync + restart command over SSH |
-
-Deployment strategies: **rolling** (default), **blue-green** (service selector switch), **canary** (replica scaling).
-
-Post-deploy health checks: HTTP polling with configurable timeout/interval, Kubernetes rollout status.
-
-Conditions support `==` and `=~` operators and compound `AND`/`OR` expressions:
-
-```yaml
-deploy:
-  environments:
-    production:
-      when: "tag =~ 'v*' AND branch == 'main'"
-```
-
-## Configuration (`brik.yml`)
-
-Brik follows a "declare what, not how" philosophy. Only `version` and `project.name`
-are required -- everything else has sensible defaults per stack.
+Brik follows a "declare what, not how" philosophy. Only `version` and
+`project.name` are required -- everything else has sensible per-stack defaults.
 
 ```yaml
 version: 1
@@ -344,47 +176,9 @@ project:
   stack: node
 ```
 
-- Per-section reference and per-stack guides: [`docs/config/`](docs/config/README.md)
-- JSON Schema (source of truth): [`schemas/config/v1/brik.schema.json`](schemas/config/v1/brik.schema.json)
-- Worked examples: [`examples/`](examples/) (minimal-node, java-maven, python-pytest, mono-dotnet)
-- Credentials and secrets configuration: [`docs/credentials.md`](docs/credentials.md)
-
-## CLI Reference
-
-| Command | Description |
-|---------|-------------|
-| `brik validate` | Validate `brik.yml` against the JSON Schema |
-| `brik doctor` | Check prerequisites (tools, stack detection) |
-| `brik init` | Scaffold `brik.yml` and platform bootstrap file |
-| `brik run stage <name>` | Execute a pipeline stage locally |
-| `brik run pipeline` | Execute the full pipeline locally |
-| `brik self-update` | Update brik to the latest version |
-| `brik self-uninstall` | Remove brik from your system |
-| `brik version` | Print version, schema, and runtime info |
-| `brik help` | Print usage information |
-
-Valid stages for `brik run stage`: `init`, `release`, `build`, `lint`, `sast`, `scan`, `test`, `package`, `container-scan`, `deploy`, `notify`.
-
-Key options:
-
-```bash
-brik validate --config path/to/brik.yml --schema path/to/schema.json
-brik doctor --workspace ./my-project
-brik init --stack node --platform gitlab --dir ./my-project --non-interactive
-brik run stage build --config brik.yml --workspace .
-brik run pipeline --continue-on-error --with-release --with-package --with-deploy
-brik self-update --channel edge --version v0.4.0
-brik self-uninstall --force
-brik version --verbose
-```
-
-## Platform Support
-
-| Platform | Status | Integration |
-|----------|--------|-------------|
-| **GitLab CI** | Functional | Shared library with pipeline template |
-| **Jenkins** | Functional | Jenkins Shared Library (CasC + Gitea) |
-| **GitHub Actions** | Planned | Reusable workflows |
+- Configuration reference: [docs/configuration/overview.md](docs/configuration/overview.md)
+- JSON Schema (source of truth): [schemas/config/v1/brik.schema.json](schemas/config/v1/brik.schema.json)
+- Worked examples: [examples/](examples/) (minimal-node, java-maven, python-pytest, mono-dotnet)
 
 ## Architecture
 
@@ -395,138 +189,14 @@ brik version --verbose
 | **brik-lib** | Reusable CI/CD functions (Bash) |
 | **Bash Runtime** | Stage lifecycle, logging, hooks |
 
-For a detailed explanation of the architecture, design principles, stage lifecycle,
-and how to extend Brik, see [docs/architecture.md](docs/architecture.md).
+For the design, the stage lifecycle, and how to extend Brik, see
+[docs/concepts/architecture.md](docs/concepts/architecture.md).
 
-### Pipeline behavior model
+## Code metrics
 
-Stage outcomes are split along two orthogonal axes:
-
-- **Technical** -- what the stage logic returned (`tech.status` is one
-  of `success | failed | skipped`, `tech.kind` carries the human label).
-- **Business** -- what the technical outcome means for the user, given
-  the current pipeline context. `business.evaluate` produces a typed
-  status (`success | warning | error`) by combining four inputs: tech
-  status, fix-exists counters (`findings.failing.{has_fix, no_fix}`),
-  side-band signals (`findings.ignored`), and pipeline context
-  (`snapshot` vs `release`).
-
-The fix-exists axis is what differentiates "the dependency has a CVE we
-can upgrade" (`has_fix`, blocks release) from "the vendor wont fix
-this and we have a mitigation in place" (`no_fix`, stays warning even
-in release). Tools that emit warnings vs errors (eslint, ruff,
-checkstyle, dotnet-format) feed the `brikToolBlocking` annotation so
-warnings do not push release pipelines to error.
-
-Practical guide for managing the accept-with-traceability path:
-[docs/risk-management.md](docs/risk-management.md). Schema reference
-for `brik-policy.yml`: [docs/policy.md](docs/policy.md). Full module
-overview and the 10-row decision matrix:
-[docs/architecture.md](docs/architecture.md#decision-matrix).
-
-## Development
-
-### Prerequisites
-
-```bash
-brew install bash yq jq shellspec shellcheck kcov
-# jv is not in Homebrew core. Install the static binary from upstream releases:
-#   https://github.com/santhosh-tekuri/jsonschema/releases
-# Pick the darwin-arm64 or darwin-amd64 archive, extract, and place `jv`
-# somewhere on PATH (e.g. ~/.local/bin/jv).
-```
-
-### Makefile
-
-The project includes a `Makefile` with common development targets:
-
-```bash
-make test          # Run all ShellSpec tests (parallel)
-make test-quick    # Run tests, stop on first failure
-make lint          # Run shellcheck on all production scripts
-make coverage      # Run tests with kcov coverage report
-make validate      # Validate all example brik.yml files
-make check         # Full pre-commit gate: lint + coverage + validate
-make metrics       # Run shellmetrics on production scripts
-make install       # Symlink bin/brik into /usr/local/bin (dev mode)
-make uninstall     # Remove symlink
-make clean         # Remove generated coverage/ directory
-```
-
-### Run tests
-
-```bash
-# All tests (via Makefile, parallel)
-make test
-
-# Or directly with ShellSpec
-shellspec
-
-# A specific spec file
-shellspec spec/cli/validate_spec.sh
-
-# With verbose output
-shellspec --format documentation
-
-# With coverage (requires kcov)
-make coverage
-# Report in coverage/index.html
-```
-
-Tests are in `spec/` and `shared-libs/*/spec/` using [ShellSpec](https://shellspec.info). The `.shellspec` config at the project root sets the shell, spec path (`--default-path "**/spec"`), and helper.
-
-> **Note:** `ulimit -n 1024` is required on macOS when running kcov directly. The Makefile handles this automatically. See [kcov#293](https://github.com/SimonKagstrom/kcov/issues/293).
-
-### Validate examples
-
-```bash
-# All examples (via Makefile)
-make validate
-
-# Single file
-bin/brik validate --config examples/minimal-node/brik.yml
-```
-
-### Lint
-
-```bash
-# All production scripts (via Makefile)
-make lint
-
-# Single file
-shellcheck bin/brik
-```
-
-## Code Metrics
-
-Tracked automatically via [shellmetrics](https://github.com/shellspec/shellmetrics) on every push to `main`:
-
-| Metric | Description |
-|--------|-------------|
-| **avg CCN** | Average cyclomatic complexity per function (< 5 = green) |
-| **Functions** | Total function count across production scripts |
-| **LLOC** | Logical lines of code (excludes blanks and comments) |
-
-## Status
-
-**Done:**
-- [x] `brik.yml` JSON Schema v1
-- [x] Bash Runtime (`stage.run` lifecycle)
-- [x] 11 pipeline stages (init, release, build, lint, sast, scan, test, package, container-scan, deploy, notify)
-- [x] 5 stacks (node, java, python, dotnet, rust)
-- [x] GitLab CI shared library (enterprise-grade DAG with quality gates)
-- [x] Jenkins shared library (fixed flow, CasC, E2E tested)
-- [x] CLI (validate, doctor, init, run stage, run pipeline, self-update, self-uninstall, version)
-- [x] Local pipeline execution (`brik run pipeline`)
-- [x] Official Docker images (`ghcr.io/getbrik/brik-runner-*`)
-- [x] Multi-environment deploy with Git workflow profiles (trunk-based, git-flow, github-flow)
-- [x] Deploy targets: k8s, gitops (argocd), helm, compose, ssh
-- [x] Deployment strategies: rolling, blue-green, canary
-- [x] Health checks (HTTP polling, k8s rollout)
-- [x] 2016 tests (ShellSpec + ShellCheck + kcov, 92% coverage) + 24 E2E scenarios (GitLab + Jenkins)
-
-**Next:**
-- [ ] GitHub Actions reusable workflows
+Tracked automatically via [shellmetrics](https://github.com/shellspec/shellmetrics)
+on every push to `main`: average cyclomatic complexity per function, total
+function count, and logical lines of code.
 
 ## Related
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # @description Generate the Quick reference markdown table for a brik.yml
 #              section from the JSON Schema and splice it into the matching
-#              page under docs/config/reference/.
+#              page under docs/configuration/reference/.
 #
 # Pages must mark the auto-managed region with HTML sentinel comments:
 #
@@ -161,7 +161,7 @@ gen_section() {
     fi
 }
 
-# Sections that have a page under docs/config/reference/. Internal $defs
+# Sections that have a page under docs/configuration/reference/. Internal $defs
 # (deployEnvironment, hookCommand, notifyEventList) are not user-facing.
 _user_facing_sections() {
     cat <<'EOF'
@@ -236,7 +236,7 @@ _splice_page() {
 
 _page_for_section() {
     local section="$1"
-    echo "${REPO_ROOT}/docs/config/reference/${section}.md"
+    echo "${REPO_ROOT}/docs/configuration/reference/${section}.md"
 }
 
 # Apply mode: rewrite one page or all pages.

@@ -71,7 +71,7 @@ silent fallback.
 
 ## See also
 
-- [`README.md`](README.md) - top-level navigation
+- [Documentation portal](../README.md) - top-level navigation
 - [`reference/`](reference/) - one page per `brik.yml` top-level section
 - [`stacks/`](stacks/) - editorial guides per stack
 - [`schemas/config/v1/brik.schema.json`](../../schemas/config/v1/brik.schema.json) - source of truth

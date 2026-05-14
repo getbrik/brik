@@ -53,7 +53,7 @@ the runtime. They pass validation but do not change pipeline behaviour.
 
 | Field | Status |
 |-------|--------|
-| `quality.lint.enabled` | wired -- `false` skips the lint sub-stage |
+| `quality.lint.enabled` | **deprecated, not consumed** -- lint always runs; Init emits a one-shot warning when `false` is detected |
 | `quality.lint.command` | wired (Tier 1) |
 | `quality.lint.tool` | wired (Tier 2) |
 | `quality.lint.config` | **accepted, not consumed** -- the linter discovers its own config file from disk |
@@ -75,9 +75,7 @@ the runtime. They pass validation but do not change pipeline behaviour.
 | `dotnet` | `dotnet-format` | `dotnet-format` |
 
 When the stack default tool is missing on the runner, Brik exits with
-`BRIK_EXIT_MISSING_DEP` rather than silently skipping. See
-[`docs/reference.md`](../../reference.md#quality) for the per-tool
-contract (config-file fallbacks, skip conditions).
+`BRIK_EXIT_MISSING_DEP` rather than silently skipping.
 
 ## Examples
 
@@ -91,20 +89,6 @@ project:
 ```
 
 Runs `eslint` and `prettier` with stack defaults. No type check.
-
-### Disable lint entirely
-
-```yaml
-version: 1
-project:
-  name: my-app
-  stack: python
-quality:
-  lint:
-    enabled: false
-```
-
-The lint sub-stage is skipped; format still runs.
 
 ### Auto-fix on lint, format check-only
 
