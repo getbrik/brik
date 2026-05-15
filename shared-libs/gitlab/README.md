@@ -45,7 +45,8 @@ Each GitLab CI job:
 5. Calls `brik.gitlab.run_stage <stage_name>`.
 6. The wrapper invokes `stage.run` from the Brik runtime.
 
-The Init job emits `brik-init.env` as a `reports: dotenv:` artifact so
+The Init job emits `.brik-logs/pipeline.env` as a `reports: dotenv:` artifact
+(produced by the post-stage projection hook from the report env section) so
 downstream jobs receive the resolved `BRIK_CI_IMAGE` and the trigger gating
 flags. Per-project job overrides (for example a non-default coverage path) are
 merged by GitLab into the templated job -- see the

@@ -453,14 +453,30 @@ Describe "stages.init"
       The output should equal "BRIK_BUILD_STACK,BRIK_BUILD_STACK_VERSION,BRIK_CI_IMAGE,BRIK_DEPLOY_ENABLED,BRIK_GIT_USER_EMAIL,BRIK_GIT_USER_NAME,BRIK_PACKAGE_ENABLED,BRIK_PROJECT_NAME,BRIK_RELEASE_PROFILE,BRIK_TEST_COVERAGE_DIR,BRIK_TEST_COVERAGE_FORMAT,BRIK_TEST_JUNIT_PATH,BRIK_TEST_REPORTS_ENABLED"
     End
 
-    It "still produces brik-init.env for back-compat (Phase 2)"
-      run_init_dotenv_present() {
+    It "no longer creates brik-init.env"
+      run_init_no_dotenv() {
         local ctx
         ctx="$(context.create "init")" 2>/dev/null || ctx="$(mktemp)"
         stages.init "$ctx" >/dev/null 2>&1 || return $?
-        wc -l < "${BRIK_WORKSPACE}/brik-init.env" | tr -d ' '
+        if [[ -f "${BRIK_WORKSPACE}/brik-init.env" ]]; then
+          printf 'present\n'
+        else
+          printf 'absent\n'
+        fi
       }
-      When call run_init_dotenv_present
+      When call run_init_no_dotenv
+      The output should equal "absent"
+    End
+
+    It "projects every recorded env key into pipeline.env via the post-stage hook"
+      run_init_projects_all_keys() {
+        local ctx
+        ctx="$(context.create "init")" 2>/dev/null || ctx="$(mktemp)"
+        stages.init "$ctx" >/dev/null 2>&1 || return $?
+        _stage.run._project_env "init" >/dev/null 2>&1 || true
+        wc -l < "$BRIK_PIPELINE_ENV" | tr -d ' '
+      }
+      When call run_init_projects_all_keys
       The output should equal "13"
     End
   End

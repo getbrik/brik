@@ -22,7 +22,7 @@ shared-libs/jenkins/
     brikRunStage.groovy      - wraps docker.image(...).inside(...) { brikStage(...) }
     brikResolveHome.groovy   - locates the shared library under ${WORKSPACE}@libs/
     brikDockerArgs.groovy    - builds the Docker run args (HOME, caches, network, env-file)
-    brikReadDotenv.groovy    - parses brik-init.env to extract BRIK_CI_IMAGE
+    brikReadDotenv.groovy    - parses .brik-logs/pipeline.env to extract BRIK_CI_IMAGE
   spec/                      - ShellSpec tests
 ```
 

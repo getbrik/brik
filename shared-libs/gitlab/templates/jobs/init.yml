@@ -11,17 +11,17 @@ brik-init:
       - .brik-logs/pipeline.env
       - brik-artifacts/
     reports:
-      dotenv: brik-init.env
+      dotenv: .brik-logs/pipeline.env
     expire_in: 1 week
   after_script:
-    # brik-init.env is now produced by stages.init itself (single source of
-    # truth, see _stages.init._write_dotenv). after_script just echoes the
-    # file content for build log inspection -- no more parallel yq calls.
+    # The env file is produced by the post-stage projection hook from the
+    # report env section (see lib/pipeline/stage.sh _stage.run._project_env).
+    # after_script just echoes the content for build log inspection.
     - |
       set +x
-      if [ -f brik-init.env ]; then
-        echo "[brik:init] dotenv (produced by stages.init):"
-        cat brik-init.env
+      if [ -f .brik-logs/pipeline.env ]; then
+        echo "[brik:init] dotenv (projected from report env section):"
+        cat .brik-logs/pipeline.env
       else
-        echo "[brik:init] WARN: brik-init.env missing"
+        echo "[brik:init] WARN: .brik-logs/pipeline.env missing"
       fi
