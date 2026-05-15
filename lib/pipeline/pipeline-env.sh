@@ -63,6 +63,14 @@ pipeline.env.set() {
     return "$BRIK_EXIT_OK"
 }
 
+# Internal alias used by the post-stage projection hook
+# (_stage.run._project_env). Phase 4 of chantier env-channels-unification
+# turns this into the sole implementation; until then it delegates to the
+# public pipeline.env.set so the call sites can be migrated incrementally.
+_pipeline.env.append() {
+    pipeline.env.set "$@"
+}
+
 # Load all variables from the pipeline environment file into the current shell.
 # No-op if the file does not exist. Last write wins for duplicate keys.
 # Returns 0 always.

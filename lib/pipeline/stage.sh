@@ -435,6 +435,40 @@ _stage._record_business() {
     return 0
 }
 
+# Project the env section of a stage's report entry into BRIK_PIPELINE_ENV
+# so downstream stages see the variables when they call pipeline.env.load.
+# Silently no-op when the report backend or jq is absent, when the stage has
+# no env section, or when no env keys were recorded for that stage.
+#
+# Values are read via NUL-separated jq output and forwarded to
+# _pipeline.env.append, which uses printf '%s=%q\n' so newlines, tabs,
+# quotes and equal signs round-trip through pipeline.env.load.
+_stage.run._project_env() {
+    local stage_name="$1"
+    [[ -n "$stage_name" ]] || return 0
+
+    command -v jq >/dev/null 2>&1 || return 0
+
+    local log_dir="${BRIK_LOG_DIR:-${BRIK_DEFAULT_LOG_DIR:-/tmp/brik/logs}}"
+    local backend="${log_dir}/aggregate-report.json"
+    [[ -f "$backend" ]] || return 0
+
+    if [[ -z "${BRIK_PIPELINE_ENV:-}" ]]; then
+        pipeline.env.init >/dev/null 2>&1 || return 0
+    fi
+
+    local key value
+    while IFS= read -r -d '' key && IFS= read -r -d '' value; do
+        [[ -z "$key" ]] && continue
+        _pipeline.env.append "$key" "$value" 2>/dev/null || true
+    done < <(jq -j --arg s "$stage_name" \
+        '.stages[]? | select(.name == $s) | (.env // {}) | to_entries[]
+         | "\(.key)\u0000\(.value)\u0000"' \
+        "$backend" 2>/dev/null)
+
+    return 0
+}
+
 # Main entry point for stage execution.
 # Usage: stage.run <stage_name> <logic_function> [args...]
 stage.run() {
@@ -473,6 +507,7 @@ stage.run() {
         # best-effort: finalization must not mask the pre-stage hook error
         summary.build "$stage_name" "$context_file" "$log_file" "$exit_code" || true
         _stage._finalize_fragment "$stage_name" "$exit_code" "$stage_start_ms" || true
+        _stage.run._project_env "$stage_name" || true
         stage.cleanup "$context_file" "$log_file" || true
         return "$exit_code"
     }
@@ -521,6 +556,7 @@ stage.run() {
 
     summary.build "$stage_name" "$context_file" "$log_file" "$exit_code" || true
     _stage._finalize_fragment "$stage_name" "$exit_code" "$stage_start_ms" || true
+    _stage.run._project_env "$stage_name" || true
     stage.cleanup "$context_file" "$log_file" || true
 
     return "$exit_code"

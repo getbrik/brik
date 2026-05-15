@@ -242,6 +242,58 @@ Describe "report.sh"
     End
   End
 
+  # ---------------------------------------------------------------------------
+  # report.record env - cross-stage env variables (chantier env-channels)
+  #
+  # Stages publish KEY=VALUE pairs through the new "env" category. The
+  # post-stage projection hook (_stage.run._project_env) reads them from the
+  # backend and appends to BRIK_PIPELINE_ENV so downstream stages see them.
+  # ---------------------------------------------------------------------------
+  Describe "report.record env"
+    Before 'setup_report_dir'
+    After 'cleanup_report_dir'
+
+    It "accepts the env category alongside tech and business"
+      record_env_key() {
+        report.init || return 1
+        report.record "init" "env" "BRIK_APP_VERSION" "1.2.3" || return 1
+        jq -r '.stages[0].env.BRIK_APP_VERSION' "$REPORT_LOG_DIR/aggregate-report.json"
+      }
+      When call record_env_key
+      The output should equal "1.2.3"
+    End
+
+    It "preserves the env section across multiple records on the same stage"
+      record_env_multi() {
+        report.init || return 1
+        report.record "init" "env" "FOO" "alpha" || return 1
+        report.record "init" "env" "BAR" "beta"  || return 1
+        jq -c '.stages[0].env' "$REPORT_LOG_DIR/aggregate-report.json"
+      }
+      When call record_env_multi
+      The output should equal '{"FOO":"alpha","BAR":"beta"}'
+    End
+
+    It "coexists with tech and business records on the same stage"
+      record_env_mixed() {
+        report.init || return 1
+        report.record "init" "tech"     "status"          "success" || return 1
+        report.record "init" "business" "project_name"    "myapp"   || return 1
+        report.record "init" "env"      "BRIK_BUILD_STACK" "node"   || return 1
+        jq -r '.stages[0] | "\(.tech.status)|\(.business.project_name)|\(.env.BRIK_BUILD_STACK)"' \
+          "$REPORT_LOG_DIR/aggregate-report.json"
+      }
+      When call record_env_mixed
+      The output should equal "success|myapp|node"
+    End
+
+    It "still rejects an unknown category"
+      When call report.record "init" "runtime" "FOO" "bar"
+      The status should equal "$BRIK_EXIT_INVALID_INPUT"
+      The error should be present
+    End
+  End
+
   Describe "report.render"
     Before 'setup_report_dir'
     After 'cleanup_report_dir'

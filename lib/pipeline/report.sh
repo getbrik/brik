@@ -80,10 +80,10 @@ report.record() {
     local stage="$1" category="$2" key="$3" value="$4"
 
     case "$category" in
-        tech|business) ;;
+        tech|business|env) ;;
         *)
             error.raise "$BRIK_EXIT_INVALID_INPUT" \
-                "report.record: invalid category '$category' (expected tech|business)"
+                "report.record: invalid category '$category' (expected tech|business|env)"
             return "$?"
             ;;
     esac
@@ -115,10 +115,10 @@ report.record_object() {
     local stage="$1" category="$2" key="$3" value="$4"
 
     case "$category" in
-        tech|business) ;;
+        tech|business|env) ;;
         *)
             error.raise "$BRIK_EXIT_INVALID_INPUT" \
-                "report.record_object: invalid category '$category' (expected tech|business)"
+                "report.record_object: invalid category '$category' (expected tech|business|env)"
             return "$?"
             ;;
     esac
@@ -168,6 +168,50 @@ report.has_status() {
     [[ -n "$status" ]]
 }
 
+# Read a recorded value from the backend JSON.
+# Usage: report.read <stage> <category> <key> [default]
+# Prints the recorded value, or default (or empty) when the key is absent.
+# Returns 0 always when arguments are valid (so callers can rely on the
+# printed string and use a default for absent keys without branching).
+report.read() {
+    if [[ $# -lt 3 || $# -gt 4 ]]; then
+        error.raise "$BRIK_EXIT_INVALID_INPUT" \
+            "report.read expects 3-4 arguments: stage category key [default] (got $#)"
+        return "$?"
+    fi
+    local stage="$1" category="$2" key="$3" default="${4:-}"
+
+    case "$category" in
+        tech|business|env) ;;
+        *)
+            error.raise "$BRIK_EXIT_INVALID_INPUT" \
+                "report.read: invalid category '$category' (expected tech|business|env)"
+            return "$?"
+            ;;
+    esac
+
+    _report._require_jq || return "$?"
+
+    local backend
+    backend="$(_report._backend_path)"
+    [[ -f "$backend" ]] || {
+        log.error "report not initialized: $backend (call report.init first)"
+        return "$BRIK_EXIT_IO_FAILURE"
+    }
+
+    local value
+    value="$(jq -r --arg s "$stage" --arg c "$category" --arg k "$key" \
+        '.stages[]? | select(.name == $s) | .[$c][$k] // empty' \
+        "$backend" 2>/dev/null)" || value=""
+
+    if [[ -n "$value" ]]; then
+        printf '%s\n' "$value"
+    else
+        printf '%s\n' "$default"
+    fi
+    return 0
+}
+
 # Atomic read-modify-write of the backend JSON: create stage on first touch,
 # then set .stages[name=stage].<category>.<key> = value.
 _report._append_json() {
@@ -197,7 +241,7 @@ _report._append_json() {
             '
             def ensure_stage(s):
               if any(.stages[]; .name == s) then .
-              else .stages += [{ name: s, tech: {}, business: {} }]
+              else .stages += [{ name: s, tech: {}, business: {}, env: {} }]
               end;
             ensure_stage($stage)
             | .stages |= map(
@@ -246,7 +290,7 @@ _report._append_json_object() {
             '
             def ensure_stage(s):
               if any(.stages[]; .name == s) then .
-              else .stages += [{ name: s, tech: {}, business: {} }]
+              else .stages += [{ name: s, tech: {}, business: {}, env: {} }]
               end;
             ensure_stage($stage)
             | .stages |= map(
@@ -347,6 +391,7 @@ report.write_fragment() {
         ( [ .stages[] | select(.name == $stage_name) ][0] // {} ) as $entry
         | ( $entry.tech     // {} ) as $tech
         | ( $entry.business // {} ) as $business
+        | ( $entry.env      // {} ) as $env
         | ( $tech.status    // "skipped" ) as $status
         | ( ($tech.exit_code // 0) | tonumber? // 0 ) as $rc
         | ( $tech.duration_ms ) as $duration_raw
@@ -372,7 +417,8 @@ report.write_fragment() {
             business: $business_v11
           }
           + ( if $duration_raw == null or $duration_raw == "" then {}
-              else { duration_ms: ($duration_raw | tonumber? // 0) } end ) )
+              else { duration_ms: ($duration_raw | tonumber? // 0) } end )
+          + ( if ($env | length) > 0 then { env: $env } else {} end ) )
         ' "$backend" > "$tmp" || {
         rm -f "$tmp"
         log.error "cannot build fragment for stage: $stage_name"

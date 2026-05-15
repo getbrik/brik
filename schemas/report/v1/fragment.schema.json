@@ -97,6 +97,13 @@
           "type": "string"
         }
       }
+    },
+    "env": {
+      "description": "Cross-stage environment variables published by the stage (chantier env-channels-unification). Each entry is a KEY=VALUE pair appended to .brik-logs/pipeline.env by the post-stage projection hook so downstream stages can read it via pipeline.env.load. Keys SHOULD follow the BRIK_* convention; values are strings.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
     }
   }
 }
