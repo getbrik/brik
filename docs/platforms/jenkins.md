@@ -26,7 +26,7 @@ orchestration. `shared-libs/jenkins/vars/` defines six small variables:
 | `brikRunStage` | Wraps `docker.image(image).inside(args) { brikStage(...) }` and injects `-e BRIK_RUNNER_IMAGE` so each fragment records its real execution image. |
 | `brikResolveHome` | Locates the Brik shared library inside `${WORKSPACE}@libs/`. |
 | `brikDockerArgs` | Builds the Docker run args (HOME redirection, JVM cache paths, memory cap, network attachment, `--env-file` for `NEXUS_` / `BRIK_` / `REGISTRY_` / `ARGOCD_` / `CARGO_` / `SSH_` vars). |
-| `brikReadDotenv` | Parses `brik-init.env` so the controller can extract `BRIK_CI_IMAGE`, mirroring GitLab's dotenv contract. |
+| `brikReadDotenv` | Parses `.brik-logs/pipeline.env` so the controller can extract `BRIK_CI_IMAGE`, mirroring GitLab's dotenv contract (single-file, projected from the report env section). |
 
 `brikPipeline` exposes five per-image stage helpers -- `runInBase`, `runStage`,
 `runInAnalysis`, `runInScanner`, `runInDeploy` -- all routed through

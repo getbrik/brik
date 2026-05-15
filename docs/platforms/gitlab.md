@@ -39,7 +39,8 @@ flowchart LR
     deploy --> notify["brik-notify"]
 ```
 
-The Init job emits `brik-init.env` as a `reports: dotenv:` artifact, so
+The Init job emits `.brik-logs/pipeline.env` as a `reports: dotenv:` artifact
+(produced by the post-stage projection hook from the report env section), so
 downstream jobs receive `BRIK_CI_IMAGE` (the resolved
 `brik-runner-<stack>:<version>` for the project) and the trigger gating flags.
 

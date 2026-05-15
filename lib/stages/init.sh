@@ -116,7 +116,7 @@ stages.init() {
     fi
 
     _stages.init._resolve_git_identity
-    _stages.init._write_dotenv
+    _stages.init._record_env_section
 
     log.info "init stage complete"
     return 0
@@ -130,9 +130,10 @@ stages.init() {
 #      $GITLAB_USER_NAME / $CHANGE_AUTHOR_DISPLAY_NAME
 #   3. fallback "brik-ci@brik.local" / "Brik CI"
 #
-# Writes the resolved values to the pipeline env file (consumed by
-# pipeline.env.load in subsequent stages) AND exports them in the current
-# shell so the caller of _write_dotenv below can echo them into brik-init.env
+# Records the resolved values in the report env section (consumed by
+# pipeline.env.load in subsequent stages, after the post-stage projection
+# hook mirrors them into BRIK_PIPELINE_ENV) AND exports them in the current
+# shell so _record_env_section below can read them via ${BRIK_GIT_USER_*:-...}
 # without re-doing the resolution.
 _stages.init._resolve_git_identity() {
     local git_email git_name
@@ -305,27 +306,15 @@ _stages.init._has_block() {
     [[ "$val" != "null" && -n "$val" ]] && printf 'true' || printf 'false'
 }
 
-# stages.init becomes the single source of truth for the dotenv consumed by
-# CI rules and downstream jobs. The schema is contractual: every key has a
-# predictable value with a sensible default if brik.yml does not specify it.
-# The dotenv lives at $BRIK_WORKSPACE/brik-init.env (the path GitLab's
-# artifacts.reports.dotenv consumes).
-_stages.init._write_dotenv() {
-    local dotenv="${BRIK_WORKSPACE:-.}/brik-init.env"
-
-    # _kv KEY VALUE: write to brik-init.env (Phase 2 back-compat) AND
-    # publish through the report env section. The post-stage projection
-    # hook (_stage.run._project_env) mirrors the env section into
-    # BRIK_PIPELINE_ENV; Phase 3 will collapse the two physical files
-    # into one by switching the GitLab dotenv source to .brik-logs/pipeline.env.
+# stages.init publishes the cross-stage env contract through report.record
+# env. The post-stage projection hook (_stage.run._project_env) mirrors the
+# env section into .brik-logs/pipeline.env, which is now the single physical
+# env file: GitLab declares it as artifacts.reports.dotenv, Jenkins reads it
+# via brikReadDotenv, and the Bash runtime sources it via pipeline.env.load.
+_stages.init._record_env_section() {
+    # _kv KEY VALUE: publish through the report env section.
     _kv() {
-        printf '%s=%s\n' "$1" "$2" >> "$dotenv"
         report.record "init" "env" "$1" "$2" 2>/dev/null || true
-    }
-
-    : > "$dotenv" 2>/dev/null || {
-        log.warn "could not write dotenv to $dotenv"
-        return 0
     }
 
     # Project identity (BRIK_BUILD_STACK already resolved by the caller).
@@ -357,7 +346,7 @@ _stages.init._write_dotenv() {
     _kv BRIK_TEST_COVERAGE_DIR    "$(config.get '.test.reports.coverage.output_dir' 'brik-artifacts/test/coverage')"
     _kv BRIK_TEST_JUNIT_PATH      "$(config.get '.test.reports.junit.output_path' 'brik-artifacts/test/junit.xml')"
 
-    log.info "wrote $(wc -l < "$dotenv" 2>/dev/null | tr -d ' ') variables to $dotenv"
+    log.info "recorded 13 env keys for downstream stages"
 }
 
 # Fetch + compile the DSI policy file when BRIK_POLICY_URL is set.

@@ -118,7 +118,7 @@ def call(Map params = [:]) {
             def brikHome = params.brikHome ?: brikResolveHome()
 
             // Stage runner images. resolvedImage is filled after Init reads
-            // brik-init.env and exposes BRIK_CI_IMAGE.
+            // .brik-logs/pipeline.env and exposes BRIK_CI_IMAGE.
             def baseImage     = 'ghcr.io/getbrik/brik-runner-base:latest'
             def analysisImage = 'ghcr.io/getbrik/brik-runner-analysis:latest'
             def scannerImage  = 'ghcr.io/getbrik/brik-runner-scanner:latest'
@@ -206,13 +206,15 @@ def call(Map params = [:]) {
             }
 
             try {
-                // Init produces brik-init.env in the workspace. brikReadDotenv
+                // Init publishes its env contract through report.record env;
+                // the post-stage projection hook materialises it as
+                // .brik-logs/pipeline.env in the workspace. brikReadDotenv
                 // extracts BRIK_CI_IMAGE so subsequent stages run in the
-                // stack-specific runner. Same contract as GitLab's
-                // artifacts.reports.dotenv.
+                // stack-specific runner. Same single-file contract as GitLab's
+                // artifacts.reports.dotenv (which reads the same path).
                 runStageWithReporting('Init') { runInBase('init') }
 
-                def initEnv = brikReadDotenv("${env.WORKSPACE}/brik-init.env")
+                def initEnv = brikReadDotenv("${env.WORKSPACE}/.brik-logs/pipeline.env")
                 resolvedImage = initEnv['BRIK_CI_IMAGE'] ?: ''
                 if (resolvedImage) {
                     docker.image(resolvedImage).pull()
