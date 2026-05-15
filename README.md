@@ -192,6 +192,13 @@ project:
 For the design, the stage lifecycle, and how to extend Brik, see
 [docs/concepts/architecture.md](docs/concepts/architecture.md).
 
+## Code coverage
+
+Measured by [ShellSpec](https://shellspec.info) with
+[kcov](https://github.com/SimonKagstrom/kcov) on every push and pull request,
+then published to [Codecov](https://codecov.io/gh/getbrik/brik) with an 80%
+project and patch gate.
+
 ## Code metrics
 
 Tracked automatically via [shellmetrics](https://github.com/shellspec/shellmetrics)
