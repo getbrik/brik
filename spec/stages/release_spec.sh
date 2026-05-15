@@ -171,6 +171,34 @@ Describe "stages.release"
     The output should equal "v"
   End
 
+  # Cross-stage env publishing (chantier env-channels-unification).
+  # release computes BRIK_APP_VERSION and publishes it through the env section
+  # of the report backend so package and downstream stages can read it
+  # (formerly written via pipeline.env.set, now via report.record env).
+  It "records BRIK_APP_VERSION into report.env"
+    run_release_records_env_version() {
+      local ctx
+      ctx="$(context.create "release")" 2>/dev/null || ctx="$(mktemp)"
+      stages.release "$ctx" >/dev/null 2>&1 || return $?
+      jq -r '.stages[] | select(.name == "release") | .env.BRIK_APP_VERSION // empty' \
+        "$BRIK_LOG_DIR/aggregate-report.json"
+    }
+    When call run_release_records_env_version
+    The output should not equal ""
+  End
+
+  It "projects BRIK_APP_VERSION into pipeline.env via the post-stage hook"
+    run_release_projects_version() {
+      local ctx
+      ctx="$(context.create "release")" 2>/dev/null || ctx="$(mktemp)"
+      stages.release "$ctx" >/dev/null 2>&1 || return $?
+      _stage.run._project_env "release" >/dev/null 2>&1 || true
+      grep -c '^BRIK_APP_VERSION=' "$BRIK_PIPELINE_ENV"
+    }
+    When call run_release_projects_version
+    The output should equal "1"
+  End
+
   Describe "with custom release config"
     setup_release() {
       cat > "$BRIK_CONFIG_FILE" <<'YAML'

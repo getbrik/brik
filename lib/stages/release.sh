@@ -76,7 +76,7 @@ stages.release() {
     local _bump_type="none"
     [[ -n "${BRIK_TAG:-}" ]] && _bump_type="explicit"
     report.record "release" "business" "bump_type" "$_bump_type" 2>/dev/null || true
-    pipeline.env.set "BRIK_APP_VERSION" "$current_version"
+    report.record "release" "env" "BRIK_APP_VERSION" "$current_version" 2>/dev/null || true
 
     # If on a tag (release trigger), prepare and finalize. A failure in either
     # step must propagate so the pipeline (and aggregate-report.json) reflect
