@@ -314,7 +314,8 @@ def call(Map params = [:]) {
                             echo "[brik] notify stage signalled failure: ${ne.message}"
                             currentBuild.result = 'FAILURE'
                         }
-                        archiveArtifacts artifacts: 'brik-artifacts/**/*',
+                        archiveArtifacts artifacts: 'brik-artifacts/**/*,.brik-logs/**/*',
+                            excludes: '.brik-logs/*.lock,.brik-logs/context-*',
                             allowEmptyArchive: true,
                             fingerprint: false
                     } catch (Exception e) {

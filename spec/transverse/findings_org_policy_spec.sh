@@ -51,9 +51,9 @@ Describe "transverse/findings/org_policy.sh"
   End
 
   Describe "org_policy.cache_path"
-    It "defaults to BRIK_WORKSPACE/brik-artifacts/.policy.cache.json"
+    It "defaults to BRIK_WORKSPACE/.brik-logs/policy.cache.json"
       When call org_policy.cache_path
-      The output should equal "${BRIK_WORKSPACE}/brik-artifacts/.policy.cache.json"
+      The output should equal "${BRIK_WORKSPACE}/.brik-logs/policy.cache.json"
     End
 
     It "honors BRIK_POLICY_CACHE_PATH override"

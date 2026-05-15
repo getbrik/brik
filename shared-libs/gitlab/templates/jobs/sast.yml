@@ -35,5 +35,8 @@ brik-sast:
     # the conditional overlay jobs/sast-reports.yml adds reports.sarif
     # when CI_GITLAB_FEATURES advertises sast support.
     paths:
-      - .brik-logs/pipeline.env
+      - .brik-logs/
       - brik-artifacts/
+    exclude:
+      - .brik-logs/*.lock
+      - .brik-logs/context-*

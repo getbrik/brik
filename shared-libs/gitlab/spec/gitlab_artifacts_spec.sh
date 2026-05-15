@@ -97,13 +97,23 @@ Describe "shared-libs/gitlab templates - brik-artifacts paths"
       The output should equal "2"
     End
 
-    It "artifacts.paths includes .brik-logs/pipeline.env for cross-stage env propagation"
+    It "artifacts.paths includes .brik-logs/ for cross-stage env propagation and forensic data"
       Skip if "yq not installed" yq_missing
-      check_pipeline_env_path() {
-        yq -e '.brik-test.artifacts.paths | contains([".brik-logs/pipeline.env"])' \
+      check_brik_logs_path() {
+        yq -e '.brik-test.artifacts.paths | contains([".brik-logs/"])' \
           "$(test_yml)" >/dev/null 2>&1
       }
-      When call check_pipeline_env_path
+      When call check_brik_logs_path
+      The status should be success
+    End
+
+    It "artifacts.exclude drops .lock and context-* churn from .brik-logs/"
+      Skip if "yq not installed" yq_missing
+      check_excludes() {
+        yq -e '.brik-test.artifacts.exclude | contains([".brik-logs/*.lock", ".brik-logs/context-*"])' \
+          "$(test_yml)" >/dev/null 2>&1
+      }
+      When call check_excludes
       The status should be success
     End
   End

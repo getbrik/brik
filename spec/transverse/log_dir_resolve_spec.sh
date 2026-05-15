@@ -44,4 +44,17 @@ Describe "_brik.log_dir._resolve"
     When call run_resolve_empty_var
     The output should equal "$LOGRES_WS/.brik-logs"
   End
+
+  # Lock-down: BRIK_DEFAULT_LOG_DIR was an old escape hatch that the
+  # 3-level fallback cascaded through. Phase 1 deprecated it; Phase 4
+  # removed the export from error.sh. This assertion prevents
+  # reintroduction (spec_helper.sh sources error.sh, so any export there
+  # would already be in the test process env).
+  It "does not re-export the legacy BRIK_DEFAULT_LOG_DIR constant"
+    check_default_var_absent() {
+      env | grep -q '^BRIK_DEFAULT_LOG_DIR='
+    }
+    When call check_default_var_absent
+    The status should be failure
+  End
 End

@@ -12,8 +12,14 @@ Describe "shared-libs/jenkins brikPipeline.groovy - artifact layout"
     The status should not equal 0
   End
 
-  It "still archives brik-artifacts in the final block"
-    When call grep -F "archiveArtifacts artifacts: 'brik-artifacts/**/*'" "$GROOVY"
+  It "archives both brik-artifacts and .brik-logs in the final block"
+    When call grep -F "archiveArtifacts artifacts: 'brik-artifacts/**/*,.brik-logs/**/*'" "$GROOVY"
+    The status should be success
+    The output should be present
+  End
+
+  It "excludes lock files and context-* churn from the .brik-logs archive"
+    When call grep -F "excludes: '.brik-logs/*.lock,.brik-logs/context-*'" "$GROOVY"
     The status should be success
     The output should be present
   End

@@ -52,8 +52,11 @@ brik-package:
     - bash -c '. /tmp/brik-bootstrap.sh && brik.gitlab.run_stage package'
   artifacts:
     paths:
-      - .brik-logs/pipeline.env
+      - .brik-logs/
       - brik-artifacts/
+    exclude:
+      - .brik-logs/*.lock
+      - .brik-logs/context-*
     when: always
     expire_in: 1 week
   # No tag-only gate: producing a package on every commit is the
