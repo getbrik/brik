@@ -227,6 +227,17 @@ a:hover { border-bottom-color: var(--link); }
 }
 .hero .context-badge.release  { color: oklch(80% 0.12 75); box-shadow: 0 0 28px -10px currentColor; }
 .hero .context-badge.snapshot { color: var(--text-faint); }
+.hero .dry-run-badge {
+  display: inline-flex; align-items: center;
+  padding: 4px 10px;
+  border-radius: var(--radius-chip);
+  font-size: 11px; font-weight: 700;
+  letter-spacing: 0.12em; text-transform: uppercase;
+  color: oklch(72% 0.18 35);
+  border: 1px solid currentColor;
+  background: color-mix(in oklch, currentColor 12%, transparent);
+  box-shadow: 0 0 28px -10px currentColor;
+}
 .hero .version {
   font-family: var(--font-mono);
   font-size: 20px;
@@ -680,6 +691,17 @@ a:hover { border-bottom-color: var(--link); }
 .timeline-cell .stage-status.skipped { color: var(--skipped); }
 .timeline-cell .stage-status.warning { color: var(--warning); }
 .timeline-cell .stage-duration { font-size: 12px; color: var(--text-muted); font-family: var(--font-mono); }
+.timeline-cell .stage-dry-run {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 2px 8px;
+  font-size: 10px; font-weight: 700;
+  letter-spacing: 0.10em; text-transform: uppercase;
+  color: oklch(72% 0.18 35);
+  border: 1px solid currentColor;
+  border-radius: var(--radius-chip);
+  background: color-mix(in oklch, currentColor 10%, transparent);
+}
 .timeline-cell.parallel-group {
   background: transparent; border-style: dashed;
   padding: var(--space-3);
@@ -826,6 +848,14 @@ a:hover { border-bottom-color: var(--link); }
 .business-stage h3.failed  { color: var(--failed); }
 .business-stage h3.skipped { color: var(--skipped); }
 .business-stage h3 .stage-name { color: var(--text); }
+.business-stage h3 .stage-dry-run-chip {
+  font-family: var(--font-mono); font-size: 10px; font-weight: 700;
+  letter-spacing: 0.10em; text-transform: uppercase;
+  color: oklch(72% 0.18 35);
+  padding: 2px 8px; border-radius: var(--radius-chip);
+  border: 1px solid currentColor;
+  background: color-mix(in oklch, currentColor 12%, transparent);
+}
 .business-stage h3 .duration-badge {
   margin-left: auto;
   font-family: var(--font-mono); font-size: 11px; font-weight: 500;
@@ -1365,9 +1395,12 @@ _report._render_html_tail() {
     const dateHtml = formatHumanDate(p.started_at);
     const total = fmtDuration(totalDurationMs());
 
+    const dryRun = !!(p.tech && p.tech.dry_run === true);
+
     const idsRow = '<div class="ids-row">'
       + '<span class="pipeline-id mono">#' + idLink + '</span>'
       + '<span class="context-badge ' + escapeHtml(context) + '">' + escapeHtml(context) + '</span>'
+      + (dryRun ? '<span class="dry-run-badge" title="BRIK_DRY_RUN=true: destructive actions were skipped">dry-run</span>' : '')
       + (versionVal ? '<span class="version">' + versionInner + '</span>' : '')
       + '</div>';
 
@@ -1415,9 +1448,14 @@ _report._render_html_tail() {
     const status = s.status || 'unknown';
     const job = (s.runner && s.runner.job_url) || '';
     const jobHtml = job ? '<div class="stage-job"><a href="' + escapeHtml(job) + '" target="_blank" rel="noopener">job</a></div>' : '';
+    const stageDryRun = !!(s.tech && (s.tech.dry_run === true || s.tech.dry_run === 'true'));
+    const dryRunHtml = stageDryRun
+      ? '<div class="stage-dry-run" title="BRIK_DRY_RUN=true: destructive actions for this stage were skipped">dry-run</div>'
+      : '';
     cell.innerHTML = ''
       + '<div class="stage-name">' + escapeHtml(s.stage || '-') + '</div>'
       + '<div class="stage-status ' + status + '">' + escapeHtml(status) + '</div>'
+      + dryRunHtml
       + '<div class="stage-duration">' + fmtDuration(s.duration_ms) + '</div>'
       + jobHtml;
     return cell;
@@ -2722,7 +2760,11 @@ _report._render_html_tail() {
       wrap.className = 'business-stage';
       const status = s.status || 'unknown';
       const dur = s.duration_ms != null ? '<span class="duration-badge">' + fmtDuration(s.duration_ms) + '</span>' : '';
-      wrap.innerHTML = '<h3 class="' + status + '"><span class="stage-dot"></span><span class="stage-name">' + escapeHtml(s.stage || '-') + '</span>' + dur + '</h3>'
+      const sectionDryRun = !!(s.tech && (s.tech.dry_run === true || s.tech.dry_run === 'true'));
+      const dryChip = sectionDryRun
+        ? ' <span class="stage-dry-run-chip" title="BRIK_DRY_RUN=true: destructive actions for this stage were skipped">dry-run</span>'
+        : '';
+      wrap.innerHTML = '<h3 class="' + status + '"><span class="stage-dot"></span><span class="stage-name">' + escapeHtml(s.stage || '-') + '</span>' + dryChip + dur + '</h3>'
         + failureBanner(s)
         + inner;
       list.appendChild(wrap);
