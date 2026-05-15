@@ -366,6 +366,7 @@ Describe "stages.init"
       local ctx
       ctx="$(context.create "init")" 2>/dev/null || ctx="$(mktemp)"
       stages.init "$ctx" >/dev/null 2>&1 || return $?
+      _stage.run._project_env "init" >/dev/null 2>&1 || true
       grep '^BRIK_GIT_USER_EMAIL=' "$BRIK_PIPELINE_ENV" | tail -1
     }
     When call run_init_git_yml
@@ -378,6 +379,7 @@ Describe "stages.init"
       local ctx
       ctx="$(context.create "init")" 2>/dev/null || ctx="$(mktemp)"
       stages.init "$ctx" >/dev/null 2>&1 || return $?
+      _stage.run._project_env "init" >/dev/null 2>&1 || true
       grep '^BRIK_GIT_USER_EMAIL=' "$BRIK_PIPELINE_ENV" | tail -1
       unset GITLAB_USER_EMAIL
     }
@@ -390,6 +392,7 @@ Describe "stages.init"
       local ctx
       ctx="$(context.create "init")" 2>/dev/null || ctx="$(mktemp)"
       stages.init "$ctx" >/dev/null 2>&1 || return $?
+      _stage.run._project_env "init" >/dev/null 2>&1 || true
       grep '^BRIK_GIT_USER_EMAIL=' "$BRIK_PIPELINE_ENV" | tail -1
     }
     When call run_init_default_fallback
@@ -408,6 +411,58 @@ Describe "stages.init"
     When call run_init_with_invalid_schema
     The status should equal 7
     The error should include "validation failed"
+  End
+
+  # ---------------------------------------------------------------------------
+  # Cross-stage env publishing via report.record env (chantier env-channels).
+  # init writes its 13 dotenv keys plus git identity through the env section
+  # of the report backend; the post-stage projection hook (exercised
+  # explicitly here since stages.init runs outside stage.run in unit tests)
+  # mirrors them into BRIK_PIPELINE_ENV.
+  # ---------------------------------------------------------------------------
+  Describe "env section publishing"
+    read_init_env() {
+      local key="$1"
+      jq -r --arg k "$key" \
+        '.stages[] | select(.name == "init") | .env[$k] // empty' \
+        "$BRIK_LOG_DIR/aggregate-report.json" 2>/dev/null
+    }
+
+    It "records git identity into report.env"
+      run_init_records_env_identity() {
+        local ctx
+        ctx="$(context.create "init")" 2>/dev/null || ctx="$(mktemp)"
+        stages.init "$ctx" >/dev/null 2>&1 || return $?
+        printf '%s|%s' \
+          "$(read_init_env BRIK_GIT_USER_EMAIL)" \
+          "$(read_init_env BRIK_GIT_USER_NAME)"
+      }
+      When call run_init_records_env_identity
+      The output should equal "brik-ci@brik.local|Brik CI"
+    End
+
+    It "records every dotenv key into report.env"
+      run_init_records_all_env_keys() {
+        local ctx
+        ctx="$(context.create "init")" 2>/dev/null || ctx="$(mktemp)"
+        stages.init "$ctx" >/dev/null 2>&1 || return $?
+        jq -r '.stages[] | select(.name == "init") | .env | keys | sort | join(",")' \
+          "$BRIK_LOG_DIR/aggregate-report.json"
+      }
+      When call run_init_records_all_env_keys
+      The output should equal "BRIK_BUILD_STACK,BRIK_BUILD_STACK_VERSION,BRIK_CI_IMAGE,BRIK_DEPLOY_ENABLED,BRIK_GIT_USER_EMAIL,BRIK_GIT_USER_NAME,BRIK_PACKAGE_ENABLED,BRIK_PROJECT_NAME,BRIK_RELEASE_PROFILE,BRIK_TEST_COVERAGE_DIR,BRIK_TEST_COVERAGE_FORMAT,BRIK_TEST_JUNIT_PATH,BRIK_TEST_REPORTS_ENABLED"
+    End
+
+    It "still produces brik-init.env for back-compat (Phase 2)"
+      run_init_dotenv_present() {
+        local ctx
+        ctx="$(context.create "init")" 2>/dev/null || ctx="$(mktemp)"
+        stages.init "$ctx" >/dev/null 2>&1 || return $?
+        wc -l < "${BRIK_WORKSPACE}/brik-init.env" | tr -d ' '
+      }
+      When call run_init_dotenv_present
+      The output should equal "13"
+    End
   End
 
   Describe "deprecation warning for legacy *.enabled=false keys"

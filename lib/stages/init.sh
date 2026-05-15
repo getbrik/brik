@@ -144,8 +144,12 @@ _stages.init._resolve_git_identity() {
     export BRIK_GIT_USER_EMAIL="$git_email"
     export BRIK_GIT_USER_NAME="$git_name"
 
-    pipeline.env.set "BRIK_GIT_USER_EMAIL" "$git_email" 2>/dev/null || true
-    pipeline.env.set "BRIK_GIT_USER_NAME"  "$git_name"  2>/dev/null || true
+    # Cross-stage publish via the report env section. The post-stage
+    # projection hook (_stage.run._project_env) mirrors these into
+    # BRIK_PIPELINE_ENV so transverse.git.config_identity sees them when
+    # release runs.
+    report.record "init" "env" "BRIK_GIT_USER_EMAIL" "$git_email" 2>/dev/null || true
+    report.record "init" "env" "BRIK_GIT_USER_NAME"  "$git_name"  2>/dev/null || true
 }
 
 # Warn the user when their brik.yml carries one of the legacy
@@ -309,51 +313,49 @@ _stages.init._has_block() {
 _stages.init._write_dotenv() {
     local dotenv="${BRIK_WORKSPACE:-.}/brik-init.env"
 
-    {
-        # Project identity (BRIK_BUILD_STACK already resolved by the caller).
-        printf 'BRIK_PROJECT_NAME=%s\n' "$(config.get '.project.name' 'unnamed')"
-        printf 'BRIK_BUILD_STACK=%s\n'  "${BRIK_BUILD_STACK:-auto}"
-        printf 'BRIK_BUILD_STACK_VERSION=%s\n' "$(config.get '.project.stack_version' '')"
-        printf 'BRIK_CI_IMAGE=%s\n' "$(_stages.init._resolve_runner_image)"
+    # _kv KEY VALUE: write to brik-init.env (Phase 2 back-compat) AND
+    # publish through the report env section. The post-stage projection
+    # hook (_stage.run._project_env) mirrors the env section into
+    # BRIK_PIPELINE_ENV; Phase 3 will collapse the two physical files
+    # into one by switching the GitLab dotenv source to .brik-logs/pipeline.env.
+    _kv() {
+        printf '%s=%s\n' "$1" "$2" >> "$dotenv"
+        report.record "init" "env" "$1" "$2" 2>/dev/null || true
+    }
 
-        # Legacy quality and security gating env vars (BRIK_LINT_ENABLED,
-        # BRIK_SAST_ENABLED, ...) are no longer emitted: stages always run
-        # and the *.enabled=false opt-outs are surfaced as deprecation
-        # warnings by _stages.init._warn_legacy_enabled_keys instead.
-
-        # Git identity (already resolved + exported by _resolve_git_identity).
-        printf 'BRIK_GIT_USER_EMAIL=%s\n' "${BRIK_GIT_USER_EMAIL:-brik-ci@brik.local}"
-        printf 'BRIK_GIT_USER_NAME=%s\n'  "${BRIK_GIT_USER_NAME:-Brik CI}"
-
-        # Release / package / deploy gating (placeholder values that downstream
-        # CI rules can read; chantier 9.A will refine release.profile).
-        printf 'BRIK_RELEASE_PROFILE=%s\n' "$(config.get '.release.profile' 'none')"
-        printf 'BRIK_PACKAGE_ENABLED=%s\n' "$(_stages.init._has_block '.package')"
-        printf 'BRIK_DEPLOY_ENABLED=%s\n'  "$(_stages.init._has_block '.deploy')"
-
-        # Test reports opt-in (consumed by lib/stacks/<stack>.sh to inject
-        # coverage/junit flags into the test command). Default: false ->
-        # test runners keep their native defaults.
-        printf 'BRIK_TEST_REPORTS_ENABLED=%s\n'  "$(config.get '.test.reports.enabled' 'false')"
-        printf 'BRIK_TEST_COVERAGE_FORMAT=%s\n' "$(config.get '.test.reports.coverage.format' 'auto')"
-        printf 'BRIK_TEST_COVERAGE_DIR=%s\n'    "$(config.get '.test.reports.coverage.output_dir' 'brik-artifacts/test/coverage')"
-        printf 'BRIK_TEST_JUNIT_PATH=%s\n'      "$(config.get '.test.reports.junit.output_path' 'brik-artifacts/test/junit.xml')"
-    } > "$dotenv" 2>/dev/null || {
+    : > "$dotenv" 2>/dev/null || {
         log.warn "could not write dotenv to $dotenv"
         return 0
     }
 
-    # Mirror every key into the pipeline env file so Jenkins (which loads
-    # pipeline.env at each stage via pipeline.env.load) sees the same
-    # values as GitLab (which gets brik-init.env auto-injected via the
-    # artifacts.reports.dotenv mechanism).
-    local _line _key _val
-    while IFS= read -r _line; do
-        [[ -z "$_line" ]] && continue
-        _key="${_line%%=*}"
-        _val="${_line#*=}"
-        pipeline.env.set "$_key" "$_val" 2>/dev/null || true
-    done < "$dotenv"
+    # Project identity (BRIK_BUILD_STACK already resolved by the caller).
+    _kv BRIK_PROJECT_NAME        "$(config.get '.project.name' 'unnamed')"
+    _kv BRIK_BUILD_STACK         "${BRIK_BUILD_STACK:-auto}"
+    _kv BRIK_BUILD_STACK_VERSION "$(config.get '.project.stack_version' '')"
+    _kv BRIK_CI_IMAGE            "$(_stages.init._resolve_runner_image)"
+
+    # Legacy quality and security gating env vars (BRIK_LINT_ENABLED,
+    # BRIK_SAST_ENABLED, ...) are no longer emitted: stages always run
+    # and the *.enabled=false opt-outs are surfaced as deprecation
+    # warnings by _stages.init._warn_legacy_enabled_keys instead.
+
+    # Git identity (already resolved + exported by _resolve_git_identity).
+    _kv BRIK_GIT_USER_EMAIL "${BRIK_GIT_USER_EMAIL:-brik-ci@brik.local}"
+    _kv BRIK_GIT_USER_NAME  "${BRIK_GIT_USER_NAME:-Brik CI}"
+
+    # Release / package / deploy gating (placeholder values that downstream
+    # CI rules can read; chantier 9.A will refine release.profile).
+    _kv BRIK_RELEASE_PROFILE "$(config.get '.release.profile' 'none')"
+    _kv BRIK_PACKAGE_ENABLED "$(_stages.init._has_block '.package')"
+    _kv BRIK_DEPLOY_ENABLED  "$(_stages.init._has_block '.deploy')"
+
+    # Test reports opt-in (consumed by lib/stacks/<stack>.sh to inject
+    # coverage/junit flags into the test command). Default: false ->
+    # test runners keep their native defaults.
+    _kv BRIK_TEST_REPORTS_ENABLED "$(config.get '.test.reports.enabled' 'false')"
+    _kv BRIK_TEST_COVERAGE_FORMAT "$(config.get '.test.reports.coverage.format' 'auto')"
+    _kv BRIK_TEST_COVERAGE_DIR    "$(config.get '.test.reports.coverage.output_dir' 'brik-artifacts/test/coverage')"
+    _kv BRIK_TEST_JUNIT_PATH      "$(config.get '.test.reports.junit.output_path' 'brik-artifacts/test/junit.xml')"
 
     log.info "wrote $(wc -l < "$dotenv" 2>/dev/null | tr -d ' ') variables to $dotenv"
 }
