@@ -392,7 +392,7 @@ Describe "base-wrapper.sh"
 
     It "loads pipeline env variables before running stage"
       check_pipeline_load() {
-        pipeline.env.set "BRIK_TEST_PIPELINE_VAR" "from_pipeline_env"
+        _pipeline.env.append "BRIK_TEST_PIPELINE_VAR" "from_pipeline_env"
         brik.wrapper.run_stage "init" >/dev/null 2>&1
         printf '%s' "${BRIK_TEST_PIPELINE_VAR:-}"
       }
