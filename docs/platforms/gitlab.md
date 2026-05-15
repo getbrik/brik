@@ -102,6 +102,26 @@ Each GitLab CI job:
 | `BRIK_SCANNER_IMAGE` | `ghcr.io/getbrik/brik-runner-scanner:latest` | Scan / Container Scan image |
 | `BRIK_DEPLOY_IMAGE` | `ghcr.io/getbrik/brik-runner-deploy:latest` | Deploy stage image |
 
+## User-overridable inputs (Run pipeline form)
+
+These variables are declared in the long form
+(`value` / `description` / `options`) so they appear pre-populated in the
+GitLab "Run pipeline" UI, where they can be overridden per run. Short-form
+variables in `.gitlab-ci.yml` apply at runtime but stay invisible in the form,
+which is why these two are declared with the explicit object syntax.
+
+| Variable | Default | Type | Description |
+|----------|---------|------|-------------|
+| `BRIK_DRY_RUN` | `false` | enum (`false`, `true`) | Skip destructive deploy actions (compose up, k8s apply, helm upgrade, argocd sync, rsync). Print what would run instead. Mirrors the Jenkins `BRIK_DRY_RUN` `booleanParam`. |
+| `BRIK_TAG` | `""` | string | Release tag for this build (e.g. `v0.1.0`). Leave empty for snapshot builds. Mirrors `CI_COMMIT_TAG` semantics. |
+
+The `options:` dropdown for `BRIK_DRY_RUN` requires GitLab >= 15.7. Earlier
+versions ignore the constraint and fall back to a free-form text field but
+still honour the description and default. The wrapper enforces the contract:
+only the exact string `true` enables dry-run; any other value (including
+`1`, `yes`, `on`) is downgraded to `false` with a warning, keeping the
+value `lib/` consumes always canonical.
+
 ## Cache relocation
 
 GitLab CI requires caches to live within `$CI_PROJECT_DIR`. The template

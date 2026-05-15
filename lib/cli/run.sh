@@ -56,13 +56,14 @@ _cli.run._runtime() {
 }
 
 # cli.run.stage - execute a single stage via the local wrapper.
-# Usage: cli.run.stage <stage_name> [--config <path>] [--workspace <path>]
+# Usage: cli.run.stage <stage_name> [--config <path>] [--workspace <path>] [--dry-run]
 cli.run.stage() {
     brik.use cli.helpers
 
     local stage_name=""
     local config_path=""
     local workspace=""
+    local dry_run=""
 
     if [[ $# -eq 0 ]]; then
         brik_error "'brik run stage' requires a stage name"
@@ -85,6 +86,10 @@ cli.run.stage() {
                 workspace="$2"
                 shift 2
                 ;;
+            --dry-run)
+                dry_run="true"
+                shift
+                ;;
             *)
                 brik_usage_error "unknown option: $1" || return "$?"
                 ;;
@@ -101,19 +106,24 @@ cli.run.stage() {
     export BRIK_LOG_DIR="${BRIK_LOG_DIR:-/tmp/brik/logs}"
     mkdir -p "${BRIK_LOG_DIR}"
 
+    # Activate dry-run only when the flag was passed. We never demote a
+    # pre-existing BRIK_DRY_RUN=true exported by the caller's shell.
+    [[ "$dry_run" == "true" ]] && export BRIK_DRY_RUN="true"
+
     _cli.run._setup_local_env || return "$?"
 
     _cli.run._runtime brik.local.run_stage "$stage_name"
 }
 
 # cli.run.pipeline - execute the full pipeline via the local wrapper.
-# Usage: cli.run.pipeline [--config <path>] [--workspace <path>]
+# Usage: cli.run.pipeline [--config <path>] [--workspace <path>] [--dry-run]
 #        [--continue-on-error] [--with-release] [--with-package] [--with-deploy]
 cli.run.pipeline() {
     brik.use cli.helpers
 
     local config_path=""
     local workspace=""
+    local dry_run=""
     local -a pipeline_flags=()
 
     workspace="$(pwd)"
@@ -129,6 +139,10 @@ cli.run.pipeline() {
                 brik_require_arg "--workspace" "${2-}" || return "$?"
                 workspace="$2"
                 shift 2
+                ;;
+            --dry-run)
+                dry_run="true"
+                shift
                 ;;
             --continue-on-error|--with-release|--with-package|--with-deploy)
                 pipeline_flags+=("$1")
@@ -149,6 +163,10 @@ cli.run.pipeline() {
     export BRIK_CONFIG_FILE="${config_path}"
     export BRIK_LOG_DIR="${BRIK_LOG_DIR:-/tmp/brik/logs}"
     mkdir -p "${BRIK_LOG_DIR}"
+
+    # Activate dry-run only when the flag was passed. We never demote a
+    # pre-existing BRIK_DRY_RUN=true exported by the caller's shell.
+    [[ "$dry_run" == "true" ]] && export BRIK_DRY_RUN="true"
 
     _cli.run._setup_local_env || return "$?"
 

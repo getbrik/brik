@@ -69,6 +69,17 @@ The opt-in flags (`--with-release`, `--with-package`, `--with-deploy`) enable
 the trigger-gated stages; see [fixed flow](../concepts/fixed-flow.md#opt-in-stages-and-triggers).
 `--continue-on-error` forces the pipeline to keep going past a failed stage; see
 [pipeline context](../concepts/pipeline-context.md#continue_on_error-precedence).
+`--dry-run` exports `BRIK_DRY_RUN=true` so that deploy targets, registry pushes,
+and release tag creation print what they would do without performing the
+destructive action:
+
+```bash
+brik run stage deploy --dry-run
+brik run pipeline --with-deploy --dry-run
+```
+
+The same behaviour can be triggered by exporting `BRIK_DRY_RUN=true` in the
+caller shell; the CLI flag is the supported way to surface it.
 
 ## CLI reference
 
@@ -89,7 +100,9 @@ brik validate --config path/to/brik.yml --schema path/to/schema.json
 brik doctor --workspace ./my-project
 brik init --stack node --platform gitlab --dir ./my-project --non-interactive
 brik run stage build --config brik.yml --workspace .
+brik run stage deploy --dry-run
 brik run pipeline --continue-on-error --with-release --with-package --with-deploy
+brik run pipeline --with-deploy --dry-run
 brik self-update --channel edge --version v0.4.0
 brik self-uninstall --force
 brik version --verbose
