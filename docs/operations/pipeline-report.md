@@ -6,6 +6,14 @@ self-contained HTML renderings (`aggregate-report.{md,html}`) under
 The HTML view inlines its CSS, JS, and the Brik logo so it stays browseable as a
 standalone CI artifact.
 
+<p align="center">
+  <a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/getbrik/brik/main/docs/aggregate-report.html"><img src="../report.png" alt="Brik HTML pipeline report" width="900"></a>
+</p>
+
+<p align="center">
+  <em><a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/getbrik/brik/main/docs/aggregate-report.html">Open the full interactive HTML report</a> (sample from a <code>node-complete</code> run)</em>
+</p>
+
 This page is the producer field contract. Producers emit `schema_version: "1.1"`
 today; consumers should match on `^1\.` to accept future minor 1.x evolutions.
 
