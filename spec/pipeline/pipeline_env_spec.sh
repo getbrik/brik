@@ -41,11 +41,11 @@ Describe "pipeline-env.sh"
     End
   End
 
-  Describe "pipeline.env.set"
+  Describe "_pipeline.env.append"
     It "appends a variable to the file"
       set_and_check() {
         pipeline.env.init
-        pipeline.env.set "MY_KEY" "my_value"
+        _pipeline.env.append "MY_KEY" "my_value"
         grep -q "MY_KEY=my_value" "$BRIK_PIPELINE_ENV"
       }
       When call set_and_check
@@ -53,7 +53,7 @@ Describe "pipeline-env.sh"
     End
 
     It "fails without prior init"
-      When call pipeline.env.set "KEY" "value"
+      When call _pipeline.env.append "KEY" "value"
       The status should equal "$BRIK_EXIT_IO_FAILURE"
       The stderr should be present
     End
@@ -63,7 +63,7 @@ Describe "pipeline-env.sh"
     It "exports variables into the shell"
       set_and_load() {
         pipeline.env.init
-        pipeline.env.set "MY_VAR" "hello"
+        _pipeline.env.append "MY_VAR" "hello"
         pipeline.env.load
         printf '%s' "$MY_VAR"
       }
@@ -74,8 +74,8 @@ Describe "pipeline-env.sh"
     It "last write wins for duplicate keys"
       set_twice_and_load() {
         pipeline.env.init
-        pipeline.env.set "K" "v1"
-        pipeline.env.set "K" "v2"
+        _pipeline.env.append "K" "v1"
+        _pipeline.env.append "K" "v2"
         pipeline.env.load
         printf '%s' "$K"
       }
@@ -87,6 +87,20 @@ Describe "pipeline-env.sh"
       When call pipeline.env.load
       The status should be success
       The stderr should equal ""
+    End
+  End
+
+  # API surface lock-down (chantier env-channels-unification Phase 4).
+  # Stages must publish through report.record env; the projection hook is
+  # the only writer of the env file. Keeping pipeline.env.set as a public
+  # callable would invite drift back to the dual-channel design.
+  Describe "API surface"
+    It "no longer exposes pipeline.env.set as a public function"
+      check_pipeline_env_set_absent() {
+        type pipeline.env.set >/dev/null 2>&1
+      }
+      When call check_pipeline_env_set_absent
+      The status should be failure
     End
   End
 End

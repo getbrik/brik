@@ -5,6 +5,12 @@
 #
 # Manages a shared KEY=VALUE file ($BRIK_LOG_DIR/pipeline.env) that persists
 # business variables across stages. Append-only -- last write wins on source.
+#
+# Public API: pipeline.env.init (create the file), pipeline.env.load (source
+# it into the current shell). Stages MUST publish through report.record env
+# instead of writing here directly; the post-stage projection hook
+# (_stage.run._project_env) is the only producer of the file content. The
+# private _pipeline.env.append is used by that hook -- not from stages.
 
 # Guard against double-sourcing
 [[ -n "${_BRIK_PIPELINE_ENV_LOADED:-}" ]] && return 0
@@ -39,9 +45,12 @@ pipeline.env.init() {
 }
 
 # Append a key-value pair to the pipeline environment file.
-# Usage: pipeline.env.set <key> <value>
+# Internal: invoked only by _stage.run._project_env. Stages MUST publish
+# through report.record env instead -- the projection hook owns the env
+# file write contract.
+# Usage: _pipeline.env.append <key> <value>
 # Returns 0 on success, BRIK_EXIT_IO_FAILURE on filesystem error.
-pipeline.env.set() {
+_pipeline.env.append() {
     local key="$1"
     local value="$2"
 
@@ -59,16 +68,8 @@ pipeline.env.set() {
         return "$BRIK_EXIT_IO_FAILURE"
     }
 
-    log.debug "pipeline env set: ${key}=${value}"
+    log.debug "pipeline env append: ${key}=${value}"
     return "$BRIK_EXIT_OK"
-}
-
-# Internal alias used by the post-stage projection hook
-# (_stage.run._project_env). Phase 4 of chantier env-channels-unification
-# turns this into the sole implementation; until then it delegates to the
-# public pipeline.env.set so the call sites can be migrated incrementally.
-_pipeline.env.append() {
-    pipeline.env.set "$@"
 }
 
 # Load all variables from the pipeline environment file into the current shell.

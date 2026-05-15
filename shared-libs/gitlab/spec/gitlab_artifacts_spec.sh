@@ -90,11 +90,21 @@ Describe "shared-libs/gitlab templates - brik-artifacts paths"
       The output should equal "brik-artifacts/test/coverage/coverage.xml"
     End
 
-    It "artifacts.paths simplifies to a single brik-artifacts/ entry"
+    It "artifacts.paths carries brik-artifacts/ plus the cross-stage env file"
       Skip if "yq not installed" yq_missing
       When call yq -r '.brik-test.artifacts.paths | length' "$(test_yml)"
       The status should be success
-      The output should equal "1"
+      The output should equal "2"
+    End
+
+    It "artifacts.paths includes .brik-logs/pipeline.env for cross-stage env propagation"
+      Skip if "yq not installed" yq_missing
+      check_pipeline_env_path() {
+        yq -e '.brik-test.artifacts.paths | contains([".brik-logs/pipeline.env"])' \
+          "$(test_yml)" >/dev/null 2>&1
+      }
+      When call check_pipeline_env_path
+      The status should be success
     End
   End
 
