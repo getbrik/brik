@@ -127,3 +127,23 @@ log.error() {
     _log._should_log error || return 0
     _log._emit error "$@"
 }
+
+# Resolve the log directory used by context.sh, pipeline-env.sh, report.sh,
+# stage.sh and every other runtime module that needs to write under
+# BRIK_LOG_DIR. Single source of truth for the precedence:
+#   1. $BRIK_LOG_DIR (explicit override, always wins when non-empty)
+#   2. ${BRIK_WORKSPACE}/.brik-logs (workspace-derived; the standard)
+#   3. /tmp/brik/logs (ultimate fallback for pre-init contexts where
+#      BRIK_WORKSPACE is not yet exported, e.g. Jenkins agent setup)
+#
+# Lives in logging.sh because it has no dependency beyond shell builtins
+# and is loaded earlier than transverse/artifacts.sh in most modules.
+_brik.log_dir._resolve() {
+    if [[ -n "${BRIK_LOG_DIR:-}" ]]; then
+        printf '%s' "$BRIK_LOG_DIR"
+    elif [[ -n "${BRIK_WORKSPACE:-}" ]]; then
+        printf '%s/.brik-logs' "$BRIK_WORKSPACE"
+    else
+        printf '/tmp/brik/logs'
+    fi
+}

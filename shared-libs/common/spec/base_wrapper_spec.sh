@@ -111,14 +111,14 @@ Describe "base-wrapper.sh"
       The output should include "brik.yml"
     End
 
-    It "sets BRIK_LOG_DIR to default"
+    It "derives BRIK_LOG_DIR from BRIK_WORKSPACE by default"
       check_logdir() {
         unset BRIK_LOG_DIR 2>/dev/null || true
         brik.wrapper.set_standard_env
         printf '%s' "$BRIK_LOG_DIR"
       }
       When call check_logdir
-      The output should include "/tmp/brik/logs"
+      The output should include "/.brik-logs"
     End
 
     It "leaves BRIK_LIB empty by default (legacy escape hatch)"
@@ -141,24 +141,22 @@ Describe "base-wrapper.sh"
       The output should equal "/custom/logs"
     End
 
-    It "generates unique BRIK_LOG_DIR when not pre-set"
+    It "produces a stable BRIK_LOG_DIR for the same workspace across calls"
       check_unique_logdir() {
         unset BRIK_LOG_DIR 2>/dev/null || true
-        unset BRIK_DEFAULT_LOG_DIR 2>/dev/null || true
         brik.wrapper.set_standard_env
         local dir1="$BRIK_LOG_DIR"
         unset BRIK_LOG_DIR
-        sleep 1
         brik.wrapper.set_standard_env
         local dir2="$BRIK_LOG_DIR"
-        if [[ "$dir1" != "$dir2" ]]; then
-          echo "unique"
+        if [[ "$dir1" == "$dir2" ]]; then
+          echo "stable"
         else
-          echo "same"
+          echo "diverged:$dir1|$dir2"
         fi
       }
       When call check_unique_logdir
-      The output should equal "unique"
+      The output should equal "stable"
     End
   End
 

@@ -28,7 +28,8 @@ _BRIK_REPORT_LOADED=1
 
 # Resolve the backend JSON path from BRIK_LOG_DIR.
 _report._backend_path() {
-    local log_dir="${BRIK_LOG_DIR:-${BRIK_DEFAULT_LOG_DIR:-/tmp/brik/logs}}"
+    local log_dir
+    log_dir="$(_brik.log_dir._resolve)"
     printf '%s/aggregate-report.json' "$log_dir"
 }
 
@@ -45,7 +46,8 @@ _report._require_jq() {
 report.init() {
     _report._require_jq || return "$?"
 
-    local log_dir="${BRIK_LOG_DIR:-${BRIK_DEFAULT_LOG_DIR:-/tmp/brik/logs}}"
+    local log_dir
+    log_dir="$(_brik.log_dir._resolve)"
     mkdir -p "$log_dir" || {
         log.error "cannot create log directory: $log_dir"
         return "$BRIK_EXIT_IO_FAILURE"
@@ -360,7 +362,7 @@ report.write_fragment() {
         return "$BRIK_EXIT_IO_FAILURE"
     }
 
-    local fragment_dir="${BRIK_WORKSPACE:-${BRIK_LOG_DIR:-${BRIK_DEFAULT_LOG_DIR:-/tmp/brik/logs}}}/brik-artifacts"
+    local fragment_dir="${BRIK_WORKSPACE:-$(_brik.log_dir._resolve)}/brik-artifacts"
     local stage_dir="${fragment_dir}/${stage_name}"
     mkdir -p "$stage_dir" || {
         log.error "cannot create fragment directory: $stage_dir"
@@ -484,7 +486,8 @@ report.aggregate_fragments() {
 
     _report._require_jq || return "$?"
 
-    local log_dir="${BRIK_LOG_DIR:-${BRIK_DEFAULT_LOG_DIR:-/tmp/brik/logs}}"
+    local log_dir
+    log_dir="$(_brik.log_dir._resolve)"
     mkdir -p "$log_dir" || {
         log.error "cannot create log directory: $log_dir"
         return "$BRIK_EXIT_IO_FAILURE"
@@ -1158,7 +1161,8 @@ report.render() {
         return "$BRIK_EXIT_IO_FAILURE"
     }
 
-    local log_dir="${BRIK_LOG_DIR:-${BRIK_DEFAULT_LOG_DIR:-/tmp/brik/logs}}"
+    local log_dir
+    log_dir="$(_brik.log_dir._resolve)"
 
     case "$format" in
         md)

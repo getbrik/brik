@@ -19,7 +19,8 @@ _BRIK_CONTEXT_LOADED=1
 # Returns 0 on success, 6 on IO failure.
 context.create() {
     local stage_name="$1"
-    local log_dir="${BRIK_LOG_DIR:-${BRIK_DEFAULT_LOG_DIR:-/tmp/brik/logs}}"
+    local log_dir
+    log_dir="$(_brik.log_dir._resolve)"
     local context_file
 
     mkdir -p "$log_dir" || {

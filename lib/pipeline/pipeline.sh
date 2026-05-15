@@ -302,7 +302,8 @@ pipeline.run() {
 # systems (GitLab via CI_PROJECT_DIR, Jenkins via WORKSPACE) can archive it.
 # No-op when no workspace root resolves (standalone local run outside CI).
 _pipeline._archive_report() {
-    local _log_dir="${BRIK_LOG_DIR:-${BRIK_DEFAULT_LOG_DIR:-/tmp/brik/logs}}"
+    local _log_dir
+    _log_dir="$(_brik.log_dir._resolve)"
     local _report_md="${_log_dir}/aggregate-report.md"
     local _report_json="${_log_dir}/aggregate-report.json"
 

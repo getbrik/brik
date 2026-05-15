@@ -103,7 +103,7 @@ cli.run.stage() {
     export BRIK_PROJECT_DIR="${workspace}"
     export BRIK_WORKSPACE="${workspace}"
     export BRIK_CONFIG_FILE="${config_path}"
-    export BRIK_LOG_DIR="${BRIK_LOG_DIR:-/tmp/brik/logs}"
+    export BRIK_LOG_DIR="${BRIK_LOG_DIR:-${workspace}/.brik-logs}"
     mkdir -p "${BRIK_LOG_DIR}"
 
     # Activate dry-run only when the flag was passed. We never demote a
@@ -161,7 +161,7 @@ cli.run.pipeline() {
     export BRIK_PROJECT_DIR="${workspace}"
     export BRIK_WORKSPACE="${workspace}"
     export BRIK_CONFIG_FILE="${config_path}"
-    export BRIK_LOG_DIR="${BRIK_LOG_DIR:-/tmp/brik/logs}"
+    export BRIK_LOG_DIR="${BRIK_LOG_DIR:-${workspace}/.brik-logs}"
     mkdir -p "${BRIK_LOG_DIR}"
 
     # Activate dry-run only when the flag was passed. We never demote a

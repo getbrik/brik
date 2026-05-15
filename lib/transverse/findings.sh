@@ -603,7 +603,8 @@ findings.scan_gate() {
         findings.process "$stage" "$sarif_path" 2>/dev/null || true
 
         # Verify business.findings actually landed before trusting the gate.
-        local backend="${BRIK_LOG_DIR:-${BRIK_DEFAULT_LOG_DIR:-/tmp/brik/logs}}/aggregate-report.json"
+        local backend
+        backend="$(_brik.log_dir._resolve)/aggregate-report.json"
         if [[ -f "$backend" ]] && command -v jq >/dev/null 2>&1; then
             local _has_entry
             _has_entry="$(jq -r --arg s "$stage" \
@@ -640,7 +641,8 @@ findings.gate() {
         return "${BRIK_EXIT_INVALID_INPUT:-2}"
     fi
 
-    local backend="${BRIK_LOG_DIR:-${BRIK_DEFAULT_LOG_DIR:-/tmp/brik/logs}}/aggregate-report.json"
+    local backend
+    backend="$(_brik.log_dir._resolve)/aggregate-report.json"
     [[ -f "$backend" ]] || return 0
     command -v jq >/dev/null 2>&1 || return 0
 

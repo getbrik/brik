@@ -24,7 +24,8 @@ _BRIK_PIPELINE_ENV_LOADED=1
 # Exports BRIK_PIPELINE_ENV and creates the file if it does not exist.
 # Returns 0 on success, BRIK_EXIT_IO_FAILURE on filesystem error.
 pipeline.env.init() {
-    local log_dir="${BRIK_LOG_DIR:-${BRIK_DEFAULT_LOG_DIR:-/tmp/brik/logs}}"
+    local log_dir
+    log_dir="$(_brik.log_dir._resolve)"
 
     mkdir -p "$log_dir" || {
         log.error "cannot create log directory: $log_dir"
