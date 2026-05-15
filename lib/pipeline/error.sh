@@ -13,8 +13,11 @@ _BRIK_ERROR_LOADED=1
 # shellcheck source=logging.sh
 [[ -z "${_BRIK_LOGGING_LOADED:-}" ]] && . "${BASH_SOURCE[0]%/*}/logging.sh"
 
-# Default log directory - single source of truth for runtime modules
-export BRIK_DEFAULT_LOG_DIR="/tmp/brik/logs"
+# Note: BRIK_DEFAULT_LOG_DIR (an old escape hatch for the legacy
+# /tmp/brik/logs default) was removed in chantier pipeline-layout-unification
+# Phase 4. Use _brik.log_dir._resolve in lib/pipeline/logging.sh, which
+# derives BRIK_LOG_DIR from BRIK_WORKSPACE (or falls back to /tmp/brik/logs
+# when no workspace is set, e.g. during pre-init Jenkins agent setup).
 
 # Exit code constants - exported for use by all brik-lib modules
 #

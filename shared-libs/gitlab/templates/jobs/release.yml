@@ -10,8 +10,11 @@ brik-release:
     - bash -c '. /tmp/brik-bootstrap.sh && brik.gitlab.run_stage release'
   artifacts:
     paths:
-      - .brik-logs/pipeline.env
+      - .brik-logs/
       - brik-artifacts/
+    exclude:
+      - .brik-logs/*.lock
+      - .brik-logs/context-*
     when: always
     expire_in: 1 week
   rules:

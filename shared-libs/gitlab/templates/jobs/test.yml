@@ -45,6 +45,9 @@ brik-test:
         coverage_format: cobertura
         path: brik-artifacts/test/coverage/coverage.xml
     paths:
-      - .brik-logs/pipeline.env
+      - .brik-logs/
       - brik-artifacts/
+    exclude:
+      - .brik-logs/*.lock
+      - .brik-logs/context-*
     expire_in: 1 week

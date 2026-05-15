@@ -35,7 +35,7 @@ brik-build:
   artifacts:
     when: always
     paths:
-      - .brik-logs/pipeline.env
+      - .brik-logs/
       - dist/
       - build/
       - target/
@@ -44,6 +44,8 @@ brik-build:
       - "*.tar.gz"
       - brik-artifacts/
     exclude:
+      - .brik-logs/*.lock
+      - .brik-logs/context-*
       - node_modules/
       - .venv/
       - __pycache__/

@@ -30,5 +30,8 @@ brik-lint:
     when: always
     expire_in: 1 week
     paths:
-      - .brik-logs/pipeline.env
+      - .brik-logs/
       - brik-artifacts/
+    exclude:
+      - .brik-logs/*.lock
+      - .brik-logs/context-*

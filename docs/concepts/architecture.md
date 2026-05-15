@@ -107,6 +107,7 @@ single command with clear error messages.
 ## See also
 
 - [Fixed flow](fixed-flow.md) -- the 11 stages and their order
+- [Data layout](data-layout.md) -- the runtime on-disk contract (`brik-artifacts/` vs `.brik-logs/`)
 - [Layout](../internals/layout.md) -- the eight domain notions and the `lib/` tree
 - [Stage lifecycle](../internals/stage-lifecycle.md) -- the `stage.run` lifecycle in detail
 - [Business outcome](business-outcome.md) -- the tech/business two-axis result model

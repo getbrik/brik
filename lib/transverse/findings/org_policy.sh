@@ -6,7 +6,7 @@
 #   Fetches the DSI-owned brik-policy.yml from BRIK_POLICY_URL, validates it
 #   against schemas/policy/v1/brik-policy.schema.json, filters entries by
 #   BRIK_PROJECT_NAME and expires date, then writes a compiled cache to
-#   ${BRIK_WORKSPACE}/brik-artifacts/.policy.cache.json (override path via
+#   ${BRIK_WORKSPACE}/.brik-logs/policy.cache.json (override path via
 #   BRIK_POLICY_CACHE_PATH).
 #
 #   The compiled cache is consumed by findings.apply_policy to layer
@@ -25,7 +25,7 @@ org_policy.cache_path() {
         printf '%s' "$BRIK_POLICY_CACHE_PATH"
         return 0
     fi
-    printf '%s/brik-artifacts/.policy.cache.json' "${BRIK_WORKSPACE:-/tmp/brik}"
+    printf '%s/.brik-logs/policy.cache.json' "${BRIK_WORKSPACE:-/tmp/brik}"
 }
 
 # Returns 0 when an org policy cache exists for this run, 1 otherwise.

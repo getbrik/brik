@@ -546,7 +546,7 @@ report.aggregate_fragments() {
     local policy_org_loaded_at=""
     local policy_expiring_soon='[]'
 
-    local _policy_cache="${BRIK_POLICY_CACHE_PATH:-${BRIK_WORKSPACE:-/tmp/brik}/brik-artifacts/.policy.cache.json}"
+    local _policy_cache="${BRIK_POLICY_CACHE_PATH:-${BRIK_WORKSPACE:-/tmp/brik}/.brik-logs/policy.cache.json}"
     if [[ -f "$_policy_cache" ]] && command -v jq >/dev/null 2>&1; then
         local _override
         _override="$(jq -r '.preset_override // empty' "$_policy_cache" 2>/dev/null)"

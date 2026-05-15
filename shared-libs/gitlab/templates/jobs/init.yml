@@ -8,8 +8,11 @@ brik-init:
   artifacts:
     when: always
     paths:
-      - .brik-logs/pipeline.env
+      - .brik-logs/
       - brik-artifacts/
+    exclude:
+      - .brik-logs/*.lock
+      - .brik-logs/context-*
     reports:
       dotenv: .brik-logs/pipeline.env
     expire_in: 1 week
