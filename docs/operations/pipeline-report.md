@@ -66,6 +66,20 @@ Carries the commit identity for at-a-glance auditing. Mirrors the fields under
 | `message_subject` | `CI_COMMIT_TITLE` or `git log -1 --format=%s` | first line only |
 | `repo_url` | `CI_PROJECT_URL` / `GIT_URL` / `git config remote.origin.url` | browseable HTTPS URL; credentials stripped, SSH forms converted to HTTPS, `.git` dropped |
 
+## Top-level `pipeline.tech`
+
+Pipeline-wide technical metadata stamped onto the aggregate (rather than on
+any single stage). Currently carries the dry-run flag; future infrastructure
+signals would live here as well.
+
+| Field | Type | Source |
+|-------|------|--------|
+| `tech.dry_run` | bool | `BRIK_DRY_RUN` -- present and `true` only when the run was launched with `BRIK_DRY_RUN=true`; absent otherwise. Stamped by `_pipeline._stamp_dry_run` in local mode and by `report.aggregate_fragments` in CI mode. |
+
+Renderers surface this field as a top-of-report `DRY-RUN` banner (Markdown
+blockquote and HTML hero badge) so an operator scanning the report can tell
+a dry-run from a real run at a glance.
+
 ## Per-stage fields
 
 Each entry in `stages[]` carries `tech` (machine-targeted) and `business`
@@ -174,6 +188,7 @@ When no SARIF is produced, `business.*` is omitted (backward compatible).
 | `tech.image_built` | bool string | `true` once `stacks.docker.build` succeeded |
 | `tech.image_ref` | string | `<image>:<tag>` |
 | `tech.build_duration_ms` | int string | wraps `stacks.docker.build` |
+| `tech.dry_run` | bool string | `"true"` when `BRIK_DRY_RUN=true`; absent otherwise. Stamped by `_stage._finalize_fragment`; signals that the registry publish step was skipped. |
 | `business.image.{name, tag, full_name, digest}` | object | `digest` from `docker inspect` post-push |
 | `business.registry.{host, namespace, repository}` | object | parsed from the image reference |
 | `business.registry.ui_url` | string | browseable registry UI URL; from `BRIK_PACKAGE_REGISTRY_UI_URL` or `.package.registry.ui_url`; omitted when neither is set |
@@ -192,6 +207,7 @@ When no SARIF is produced, `business.*` is omitted (backward compatible).
 | Field | Type | Source |
 |-------|------|--------|
 | `tech.environments` | array | configured env names |
+| `tech.dry_run` | bool string | `"true"` when `BRIK_DRY_RUN=true`; absent otherwise. Stamped by `_stage._finalize_fragment`; signals that the destructive actions (`k8s apply`, `helm upgrade`, `compose up`, `argocd sync`, `rsync`) were skipped. |
 | `business.environments[].name` | string | env name |
 | `business.environments[].target` | string | k8s / helm / compose / ssh / gitops / argocd |
 | `business.environments[].namespace` | string or null | configured namespace |
