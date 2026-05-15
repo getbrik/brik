@@ -117,6 +117,31 @@ _pipeline._stamp_context() {
     fi
 }
 
+# Stamp pipeline.tech.dry_run=true onto the local backend when the run was
+# launched with BRIK_DRY_RUN=true. This is the pipeline-level marker that
+# the MD/HTML renderers use to print a top-of-report DRY-RUN banner so the
+# operator cannot miss that destructive actions were skipped. No-op when
+# BRIK_DRY_RUN is unset/false, which keeps the field absent (rather than
+# present-and-false) on regular runs.
+_pipeline._stamp_dry_run() {
+    [[ "${BRIK_DRY_RUN:-}" == "true" ]] || return 0
+    local backend
+    backend="$(_report._backend_path)"
+    [[ -f "$backend" ]] || return 0
+    command -v jq >/dev/null 2>&1 || return 0
+
+    local tmp
+    tmp="$(mktemp "${backend}.XXXXXX")" || return 0
+    if jq '. + { pipeline: ((.pipeline // {})
+                            + { tech: ((.pipeline.tech // {})
+                                        + { dry_run: true }) }) }' \
+            "$backend" > "$tmp" 2>/dev/null; then
+        mv "$tmp" "$backend" || rm -f "$tmp"
+    else
+        rm -f "$tmp"
+    fi
+}
+
 # Decide whether a stage should be skipped based on opt-in flags.
 # Returns 0 (true) if the stage should be skipped, 1 otherwise.
 # Usage: _pipeline._should_skip <stage> <with_release> <with_package> <with_deploy>
@@ -168,6 +193,17 @@ pipeline.run() {
         log.warn "deploy stage enabled - review target environment before running"
     fi
 
+    if [[ "${BRIK_DRY_RUN:-}" == "true" ]]; then
+        log.warn "============================================================"
+        log.warn "DRY-RUN MODE: BRIK_DRY_RUN=true"
+        log.warn "Destructive actions will be skipped:"
+        log.warn "  - release: no tag will be pushed"
+        log.warn "  - package: no registry publish"
+        log.warn "  - deploy: no compose up / k8s apply / helm upgrade / argocd sync / rsync"
+        log.warn "  - notify: webhooks suppressed when honoured by the channel"
+        log.warn "============================================================"
+    fi
+
     local pipeline_context
     pipeline_context="$(_pipeline._resolve_context)"
     local continue_on_error_str
@@ -183,6 +219,7 @@ pipeline.run() {
 
     report.init || return "$?"
     _pipeline._stamp_context "$pipeline_context"
+    _pipeline._stamp_dry_run
 
     # Local mode treats per-stage fragments as a CI-only mechanism: pipeline.run
     # produces the canonical aggregate-report.{md,json} directly via report.render

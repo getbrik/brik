@@ -538,6 +538,8 @@ report.aggregate_fragments() {
     # set, so the aggregate omits absent fields rather than emitting empty
     # strings (matches schema 'optional' semantics).
     local pipeline_url="${BRIK_PIPELINE_URL:-}"
+    local dry_run="false"
+    [[ "${BRIK_DRY_RUN:-}" == "true" ]] && dry_run="true"
     local commit_sha="${BRIK_COMMIT_SHA:-}"
     local commit_short_sha="${BRIK_COMMIT_SHORT_SHA:-}"
     local commit_ref="${BRIK_COMMIT_REF:-}"
@@ -605,6 +607,7 @@ report.aggregate_fragments() {
         --arg policy_org_url "$policy_org_url" \
         --arg policy_org_loaded_at "$policy_org_loaded_at" \
         --argjson policy_expiring_soon "$policy_expiring_soon" \
+        --arg dry_run "$dry_run" \
         --argjson frags "$frags_json" \
         '
         ( $frags
@@ -655,6 +658,7 @@ report.aggregate_fragments() {
             + ( if $pipeline_url != "" then { url:          $pipeline_url } else {} end )
             + ( if ($commit | length) > 0 then { commit:    $commit       } else {} end )
             + ( if $triggered_by != "" then { triggered_by: $triggered_by } else {} end )
+            + ( if $dry_run == "true" then { tech: { dry_run: true } } else {} end )
           ) as $pipeline
         | {
             schema_version: "1.1",
@@ -965,6 +969,7 @@ _report._render_aggregate_md() {
            | (
                "| " + (.stage // "-")
                + " | " + status_glyph(.status // "?") + " " + (.status // "-")
+                       + (if ((.tech.dry_run // false) | tostring) == "true" then " _(dry-run)_" else "" end)
                + " | " + human_duration_ms(.duration_ms)
                + " | " + (if (.runner.job_url // "") != "" then "[job](\(.runner.job_url))" else "-" end)
                + " |"
@@ -998,7 +1003,7 @@ _report._render_aggregate_md() {
             else
               ("## Business", "",
                ($stages_with_business[]
-                | ("### \(.stage)",
+                | ("### \(.stage)\(if ((.tech.dry_run // false) | tostring) == "true" then " _(dry-run)_" else "" end)",
                    "",
                    (._lines[] | "- **\(.key):** \(.value)"),
                    "")))
@@ -1008,6 +1013,11 @@ _report._render_aggregate_md() {
         (total_duration_ms) as $totms
         | "# Pipeline Report",
           "",
+          (if (.pipeline.tech.dry_run // false) == true
+           then ("> **DRY-RUN** — BRIK_DRY_RUN=true: destructive actions were skipped (no tag pushed, no registry publish, no real deploy).",
+                 "")
+           else empty
+           end),
           (if (.pipeline.url // "") != ""
            then "- **Pipeline ID:** [\(.pipeline.id // "-")](\(.pipeline.url))"
            else "- **Pipeline ID:** \(.pipeline.id // "-")"
@@ -1148,6 +1158,11 @@ _report._render_md() {
     jq -r '
         "# Pipeline Report",
         "",
+        (if (.pipeline.tech.dry_run // false) == true
+         then ("> **DRY-RUN** — BRIK_DRY_RUN=true: destructive actions were skipped (no tag pushed, no registry publish, no real deploy).",
+               "")
+         else empty
+         end),
         "- **Pipeline ID:** \(.pipeline_id)",
         "- **Started:** \(.started_at)",
         "- **Finished:** \(.finished_at // "-")",
@@ -1156,14 +1171,14 @@ _report._render_md() {
         "",
         "| Stage | Status | Duration (ms) | Exit code |",
         "|---|---|---|---|",
-        (.stages[] | "| \(.name) | \(.tech.status // "-") | \(.tech.duration_ms // "-") | \(.tech.exit_code // "-") |"),
+        (.stages[] | "| \(.name) | \(.tech.status // "-")\(if ((.tech.dry_run // false) | tostring) == "true" then " _(dry-run)_" else "" end) | \(.tech.duration_ms // "-") | \(.tech.exit_code // "-") |"),
         "",
         "## Business",
         "",
         (
           .stages[]
           | select(.business != null and (.business | length) > 0)
-          | ("### \(.name)",
+          | ("### \(.name)\(if ((.tech.dry_run // false) | tostring) == "true" then " _(dry-run)_" else "" end)",
              "",
              (.business | to_entries[] | "- **\(.key):** \(.value)"),
              "")

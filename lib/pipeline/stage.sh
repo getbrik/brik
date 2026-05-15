@@ -331,6 +331,22 @@ _stage._finalize_fragment() {
         fi
     fi
 
+    # Per-stage dry-run marker. Stamps tech.dry_run=true on the stages
+    # whose bodies consult BRIK_DRY_RUN to skip destructive actions
+    # (release pushes a tag; package publishes to a registry; deploy
+    # invokes k8s/helm/compose/argocd/rsync; notify sends webhooks).
+    # Centralising the stamp here means renderers can rely on the field
+    # being present for every impacted stage without each stage having to
+    # remember to record it. release.sh records it itself for back-compat;
+    # report.record is an upsert so the second write is a no-op.
+    if [[ "${BRIK_DRY_RUN:-}" == "true" ]]; then
+        case "$stage_name" in
+            release|package|deploy|notify)
+                report.record "$stage_name" "tech" "dry_run" "true" 2>/dev/null || true
+                ;;
+        esac
+    fi
+
     _stage._record_business "$stage_name" "$backend" || true
 
     [[ "${BRIK_DISABLE_REPORT_FRAGMENTS:-}" == "1" ]] && return 0
