@@ -52,12 +52,43 @@ brik.gitlab.setup() {
     export BRIK_PIPELINE_SOURCE="${CI_PIPELINE_SOURCE:-}"
     export BRIK_MERGE_REQUEST_ID="${CI_MERGE_REQUEST_IID:-}"
 
+    # Dry-run normalization. GitLab promotes CI/CD variables to env vars
+    # automatically, but the contract for BRIK_DRY_RUN -- exact string
+    # "true" enables, anything else disables -- is enforced here so that
+    # the value lib/ sees is always canonical. Mirrors the Jenkins
+    # booleanParam semantics declared in vars/brikPipeline.groovy.
+    _brik_gitlab_normalize_dry_run
+
     brik.wrapper.set_standard_env
     brik.wrapper.bootstrap || return $?
     brik.wrapper.load_config || return $?
 
     log.info "brik gitlab setup complete (BRIK_HOME=$BRIK_HOME)"
     return 0
+}
+
+# Normalize BRIK_DRY_RUN to a canonical "true"/"false" string. Unknown or
+# misspelled values (1, yes, on, ...) are downgraded to "false" with a
+# warning so that lib/ -- which compares against the literal "true" -- has
+# a single source of truth. Unset or empty -> "false".
+_brik_gitlab_normalize_dry_run() {
+    local raw="${BRIK_DRY_RUN:-false}"
+    case "$raw" in
+        true)
+            export BRIK_DRY_RUN="true"
+            ;;
+        false|"")
+            export BRIK_DRY_RUN="false"
+            ;;
+        *)
+            if declare -f log.warn >/dev/null 2>&1; then
+                log.warn "BRIK_DRY_RUN has unexpected value '${raw}', treating as false (use 'true' to enable)"
+            else
+                echo "warning: BRIK_DRY_RUN has unexpected value '${raw}', treating as false (use 'true' to enable)" >&2
+            fi
+            export BRIK_DRY_RUN="false"
+            ;;
+    esac
 }
 
 # Run a stage by name. Dispatches to portable stages.* functions via stage.run.

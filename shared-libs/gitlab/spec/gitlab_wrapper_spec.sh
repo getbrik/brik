@@ -229,6 +229,59 @@ Describe "gitlab-wrapper.sh"
         When call setup_and_check
         The output should equal ""
       End
+
+      # ---------------------------------------------------------------------
+      # BRIK_DRY_RUN normalization
+      # ---------------------------------------------------------------------
+      It "normalizes BRIK_DRY_RUN=true to canonical 'true'"
+        setup_and_check() {
+          export BRIK_DRY_RUN="true"
+          brik.gitlab.setup "$BRIK_HOME" >/dev/null 2>&1
+          printf '%s' "$BRIK_DRY_RUN"
+        }
+        When call setup_and_check
+        The output should equal "true"
+      End
+
+      It "normalizes BRIK_DRY_RUN=false to canonical 'false'"
+        setup_and_check() {
+          export BRIK_DRY_RUN="false"
+          brik.gitlab.setup "$BRIK_HOME" >/dev/null 2>&1
+          printf '%s' "$BRIK_DRY_RUN"
+        }
+        When call setup_and_check
+        The output should equal "false"
+      End
+
+      It "defaults BRIK_DRY_RUN to 'false' when unset"
+        setup_and_check() {
+          unset BRIK_DRY_RUN 2>/dev/null || true
+          brik.gitlab.setup "$BRIK_HOME" >/dev/null 2>&1
+          printf '%s' "$BRIK_DRY_RUN"
+        }
+        When call setup_and_check
+        The output should equal "false"
+      End
+
+      It "downgrades BRIK_DRY_RUN=1 to 'false' with a warning"
+        setup_and_check() {
+          export BRIK_DRY_RUN="1"
+          brik.gitlab.setup "$BRIK_HOME" 2>&1 >/dev/null
+        }
+        When call setup_and_check
+        The status should be success
+        The output should include "unexpected value '1'"
+      End
+
+      It "downgrades BRIK_DRY_RUN=yes to 'false'"
+        setup_and_check() {
+          export BRIK_DRY_RUN="yes"
+          brik.gitlab.setup "$BRIK_HOME" >/dev/null 2>&1
+          printf '%s' "$BRIK_DRY_RUN"
+        }
+        When call setup_and_check
+        The output should equal "false"
+      End
     End
 
     Describe "when brik.yml does not exist"

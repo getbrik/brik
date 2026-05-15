@@ -74,6 +74,24 @@ directly on the Jenkins agent (same as `useDockerAgent: false`).
 brikPipeline(useDockerAgent: false)   // run on the agent instead of containers
 ```
 
+### Job parameters (user-overridable inputs)
+
+`brikPipeline.groovy` declares two job parameters via
+`properties([parameters([...])])`:
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `BRIK_DRY_RUN` | `booleanParam` | `false` | Skip destructive deploy actions (compose up, k8s apply, helm upgrade, argocd sync, rsync). Print what would run instead. |
+| `BRIK_TAG` | `stringParam` | `""` | Release tag for this build (e.g. `v0.1.0`). Leave empty for snapshot builds. Mirrors GitLab `CI_COMMIT_TAG`. |
+
+**First-build gotcha**: Jenkins registers parameters declared via
+`properties([parameters([...])])` only *after* the first build of a job
+runs. On a freshly-created job the UI shows "Build Now" instead of
+"Build with Parameters" -- one warm-up build is enough to surface the
+form for subsequent runs. If you provision jobs through Job DSL
+(Configuration-as-Code, seed job, `pipelineJob` script), redeclare the
+same parameters on the job itself to make them visible from creation.
+
 ## Variable mapping
 
 `jenkins-wrapper.sh` normalizes Jenkins environment variables to `BRIK_*`:

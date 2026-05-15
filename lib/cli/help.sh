@@ -41,10 +41,16 @@ Options for init:
 Options for run stage:
   --config <path>      Path to brik.yml (default: brik.yml in workspace)
   --workspace <path>   Path to project workspace (default: current directory)
+  --dry-run            Skip destructive deploy actions (compose up, k8s apply,
+                       helm upgrade, argocd sync, rsync). Print what would run
+                       instead. Exports BRIK_DRY_RUN=true.
 
 Options for run pipeline:
   --config <path>         Path to brik.yml (default: brik.yml in workspace)
   --workspace <path>      Path to project workspace (default: current directory)
+  --dry-run               Skip destructive deploy actions (compose up, k8s apply,
+                          helm upgrade, argocd sync, rsync). Print what would run
+                          instead. Exports BRIK_DRY_RUN=true.
   --continue-on-error     Continue pipeline despite stage failure
   --with-release          Include the release stage
   --with-package          Include the package stage
@@ -72,8 +78,10 @@ Examples:
   brik init --stack node --platform gitlab
   brik run stage build
   brik run stage lint --workspace ./my-project
+  brik run stage deploy --dry-run
   brik run pipeline
   brik run pipeline --with-package --continue-on-error
+  brik run pipeline --with-deploy --dry-run
   brik self-update
   brik self-update --channel edge
   brik self-update --version v0.4.0
