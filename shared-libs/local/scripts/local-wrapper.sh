@@ -131,7 +131,7 @@ brik.local.run_pipeline() {
 # Usage: brik.local.print_summary [<report_json_path>]
 # Default path: $BRIK_LOG_DIR/aggregate-report.json.
 brik.local.print_summary() {
-    local report_path="${1:-${BRIK_LOG_DIR:-${BRIK_DEFAULT_LOG_DIR:-/tmp/brik/logs}}/aggregate-report.json}"
+    local report_path="${1:-$(_brik.log_dir._resolve)/aggregate-report.json}"
 
     if [[ ! -f "$report_path" ]]; then
         log.warn "pipeline report not found: $report_path"

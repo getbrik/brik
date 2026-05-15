@@ -467,7 +467,8 @@ stages.notify() {
     local project_name
     project_name="$(config.get '.project.name' 'unnamed')"
 
-    local _log_dir="${BRIK_LOG_DIR:-${BRIK_DEFAULT_LOG_DIR:-/tmp/brik/logs}}"
+    local _log_dir
+    _log_dir="$(_brik.log_dir._resolve)"
     local _report_md="${_log_dir}/aggregate-report.md"
     local _report_json="${_log_dir}/aggregate-report.json"
 

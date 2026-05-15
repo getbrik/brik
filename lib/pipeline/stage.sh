@@ -228,7 +228,8 @@ _pipeline._normalize_remote_url() {
 # Create a log file for a stage. Prints the path on stdout.
 stage.create_log_file() {
     local stage_name="$1"
-    local log_dir="${BRIK_LOG_DIR:-${BRIK_DEFAULT_LOG_DIR:-/tmp/brik/logs}}"
+    local log_dir
+    log_dir="$(_brik.log_dir._resolve)"
     mkdir -p "$log_dir" || {
         log.error "cannot create log directory: $log_dir"
         return "$BRIK_EXIT_IO_FAILURE"
@@ -313,7 +314,8 @@ _stage._finalize_fragment() {
     local exit_code="$2"
     local stage_start_ms="$3"
 
-    local log_dir="${BRIK_LOG_DIR:-${BRIK_DEFAULT_LOG_DIR:-/tmp/brik/logs}}"
+    local log_dir
+    log_dir="$(_brik.log_dir._resolve)"
     local backend="${log_dir}/aggregate-report.json"
     [[ -f "$backend" ]] || return 0
 
@@ -449,7 +451,8 @@ _stage.run._project_env() {
 
     command -v jq >/dev/null 2>&1 || return 0
 
-    local log_dir="${BRIK_LOG_DIR:-${BRIK_DEFAULT_LOG_DIR:-/tmp/brik/logs}}"
+    local log_dir
+    log_dir="$(_brik.log_dir._resolve)"
     local backend="${log_dir}/aggregate-report.json"
     [[ -f "$backend" ]] || return 0
 
@@ -526,7 +529,7 @@ stage.run() {
         # Falls back silently to "completed successfully" if the report is
         # absent or jq is unavailable (stage run standalone outside pipeline).
         local _report_path _stage_status=""
-        _report_path="${BRIK_LOG_DIR:-${BRIK_DEFAULT_LOG_DIR:-/tmp/brik/logs}}/aggregate-report.json"
+        _report_path="$(_brik.log_dir._resolve)/aggregate-report.json"
         if [[ -f "$_report_path" ]] && command -v jq >/dev/null 2>&1; then
             _stage_status="$(jq -r --arg s "$stage_name" \
                 '.stages[] | select(.name == $s) | .tech.status // empty' \
@@ -597,7 +600,8 @@ stage.dispatch() {
     # Ensure the pipeline report exists so stages can report.record. When
     # invoked via pipeline.run, report.init was already called; in the
     # single-stage path (brik.wrapper.run_stage) we lazily initialize here.
-    local _report_path="${BRIK_LOG_DIR:-${BRIK_DEFAULT_LOG_DIR:-/tmp/brik/logs}}/aggregate-report.json"
+    local _report_path
+    _report_path="$(_brik.log_dir._resolve)/aggregate-report.json"
     [[ -f "$_report_path" ]] || report.init >/dev/null 2>&1 || true
 
     local logic_function=""

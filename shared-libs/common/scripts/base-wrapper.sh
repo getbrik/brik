@@ -84,7 +84,7 @@ brik.wrapper.validate_home() {
 brik.wrapper.set_standard_env() {
     export BRIK_WORKSPACE="${BRIK_WORKSPACE:-${BRIK_PROJECT_DIR}}"
     export BRIK_CONFIG_FILE="${BRIK_CONFIG_FILE:-${BRIK_PROJECT_DIR}/brik.yml}"
-    export BRIK_LOG_DIR="${BRIK_LOG_DIR:-${BRIK_DEFAULT_LOG_DIR:-/tmp/brik/logs/run-$(date +%s)-$$}}"
+    export BRIK_LOG_DIR="${BRIK_LOG_DIR:-$(_brik.log_dir._resolve)}"
     # BRIK_LIB is an optional escape hatch for user overrides (empty by default
     # now that lib/core/ has been absorbed into the notion directories).
     export BRIK_LIB="${BRIK_LIB:-}"
