@@ -35,6 +35,7 @@ brik-build:
   artifacts:
     when: always
     paths:
+      - .brik-logs/pipeline.env
       - dist/
       - build/
       - target/

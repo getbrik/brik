@@ -38,4 +38,5 @@ brik-scan:
       cyclonedx:
         - brik-artifacts/scan/sbom.cdx.json
     paths:
+      - .brik-logs/pipeline.env
       - brik-artifacts/

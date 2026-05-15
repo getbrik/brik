@@ -47,6 +47,7 @@ brik-notify:
     expire_in: 1 month
     name: "aggregate-report-${CI_PIPELINE_ID}"
     paths:
+      - .brik-logs/pipeline.env
       - brik-artifacts/
     reports:
       sast: brik-artifacts/gl-sast-report.json
