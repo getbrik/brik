@@ -813,7 +813,6 @@ JSON
         The output should include 'class="tools-table lint-table"'
         The output should include '<th class="tool-name">Check</th>'
         The output should include '<th class="tool-version">Tool</th>'
-        The output should include '<th class="tool-status">Outcome</th>'
       End
 
       It "shows no-SARIF hint when business.violations is absent"
@@ -828,8 +827,8 @@ JSON
         write_lint_with_sarif_aggregate
         run() { _report._render_html "$BACKEND"; }
         When call run
-        The output should include "'Total violations'"
         The output should include "'Violations'"
+        The output should include "findingsCounter(total, '', state, 'violation')"
       End
 
       It "carries the SARIF violation counts through the data island"
@@ -1040,12 +1039,15 @@ JSON
 JSON
       }
 
-      It "renders both Dependencies and Secrets sub-sections"
+      It "renders the Checks + Findings sections with both sondes inside"
         write_scan_clean_aggregate
         run() { _report._render_html "$BACKEND"; }
         When call run
-        The output should include "sectionLabel('Dependencies')"
-        The output should include "sectionLabel('Secrets')"
+        The output should include "sectionLabel('Checks')"
+        The output should include "sectionLabel('Findings')"
+        The output should include 'dependency vulnerabilities'
+        The output should include 'secret scan'
+        The output should include 'scan-finding-label'
       End
 
       It "shows per-sonde tool in the Check/Tool table"
@@ -1299,10 +1301,11 @@ JSON
 JSON
       }
 
-      It "renders the two sections (Container image / Distribution)"
+      It "renders the three sections (Packager / Container image / Distribution)"
         write_package_docker_internal_aggregate
         run() { _report._render_html "$BACKEND"; }
         When call run
+        The output should include "sectionLabel('Packager')"
         The output should include "sectionLabel('Container image')"
         The output should include "sectionLabel('Distribution')"
       End
@@ -1614,22 +1617,25 @@ JSON
 JSON
       }
 
-      It "renders an env-centric grid with one card per environment"
+      It "renders an env table with one row per environment"
         write_deploy_success_k8s_aggregate
         run() { _report._render_html "$BACKEND"; }
         When call run
         The output should include 'function renderDeploy'
-        The output should include 'function deployEnvCard'
-        The output should include 'deploy-env-grid'
+        The output should include 'function deployEnvRow'
+        The output should include 'deploy-env-table'
+        The output should include '<th>Environment</th>'
+        The output should include '<th>Target</th>'
+        The output should include '<th>Namespace</th>'
+        The output should include '<th>Strategy</th>'
         The output should include '"name":"production"'
       End
 
-      It "renders the namespace as a mono row when present"
+      It "renders the namespace as a mono cell when present"
         write_deploy_success_k8s_aggregate
         run() { _report._render_html "$BACKEND"; }
         When call run
-        The output should include 'deploy-env-key">ns<'
-        The output should include 'deploy-env-val mono'
+        The output should include '<td class="mono">'
         The output should include '"namespace":"brik-e2e-workflow"'
       End
 
@@ -1644,32 +1650,32 @@ JSON
         The output should include '"target":"k8s"'
       End
 
-      It "omits the namespace row when namespace is null (gitops)"
+      It "renders a muted dash when namespace is null (gitops)"
         write_deploy_gitops_aggregate
         run() { _report._render_html "$BACKEND"; }
         When call run
         The output should include '"target":"gitops"'
         The output should include '"namespace":null'
-        # Guard in deployEnvCard skips the row when ns is falsy (null/empty).
-        The output should include 'if (ns) {'
+        # In deployEnvRow, falsy namespace renders a muted dash cell.
+        The output should include '<td><span class="muted">-</span></td>'
       End
 
-      It "renders the strategy row when present"
+      It "renders the strategy in its cell when present"
         write_deploy_failure_aggregate
         run() { _report._render_html "$BACKEND"; }
         When call run
-        The output should include 'deploy-env-key">strategy<'
         The output should include '"strategy":"rolling"'
-        The output should include 'if (strat) {'
+        # deployEnvRow emits an escapeHtml(strat) cell when strat is truthy.
+        The output should include "'<td>' + escapeHtml(strat) + '</td>'"
       End
 
-      It "applies the error variant on env cards when business.status is error"
+      It "applies the error variant on the env name when business.status is error"
         write_deploy_failure_aggregate
         run() { _report._render_html "$BACKEND"; }
         When call run
-        # Ternary in deployEnvCard appends ' error' to the class list when isError.
+        # Ternary in deployEnvRow appends ' error' to the name cell class when isError.
         The output should include "(isError ? ' error' : '')"
-        The output should include '.deploy-env-card.error'
+        The output should include "'deploy-env-name'"
         The output should include '"status":"error"'
       End
 
@@ -1696,8 +1702,8 @@ JSON
         write_deploy_success_k8s_aggregate
         run() { _report._render_html "$BACKEND"; }
         When call run
-        The output should include '.deploy-env-grid'
-        The output should include '.deploy-env-card'
+        The output should include '.deploy-env-table'
+        The output should include '.deploy-env-name.error'
         The output should include '.deploy-target-chip[data-target="k8s"]'
         The output should include '.deploy-target-chip[data-target="gitops"]'
         The output should include '.deploy-skipped'

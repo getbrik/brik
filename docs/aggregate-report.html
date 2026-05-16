@@ -60,6 +60,10 @@ a:hover { border-bottom-color: var(--link); }
 .mono { font-family: var(--font-mono); font-feature-settings: "tnum" 1; }
 .muted { color: var(--text-muted); }
 .faint { color: var(--text-faint); }
+/* Inline "no data / unknown / empty" hint shared by every renderer.
+   Drop-in replacement for muted spans/divs that previously inlined a
+   13px font-size override. */
+.hint { font-size: 13px; color: var(--text-muted); }
 .card {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -362,12 +366,16 @@ a:hover { border-bottom-color: var(--link); }
 .status-pill.ok  { color: var(--success); }
 .status-pill.bad { color: var(--failed); box-shadow: 0 0 24px -12px var(--failed); }
 
-/* Required-tools table in the init panel. Override the parent tile's
-   word-break: break-word so that 2-letter names ("yq", "jq", "jv") never
-   wrap character-by-character when the tile is narrow. */
+/* Check/tool table reused by init (required tools), lint (Check/Tool),
+   sast/container-scan (one row per probe), scan (one row per sonde) and
+   test (one row per test tool). width: auto so the table only takes the
+   space its content needs - sub-section tiles often hold a 2-3 row table
+   that would look stretched at 100% width. Override the parent tile's
+   word-break: break-word so 2-letter names ("yq", "jq", "jv") never wrap
+   character-by-character when the tile is narrow. */
 .tools-table {
   border-collapse: collapse;
-  width: 100%;
+  width: auto;
   font-size: 13px;
   word-break: normal;
 }
@@ -406,43 +414,64 @@ a:hover { border-bottom-color: var(--link); }
 }
 .results-table tbody td {
   padding: 8px var(--space-5) 8px 0;
-  font-size: 22px; font-weight: 600;
+  font-size: 22px; font-weight: 700;
   font-family: var(--font-mono);
   color: var(--text);
+  line-height: 1;
 }
-.results-table td.cnt-good   { color: var(--success); text-shadow: 0 0 22px color-mix(in oklch, var(--success) 45%, transparent); }
-.results-table td.cnt-bad    { color: var(--failed);  text-shadow: 0 0 22px color-mix(in oklch, var(--failed)  45%, transparent); }
-.results-table td.muted      { color: var(--text-muted); text-shadow: none; }
+.results-table td.cnt-good   { color: var(--success); }
+.results-table td.cnt-bad    { color: var(--failed); }
+.results-table td.muted      { color: var(--text-muted); }
 
-.lint-no-sarif {
-  font-size: 12px;
-  margin-top: var(--space-3);
-  padding: var(--space-3) var(--space-4);
-  border-radius: var(--radius-tile);
+/* Uniform empty/skipped note: dashed muted box reused by lint
+   (No SARIF aggregated), test (No counts reported), package
+   (skipped/no image), and deploy (Deploy not executed). */
+.lint-no-sarif,
+.pkg-skipped,
+.deploy-skipped {
+  padding: var(--space-4) var(--space-5);
   background: var(--surface);
   border: 1px dashed var(--border);
+  border-radius: var(--radius-tile);
   color: var(--text-muted);
+  font-size: 13px;
 }
+.lint-no-sarif { margin-top: var(--space-3); }
 
-/* SAST + container-scan: findings counter layout */
+/* SAST + container-scan: findings counter layout. Sized to read at a
+   glance but kept at the same visual weight as other surfaces on the
+   page: no glow, light tinted bg, thin colored border, no inline icon
+   (the 22px coloured number conveys the state). */
 .findings-counter-row {
   display: flex; align-items: center; gap: var(--space-4);
   flex-wrap: wrap;
   margin-bottom: var(--space-3);
 }
 .findings-counter {
-  display: inline-flex; align-items: center; gap: var(--space-3);
-  padding: var(--space-4) var(--space-5);
-  border-radius: var(--radius-tile);
-  border: 1px solid currentColor;
-  background: color-mix(in oklch, currentColor 8%, transparent);
-  box-shadow: 0 0 28px -12px currentColor;
+  display: inline-flex; align-items: baseline; gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-chip);
+  border: 1px solid color-mix(in oklch, currentColor 35%, var(--border));
+  background: color-mix(in oklch, currentColor 4%, transparent);
 }
 .findings-counter.clean   { color: var(--success); }
 .findings-counter.warning { color: var(--warning); }
 .findings-counter.dirty   { color: var(--failed); }
+
+/* Scan stage: groups deps and secrets findings under one tile. Each group
+   has a small lowercased sub-label above its counter so the user can
+   identify which sonde a counter refers to (the section-label says
+   "Findings" - the sub-label says "dependency vulnerabilities" or
+   "secret scan"). Below 600px the groups stack as one column. */
+.scan-finding + .scan-finding { margin-top: var(--space-4); }
+.scan-finding-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  letter-spacing: 0.06em;
+  margin-bottom: var(--space-2);
+}
 .findings-counter .big-number {
-  font-size: 32px; font-weight: 700;
+  font-size: 22px; font-weight: 700;
   font-family: var(--font-mono);
   line-height: 1;
 }
@@ -543,13 +572,6 @@ a:hover { border-bottom-color: var(--link); }
 }
 .ignored-severity-table tfoot td.num { color: var(--text); }
 
-/* Image-ref styling for runner.image */
-.image-ref {
-  font-size: 13px;
-  color: var(--text);
-  word-break: break-all;
-}
-
 /* Tile in warning state: artifact size = 0, empty deployment, etc. */
 .stage-tile.tile-warning {
   border-color: color-mix(in oklch, var(--warning) 45%, var(--border));
@@ -559,9 +581,9 @@ a:hover { border-bottom-color: var(--link); }
 .size-badge {
   display: inline-block;
   margin-left: var(--space-2);
-  padding: 2px 8px;
+  padding: 1px 8px;
   border-radius: var(--radius-chip);
-  background: var(--surface-strong);
+  background: var(--surface-hi);
   border: 1px solid var(--border);
   font-family: var(--font-mono);
   font-size: 11px;
@@ -638,17 +660,22 @@ a:hover { border-bottom-color: var(--link); }
 .timeline-cell .stage-status.skipped { color: var(--skipped); }
 .timeline-cell .stage-status.warning { color: var(--warning); }
 .timeline-cell .stage-duration { font-size: 12px; color: var(--text-muted); font-family: var(--font-mono); }
-.timeline-cell .stage-dry-run {
+/* Small dry-run badge shared by the timeline cells and the business-stage
+   header. Visual is identical; the only delta is family (mono in the
+   header) and the timeline's top margin to separate it from the duration.
+   The hero keeps its own larger variant (.hero .dry-run-badge). */
+.timeline-cell .stage-dry-run,
+.business-stage h3 .stage-dry-run-chip {
   display: inline-block;
-  margin-top: 4px;
   padding: 2px 8px;
   font-size: 10px; font-weight: 700;
   letter-spacing: 0.10em; text-transform: uppercase;
   color: oklch(72% 0.18 35);
   border: 1px solid currentColor;
   border-radius: var(--radius-chip);
-  background: color-mix(in oklch, currentColor 10%, transparent);
+  background: color-mix(in oklch, currentColor 12%, transparent);
 }
+.timeline-cell .stage-dry-run { margin-top: 4px; }
 .timeline-cell.parallel-group {
   background: transparent; border-style: dashed;
   padding: var(--space-3);
@@ -771,9 +798,33 @@ a:hover { border-bottom-color: var(--link); }
   letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-faint);
 }
 .kv-card .kv-line { display: flex; justify-content: space-between; gap: var(--space-3); padding: 4px 0; font-size: 13px; }
-.kv-card .kv-line .k { color: var(--text-muted); }
-.kv-card .kv-line .v { color: var(--text); font-family: var(--font-mono); text-align: right; }
-
+.kv-card .kv-line .k { color: var(--text-muted); flex-shrink: 0; }
+/* The value lives in a flex cell that must shrink to its parent, otherwise
+   long values (e.g. file URLs) push the card past its grid track. */
+.kv-card .kv-line .v {
+  color: var(--text);
+  font-family: var(--font-mono);
+  text-align: right;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.kv-card .kv-line .v a { color: var(--link); border-bottom-color: var(--border-strong); }
+.kv-card .kv-line .v a:hover { border-bottom-color: var(--link); }
+/* Relative-time chip rendered next to an expiry date in the Expiring soon
+   card. Default is muted (more than a week out); .soon turns orange when
+   the date is within 7 days; .expired turns red when already past. */
+.expiry-rel {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: var(--radius-chip);
+  font-size: 11px;
+  font-family: var(--font-body);
+  background: var(--surface-hi);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+}
+.expiry-rel.soon    { color: var(--warning); border-color: color-mix(in oklch, var(--warning) 40%, transparent); }
+.expiry-rel.expired { color: var(--failed);  border-color: color-mix(in oklch, var(--failed)  40%, transparent); }
 .kv-card .desc { margin-top: var(--space-2); padding-top: var(--space-2); border-top: 1px solid var(--border); font-size: 12px; color: var(--text-faint); line-height: 1.5; }
 
 .business-stage {
@@ -795,14 +846,7 @@ a:hover { border-bottom-color: var(--link); }
 .business-stage h3.failed  { color: var(--failed); }
 .business-stage h3.skipped { color: var(--skipped); }
 .business-stage h3 .stage-name { color: var(--text); }
-.business-stage h3 .stage-dry-run-chip {
-  font-family: var(--font-mono); font-size: 10px; font-weight: 700;
-  letter-spacing: 0.10em; text-transform: uppercase;
-  color: oklch(72% 0.18 35);
-  padding: 2px 8px; border-radius: var(--radius-chip);
-  border: 1px solid currentColor;
-  background: color-mix(in oklch, currentColor 12%, transparent);
-}
+.business-stage h3 .stage-dry-run-chip { font-family: var(--font-mono); }
 .business-stage h3 .duration-badge {
   margin-left: auto;
   font-family: var(--font-mono); font-size: 11px; font-weight: 500;
@@ -868,6 +912,16 @@ a:hover { border-bottom-color: var(--link); }
 .stage-tile .value.mono { font-family: var(--font-mono); font-size: 13px; font-weight: 500; }
 .stage-tile .sub { font-size: 12px; color: var(--text-muted); font-family: var(--font-mono); word-break: break-word; }
 
+/* Sub-section tile variant: a stage-tile that holds wider content (tables,
+   counters, severity bars) instead of a single value. Used by lint, sast,
+   scan, test and container-scan. Each verify sub-section is rendered as
+   section-label (outside) + this tile (the body), in the same order as
+   release and build. Slightly larger inner gap so stacked children
+   (counter + severity bar, table + counter + details) breathe. */
+.section-tile {
+  gap: var(--space-3);
+}
+
 .version-arrow {
   display: flex; align-items: baseline; gap: var(--space-2);
   font-family: var(--font-mono);
@@ -875,25 +929,16 @@ a:hover { border-bottom-color: var(--link); }
   letter-spacing: -0.01em;
   color: var(--text);
 }
-.version-arrow .from   { color: var(--text-muted); font-weight: 500; }
-.version-arrow .arrow  { color: var(--text-faint); font-size: 18px; padding: 0 var(--space-1); }
-.version-arrow .to     { color: var(--text); }
-.version-arrow.same-version .to { color: var(--text); }
-.version-arrow .from { color: var(--text-muted); font-size: 14px; }
-.version-arrow .arrow { color: var(--text-faint); }
-.version-arrow .to   { color: var(--text); font-size: 18px; font-weight: 600; }
-.version-arrow .same { color: var(--text-muted); font-size: 16px; }
+.version-arrow .from  { color: var(--text-muted); font-weight: 500; font-size: 14px; }
+.version-arrow .arrow { color: var(--text-faint); font-size: 18px; padding: 0 var(--space-1); }
+.version-arrow .to    { color: var(--text); font-size: 18px; font-weight: 600; }
 
-.size-badge {
-  display: inline-block;
-  padding: 1px 8px; border-radius: var(--radius-chip);
-  background: var(--surface-hi);
-  border: 1px solid var(--border);
-  color: var(--text-muted);
-  font-family: var(--font-mono); font-size: 11px; margin-left: var(--space-2);
+.image-ref {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--text);
+  word-break: break-all;
 }
-
-.image-ref { font-family: var(--font-mono); font-size: 13px; word-break: break-all; }
 .image-ref .registry { color: var(--text-muted); }
 .image-ref .repo { color: var(--text); }
 .image-ref .tag { color: var(--success); }
@@ -926,17 +971,13 @@ a:hover { border-bottom-color: var(--link); }
   color: var(--text-faint); font-weight: 600;
 }
 
-.pkg-meta-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: var(--space-3);
-}
-@media (max-width: 720px) { .pkg-meta-grid { grid-template-columns: 1fr; } }
+/* Sub-block inside the Distribution section-tile (Registry only after
+   the Packager Check/Tool was promoted to its own leading section).
+   No card framing - the outer section-tile already provides surface
+   /border/radius. Just a vertical stack of the small "meta-key"
+   header + the value (host name) + optional sub (namespace/repository). */
 .pkg-meta-tile {
-  padding: var(--space-4) var(--space-5);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-tile);
+  display: flex; flex-direction: column;
 }
 .pkg-meta-tile .meta-key {
   display: block;
@@ -949,47 +990,36 @@ a:hover { border-bottom-color: var(--link); }
 .pkg-meta-tile a.meta-value { color: var(--link); text-decoration: none; border-bottom: 1px solid transparent; }
 .pkg-meta-tile a.meta-value:hover { border-bottom-color: var(--link); }
 
-.pkg-skipped {
-  padding: var(--space-4) var(--space-5);
-  background: var(--surface);
-  border: 1px dashed var(--border);
-  border-radius: var(--radius-tile);
-  color: var(--text-muted);
-  font-size: 13px;
-}
-
 /* Deploy stage panel ------------------------------------------- */
-.deploy-env-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: var(--space-3);
+/* Deploy table - one row per environment. Same column-rhythm as the
+   tools-table (10px uppercase headers, 13px body) so deploy reads in
+   the same scan-flow as the verify stages' Check/Tool tables. */
+.deploy-env-table {
+  border-collapse: collapse;
+  width: auto;
+  font-size: 13px;
+  word-break: normal;
 }
-.deploy-env-card {
-  padding: var(--space-4) var(--space-5);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-tile);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
+.deploy-env-table thead th {
+  text-align: left;
+  font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--text-faint); font-weight: 600;
+  padding: 0 var(--space-4) 6px 0;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
 }
-.deploy-env-card.error {
-  border-color: color-mix(in oklch, var(--critical) 50%, transparent);
-  box-shadow: 0 0 30px -16px var(--critical);
+.deploy-env-table tbody td {
+  padding: 8px var(--space-4) 8px 0;
+  vertical-align: middle;
 }
-.deploy-env-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
+.deploy-env-table tbody td.mono {
+  font-family: var(--font-mono);
 }
 .deploy-env-name {
-  font-size: 16px;
   font-weight: 600;
-  letter-spacing: 0.02em;
   color: var(--text);
 }
-.deploy-env-card.error .deploy-env-name { color: var(--critical); }
+.deploy-env-name.error { color: var(--critical); }
 .deploy-target-chip {
   display: inline-flex;
   align-items: center;
@@ -1013,28 +1043,6 @@ a:hover { border-bottom-color: var(--link); }
   border-color: color-mix(in oklch, oklch(74% 0.13 165) 40%, transparent);
 }
 .deploy-target-chip svg { flex-shrink: 0; }
-.deploy-env-row {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-3);
-  font-size: 13px;
-}
-.deploy-env-key {
-  font-size: 10px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--text-faint);
-  font-weight: 600;
-  min-width: 64px;
-}
-.deploy-env-val { color: var(--text); }
-.deploy-env-val.mono { font-family: var(--font-mono); font-size: 13px; word-break: break-all; }
-.deploy-skipped {
-  padding: var(--space-4) var(--space-5);
-  background: var(--surface);
-  border: 1px dashed var(--border);
-  border-radius: var(--radius-tile);
-}
 .deploy-skipped-title {
   font-size: 14px;
   color: var(--text);
@@ -1071,51 +1079,54 @@ a:hover { border-bottom-color: var(--link); }
   font-size: 12px;
 }
 .notify-cfg-on  { color: var(--success); }
-.notify-cfg-off { color: var(--text-faint); }
+.notify-cfg-off { color: var(--failed); }
 .notify-send-yes { color: var(--success); }
 .notify-send-no  { color: var(--text-faint); }
 .notify-send-no .notify-skip { font-family: var(--font-mono); font-size: 13px; }
+/* Pipeline verdict block inside the section-tile.
+   - .notify-gk-verdict: large coloured PASS/FAIL pill. Most prominent
+     element so the verdict reads at a glance.
+   - .notify-gk-source: small caption "based on business status: <x>",
+     making the chain "business outcome -> verdict" explicit.
+   - .notify-gk-explain: human-readable explanation paragraph so a
+     reader unfamiliar with the gatekeeper semantics still understands
+     what shipping decision was made. */
 .notify-gatekeeper {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.notify-gk-header {
   display: flex;
   align-items: baseline;
   gap: var(--space-4);
-  padding: var(--space-3) var(--space-4);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-tile);
-  margin-top: var(--space-2);
+  flex-wrap: wrap;
 }
-.notify-gk-key {
-  font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase;
-  color: var(--text-faint); font-weight: 600;
+.notify-gk-verdict {
+  font-size: 14px; font-weight: 700;
+  letter-spacing: 0.12em;
+  padding: 5px 14px;
+  border-radius: var(--radius-chip);
+  border: 1px solid currentColor;
+  background: color-mix(in oklch, currentColor 6%, transparent);
 }
-.notify-gk-decision {
-  font-size: 16px; font-weight: 600; letter-spacing: 0.04em;
-}
-.notify-gatekeeper.notify-gk-pass .notify-gk-decision { color: var(--success); }
-.notify-gatekeeper.notify-gk-fail .notify-gk-decision { color: var(--critical); }
-.notify-gatekeeper.notify-gk-fail {
-  border-color: color-mix(in oklch, var(--critical) 50%, transparent);
-  box-shadow: 0 0 30px -16px var(--critical);
-}
-.notify-gk-business {
+.notify-gatekeeper.notify-gk-pass .notify-gk-verdict { color: var(--success); }
+.notify-gatekeeper.notify-gk-fail .notify-gk-verdict { color: var(--critical); }
+.notify-gk-source {
   font-size: 12px;
   color: var(--text-muted);
+}
+.notify-gk-bstatus {
   font-family: var(--font-mono);
+  color: var(--text);
 }
-
-.commit-card {
-  padding: var(--space-4);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-tile);
-  display: grid; grid-template-columns: minmax(0, auto) 1fr; gap: var(--space-2) var(--space-4);
-  align-items: baseline;
+.notify-gatekeeper.notify-gk-fail .notify-gk-bstatus { color: var(--critical); }
+.notify-gk-explain {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.5;
+  max-width: 70ch;
 }
-.commit-card .sha { font-family: var(--font-mono); font-size: 16px; font-weight: 600; color: var(--text); }
-.commit-card .subject { color: var(--text); font-size: 14px; font-style: italic; }
-.commit-card .meta-line { grid-column: 1 / -1; font-size: 12px; color: var(--text-muted); display: flex; gap: var(--space-3); flex-wrap: wrap; }
-.commit-card .meta-line strong { color: var(--text); font-weight: 500; }
 
 /* Severity bar (sast/scan/container-scan) ----------------------- */
 .sev-bar {
@@ -1131,16 +1142,6 @@ a:hover { border-bottom-color: var(--link); }
 .sev-legend { display: flex; gap: var(--space-3); flex-wrap: wrap; font-size: 12px; color: var(--text-muted); }
 .sev-legend .lg { display: inline-flex; align-items: center; gap: 6px; }
 .sev-legend .lg .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
-.findings-jump {
-  align-self: flex-start;
-  font-size: 12px; font-weight: 500;
-  padding: 4px 10px; border-radius: var(--radius-chip);
-  background: var(--surface-hi);
-  border: 1px solid var(--border);
-  color: var(--text-muted);
-}
-.findings-jump:hover { color: var(--text); border-color: var(--border-strong); }
-
 /* Coverage progress bars (test stage) ---------------------------- */
 .cov-bar { display: flex; flex-direction: column; gap: 6px; }
 .cov-bar .row { display: flex; justify-content: space-between; font-size: 12px; }
@@ -1153,20 +1154,12 @@ a:hover { border-bottom-color: var(--link); }
 .cov-bar .fill { height: 100%; background: var(--success); transition: width .3s; }
 .cov-bar .fill.low  { background: var(--high); }
 .cov-bar .fill.mid  { background: var(--medium); }
-
-.tool-chips { display: flex; flex-wrap: wrap; gap: var(--space-2); }
-.tool-chip {
-  font-family: var(--font-mono); font-size: 11px;
-  padding: 3px 10px; border-radius: var(--radius-chip);
-  background: var(--surface-hi); border: 1px solid var(--border);
-  color: var(--text-muted);
-}
-.tool-chip strong { color: var(--text); }
+.cov-bar + .cov-bar { margin-top: var(--space-3); }
 
 footer { color: var(--text-faint); font-size: 12px; text-align: center; padding-top: var(--space-5); }
 </style>
 </head>
-<body data-findings-count="18">
+<body data-findings-count="7">
 <main>
   <header class="brand">
     <a href="https://github.com/getbrik" target="_blank" rel="noopener" aria-label="Brik on GitHub">
@@ -1179,18 +1172,18 @@ footer { color: var(--text-faint); font-size: 12px; text-align: center; padding-
     <h2>Lifecycle</h2>
     <div class="timeline-rail" id="timeline-rail"></div>
   </section>
-  <section id="meta" class="card" aria-label="Policy and coverage">
-    <h2>Policy and coverage</h2>
+  <section id="meta" class="card" aria-label="Policy and outcome">
+    <h2>Policy and outcome</h2>
     <div class="kv-grid" id="meta-grid"></div>
   </section>
   <section id="business" class="card" aria-label="Per-stage business">
     <h2>Per-stage payload</h2>
     <div id="business-list"></div>
   </section>
-  <footer>Generated by <a href="https://github.com/getbrik" target="_blank" rel="noopener">brik</a> report.render.</footer>
+  <footer>Powered by <a href="https://github.com/getbrik" target="_blank" rel="noopener">brik</a> - Write once, ship everywhere.</footer>
 </main>
 <script type="application/json" id="brik-report">
-{"schema_version":"1.1","pipeline":{"id":"2602","platform":"gitlab","project":"node-deploy","context":"release","business":{"status":"warning"},"started_at":"2026-05-15T10:46:08+0000","finished_at":"2026-05-15T10:48:08+0000","status":"success","url":"http://gitlab.briklab.test:8929/brik/node-deploy/-/pipelines/2602","commit":{"sha":"cba3113341fef8514696c646fa26562098275e02","short_sha":"cba3113","ref":"v0.1.0","tag":"v0.1.0","author":"jeanjerome","author_email":"jeanjerome.levy@gmail.com","timestamp":"2026-05-15T09:46:38+00:00","message_subject":"Initial commit","repo_url":"http://gitlab.briklab.test:8929/brik/node-deploy"},"triggered_by":"root","tech":{"dry_run":true},"notify":{"channels":[{"type":"slack","configured":false,"on":"always","would_send":false},{"type":"email","configured":false,"on":"always","would_send":false},{"type":"webhook","configured":false,"on":"always","would_send":false}],"gatekeeper":{"decision":"pass","business_status":"warning"}}},"stages":[{"schema_version":"1.1","stage":"build","timestamp":"2026-05-15T10:46:30+0000","rc":0,"status":"success","runner":{"platform":"gitlab","image":"ghcr.io/getbrik/brik-runner-node:22","job_url":"http://gitlab.briklab.test:8929/brik/node-deploy/-/jobs/25547"},"tech":{"stack":"node","tool":"auto","command":"<stack-default>","duration_ms":"582","exit_code":"0","status":"success"},"business":{"artifact":{"type":"directory","name":"dist","size_bytes":459,"sha256":"2a585ca0aad26d8b0c8cc9eb30b5a92c4802eedfdca609d56d1a53119633a349","path":"/builds/brik/node-deploy/dist","main_file":"index.js"},"status":"success","reason":""},"duration_ms":582},{"schema_version":"1.1","stage":"container-scan","timestamp":"2026-05-15T10:47:43+0000","rc":0,"status":"success","runner":{"platform":"gitlab","image":"ghcr.io/getbrik/brik-runner-node:22","job_url":"http://gitlab.briklab.test:8929/brik/node-deploy/-/jobs/25553"},"tech":{"tool":"auto","target_image":"nexus.briklab.test:8082/brik/node-deploy:0.1.0","target_digest":"sha256:4edaaac37efabb270a924603b3a04f2d4735f7e8e3e2b89554893e349ad9bc4c","scan_duration_ms":"32121","duration_ms":"32221","exit_code":"0","status":"success"},"business":{"findings":{"total":18,"by_severity":{"critical":0,"high":11,"medium":5,"low":2,"info":0},"cwe":[],"failing":{"total":0,"has_fix":0,"no_fix":0},"ignored":{"total":18,"by_source":{"policy.org.path-allowlist":18},"by_severity":{"critical":0,"high":11,"medium":5,"low":2,"info":0}},"items":[{"id":"GHSA-3xgq-45jj-v275-cross-spawn","severity":"high","score":7.7,"level":"error","message":"A high vulnerability in npm package: cross-spawn, version 7.0.3 was found in image nexus.briklab.test:8082/brik/node-deploy:0.1.0 at: /usr/local/lib/node_modules/npm/node_modules/cross-spawn/package.json","tool":{"name":"grype","version":"0.111.1"},"location":{"uri":"node-deploy//usr/local/lib/node_modules/npm/node_modules/cross-spawn/package.json","start_line":1,"end_line":1,"snippet":null,"logical":"nexus.briklab.test:8082/brik/node-deploy:0.1.0@sha256:21e4f00ae03f714ca184b962b542ebb67dc73b5c2f7200659becdef9bdfe320e:/usr/local/lib/node_modules/npm/node_modules/cross-spawn/package.json"},"package":{"name":"cross-spawn","version":"7.0.3","ecosystem":"npm"},"fix":{"versions":["7.0.5"],"available":true},"help_uri":"https://github.com/advisories/GHSA-3xgq-45jj-v275","cwe":[]},{"id":"CVE-2025-60876-busybox","severity":"medium","score":6.5,"level":"warning","message":"A medium vulnerability in apk package: busybox, version 1.37.0-r30 was found in image nexus.briklab.test:8082/brik/node-deploy:0.1.0 at: /lib/apk/db/installed","tool":{"name":"grype","version":"0.111.1"},"location":{"uri":"node-deploy//lib/apk/db/installed","start_line":1,"end_line":1,"snippet":null,"logical":"nexus.briklab.test:8082/brik/node-deploy:0.1.0@sha256:d71b9385f08ff45e2ffd832dfd8ce8edb39dbe4e0775cf14d142aeecf3350a2d:/lib/apk/db/installed"},"package":{"name":"busybox","version":"1.37.0-r30","ecosystem":"apk"},"fix":{"versions":[],"available":false},"help_uri":"https://nvd.nist.gov/vuln/detail/CVE-2025-60876","cwe":[]},{"id":"CVE-2025-60876-busybox-binsh","severity":"medium","score":6.5,"level":"warning","message":"A medium vulnerability in apk package: busybox-binsh, version 1.37.0-r30 was found in image nexus.briklab.test:8082/brik/node-deploy:0.1.0 at: /lib/apk/db/installed","tool":{"name":"grype","version":"0.111.1"},"location":{"uri":"node-deploy//lib/apk/db/installed","start_line":1,"end_line":1,"snippet":null,"logical":"nexus.briklab.test:8082/brik/node-deploy:0.1.0@sha256:d71b9385f08ff45e2ffd832dfd8ce8edb39dbe4e0775cf14d142aeecf3350a2d:/lib/apk/db/installed"},"package":{"name":"busybox-binsh","version":"1.37.0-r30","ecosystem":"apk"},"fix":{"versions":[],"available":false},"help_uri":"https://nvd.nist.gov/vuln/detail/CVE-2025-60876","cwe":[]},{"id":"CVE-2025-60876-ssl_client","severity":"medium","score":6.5,"level":"warning","message":"A medium vulnerability in apk package: ssl_client, version 1.37.0-r30 was found in image nexus.briklab.test:8082/brik/node-deploy:0.1.0 at: /lib/apk/db/installed","tool":{"name":"grype","version":"0.111.1"},"location":{"uri":"node-deploy//lib/apk/db/installed","start_line":1,"end_line":1,"snippet":null,"logical":"nexus.briklab.test:8082/brik/node-deploy:0.1.0@sha256:d71b9385f08ff45e2ffd832dfd8ce8edb39dbe4e0775cf14d142aeecf3350a2d:/lib/apk/db/installed"},"package":{"name":"ssl_client","version":"1.37.0-r30","ecosystem":"apk"},"fix":{"versions":[],"available":false},"help_uri":"https://nvd.nist.gov/vuln/detail/CVE-2025-60876","cwe":[]},{"id":"GHSA-v2v4-37r5-5v8g-ip-address","severity":"medium","score":5.3,"level":"warning","message":"A medium vulnerability in npm package: ip-address, version 9.0.5 was found in image nexus.briklab.test:8082/brik/node-deploy:0.1.0 at: /usr/local/lib/node_modules/npm/node_modules/ip-address/package.json","tool":{"name":"grype","version":"0.111.1"},"location":{"uri":"node-deploy//usr/local/lib/node_modules/npm/node_modules/ip-address/package.json","start_line":1,"end_line":1,"snippet":null,"logical":"nexus.briklab.test:8082/brik/node-deploy:0.1.0@sha256:21e4f00ae03f714ca184b962b542ebb67dc73b5c2f7200659becdef9bdfe320e:/usr/local/lib/node_modules/npm/node_modules/ip-address/package.json"},"package":{"name":"ip-address","version":"9.0.5","ecosystem":"npm"},"fix":{"versions":["10.1.1"],"available":true},"help_uri":"https://github.com/advisories/GHSA-v2v4-37r5-5v8g","cwe":[]},{"id":"GHSA-7r86-cg39-jmmj-minimatch","severity":"high","score":7.5,"level":"error","message":"A high vulnerability in npm package: minimatch, version 9.0.5 was found in image nexus.briklab.test:8082/brik/node-deploy:0.1.0 at: /usr/local/lib/node_modules/npm/node_modules/minimatch/package.json","tool":{"name":"grype","version":"0.111.1"},"location":{"uri":"node-deploy//usr/local/lib/node_modules/npm/node_modules/minimatch/package.json","start_line":1,"end_line":1,"snippet":null,"logical":"nexus.briklab.test:8082/brik/node-deploy:0.1.0@sha256:21e4f00ae03f714ca184b962b542ebb67dc73b5c2f7200659becdef9bdfe320e:/usr/local/lib/node_modules/npm/node_modules/minimatch/package.json"},"package":{"name":"minimatch","version":"9.0.5","ecosystem":"npm"},"fix":{"versions":["9.0.7"],"available":true},"help_uri":"https://github.com/advisories/GHSA-7r86-cg39-jmmj","cwe":[]},{"id":"GHSA-v6h2-p8h4-qcjw-brace-expansion","severity":"low","score":3.1,"level":"note","message":"A low vulnerability in npm package: brace-expansion, version 2.0.1 was found in image nexus.briklab.test:8082/brik/node-deploy:0.1.0 at: /usr/local/lib/node_modules/npm/node_modules/brace-expansion/package.json","tool":{"name":"grype","version":"0.111.1"},"location":{"uri":"node-deploy//usr/local/lib/node_modules/npm/node_modules/brace-expansion/package.json","start_line":1,"end_line":1,"snippet":null,"logical":"nexus.briklab.test:8082/brik/node-deploy:0.1.0@sha256:21e4f00ae03f714ca184b962b542ebb67dc73b5c2f7200659becdef9bdfe320e:/usr/local/lib/node_modules/npm/node_modules/brace-expansion/package.json"},"package":{"name":"brace-expansion","version":"2.0.1","ecosystem":"npm"},"fix":{"versions":["2.0.2"],"available":true},"help_uri":"https://github.com/advisories/GHSA-v6h2-p8h4-qcjw","cwe":[]},{"id":"GHSA-3ppc-4f35-3m26-minimatch","severity":"high","score":8.7,"level":"error","message":"A high vulnerability in npm package: minimatch, version 9.0.5 was found in image nexus.briklab.test:8082/brik/node-deploy:0.1.0 at: /usr/local/lib/node_modules/npm/node_modules/minimatch/package.json","tool":{"name":"grype","version":"0.111.1"},"location":{"uri":"node-deploy//usr/local/lib/node_modules/npm/node_modules/minimatch/package.json","start_line":1,"end_line":1,"snippet":null,"logical":"nexus.briklab.test:8082/brik/node-deploy:0.1.0@sha256:21e4f00ae03f714ca184b962b542ebb67dc73b5c2f7200659becdef9bdfe320e:/usr/local/lib/node_modules/npm/node_modules/minimatch/package.json"},"package":{"name":"minimatch","version":"9.0.5","ecosystem":"npm"},"fix":{"versions":["9.0.6"],"available":true},"help_uri":"https://github.com/advisories/GHSA-3ppc-4f35-3m26","cwe":[]},{"id":"GHSA-23c5-xmqv-rm74-minimatch","severity":"high","score":7.5,"level":"error","message":"A high vulnerability in npm package: minimatch, version 9.0.5 was found in image nexus.briklab.test:8082/brik/node-deploy:0.1.0 at: /usr/local/lib/node_modules/npm/node_modules/minimatch/package.json","tool":{"name":"grype","version":"0.111.1"},"location":{"uri":"node-deploy//usr/local/lib/node_modules/npm/node_modules/minimatch/package.json","start_line":1,"end_line":1,"snippet":null,"logical":"nexus.briklab.test:8082/brik/node-deploy:0.1.0@sha256:21e4f00ae03f714ca184b962b542ebb67dc73b5c2f7200659becdef9bdfe320e:/usr/local/lib/node_modules/npm/node_modules/minimatch/package.json"},"package":{"name":"minimatch","version":"9.0.5","ecosystem":"npm"},"fix":{"versions":["9.0.7"],"available":true},"help_uri":"https://github.com/advisories/GHSA-23c5-xmqv-rm74","cwe":[]},{"id":"GHSA-5j98-mcp5-4vw2-glob","severity":"high","score":7.5,"level":"error","message":"A high vulnerability in npm package: glob, version 10.4.2 was found in image nexus.briklab.test:8082/brik/node-deploy:0.1.0 at: /usr/local/lib/node_modules/npm/node_modules/glob/package.json","tool":{"name":"grype","version":"0.111.1"},"location":{"uri":"node-deploy//usr/local/lib/node_modules/npm/node_modules/glob/package.json","start_line":1,"end_line":1,"snippet":null,"logical":"nexus.briklab.test:8082/brik/node-deploy:0.1.0@sha256:21e4f00ae03f714ca184b962b542ebb67dc73b5c2f7200659becdef9bdfe320e:/usr/local/lib/node_modules/npm/node_modules/glob/package.json"},"package":{"name":"glob","version":"10.4.2","ecosystem":"npm"},"fix":{"versions":["10.5.0"],"available":true},"help_uri":"https://github.com/advisories/GHSA-5j98-mcp5-4vw2","cwe":[]},{"id":"GHSA-34x7-hfp2-rc4v-tar","severity":"high","score":8.2,"level":"error","message":"A high vulnerability in npm package: tar, version 6.2.1 was found in image nexus.briklab.test:8082/brik/node-deploy:0.1.0 at: /usr/local/lib/node_modules/npm/node_modules/tar/package.json","tool":{"name":"grype","version":"0.111.1"},"location":{"uri":"node-deploy//usr/local/lib/node_modules/npm/node_modules/tar/package.json","start_line":1,"end_line":1,"snippet":null,"logical":"nexus.briklab.test:8082/brik/node-deploy:0.1.0@sha256:21e4f00ae03f714ca184b962b542ebb67dc73b5c2f7200659becdef9bdfe320e:/usr/local/lib/node_modules/npm/node_modules/tar/package.json"},"package":{"name":"tar","version":"6.2.1","ecosystem":"npm"},"fix":{"versions":["7.5.7"],"available":true},"help_uri":"https://github.com/advisories/GHSA-34x7-hfp2-rc4v","cwe":[]},{"id":"GHSA-f886-m6hf-6m8v-brace-expansion","severity":"medium","score":6.5,"level":"warning","message":"A medium vulnerability in npm package: brace-expansion, version 2.0.1 was found in image nexus.briklab.test:8082/brik/node-deploy:0.1.0 at: /usr/local/lib/node_modules/npm/node_modules/brace-expansion/package.json","tool":{"name":"grype","version":"0.111.1"},"location":{"uri":"node-deploy//usr/local/lib/node_modules/npm/node_modules/brace-expansion/package.json","start_line":1,"end_line":1,"snippet":null,"logical":"nexus.briklab.test:8082/brik/node-deploy:0.1.0@sha256:21e4f00ae03f714ca184b962b542ebb67dc73b5c2f7200659becdef9bdfe320e:/usr/local/lib/node_modules/npm/node_modules/brace-expansion/package.json"},"package":{"name":"brace-expansion","version":"2.0.1","ecosystem":"npm"},"fix":{"versions":["2.0.3"],"available":true},"help_uri":"https://github.com/advisories/GHSA-f886-m6hf-6m8v","cwe":[]},{"id":"GHSA-qffp-2rhf-9h96-tar","severity":"high","score":8.2,"level":"error","message":"A high vulnerability in npm package: tar, version 6.2.1 was found in image nexus.briklab.test:8082/brik/node-deploy:0.1.0 at: /usr/local/lib/node_modules/npm/node_modules/tar/package.json","tool":{"name":"grype","version":"0.111.1"},"location":{"uri":"node-deploy//usr/local/lib/node_modules/npm/node_modules/tar/package.json","start_line":1,"end_line":1,"snippet":null,"logical":"nexus.briklab.test:8082/brik/node-deploy:0.1.0@sha256:21e4f00ae03f714ca184b962b542ebb67dc73b5c2f7200659becdef9bdfe320e:/usr/local/lib/node_modules/npm/node_modules/tar/package.json"},"package":{"name":"tar","version":"6.2.1","ecosystem":"npm"},"fix":{"versions":["7.5.10"],"available":true},"help_uri":"https://github.com/advisories/GHSA-qffp-2rhf-9h96","cwe":[]},{"id":"GHSA-r6q2-hw4h-h46w-tar","severity":"high","score":8.8,"level":"error","message":"A high vulnerability in npm package: tar, version 6.2.1 was found in image nexus.briklab.test:8082/brik/node-deploy:0.1.0 at: /usr/local/lib/node_modules/npm/node_modules/tar/package.json","tool":{"name":"grype","version":"0.111.1"},"location":{"uri":"node-deploy//usr/local/lib/node_modules/npm/node_modules/tar/package.json","start_line":1,"end_line":1,"snippet":null,"logical":"nexus.briklab.test:8082/brik/node-deploy:0.1.0@sha256:21e4f00ae03f714ca184b962b542ebb67dc73b5c2f7200659becdef9bdfe320e:/usr/local/lib/node_modules/npm/node_modules/tar/package.json"},"package":{"name":"tar","version":"6.2.1","ecosystem":"npm"},"fix":{"versions":["7.5.4"],"available":true},"help_uri":"https://github.com/advisories/GHSA-r6q2-hw4h-h46w","cwe":[]},{"id":"GHSA-9ppj-qmqm-q256-tar","severity":"high","score":8.2,"level":"error","message":"A high vulnerability in npm package: tar, version 6.2.1 was found in image nexus.briklab.test:8082/brik/node-deploy:0.1.0 at: /usr/local/lib/node_modules/npm/node_modules/tar/package.json","tool":{"name":"grype","version":"0.111.1"},"location":{"uri":"node-deploy//usr/local/lib/node_modules/npm/node_modules/tar/package.json","start_line":1,"end_line":1,"snippet":null,"logical":"nexus.briklab.test:8082/brik/node-deploy:0.1.0@sha256:21e4f00ae03f714ca184b962b542ebb67dc73b5c2f7200659becdef9bdfe320e:/usr/local/lib/node_modules/npm/node_modules/tar/package.json"},"package":{"name":"tar","version":"6.2.1","ecosystem":"npm"},"fix":{"versions":["7.5.11"],"available":true},"help_uri":"https://github.com/advisories/GHSA-9ppj-qmqm-q256","cwe":[]},{"id":"GHSA-83g3-92jg-28cx-tar","severity":"high","score":7.1,"level":"error","message":"A high vulnerability in npm package: tar, version 6.2.1 was found in image nexus.briklab.test:8082/brik/node-deploy:0.1.0 at: /usr/local/lib/node_modules/npm/node_modules/tar/package.json","tool":{"name":"grype","version":"0.111.1"},"location":{"uri":"node-deploy//usr/local/lib/node_modules/npm/node_modules/tar/package.json","start_line":1,"end_line":1,"snippet":null,"logical":"nexus.briklab.test:8082/brik/node-deploy:0.1.0@sha256:21e4f00ae03f714ca184b962b542ebb67dc73b5c2f7200659becdef9bdfe320e:/usr/local/lib/node_modules/npm/node_modules/tar/package.json"},"package":{"name":"tar","version":"6.2.1","ecosystem":"npm"},"fix":{"versions":["7.5.8"],"available":true},"help_uri":"https://github.com/advisories/GHSA-83g3-92jg-28cx","cwe":[]},{"id":"GHSA-73rr-hh4g-fpgx-diff","severity":"low","score":2.7,"level":"note","message":"A low vulnerability in npm package: diff, version 5.2.0 was found in image nexus.briklab.test:8082/brik/node-deploy:0.1.0 at: /usr/local/lib/node_modules/npm/node_modules/diff/package.json","tool":{"name":"grype","version":"0.111.1"},"location":{"uri":"node-deploy//usr/local/lib/node_modules/npm/node_modules/diff/package.json","start_line":1,"end_line":1,"snippet":null,"logical":"nexus.briklab.test:8082/brik/node-deploy:0.1.0@sha256:21e4f00ae03f714ca184b962b542ebb67dc73b5c2f7200659becdef9bdfe320e:/usr/local/lib/node_modules/npm/node_modules/diff/package.json"},"package":{"name":"diff","version":"5.2.0","ecosystem":"npm"},"fix":{"versions":["5.2.2"],"available":true},"help_uri":"https://github.com/advisories/GHSA-73rr-hh4g-fpgx","cwe":[]},{"id":"GHSA-8qq5-rm4j-mr97-tar","severity":"high","score":8.2,"level":"error","message":"A high vulnerability in npm package: tar, version 6.2.1 was found in image nexus.briklab.test:8082/brik/node-deploy:0.1.0 at: /usr/local/lib/node_modules/npm/node_modules/tar/package.json","tool":{"name":"grype","version":"0.111.1"},"location":{"uri":"node-deploy//usr/local/lib/node_modules/npm/node_modules/tar/package.json","start_line":1,"end_line":1,"snippet":null,"logical":"nexus.briklab.test:8082/brik/node-deploy:0.1.0@sha256:21e4f00ae03f714ca184b962b542ebb67dc73b5c2f7200659becdef9bdfe320e:/usr/local/lib/node_modules/npm/node_modules/tar/package.json"},"package":{"name":"tar","version":"6.2.1","ecosystem":"npm"},"fix":{"versions":["7.5.3"],"available":true},"help_uri":"https://github.com/advisories/GHSA-8qq5-rm4j-mr97","cwe":[]}]},"report":{"format":"sarif","path":"brik-artifacts/container-scan/findings.sarif"},"status":"warning","reason":"findings accepted by policy"},"duration_ms":32221},{"schema_version":"1.1","stage":"deploy","timestamp":"2026-05-15T10:47:54+0000","rc":0,"status":"success","runner":{"platform":"gitlab","image":"ghcr.io/getbrik/brik-runner-node:22","job_url":"http://gitlab.briklab.test:8929/brik/node-deploy/-/jobs/25554"},"tech":{"environments":["staging"],"duration_ms":"109","exit_code":"0","status":"success","dry_run":"true"},"business":{"environments":[{"name":"staging","target":"compose","namespace":null}],"status":"success","reason":""},"duration_ms":109},{"schema_version":"1.1","stage":"init","timestamp":"2026-05-15T10:46:08+0000","rc":0,"status":"success","runner":{"platform":"gitlab","image":"ghcr.io/getbrik/brik-runner-node:22","job_url":"http://gitlab.briklab.test:8929/brik/node-deploy/-/jobs/25545"},"tech":{"stack":"node","stack_version":"22","config_file":"/builds/brik/node-deploy/brik.yml","config_valid":true,"prereqs_present":{"yq":true,"jq":true,"jv":true},"tool_versions":{"yq":"4.53.2","jq":"1.8.1","jv":"0.7.0"},"duration_ms":"517","exit_code":"0","status":"success"},"business":{"project_name":"node-deploy","platform":"gitlab","commit":{"sha":"cba3113341fef8514696c646fa26562098275e02","short_sha":"cba3113","ref":"v0.1.0","tag":"v0.1.0","author":"jeanjerome","author_email":"jeanjerome.levy@gmail.com","timestamp":"2026-05-15T09:46:38+00:00","message_subject":"Initial commit","repo_url":"http://gitlab.briklab.test:8929/brik/node-deploy"},"pipeline":{"id":"2602","url":"http://gitlab.briklab.test:8929/brik/node-deploy/-/pipelines/2602"},"triggered_by":"root","status":"success","reason":""},"duration_ms":517},{"schema_version":"1.1","stage":"lint","timestamp":"2026-05-15T10:46:47+0000","rc":0,"status":"success","runner":{"platform":"gitlab","image":"ghcr.io/getbrik/brik-runner-node:22","job_url":"http://gitlab.briklab.test:8929/brik/node-deploy/-/jobs/25548"},"tech":{"checks":["lint","format"],"tools":{"lint":"eslint","format":"prettier"},"duration_ms":"1442","exit_code":"0","status":"success"},"business":{"status":"success","reason":""},"duration_ms":1442},{"schema_version":"1.1","stage":"package","timestamp":"2026-05-15T10:47:02+0000","rc":0,"status":"success","runner":{"platform":"gitlab","image":"ghcr.io/getbrik/brik-runner-node:22","job_url":"http://gitlab.briklab.test:8929/brik/node-deploy/-/jobs/25552"},"tech":{"packager":"docker","dockerfile":"Dockerfile","build_duration_ms":"8","image_built":"true","image_ref":"nexus.briklab.test:8082/brik/node-deploy:0.1.0","duration_ms":"159","exit_code":"0","status":"success","dry_run":"true"},"business":{"image":{"name":"nexus.briklab.test:8082/brik/node-deploy","tag":"0.1.0","full_name":"nexus.briklab.test:8082/brik/node-deploy:0.1.0","digest":"sha256:4edaaac37efabb270a924603b3a04f2d4735f7e8e3e2b89554893e349ad9bc4c"},"registry":{"host":"nexus.briklab.test:8082","namespace":"brik","repository":"node-deploy","ui_url":"http://nexus.briklab.test:8081"},"status":"success","reason":""},"duration_ms":159},{"schema_version":"1.1","stage":"release","timestamp":"2026-05-15T10:46:18+0000","rc":0,"status":"success","runner":{"platform":"gitlab","image":"ghcr.io/getbrik/brik-runner-node:22","job_url":"http://gitlab.briklab.test:8929/brik/node-deploy/-/jobs/25546"},"tech":{"strategy":"semver","tag_prefix":"v","dry_run":"true","duration_ms":"97","exit_code":"0","status":"success"},"business":{"previous_version":"0.1.0","new_version":"0.1.0","bump_type":"explicit","tag":{"name":"v0.1.0","sha":null,"annotated":true,"dry_run":true},"status":"success","reason":""},"duration_ms":97},{"schema_version":"1.1","stage":"sast","timestamp":"2026-05-15T10:46:49+0000","rc":0,"status":"success","runner":{"platform":"gitlab","image":"ghcr.io/getbrik/brik-runner-node:22","job_url":"http://gitlab.briklab.test:8929/brik/node-deploy/-/jobs/25549"},"tech":{"tool":"semgrep","duration_ms":"3637","exit_code":"0","status":"success"},"business":{"findings":{"total":0,"by_severity":{"critical":0,"high":0,"medium":0,"low":0,"info":0},"cwe":["CWE-113","CWE-1204","CWE-1220","CWE-1333","CWE-134","CWE-16","CWE-20","CWE-200","CWE-22","CWE-23","CWE-250","CWE-269","CWE-284","CWE-287","CWE-295","CWE-300","CWE-310","CWE-311","CWE-319","CWE-321","CWE-323","CWE-326","CWE-327","CWE-329","CWE-338","CWE-341","CWE-345","CWE-347","CWE-352","CWE-362","CWE-454","CWE-489","CWE-502","CWE-509","CWE-521","CWE-522","CWE-523","CWE-601","CWE-611","CWE-667","CWE-676","CWE-682","CWE-688","CWE-697","CWE-704","CWE-706","CWE-73","CWE-732","CWE-776","CWE-78","CWE-79","CWE-798","CWE-829","CWE-841","CWE-862","CWE-89","CWE-913","CWE-915","CWE-918","CWE-94","CWE-943","CWE-95","CWE-96"],"failing":{"total":0,"has_fix":0,"no_fix":0},"ignored":{"total":0,"by_source":{},"by_severity":{"critical":0,"high":0,"medium":0,"low":0,"info":0}}},"report":{"format":"sarif","path":"brik-artifacts/sast/findings.sarif"},"status":"success","reason":""},"duration_ms":3637},{"schema_version":"1.1","stage":"scan","timestamp":"2026-05-15T10:46:49+0000","rc":0,"status":"success","runner":{"platform":"gitlab","image":"ghcr.io/getbrik/brik-runner-node:22","job_url":"http://gitlab.briklab.test:8929/brik/node-deploy/-/jobs/25550"},"tech":{"deps":{"tool":"osv-scanner"},"secret":{"tool":"gitleaks"},"severity_threshold":"high","duration_ms":"2036","exit_code":"0","status":"success"},"business":{"deps":{"vulnerabilities":{"total":0,"by_severity":{"critical":0,"high":0,"medium":0,"low":0,"info":0}},"affected_packages":0,"sbom_path":"brik-artifacts/scan/sbom.cdx.json"},"report":{"format":"sarif","path":"brik-artifacts/scan/deps.sarif"},"secret":{"findings_count":0,"report":{"format":"sarif","path":"brik-artifacts/scan/secret.sarif"}},"status":"success","reason":""},"duration_ms":2036},{"schema_version":"1.1","stage":"test","timestamp":"2026-05-15T10:46:47+0000","rc":0,"status":"success","runner":{"platform":"gitlab","image":"ghcr.io/getbrik/brik-runner-node:22","job_url":"http://gitlab.briklab.test:8929/brik/node-deploy/-/jobs/25551"},"tech":{"framework":"npm","tool":"npm","coverage_tool":"auto","duration_ms":"881","exit_code":"0","status":"success"},"business":{"status":"success","reason":""},"duration_ms":881}],"summary":{"stages":{"total":10,"passed":10,"failed":0,"skipped":0},"business":{"success_count":9,"warning_count":1,"error_count":0},"policy":{"preset":"pragmatic","source":"brik.yml","org_policy_url":"file:///etc/brik/policy/brik-policy.yml","org_policy_loaded_at":"2026-05-15T10:46:08+0000"}}}
+{"schema_version":"1.1","pipeline":{"id":"2631","platform":"gitlab","project":"node-complete","context":"release","business":{"status":"warning"},"started_at":"2026-05-16T09:00:17+0000","finished_at":"2026-05-16T09:02:36+0000","status":"success","url":"http://gitlab.briklab.test:8929/brik/node-complete/-/pipelines/2631","commit":{"sha":"620db50026f27656b66cc522f475c5834680cec1","short_sha":"620db50","ref":"v0.1.0","tag":"v0.1.0","author":"jeanjerome","author_email":"jeanjerome.levy@gmail.com","timestamp":"2026-05-15T11:10:07+00:00","message_subject":"Initial commit","repo_url":"http://gitlab.briklab.test:8929/brik/node-complete"},"triggered_by":"root","notify":{"channels":[{"type":"slack","configured":false,"on":"always","would_send":false},{"type":"email","configured":false,"on":"always","would_send":false},{"type":"webhook","configured":false,"on":"always","would_send":false}],"gatekeeper":{"decision":"pass","business_status":"warning"}}},"stages":[{"schema_version":"1.1","stage":"build","timestamp":"2026-05-16T09:00:43+0000","rc":0,"status":"success","runner":{"platform":"gitlab","image":"ghcr.io/getbrik/brik-runner-node:22","job_url":"http://gitlab.briklab.test:8929/brik/node-complete/-/jobs/25860"},"tech":{"stack":"node","tool":"auto","command":"<stack-default>","duration_ms":"1285","exit_code":"0","status":"success"},"business":{"artifact":{"type":"directory","name":"dist","size_bytes":359,"sha256":"ebfa26e59060fbf9c1d69f926de55d20381c56542c74892001a119e7b2c0c71c","path":"/builds/brik/node-complete/dist","main_file":"index.js"},"status":"success","reason":""},"duration_ms":1285},{"schema_version":"1.1","stage":"container-scan","timestamp":"2026-05-16T09:02:07+0000","rc":0,"status":"success","runner":{"platform":"gitlab","image":"ghcr.io/getbrik/brik-runner-node:22","job_url":"http://gitlab.briklab.test:8929/brik/node-complete/-/jobs/25866"},"tech":{"tool":"auto","target_image":"nexus.briklab.test:8082/brik/node-complete:620db50","target_digest":"sha256:7b99de2e38d193c98b16f97623b3751abce95e40b185d444c3492101ebb728ad","scan_duration_ms":"33918","duration_ms":"34013","exit_code":"0","status":"success"},"business":{"findings":{"total":7,"by_severity":{"critical":0,"high":1,"medium":6,"low":0,"info":0},"cwe":[],"failing":{"total":0,"has_fix":0,"no_fix":0},"ignored":{"total":7,"by_source":{"policy.org.path-allowlist":7},"by_severity":{"critical":0,"high":1,"medium":6,"low":0,"info":0}},"items":[{"id":"GHSA-3v7f-55p6-f55p-picomatch","severity":"medium","score":5.3,"level":"warning","message":"A medium vulnerability in npm package: picomatch, version 4.0.3 was found in image nexus.briklab.test:8082/brik/node-complete:620db50 at: /usr/local/lib/node_modules/npm/node_modules/picomatch/package.json","tool":{"name":"grype","version":"0.111.1"},"location":{"uri":"node-complete//usr/local/lib/node_modules/npm/node_modules/picomatch/package.json","start_line":1,"end_line":1,"snippet":null,"logical":"nexus.briklab.test:8082/brik/node-complete:620db50@sha256:42b1bd5d16702748759653bc18cc0aa4f949aa9a46057fed58910379ffeeb83f:/usr/local/lib/node_modules/npm/node_modules/picomatch/package.json"},"package":{"name":"picomatch","version":"4.0.3","ecosystem":"npm"},"fix":{"versions":["4.0.4"],"available":true},"help_uri":"https://github.com/advisories/GHSA-3v7f-55p6-f55p","cwe":[]},{"id":"CVE-2025-60876-busybox","severity":"medium","score":6.5,"level":"warning","message":"A medium vulnerability in apk package: busybox, version 1.37.0-r30 was found in image nexus.briklab.test:8082/brik/node-complete:620db50 at: /lib/apk/db/installed","tool":{"name":"grype","version":"0.111.1"},"location":{"uri":"node-complete//lib/apk/db/installed","start_line":1,"end_line":1,"snippet":null,"logical":"nexus.briklab.test:8082/brik/node-complete:620db50@sha256:c8ec52347d5a2c217aec0fe5946157eb5fbdf3837e382cafc6ed16493b4f6f3f:/lib/apk/db/installed"},"package":{"name":"busybox","version":"1.37.0-r30","ecosystem":"apk"},"fix":{"versions":[],"available":false},"help_uri":"https://nvd.nist.gov/vuln/detail/CVE-2025-60876","cwe":[]},{"id":"CVE-2025-60876-busybox-binsh","severity":"medium","score":6.5,"level":"warning","message":"A medium vulnerability in apk package: busybox-binsh, version 1.37.0-r30 was found in image nexus.briklab.test:8082/brik/node-complete:620db50 at: /lib/apk/db/installed","tool":{"name":"grype","version":"0.111.1"},"location":{"uri":"node-complete//lib/apk/db/installed","start_line":1,"end_line":1,"snippet":null,"logical":"nexus.briklab.test:8082/brik/node-complete:620db50@sha256:c8ec52347d5a2c217aec0fe5946157eb5fbdf3837e382cafc6ed16493b4f6f3f:/lib/apk/db/installed"},"package":{"name":"busybox-binsh","version":"1.37.0-r30","ecosystem":"apk"},"fix":{"versions":[],"available":false},"help_uri":"https://nvd.nist.gov/vuln/detail/CVE-2025-60876","cwe":[]},{"id":"CVE-2025-60876-ssl_client","severity":"medium","score":6.5,"level":"warning","message":"A medium vulnerability in apk package: ssl_client, version 1.37.0-r30 was found in image nexus.briklab.test:8082/brik/node-complete:620db50 at: /lib/apk/db/installed","tool":{"name":"grype","version":"0.111.1"},"location":{"uri":"node-complete//lib/apk/db/installed","start_line":1,"end_line":1,"snippet":null,"logical":"nexus.briklab.test:8082/brik/node-complete:620db50@sha256:c8ec52347d5a2c217aec0fe5946157eb5fbdf3837e382cafc6ed16493b4f6f3f:/lib/apk/db/installed"},"package":{"name":"ssl_client","version":"1.37.0-r30","ecosystem":"apk"},"fix":{"versions":[],"available":false},"help_uri":"https://nvd.nist.gov/vuln/detail/CVE-2025-60876","cwe":[]},{"id":"GHSA-v2v4-37r5-5v8g-ip-address","severity":"medium","score":5.3,"level":"warning","message":"A medium vulnerability in npm package: ip-address, version 10.1.0 was found in image nexus.briklab.test:8082/brik/node-complete:620db50 at: /usr/local/lib/node_modules/npm/node_modules/ip-address/package.json","tool":{"name":"grype","version":"0.111.1"},"location":{"uri":"node-complete//usr/local/lib/node_modules/npm/node_modules/ip-address/package.json","start_line":1,"end_line":1,"snippet":null,"logical":"nexus.briklab.test:8082/brik/node-complete:620db50@sha256:42b1bd5d16702748759653bc18cc0aa4f949aa9a46057fed58910379ffeeb83f:/usr/local/lib/node_modules/npm/node_modules/ip-address/package.json"},"package":{"name":"ip-address","version":"10.1.0","ecosystem":"npm"},"fix":{"versions":["10.1.1"],"available":true},"help_uri":"https://github.com/advisories/GHSA-v2v4-37r5-5v8g","cwe":[]},{"id":"GHSA-c2c7-rcm5-vvqj-picomatch","severity":"high","score":7.5,"level":"error","message":"A high vulnerability in npm package: picomatch, version 4.0.3 was found in image nexus.briklab.test:8082/brik/node-complete:620db50 at: /usr/local/lib/node_modules/npm/node_modules/picomatch/package.json","tool":{"name":"grype","version":"0.111.1"},"location":{"uri":"node-complete//usr/local/lib/node_modules/npm/node_modules/picomatch/package.json","start_line":1,"end_line":1,"snippet":null,"logical":"nexus.briklab.test:8082/brik/node-complete:620db50@sha256:42b1bd5d16702748759653bc18cc0aa4f949aa9a46057fed58910379ffeeb83f:/usr/local/lib/node_modules/npm/node_modules/picomatch/package.json"},"package":{"name":"picomatch","version":"4.0.3","ecosystem":"npm"},"fix":{"versions":["4.0.4"],"available":true},"help_uri":"https://github.com/advisories/GHSA-c2c7-rcm5-vvqj","cwe":[]},{"id":"GHSA-f886-m6hf-6m8v-brace-expansion","severity":"medium","score":6.5,"level":"warning","message":"A medium vulnerability in npm package: brace-expansion, version 2.0.2 was found in image nexus.briklab.test:8082/brik/node-complete:620db50 at: /usr/local/lib/node_modules/npm/node_modules/brace-expansion/package.json","tool":{"name":"grype","version":"0.111.1"},"location":{"uri":"node-complete//usr/local/lib/node_modules/npm/node_modules/brace-expansion/package.json","start_line":1,"end_line":1,"snippet":null,"logical":"nexus.briklab.test:8082/brik/node-complete:620db50@sha256:42b1bd5d16702748759653bc18cc0aa4f949aa9a46057fed58910379ffeeb83f:/usr/local/lib/node_modules/npm/node_modules/brace-expansion/package.json"},"package":{"name":"brace-expansion","version":"2.0.2","ecosystem":"npm"},"fix":{"versions":["2.0.3"],"available":true},"help_uri":"https://github.com/advisories/GHSA-f886-m6hf-6m8v","cwe":[]}]},"report":{"format":"sarif","path":"brik-artifacts/container-scan/findings.sarif"},"status":"warning","reason":"findings accepted by policy"},"duration_ms":34013},{"schema_version":"1.1","stage":"deploy","timestamp":"2026-05-16T09:02:21+0000","rc":0,"status":"success","runner":{"platform":"gitlab","image":"ghcr.io/getbrik/brik-runner-node:22","job_url":"http://gitlab.briklab.test:8929/brik/node-complete/-/jobs/25867"},"tech":{"duration_ms":"53","exit_code":"0","status":"success"},"business":{"status":"success","reason":""},"duration_ms":53},{"schema_version":"1.1","stage":"init","timestamp":"2026-05-16T09:00:17+0000","rc":0,"status":"success","runner":{"platform":"gitlab","image":"ghcr.io/getbrik/brik-runner-node:22","job_url":"http://gitlab.briklab.test:8929/brik/node-complete/-/jobs/25858"},"tech":{"stack":"node","stack_version":"22","config_file":"/builds/brik/node-complete/brik.yml","config_valid":true,"prereqs_present":{"yq":true,"jq":true,"jv":true},"tool_versions":{"yq":"4.53.2","jq":"1.8.1","jv":"0.7.0"},"duration_ms":"576","exit_code":"0","status":"success"},"business":{"project_name":"node-complete","platform":"gitlab","commit":{"sha":"620db50026f27656b66cc522f475c5834680cec1","short_sha":"620db50","ref":"v0.1.0","tag":"v0.1.0","author":"jeanjerome","author_email":"jeanjerome.levy@gmail.com","timestamp":"2026-05-15T11:10:07+00:00","message_subject":"Initial commit","repo_url":"http://gitlab.briklab.test:8929/brik/node-complete"},"pipeline":{"id":"2631","url":"http://gitlab.briklab.test:8929/brik/node-complete/-/pipelines/2631"},"triggered_by":"root","status":"success","reason":""},"duration_ms":576,"env":{"BRIK_GIT_USER_EMAIL":"gitlab_admin_3e886a@example.com","BRIK_GIT_USER_NAME":"Administrator","BRIK_PROJECT_NAME":"node-complete","BRIK_BUILD_STACK":"node","BRIK_BUILD_STACK_VERSION":"22","BRIK_CI_IMAGE":"ghcr.io/getbrik/brik-runner-node:22","BRIK_RELEASE_PROFILE":"none","BRIK_PACKAGE_ENABLED":"true","BRIK_DEPLOY_ENABLED":"false","BRIK_TEST_REPORTS_ENABLED":"true","BRIK_TEST_COVERAGE_FORMAT":"auto","BRIK_TEST_COVERAGE_DIR":"brik-artifacts/test/coverage","BRIK_TEST_JUNIT_PATH":"brik-artifacts/test/junit.xml"}},{"schema_version":"1.1","stage":"lint","timestamp":"2026-05-16T09:01:06+0000","rc":0,"status":"success","runner":{"platform":"gitlab","image":"ghcr.io/getbrik/brik-runner-node:22","job_url":"http://gitlab.briklab.test:8929/brik/node-complete/-/jobs/25861"},"tech":{"checks":["lint","format"],"tools":{"lint":"eslint","format":"prettier"},"duration_ms":"3528","exit_code":"0","status":"success"},"business":{"status":"success","reason":""},"duration_ms":3528},{"schema_version":"1.1","stage":"package","timestamp":"2026-05-16T09:01:23+0000","rc":0,"status":"success","runner":{"platform":"gitlab","image":"ghcr.io/getbrik/brik-runner-node:22","job_url":"http://gitlab.briklab.test:8929/brik/node-complete/-/jobs/25865"},"tech":{"packager":"docker","dockerfile":"Dockerfile","build_duration_ms":"407","image_built":"true","image_ref":"nexus.briklab.test:8082/brik/node-complete:620db50","duration_ms":"1025","exit_code":"0","status":"success"},"business":{"image":{"name":"nexus.briklab.test:8082/brik/node-complete","tag":"620db50","full_name":"nexus.briklab.test:8082/brik/node-complete:620db50","digest":"sha256:7b99de2e38d193c98b16f97623b3751abce95e40b185d444c3492101ebb728ad"},"registry":{"host":"nexus.briklab.test:8082","namespace":"brik","repository":"node-complete","ui_url":"http://nexus.briklab.test:8081"},"status":"success","reason":""},"duration_ms":1025},{"schema_version":"1.1","stage":"release","timestamp":"2026-05-16T09:00:27+0000","rc":0,"status":"success","runner":{"platform":"gitlab","image":"ghcr.io/getbrik/brik-runner-node:22","job_url":"http://gitlab.briklab.test:8929/brik/node-complete/-/jobs/25859"},"tech":{"strategy":"semver","tag_prefix":"v","dry_run":false,"duration_ms":"127","exit_code":"0","status":"success"},"business":{"previous_version":"0.1.0","new_version":"0.1.0","bump_type":"explicit","tag":{"name":"v0.1.0","sha":"620db50026f27656b66cc522f475c5834680cec1","annotated":true,"dry_run":false},"status":"success","reason":""},"duration_ms":127,"env":{"BRIK_APP_VERSION":"0.1.0"}},{"schema_version":"1.1","stage":"sast","timestamp":"2026-05-16T09:01:07+0000","rc":0,"status":"success","runner":{"platform":"gitlab","image":"ghcr.io/getbrik/brik-runner-node:22","job_url":"http://gitlab.briklab.test:8929/brik/node-complete/-/jobs/25862"},"tech":{"tool":"semgrep","duration_ms":"4972","exit_code":"0","status":"success"},"business":{"findings":{"total":0,"by_severity":{"critical":0,"high":0,"medium":0,"low":0,"info":0},"cwe":["CWE-113","CWE-1204","CWE-1220","CWE-1333","CWE-134","CWE-16","CWE-20","CWE-200","CWE-22","CWE-23","CWE-250","CWE-269","CWE-284","CWE-287","CWE-295","CWE-300","CWE-310","CWE-311","CWE-319","CWE-321","CWE-323","CWE-326","CWE-327","CWE-329","CWE-338","CWE-341","CWE-345","CWE-347","CWE-352","CWE-362","CWE-454","CWE-489","CWE-502","CWE-509","CWE-521","CWE-522","CWE-523","CWE-601","CWE-611","CWE-667","CWE-676","CWE-682","CWE-688","CWE-697","CWE-704","CWE-706","CWE-73","CWE-732","CWE-776","CWE-78","CWE-79","CWE-798","CWE-829","CWE-841","CWE-862","CWE-89","CWE-913","CWE-915","CWE-918","CWE-94","CWE-943","CWE-95","CWE-96"],"failing":{"total":0,"has_fix":0,"no_fix":0},"ignored":{"total":0,"by_source":{},"by_severity":{"critical":0,"high":0,"medium":0,"low":0,"info":0}}},"report":{"format":"sarif","path":"brik-artifacts/sast/findings.sarif"},"status":"success","reason":""},"duration_ms":4972},{"schema_version":"1.1","stage":"scan","timestamp":"2026-05-16T09:01:07+0000","rc":0,"status":"success","runner":{"platform":"gitlab","image":"ghcr.io/getbrik/brik-runner-node:22","job_url":"http://gitlab.briklab.test:8929/brik/node-complete/-/jobs/25863"},"tech":{"deps":{"tool":"osv-scanner"},"secret":{"tool":"gitleaks"},"severity_threshold":"critical","duration_ms":"4074","exit_code":"0","status":"success"},"business":{"deps":{"vulnerabilities":{"total":0,"by_severity":{"critical":0,"high":0,"medium":0,"low":0,"info":0}},"affected_packages":0,"sbom_path":"brik-artifacts/scan/sbom.cdx.json"},"report":{"format":"sarif","path":"brik-artifacts/scan/deps.sarif"},"secret":{"findings_count":0,"report":{"format":"sarif","path":"brik-artifacts/scan/secret.sarif"}},"status":"success","reason":""},"duration_ms":4074},{"schema_version":"1.1","stage":"test","timestamp":"2026-05-16T09:01:06+0000","rc":0,"status":"success","runner":{"platform":"gitlab","image":"ghcr.io/getbrik/brik-runner-node:22","job_url":"http://gitlab.briklab.test:8929/brik/node-complete/-/jobs/25864"},"tech":{"framework":"jest","tool":"jest","coverage_tool":"auto","duration_ms":"2792","exit_code":"0","status":"success"},"business":{"coverage":{"line_pct":"45.45","branch_pct":"25.00"},"tests":{"total":10,"passed":10,"failed":0,"skipped":0,"duration_ms":283},"findings":{"total":0,"by_severity":{"critical":0,"high":0,"medium":0,"low":0,"info":0},"cwe":[],"failing":{"total":0,"has_fix":0,"no_fix":0},"ignored":{"total":0,"by_source":{},"by_severity":{"critical":0,"high":0,"medium":0,"low":0,"info":0}}},"report":{"format":"sarif","path":"brik-artifacts/test/findings.sarif"},"status":"success","reason":""},"duration_ms":2792}],"summary":{"stages":{"total":10,"passed":10,"failed":0,"skipped":0},"business":{"success_count":9,"warning_count":1,"error_count":0},"policy":{"preset":"pragmatic","source":"brik.yml","org_policy_url":"file:///etc/brik/policy/brik-policy.yml","org_policy_loaded_at":"2026-05-16T09:00:17+0000"}}}
 </script>
 <script>
 (function() {
@@ -1213,6 +1206,20 @@ footer { color: var(--text-faint); font-size: 12px; text-align: center; padding-
   const escapeHtml = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => (
     { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]
   ));
+
+  // Shared between every per-stage renderer (init, release, build, lint,
+  // findings, scan, test, package, notify). Hoisted so the same closure is
+  // reused instead of being recreated on each render call.
+  const sectionLabel = (txt) =>
+    '<div class="section-label">' + escapeHtml(txt) + '</div>';
+
+  // Wrap a sub-section body in a stage-tile-shaped card. The section heading
+  // is emitted separately by the caller via sectionLabel(...) BEFORE the
+  // tile, matching the order section-label -> (stage-grid?) -> stage-tile
+  // already used by release and build. Used by the verify stages (lint,
+  // sast, scan, test, container-scan).
+  const sectionTile = (bodyHtml) =>
+    '<div class="stage-tile section-tile">' + bodyHtml + '</div>';
 
   const fmtDuration = (ms) => {
     if (ms == null || isNaN(ms)) return '-';
@@ -1587,12 +1594,37 @@ footer { color: var(--text-faint); font-size: 12px; text-align: center; padding-
     if (repo.platform === 'bitbucket') return repo.base + '/commits/' + sha;
     return null;
   }
+  // Build a forge-specific URL pointing at a file blob at a given ref
+  // (commit SHA or branch name). Used to make path values in the Policy
+  // card click-through to the actual source on the forge.
   function blobUrl(repo, ref, path) {
-    if (!repo || !path) return null;
-    const r = ref || 'HEAD';
-    if (repo.platform === 'gitlab') return repo.base + '/-/blob/' + r + '/' + path.replace(/^\//, '');
-    if (repo.platform === 'github') return repo.base + '/blob/' + r + '/' + path.replace(/^\//, '');
-    if (repo.platform === 'gitea')  return repo.base + '/src/branch/' + r + '/' + path.replace(/^\//, '');
+    if (!repo || !ref || !path) return null;
+    const p = String(path).replace(/^\//, '');
+    if (repo.platform === 'gitlab') return repo.base + '/-/blob/' + ref + '/' + p;
+    if (repo.platform === 'github') return repo.base + '/blob/' + ref + '/' + p;
+    if (repo.platform === 'gitea')  return repo.base + '/src/commit/' + ref + '/' + p;
+    return null;
+  }
+  // Convert a raw forge URL (the kind BRIK_POLICY_URL points at) into the
+  // human-browseable blob view on the same forge. Returns null when the
+  // input does not match any known raw-URL shape; callers should then
+  // either show the URL as-is or fall back to plain text. Supported:
+  //   GitLab : .../-/raw/<ref>/<path>             -> .../-/blob/<ref>/<path>
+  //   Gitea  : .../raw/(branch|commit|tag)/<...>  -> .../src/(branch|commit|tag)/<...>
+  //   GitHub : raw.githubusercontent.com/<o>/<r>/<ref>/<path>
+  //                                               -> github.com/<o>/<r>/blob/<ref>/<path>
+  //   Bitbucket: <repo>/raw/<ref>/<path>          -> <repo>/src/<ref>/<path>
+  function gitRawToBlob(url) {
+    if (!url) return null;
+    const u = String(url);
+    let m = u.match(/^(.+)\/-\/raw\/(.+)$/);
+    if (m) return m[1] + '/-/blob/' + m[2];
+    m = u.match(/^(.+?)\/raw\/(branch|commit|tag)\/(.+)$/);
+    if (m) return m[1] + '/src/' + m[2] + '/' + m[3];
+    m = u.match(/^https?:\/\/raw\.githubusercontent\.com\/([^/]+)\/([^/]+)\/(.+)$/);
+    if (m) return 'https://github.com/' + m[1] + '/' + m[2] + '/blob/' + m[3];
+    m = u.match(/^(https?:\/\/bitbucket\.org\/[^/]+\/[^/]+)\/raw\/(.+)$/);
+    if (m) return m[1] + '/src/' + m[2];
     return null;
   }
   function treeUrl(repo, ref) {
@@ -1611,30 +1643,92 @@ footer { color: var(--text-faint); font-size: 12px; text-align: center; padding-
     if (repo.platform === 'bitbucket') return repo.base + '/src/' + tag;
     return null;
   }
-  function linkOrText(url, label) {
-    if (!url) return escapeHtml(label);
-    return '<a href="' + escapeHtml(url) + '" target="_blank" rel="noopener">' + escapeHtml(label) + '</a>';
-  }
   const REPO = detectRepo(data.pipeline || {});
+
+  // Format an ISO-8601 timestamp into [date, time] strings in UTC.
+  // Returns null when the input cannot be parsed so callers can fall back
+  // to the raw value.
+  function splitIsoUtc(iso) {
+    if (!iso) return null;
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return null;
+    const pad = (n) => String(n).padStart(2, '0');
+    const date = d.getUTCFullYear() + '-' + pad(d.getUTCMonth() + 1) + '-' + pad(d.getUTCDate());
+    const time = pad(d.getUTCHours()) + ':' + pad(d.getUTCMinutes()) + ':' + pad(d.getUTCSeconds()) + ' UTC';
+    return [date, time];
+  }
+
+  // Format an expiry date (ISO date or full timestamp) as "YYYY-MM-DD" +
+  // a relative chip ("in 12d", "today", "3d ago"). Colour the chip orange
+  // when expiring within a week, red when already past, default otherwise.
+  function formatExpiry(iso) {
+    if (!iso) return null;
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return null;
+    const pad = (n) => String(n).padStart(2, '0');
+    const dateStr = d.getUTCFullYear() + '-' + pad(d.getUTCMonth() + 1) + '-' + pad(d.getUTCDate());
+    const days = Math.round((d.getTime() - Date.now()) / (24 * 3600 * 1000));
+    let cls = 'expiry-rel';
+    let txt;
+    if (days < 0)       { cls += ' expired'; txt = Math.abs(days) + 'd ago'; }
+    else if (days === 0){ cls += ' soon';    txt = 'today'; }
+    else if (days <= 7) { cls += ' soon';    txt = 'in ' + days + 'd'; }
+    else                {                    txt = 'in ' + days + 'd'; }
+    return escapeHtml(dateStr) + ' <span class="' + cls + '">' + escapeHtml(txt) + '</span>';
+  }
 
   function renderMeta() {
     const grid = $('meta-grid');
     grid.innerHTML = '';
     const policy = (data.summary || {}).policy;
     if (policy) {
-      const lines = [['preset', policy.preset || '-'], ['source', policy.source || '-']];
-      if (policy.org_policy_url) lines.push(['org URL', policy.org_policy_url]);
-      if (policy.org_policy_loaded_at) lines.push(['loaded at', policy.org_policy_loaded_at]);
+      const lines = [['preset', policy.preset || '-']];
+
+      // source: prefer a click-through to the file at the pipeline's
+      // commit on the detected forge, otherwise plain text.
+      const src = policy.source || '';
+      const sha = ((data.pipeline || {}).commit || {}).sha
+               || ((data.pipeline || {}).commit || {}).short_sha
+               || '';
+      const srcUrl = (src && REPO && sha) ? blobUrl(REPO, sha, src) : null;
+      if (srcUrl) {
+        const forge = hostOf(REPO.base) || REPO.platform;
+        lines.push(['source',
+          '<a href="' + escapeHtml(srcUrl) + '" target="_blank" rel="noopener"'
+          + ' data-tooltip="Open ' + escapeHtml(src) + ' on ' + escapeHtml(forge)
+          + '">' + escapeHtml(src) + '</a>',
+          true
+        ]);
+      } else {
+        lines.push(['source', src || '-']);
+      }
+
+      if (policy.org_policy_url) {
+        const url = String(policy.org_policy_url);
+        const filename = (url.split('/').pop() || url) || url;
+        // Only link out when the URL can be rewritten to a forge blob
+        // view (i.e. BRIK_POLICY_URL was set to a raw git endpoint).
+        // Otherwise - file://, arbitrary HTTP host, internal mounts -
+        // render plain text with the full URL surfaced on hover.
+        const blob = gitRawToBlob(url);
+        const html = blob
+          ? '<a href="' + escapeHtml(blob) + '" target="_blank" rel="noopener"'
+            + ' data-tooltip="Open ' + escapeHtml(filename) + ' on '
+            + escapeHtml(hostOf(blob) || 'forge') + '">'
+            + escapeHtml(filename) + '</a>'
+          : '<span data-tooltip="' + escapeHtml(url) + '">'
+            + escapeHtml(filename) + '</span>';
+        lines.push(['org file', html, true]);
+      }
+      const split = splitIsoUtc(policy.org_policy_loaded_at);
+      if (split) {
+        lines.push(['loaded date', split[0]]);
+        lines.push(['loaded time', split[1]]);
+      } else if (policy.org_policy_loaded_at) {
+        lines.push(['loaded at', policy.org_policy_loaded_at]);
+      }
       const desc = POLICY_DESC[policy.preset] || '';
       grid.appendChild(kvCard('Policy', lines, desc));
-    }
-    const test = (data.stages || []).find((s) => s.stage === 'test');
-    const cov = test && test.business && test.business.coverage;
-    if (cov) {
-      const lines = [];
-      if (cov.line_pct != null)   lines.push(['lines',    cov.line_pct + '%']);
-      if (cov.branch_pct != null) lines.push(['branches', cov.branch_pct + '%']);
-      if (lines.length) grid.appendChild(kvCard('Coverage', lines));
     }
     const stages = (data.summary || {}).stages || {};
     grid.appendChild(kvCard('Stages', [
@@ -1652,15 +1746,28 @@ footer { color: var(--text-faint); font-size: 12px; text-align: center; padding-
       ['error',   business.error_count   || 0]
     ]));
     if ((policy && (policy.expiring_soon || []).length > 0)) {
-      const lines = policy.expiring_soon.map((e) => [e.id || e.glob || 'entry', e.expires || '-']);
+      const lines = policy.expiring_soon.map((e) => {
+        const label = e.id || e.glob || 'entry';
+        const formatted = formatExpiry(e.expires);
+        return formatted
+          ? [label, formatted, true]
+          : [label, e.expires || '-'];
+      });
       grid.appendChild(kvCard('Expiring soon', lines));
     }
   }
+  // Render a small key/value card. Each line is [k, v] (escaped) or
+  // [k, v, true] where the third element flags v as pre-rendered HTML
+  // (used for clickable links and similar inline composition).
   function kvCard(title, lines, desc) {
     const c = document.createElement('div');
     c.className = 'kv-card';
     c.innerHTML = '<h3>' + escapeHtml(title) + '</h3>'
-      + lines.map((l) => '<div class="kv-line"><span class="k">' + escapeHtml(l[0]) + '</span><span class="v">' + escapeHtml(String(l[1])) + '</span></div>').join('')
+      + lines.map((l) => {
+          const vHtml = l[2] === true ? String(l[1]) : escapeHtml(String(l[1]));
+          return '<div class="kv-line"><span class="k">' + escapeHtml(l[0])
+               + '</span><span class="v">' + vHtml + '</span></div>';
+        }).join('')
       + (desc ? '<div class="desc">' + escapeHtml(desc) + '</div>' : '');
     return c;
   }
@@ -1668,7 +1775,7 @@ footer { color: var(--text-faint); font-size: 12px; text-align: center; padding-
   // Severity bar component shared by sast/scan/container-scan
   function severityBar(by_sev, total) {
     const t = total || SEV_ORDER.reduce((acc, k) => acc + (by_sev[k] || 0), 0);
-    if (t === 0) return '<div class="muted" style="font-size:13px;">No findings.</div>';
+    if (t === 0) return '<div class="hint">No findings.</div>';
     const segs = SEV_ORDER.filter((k) => (by_sev[k] || 0) > 0).map((k) => {
       const w = ((by_sev[k] || 0) / t * 100).toFixed(1);
       return '<div class="seg ' + k + '" style="width:' + w + '%;" title="' + by_sev[k] + ' ' + k + '"></div>';
@@ -1679,10 +1786,17 @@ footer { color: var(--text-faint); font-size: 12px; text-align: center; padding-
     return '<div class="sev-bar">' + segs + '</div>'
          + '<div class="sev-legend">' + legend + '</div>';
   }
+  // Standard tile shape: label / value / optional sub. Use opts.warning
+  // to flag the tile (orange-tinted border, warning bg) - the build stage
+  // uses it for size_bytes=0 (empty artifact). opts.mono switches the
+  // value to compact mono (13px) but most callers prefer the default
+  // 16px and wrap mono fragments in <span class="mono"> inside the value
+  // so all stages render tiles at the same scale.
   function tile(label, valueHtml, subHtml, opts) {
     opts = opts || {};
     const cls = opts.mono ? 'value mono' : 'value';
-    return '<div class="stage-tile">'
+    const tileCls = 'stage-tile' + (opts.warning ? ' tile-warning' : '');
+    return '<div class="' + tileCls + '">'
       + '<div class="label">' + escapeHtml(label) + '</div>'
       + '<div class="' + cls + '">' + valueHtml + '</div>'
       + (subHtml ? '<div class="sub">' + subHtml + '</div>' : '')
@@ -1838,8 +1952,6 @@ footer { color: var(--text-faint); font-size: 12px; text-align: center; padding-
     // showing sparse half-data - e.g. a tools table with all "missing"
     // because prereqs_present was not written before init aborted.
     if (t.status === 'failed') return '';
-    const sectionLabel = (txt) =>
-      '<div class="section-label">' + escapeHtml(txt) + '</div>';
 
     // --- Resolved configuration ---
     const stack    = t.stack || '';
@@ -1848,11 +1960,11 @@ footer { color: var(--text-faint); font-size: 12px; text-align: center; padding-
       ? '<span class="stack-chip"><span class="lang">' + escapeHtml(stack) + '</span>'
         + (stackV ? '<span class="ver mono">' + escapeHtml(stackV) + '</span>' : '')
         + '</span>'
-      : '<span class="muted" style="font-size:13px;">unknown</span>';
+      : '<span class="hint">unknown</span>';
     const runnerImg = r.image || '';
     const runnerCell = runnerImg
       ? '<span class="mono image-ref">' + escapeHtml(runnerImg) + '</span>' + copyBtn(runnerImg, 'Copy image name')
-      : '<span class="muted" style="font-size:13px;">unknown</span>';
+      : '<span class="hint">unknown</span>';
     const cfgTiles = [
       tile('Stack', stackHtml, ''),
       tile('Runner image', runnerCell, '')
@@ -1864,7 +1976,7 @@ footer { color: var(--text-faint); font-size: 12px; text-align: center; padding-
     const cfgValidIsFalse = (cfgValid === false || cfgValid === 'false');
     const cfgPill = cfgValidIsTrue
       ? '<span class="status-pill ok">valid</span>'
-      : (cfgValidIsFalse ? '<span class="status-pill bad">invalid</span>' : '<span class="muted" style="font-size:13px;">unknown</span>');
+      : (cfgValidIsFalse ? '<span class="status-pill bad">invalid</span>' : '<span class="hint">unknown</span>');
     const cfgFile = t.config_file || '';
     const cfgFileSub = cfgFile ? '<span class="mono faint" data-tooltip="' + escapeHtml(cfgFile) + '">' + escapeHtml(cfgFile.split('/').slice(-2).join('/')) + '</span>' : '';
     const toolsHtml = buildToolsTable(t.prereqs_present || {}, t.tool_versions || {});
@@ -1950,8 +2062,6 @@ footer { color: var(--text-faint); font-size: 12px; text-align: center; padding-
       tagTiles.push(tile('Tagged commit', '<span class="mono">' + escapeHtml(shaShort) + '</span>' + copyBtn(tagSha, 'Copy full commit SHA'), ''));
     }
 
-    const sectionLabel = (txt) => '<div class="section-label">' + escapeHtml(txt) + '</div>';
-
     return ''
       + sectionLabel('Version decision')
       + '<div class="stage-grid">' + decisionTiles.join('') + '</div>'
@@ -1989,19 +2099,11 @@ footer { color: var(--text-faint); font-size: 12px; text-align: center; padding-
     if (a.type)     subParts.push(escapeHtml(a.type));
     if (main && dirName) subParts.push('in ' + escapeHtml(dirName) + '/');
     const subText = subParts.join(' &middot; ');
-    const artifactTile = '<div class="stage-tile' + (isEmpty ? ' tile-warning' : '') + '">'
-      + '<div class="label">Artifact</div>'
-      + '<div class="value mono">' + escapeHtml(displayName) + sizeBadge + '</div>'
-      + (subText ? '<div class="sub">' + subText + '</div>' : '')
-      + '</div>';
-
-    const artifactTiles = [artifactTile];
+    const artifactValue = '<span class="mono">' + escapeHtml(displayName) + '</span>' + sizeBadge;
+    const artifactTiles = [tile('Artifact', artifactValue, subText, { warning: isEmpty })];
     if (a.sha256) {
       artifactTiles.push(
-        '<div class="stage-tile">'
-        + '<div class="label">SHA-256</div>'
-        + '<div class="value mono">' + shaCell(a.sha256) + copyBtn(a.sha256, 'Copy full SHA-256') + '</div>'
-        + '</div>'
+        tile('SHA-256', shaCell(a.sha256) + copyBtn(a.sha256, 'Copy full SHA-256'), '')
       );
     }
 
@@ -2018,8 +2120,6 @@ footer { color: var(--text-faint); font-size: 12px; text-align: center; padding-
       ? '<div class="method-line">' + methodParts.join('<span class="dot-sep">&middot;</span>') + '</div>'
       : '';
 
-    const sectionLabel = (txt) => '<div class="section-label">' + escapeHtml(txt) + '</div>';
-
     return ''
       + sectionLabel('Produced artifact')
       + '<div class="stage-grid">' + artifactTiles.join('') + '</div>'
@@ -2034,69 +2134,56 @@ footer { color: var(--text-faint); font-size: 12px; text-align: center; padding-
     b = b || {}; t = t || {};
     const tools  = t.tools  || {};
     const checks = t.checks || [];
-    const stageStatus = (t.status || b.status || 'unknown');
     const violations = b.violations || null;
-    const byCheck = (violations && violations.by_check) || null;
 
-    const sectionLabel = (txt) =>
-      '<div class="section-label">' + escapeHtml(txt) + '</div>';
-
-    // --- Section 1: Quality checks (one row per check) ---
+    // --- Section 1: Quality checks (Check / Tool, one row per check) ---
+    // Same 2-column shape as sast/scan/test for visual coherence. The
+    // overall verdict is shown by the Violations counter below; per-check
+    // breakdown (when SARIF was aggregated) lives in business.violations
+    // .by_check inside the data island for debugging.
     const checkRows = checks.map((c) => {
       const tool = tools[c] || '-';
-      let outcome;
-      if (byCheck && typeof byCheck[c] === 'number') {
-        outcome = byCheck[c] === 0
-          ? '<span class="tool-ok" aria-label="no violations"><svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5l3 3 7-7"/></svg></span>'
-          : '<span class="tool-missing" aria-label="violations"><span class="mono">' + escapeHtml(String(byCheck[c])) + '</span></span>';
-      } else if (stageStatus === 'success') {
-        outcome = '<span class="tool-ok" aria-label="passed"><svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5l3 3 7-7"/></svg></span>';
-      } else if (stageStatus === 'failed') {
-        outcome = '<span class="tool-missing" aria-label="failed"><svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4l8 8M12 4l-8 8"/></svg></span>';
-      } else {
-        outcome = '<span class="muted">-</span>';
-      }
       return '<tr>'
         + '<td class="tool-name mono">' + escapeHtml(c) + '</td>'
         + '<td class="tool-version mono">' + escapeHtml(tool) + '</td>'
-        + '<td class="tool-status">' + outcome + '</td>'
         + '</tr>';
     });
 
     let checksHtml;
     if (checkRows.length === 0) {
-      checksHtml = '<div class="muted" style="font-size:13px;">No checks reported.</div>';
+      checksHtml = '<div class="hint">No checks reported.</div>';
     } else {
       checksHtml = '<table class="tools-table lint-table"><thead><tr>'
         + '<th class="tool-name">Check</th>'
         + '<th class="tool-version">Tool</th>'
-        + '<th class="tool-status">Outcome</th>'
         + '</tr></thead><tbody>' + checkRows.join('') + '</tbody></table>';
     }
 
-    // --- Section 2: Violations (only when SARIF was aggregated) ---
-    let violationsBlock = '';
+    // --- Section 2: Violations ---
+    // Uses the same findingsCounter component as sast/scan/container-scan
+    // so the visual treatment of the "primary result" is uniform across
+    // every verify stage. Pass label='violation' so the counter pluralises
+    // correctly ("0 violations" / "1 violation"). When SARIF was not
+    // aggregated, the body becomes a discreet hint so the tile envelope
+    // stays consistent across runs.
+    let violationsBody;
     if (violations) {
-      const total  = violations.total || 0;
-      const bySev  = violations.by_severity || {};
-      const tiles  = [
-        tile('Total violations', '<span style="font-size:22px;">' + total + '</span>', '')
-      ];
-      let block = '<div class="stage-grid">' + tiles.join('') + '</div>';
-      if (total > 0) block += severityBar(bySev, total);
-      violationsBlock = sectionLabel('Violations') + block;
+      const total = violations.total || 0;
+      const bySev = violations.by_severity || {};
+      const state = (total === 0) ? 'clean' : 'dirty';
+      violationsBody = findingsCounter(total, '', state, 'violation');
+      if (total > 0) {
+        violationsBody += '<div class="findings-severity-wrap">' + severityBar(bySev, total) + '</div>';
+      }
     } else {
-      // Discreet hint: lint ran but did not aggregate per-check SARIF, so
-      // detailed counts are unavailable. Common with tools that exit
-      // non-zero on violations without a structured report (Brik then
-      // surfaces only the verdict).
-      violationsBlock = '<div class="muted lint-no-sarif">No SARIF report aggregated - per-check violation counts unavailable. See job logs for tool output.</div>';
+      violationsBody = '<div class="lint-no-sarif">No SARIF report aggregated - per-check violation counts unavailable. See job logs for tool output.</div>';
     }
 
     return ''
       + sectionLabel('Quality checks')
-      + checksHtml
-      + violationsBlock;
+      + sectionTile(checksHtml)
+      + sectionLabel('Violations')
+      + sectionTile(violationsBody);
   }
 
   // Lint failure reason mapping: 10 = check failed (violations found),
@@ -2122,15 +2209,23 @@ footer { color: var(--text-faint); font-size: 12px; text-align: center; padding-
     if (ec === '4') return 'Invalid lint execution environment.';
     return b.reason || null;
   }
-  // Single-row Check / Tool table, reused by sast, container-scan, and scan.
-  function checkTable(checkLabel, toolName) {
+  // Check / Tool table shell, used by every stage that surfaces tools.
+  // Pass the rendered <tr> rows; the shell wraps them in the standard
+  // tools-table chrome. The sast-table class is a semantic marker (no
+  // unique CSS rule -- visual style comes from tools-table).
+  function checkTableShell(bodyRowsHtml) {
     return '<table class="tools-table sast-table"><thead><tr>'
       + '<th class="tool-name">Check</th>'
       + '<th class="tool-version">Tool</th>'
-      + '</tr></thead><tbody>'
-      + '<tr><td class="tool-name mono">' + escapeHtml(checkLabel) + '</td>'
-      +     '<td class="tool-version mono">' + escapeHtml(toolName) + '</td></tr>'
-      + '</tbody></table>';
+      + '</tr></thead><tbody>' + bodyRowsHtml + '</tbody></table>';
+  }
+  // Single-row Check / Tool table, reused by sast, container-scan,
+  // scan and package.
+  function checkTable(checkLabel, toolName) {
+    return checkTableShell(
+      '<tr><td class="tool-name mono">' + escapeHtml(checkLabel) + '</td>'
+      +   '<td class="tool-version mono">' + escapeHtml(toolName) + '</td></tr>'
+    );
   }
   // Findings counter with three visual states:
   //   - clean   (green): total = 0, nothing detected
@@ -2142,16 +2237,13 @@ footer { color: var(--text-faint); font-size: 12px; text-align: center; padding-
   // (clean vs dirty). Callers that distinguish ignored from failing (sast,
   // container-scan) should pass an explicit state; callers without a
   // policy/ignored notion (scan deps, scan secrets) can omit it.
-  function findingsCounter(total, chipHtml, state) {
+  function findingsCounter(total, chipHtml, state, label) {
     const resolved = state || (total === 0 ? 'clean' : 'dirty');
     const counterClass = 'findings-counter ' + resolved;
-    const counterIcon  = (resolved === 'clean')
-      ? '<svg viewBox="0 0 16 16" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8.5l3 3 7-7"/></svg>'
-      : '';
+    const noun = label || 'finding';
     const counterHtml = '<div class="' + counterClass + '">'
-      + counterIcon
       + '<span class="big-number">' + total + '</span>'
-      + '<span class="counter-label">finding' + (total === 1 ? '' : 's') + '</span>'
+      + '<span class="counter-label">' + escapeHtml(noun) + (total === 1 ? '' : 's') + '</span>'
       + '</div>';
     return '<div class="findings-counter-row">' + counterHtml + (chipHtml || '') + '</div>';
   }
@@ -2181,9 +2273,6 @@ footer { color: var(--text-faint); font-size: 12px; text-align: center; padding-
     const ignoredBySeverity = (f.ignored && f.ignored.by_severity) || {};
     const cweCount = Array.isArray(f.cwe) ? f.cwe.length : 0;
     const isClean  = (total === 0);
-
-    const sectionLabel = (txt) =>
-      '<div class="section-label">' + escapeHtml(txt) + '</div>';
 
     // --- Section 1: Security checks (Check / Tool table, lint-table style) ---
     const checkLabel = label || 'static analysis';
@@ -2270,22 +2359,20 @@ footer { color: var(--text-faint); font-size: 12px; text-align: center; padding-
 
     return ''
       + sectionLabel('Security checks')
-      + checksTable
+      + sectionTile(checksTable)
       + sectionLabel('Findings')
-      + counterRow
-      + detailsBlock
-      + ignoredBlock
-      + itemsBlock;
+      + sectionTile(counterRow + detailsBlock + ignoredBlock + itemsBlock);
   }
-  // Scan stage: two equal-weight sondes (Dependencies, Secrets), each
-  // following the same Check/Tool + counter pattern as sast. SBOM is shown
-  // as a chip alongside the Dependencies counter when present. Severity
-  // bar appears under deps only when total > 0. No severity bar for
-  // secrets (the count itself is the signal).
+  // Scan stage: two sondes (dependency vulnerabilities + secret scan)
+  // surfaced through the same Checks/Findings shape as lint and sast for
+  // visual coherence. The Checks tile holds one 2-row Check/Tool table
+  // (one row per sonde). The Findings tile holds a group per sonde, each
+  // with its own counter and optional context (SBOM chip + severity bar
+  // for deps; counter only for secrets - the count is the signal). The
+  // sonde sub-label sits between the section-label and the counter so the
+  // three-level hierarchy stays readable.
   function renderScan(b, t) {
     b = b || {}; t = t || {};
-    const sectionLabel = (txt) =>
-      '<div class="section-label">' + escapeHtml(txt) + '</div>';
 
     // --- Dependencies sonde ---
     const deps     = b.deps || {};
@@ -2296,7 +2383,6 @@ footer { color: var(--text-faint); font-size: 12px; text-align: center; padding-
     const sbomChip = sbomFile
       ? '<span class="cwe-chip" data-tooltip="' + escapeHtml(deps.sbom_path) + '">SBOM: <span class="mono">' + escapeHtml(sbomFile) + '</span></span>'
       : '';
-    const depsCheckTable = checkTable('dependency vulnerabilities', depsTool);
     const depsCounter    = findingsCounter(depsTot, sbomChip);
     let   depsDetails    = '';
     if (depsTot > 0) {
@@ -2310,17 +2396,32 @@ footer { color: var(--text-faint); font-size: 12px; text-align: center; padding-
     const sec      = b.secret || {};
     const secTot   = sec.findings_count || 0;
     const secTool  = (t.secret && t.secret.tool) || '-';
-    const secCheckTable = checkTable('secret scan', secTool);
     const secCounter    = findingsCounter(secTot, '');
 
+    // Combined 2-row checks table: one row per sonde.
+    const checksTable = checkTableShell(
+      '<tr><td class="tool-name mono">dependency vulnerabilities</td>'
+      +   '<td class="tool-version mono">' + escapeHtml(depsTool) + '</td></tr>'
+      + '<tr><td class="tool-name mono">secret scan</td>'
+      +   '<td class="tool-version mono">' + escapeHtml(secTool) + '</td></tr>'
+    );
+
+    // Two grouped findings: each gets a small sonde label above its counter.
+    const findingsBody = ''
+      + '<div class="scan-finding">'
+      +   '<div class="scan-finding-label">dependency vulnerabilities</div>'
+      +   depsCounter + depsDetails
+      + '</div>'
+      + '<div class="scan-finding">'
+      +   '<div class="scan-finding-label">secret scan</div>'
+      +   secCounter
+      + '</div>';
+
     return ''
-      + sectionLabel('Dependencies')
-      + depsCheckTable
-      + depsCounter
-      + depsDetails
-      + sectionLabel('Secrets')
-      + secCheckTable
-      + secCounter;
+      + sectionLabel('Checks')
+      + sectionTile(checksTable)
+      + sectionLabel('Findings')
+      + sectionTile(findingsBody);
   }
   // Test stage: three sections. Test execution shows the test tooling
   // (Check/Tool table, extra rows when framework or coverage_tool diverge
@@ -2331,8 +2432,6 @@ footer { color: var(--text-faint); font-size: 12px; text-align: center; padding-
   // Coverage keeps the existing line + branch bars with 80/60 thresholds.
   function renderTest(b, t) {
     b = b || {}; t = t || {};
-    const sectionLabel = (txt) =>
-      '<div class="section-label">' + escapeHtml(txt) + '</div>';
 
     // --- Section 1: Test execution (Check / Tool, multi-row when divergent) ---
     const tool         = t.tool || '-';
@@ -2348,10 +2447,7 @@ footer { color: var(--text-faint); font-size: 12px; text-align: center; padding-
       rows.push('<tr><td class="tool-name mono">coverage</td>'
               + '<td class="tool-version mono">' + escapeHtml(coverageTool) + '</td></tr>');
     }
-    const checksTable = '<table class="tools-table sast-table"><thead><tr>'
-      + '<th class="tool-name">Check</th>'
-      + '<th class="tool-version">Tool</th>'
-      + '</tr></thead><tbody>' + rows.join('') + '</tbody></table>';
+    const checksTable = checkTableShell(rows.join(''));
 
     // --- Section 2: Results (counts mini-table, or fallback verdict) ---
     const tests = b.tests || null;
@@ -2400,18 +2496,18 @@ footer { color: var(--text-faint); font-size: 12px; text-align: center; padding-
     };
     const bars = [bar('lines', line), bar('branches', branch)]
       .filter(Boolean)
-      .join('<div style="height:var(--space-3);"></div>');
+      .join('');
     const coverageBlock = bars
       ? bars
-      : '<div class="muted" style="font-size:13px;">No coverage reported.</div>';
+      : '<div class="hint">No coverage reported.</div>';
 
     return ''
       + sectionLabel('Test execution')
-      + checksTable
+      + sectionTile(checksTable)
       + sectionLabel('Results')
-      + resultsBlock
+      + sectionTile(resultsBlock)
       + sectionLabel('Coverage')
-      + coverageBlock;
+      + sectionTile(coverageBlock);
   }
   // Best-effort registry URL from the host. Internal/dev hosts (.test,
   // .local, .internal, or with an explicit port suggesting self-hosted
@@ -2434,8 +2530,6 @@ footer { color: var(--text-faint); font-size: 12px; text-align: center; padding-
   // muted message replaces the panel entirely.
   function renderPackage(b, t) {
     b = b || {}; t = t || {};
-    const sectionLabel = (txt) =>
-      '<div class="section-label">' + escapeHtml(txt) + '</div>';
 
     // --- Skipped fallback ---
     if (t.status === 'skipped' || b.status === 'skipped') {
@@ -2495,35 +2589,27 @@ footer { color: var(--text-faint); font-size: 12px; text-align: center; padding-
     const regSub = (reg.namespace || reg.repository)
       ? '<div class="meta-sub">' + escapeHtml((reg.namespace ? reg.namespace + '/' : '') + (reg.repository || '')) + '</div>'
       : '';
-    const registryTile = '<div class="pkg-meta-tile">'
+    const registryBlock = '<div class="pkg-meta-tile">'
       + '<span class="meta-key">Registry</span>'
       + regValue
       + regSub
       + '</div>';
 
+    // Packager Check/Tool table - same shape as the leading Check/Tool
+    // table of every other stage (lint Quality checks, sast Security
+    // checks, scan Checks, test Test execution). It opens the package
+    // panel for visual coherence: the user sees WHICH tool was used
+    // before seeing the artifact and the distribution.
     const packager = t.packager || '-';
-    const packagerTable = '<table class="tools-table sast-table"><thead><tr>'
-      + '<th class="tool-name">Check</th>'
-      + '<th class="tool-version">Tool</th>'
-      + '</tr></thead><tbody>'
-      + '<tr><td class="tool-name mono">container packaging</td>'
-      +     '<td class="tool-version mono">' + escapeHtml(packager) + '</td></tr>'
-      + '</tbody></table>';
-    const packagerTile = '<div class="pkg-meta-tile">'
-      + '<span class="meta-key">Packager</span>'
-      + packagerTable
-      + '</div>';
-
-    const distributionBlock = '<div class="pkg-meta-grid">'
-      + registryTile + packagerTile
-      + '</div>';
+    const packagerTable = checkTable('container packaging', packager);
 
     return ''
+      + sectionLabel('Packager')
+      + sectionTile(packagerTable)
       + sectionLabel('Container image')
-      + imageBlock
-      + digestBlock
+      + sectionTile(imageBlock + digestBlock)
       + sectionLabel('Distribution')
-      + distributionBlock;
+      + sectionTile(registryBlock);
   }
   // deploy.business shape (see brik/lib/stages/deploy.sh):
   //   { environments: [{name, target, namespace?, strategy?}], status, reason }
@@ -2547,32 +2633,28 @@ footer { color: var(--text-faint); font-size: 12px; text-align: center; padding-
       + '<span>' + escapeHtml(target || '-') + '</span>'
       + '</span>';
   }
-  function deployEnvCard(env, isError) {
+  // One table row per environment. The Target cell keeps the colored
+  // deployTargetChip so k8s / gitops stay visually distinct. Namespace
+  // and Strategy degrade to a muted dash when absent (gitops envs have
+  // no namespace; legacy entries may have no strategy).
+  function deployEnvRow(env, isError) {
     const name = env.name || '-';
     const target = env.target || '-';
     const ns = env.namespace;
     const strat = env.strategy;
-    const rows = [];
-    if (ns) {
-      rows.push('<div class="deploy-env-row">'
-        + '<span class="deploy-env-key">ns</span>'
-        + '<span class="deploy-env-val mono">' + escapeHtml(ns) + '</span>'
-        + '</div>');
-    }
-    if (strat) {
-      rows.push('<div class="deploy-env-row">'
-        + '<span class="deploy-env-key">strategy</span>'
-        + '<span class="deploy-env-val">' + escapeHtml(strat) + '</span>'
-        + '</div>');
-    }
-    const cls = 'deploy-env-card' + (isError ? ' error' : '');
-    return '<div class="' + cls + '">'
-      + '<div class="deploy-env-header">'
-      +   '<span class="deploy-env-name">' + escapeHtml(name) + '</span>'
-      +   deployTargetChip(target)
-      + '</div>'
-      + rows.join('')
-      + '</div>';
+    const nameCls = 'deploy-env-name' + (isError ? ' error' : '');
+    const nsCell = ns
+      ? '<td class="mono">' + escapeHtml(ns) + '</td>'
+      : '<td><span class="muted">-</span></td>';
+    const stratCell = strat
+      ? '<td>' + escapeHtml(strat) + '</td>'
+      : '<td><span class="muted">-</span></td>';
+    return '<tr>'
+      + '<td class="' + nameCls + '">' + escapeHtml(name) + '</td>'
+      + '<td>' + deployTargetChip(target) + '</td>'
+      + nsCell
+      + stratCell
+      + '</tr>';
   }
   function deploySkipped() {
     return '<div class="deploy-skipped">'
@@ -2584,8 +2666,13 @@ footer { color: var(--text-faint); font-size: 12px; text-align: center; padding-
     const envs = Array.isArray(b.environments) ? b.environments : [];
     if (envs.length === 0) return deploySkipped();
     const isError = b.status === 'error' || b.status === 'failed' || b.status === 'failure';
-    const cards = envs.map((e) => deployEnvCard(e || {}, isError)).join('');
-    return '<div class="deploy-env-grid">' + cards + '</div>';
+    const rows = envs.map((e) => deployEnvRow(e || {}, isError)).join('');
+    const table = '<table class="deploy-env-table"><thead><tr>'
+      + '<th>Environment</th><th>Target</th><th>Namespace</th><th>Strategy</th>'
+      + '</tr></thead><tbody>' + rows + '</tbody></table>';
+    return ''
+      + sectionLabel('Environments')
+      + sectionTile(table);
   }
   function deployFailureReason(s) {
     const b = s.business || {};
@@ -2621,16 +2708,41 @@ footer { color: var(--text-faint); font-size: 12px; text-align: center; padding-
       + '<thead><tr>'
       + '<th>Channel</th><th>Configured</th><th>Policy</th><th>Will dispatch</th>'
       + '</tr></thead><tbody>' + rows + '</tbody></table>';
+    // Gatekeeper renders the *pipeline verdict* - the final pass/fail
+    // signal notify propagates to the CI runner so the job exits with
+    // the correct code. Derived from pipeline.business.status:
+    //   success -> PASS  ("All business checks passed")
+    //   warning -> PASS  ("Non-critical issues - still shippable")
+    //   error   -> FAIL  ("Critical failures - not shippable")
+    // The visual makes the verdict unmissable (large coloured pill) and
+    // explains the rationale in plain language so a reader does not need
+    // the runtime semantics to understand the outcome.
     const gk = n.gatekeeper || {};
-    const gkCls = gk.decision === 'fail' ? 'notify-gk-fail' : 'notify-gk-pass';
-    const gkLabel = gk.decision === 'fail' ? 'Fail' : 'Pass';
+    const decision = gk.decision === 'fail' ? 'fail' : 'pass';
+    const bstatus  = gk.business_status || 'unknown';
+    const decisionLabel = decision === 'fail' ? 'FAIL' : 'PASS';
+    const explanations = {
+      success: 'All business checks passed. The pipeline is shippable.',
+      warning: 'Non-critical issues detected. The pipeline is shippable but warnings warrant review.',
+      error:   'Critical business failures detected. The pipeline is not shippable.',
+      unknown: 'Business outcome could not be determined.'
+    };
+    const explanation = explanations[bstatus] || explanations.unknown;
+    const gkCls = decision === 'fail' ? 'notify-gk-fail' : 'notify-gk-pass';
     const gkBlock = '<div class="notify-gatekeeper ' + gkCls + '">'
-      + '<span class="notify-gk-key">Gatekeeper</span>'
-      + '<span class="notify-gk-decision">' + escapeHtml(gkLabel) + '</span>'
-      + '<span class="notify-gk-business">business: ' + escapeHtml(gk.business_status || '-') + '</span>'
+      + '<div class="notify-gk-header">'
+      +   '<span class="notify-gk-verdict">' + decisionLabel + '</span>'
+      +   '<span class="notify-gk-source">based on business status: '
+      +     '<span class="notify-gk-bstatus">' + escapeHtml(bstatus) + '</span>'
+      +   '</span>'
+      + '</div>'
+      + '<div class="notify-gk-explain">' + escapeHtml(explanation) + '</div>'
       + '</div>';
-    const sectionLabel = (txt) => '<div class="section-label">' + escapeHtml(txt) + '</div>';
-    return sectionLabel('Channels') + channelsTable + sectionLabel('Gatekeeper') + gkBlock;
+    return ''
+      + sectionLabel('Channels')
+      + sectionTile(channelsTable)
+      + sectionLabel('Pipeline verdict')
+      + sectionTile(gkBlock);
   }
 
   const STAGE_RENDERERS = {
@@ -2729,7 +2841,7 @@ footer { color: var(--text-faint); font-size: 12px; text-align: center; padding-
   }
   function renderFlat(b) {
     const lines = flattenBusiness(b);
-    if (lines.length === 0) return '<div class="muted" style="font-size:13px;">No payload.</div>';
+    if (lines.length === 0) return '<div class="hint">No payload.</div>';
     return lines.map((l) => '<div class="kv-line"><span class="k">' + escapeHtml(l[0]) + '</span><span class="v">' + escapeHtml(String(l[1])) + '</span></div>').join('');
   }
   function flattenBusiness(b) {
