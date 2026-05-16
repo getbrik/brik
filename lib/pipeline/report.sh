@@ -23,8 +23,8 @@ _BRIK_REPORT_LOADED=1
 [[ -z "${_BRIK_ERROR_LOADED:-}" ]] && . "${BASH_SOURCE[0]%/*}/error.sh"
 # shellcheck source=../transverse/sarif.sh
 [[ -z "${_BRIK_TRANSVERSE_SARIF_LOADED:-}" ]] && . "${BASH_SOURCE[0]%/*}/../transverse/sarif.sh"
-# shellcheck source=report_html.sh
-[[ -z "${_BRIK_REPORT_HTML_LOADED:-}" ]] && . "${BASH_SOURCE[0]%/*}/report_html.sh"
+# shellcheck source=report_html/render.sh
+[[ -z "${_BRIK_REPORT_HTML_RENDER_LOADED:-}" ]] && . "${BASH_SOURCE[0]%/*}/report_html/render.sh"
 
 # Resolve the backend JSON path from BRIK_LOG_DIR.
 _report._backend_path() {

@@ -1,6 +1,6 @@
 Describe "report renderers expose business outcome"
   Include "$BRIK_PIPELINE_LIB/report.sh"
-  Include "$BRIK_PIPELINE_LIB/report_html.sh"
+  Include "$BRIK_PIPELINE_LIB/report_html/render.sh"
 
   setup_dirs() {
     RB_LOG_DIR="$(mktemp -d)"

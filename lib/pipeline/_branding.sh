@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# shellcheck disable=SC2034  # constants consumed by report_html.sh after sourcing
+# shellcheck disable=SC2034  # constants consumed by report_html/head.sh after sourcing
 # @module pipeline/_branding
 # @description Brik branding assets embedded into HTML reports.
 # Logo is the official Brik mark resized to 128x128 (covers retina 2x
