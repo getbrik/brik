@@ -7,6 +7,33 @@
 [[ -n "${_BRIK_STACKS_DEPS_LOADED:-}" ]] && return 0
 _BRIK_STACKS_DEPS_LOADED=1
 
+# Stack-specific cache paths -- single source of truth.
+#
+# Three consumers query this rather than maintain their own copy:
+#   1. GitLab job templates (build/lint/package/sast/scan/test.yml) declare
+#      these under cache.paths so dependency downloads survive across runs.
+#      The inline YAML list is kept in sync via spec/integration/cache_paths_parity_spec.sh.
+#   2. Jenkins brikPipeline.groovy maps each path to a "<top-level>/**"
+#      EXCLUDE pattern for cleanWs, so cached deps survive cross-build cleanups.
+#   3. shared-libs/gitlab/scripts/gitlab-wrapper.sh pre-creates each path
+#      with a .brik-keep marker so GitLab's cache step never logs
+#      "no matching files" for stacks the active build doesn't populate.
+#
+# Output: one path per line, in stable order (the order CI templates and
+# the marker function iterate over). Paths are relative to BRIK_WORKSPACE.
+stacks.cache_paths() {
+    cat <<'EOF'
+.npm
+.cache/pip
+.m2/repository
+.gradle/caches
+.gradle/wrapper
+.cargo/registry
+.cargo/git
+.nuget/packages
+EOF
+}
+
 # Install project dependencies for a given stage mode.
 # Usage: stacks.install_deps <workspace> <mode>
 # Modes:

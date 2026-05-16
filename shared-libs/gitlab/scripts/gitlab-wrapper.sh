@@ -91,8 +91,97 @@ _brik_gitlab_normalize_dry_run() {
     esac
 }
 
+# Pre-create the GitLab cache and artefact directories declared in the job
+# templates (build.yml, test.yml, ...). The active stack only populates one
+# or two of them, so GitLab logs "no matching files" for every other path
+# on every run. Pre-creating each path with an empty .brik-keep file makes
+# the cache/artefact step always find at least one entry and stay silent.
+#
+# Cache paths come from the canonical lib/stacks/_deps.sh::stacks.cache_paths.
+# Artefact output dirs (coverage, reports, build, target, bin, dist) stay
+# inline because they are stack-independent. Glob placeholders cover the
+# artifacts:paths glob patterns (*.whl, *.tar.gz, reports/*.xml) that no
+# stack output directory can satisfy.
+#
+# Arguments: $1 = workspace dir (optional, defaults to $BRIK_WORKSPACE).
+# Operates inside a subshell so the caller's PWD is never altered.
+# Returns: 0 on success or partial success; 4 if no workspace can be resolved.
+# A read-only filesystem or per-path permission error is tolerated: one bad
+# path must not break the rest of the stage.
+_brik_gitlab._ensure_artefact_markers() {
+    local workspace="${1:-${BRIK_WORKSPACE:-}}"
+
+    if [[ -z "$workspace" ]]; then
+        echo "error: _brik_gitlab._ensure_artefact_markers: workspace required (set BRIK_WORKSPACE or pass as \$1)" >&2
+        return "$BRIK_EXIT_INVALID_ENV"
+    fi
+    if [[ ! -d "$workspace" ]]; then
+        echo "error: _brik_gitlab._ensure_artefact_markers: workspace not a directory: $workspace" >&2
+        return "$BRIK_EXIT_INVALID_ENV"
+    fi
+
+    # Ensure stacks.cache_paths is loaded. The _deps.sh double-source guard
+    # makes this safe to call on every stage; BRIK_HOME is validated before
+    # any caller reaches this function.
+    if ! declare -f stacks.cache_paths >/dev/null 2>&1; then
+        # shellcheck source=/dev/null
+        . "${BRIK_HOME}/lib/stacks/_deps.sh"
+    fi
+
+    # Stack cache paths -- single source of truth.
+    local stack_paths=()
+    local _p
+    while IFS= read -r _p; do
+        stack_paths+=("$_p")
+    done < <(stacks.cache_paths)
+
+    # Stage artefact output dirs (stack-independent, kept inline).
+    local artefact_paths=(
+        "coverage"
+        "reports"
+        "build"
+        "target"
+        "bin"
+        "dist"
+    )
+    # Glob-pattern placeholders: artifacts:paths and reports:junit list
+    # glob patterns (*.whl, *.tar.gz, reports/*.xml) that no stack-output
+    # dir can satisfy. A zero-byte placeholder file matches the glob and
+    # silences the warning without affecting real archives produced by the
+    # stage.
+    local glob_placeholders=(
+        ".brik-keep.whl"
+        ".brik-keep.tar.gz"
+        "reports/.brik-keep.xml"
+    )
+    (
+        cd "$workspace" || exit 0
+        local p
+        for p in "${stack_paths[@]}" "${artefact_paths[@]}"; do
+            [[ -f "$p/.brik-keep" ]] && continue
+            mkdir -p "$p" 2>/dev/null || continue
+            : > "$p/.brik-keep" 2>/dev/null || true
+        done
+        for p in "${glob_placeholders[@]}"; do
+            [[ -f "$p" ]] && continue
+            mkdir -p "$(dirname "$p")" 2>/dev/null || continue
+            : > "$p" 2>/dev/null || true
+        done
+    )
+    return 0
+}
+
 # Run a stage by name. Dispatches to portable stages.* functions via stage.run.
 # Usage: brik.gitlab.run_stage <stage_name>
 brik.gitlab.run_stage() {
+    # Pre-create cache/artefact markers so GitLab's cache and artifact steps
+    # never log "no matching files" for stack paths the active build does
+    # not populate. Skip silently when BRIK_WORKSPACE is not set (e.g. early
+    # CLI errors before setup ran); the function's hard-fail mode is reserved
+    # for direct callers.
+    if [[ -n "${BRIK_WORKSPACE:-}" ]]; then
+        _brik_gitlab._ensure_artefact_markers "$BRIK_WORKSPACE" >/dev/null 2>&1 || true
+    fi
+
     brik.wrapper.run_stage "$@"
 }

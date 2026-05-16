@@ -566,4 +566,156 @@ Describe "gitlab-wrapper.sh"
       The output should equal "init:SUCCESS"
     End
   End
+
+  # =========================================================================
+  # _brik_gitlab._ensure_artefact_markers
+  # =========================================================================
+  # Pre-creates the cache and artefact directories declared in GitLab job
+  # templates (build.yml, test.yml, ...) with a .brik-keep file so GitLab's
+  # cache and artefact upload steps never log "no matching files" for paths
+  # the active stack does not populate. Cache paths come from the canonical
+  # stacks.cache_paths; artefact output dirs (coverage, reports, build, ...)
+  # stay inline because they are stack-independent.
+  Describe "_brik_gitlab._ensure_artefact_markers"
+    Include "$BRIK_HOME/shared-libs/gitlab/scripts/gitlab-wrapper.sh"
+    Include "$BRIK_HOME/lib/stacks/_deps.sh"
+
+    setup_ws() {
+      _markers_ws="$(mktemp -d)"
+    }
+    cleanup_ws() {
+      [[ -d "$_markers_ws/.cargo" ]] && chmod -R u+w "$_markers_ws/.cargo" 2>/dev/null
+      rm -rf "$_markers_ws"
+    }
+    Before 'setup_ws'
+    After 'cleanup_ws'
+
+    It "is defined as a function"
+      callable_check() { declare -f _brik_gitlab._ensure_artefact_markers >/dev/null; }
+      When call callable_check
+      The status should be success
+    End
+
+    It "fails when no workspace is provided and BRIK_WORKSPACE is unset"
+      run_no_workspace() {
+        unset BRIK_WORKSPACE
+        _brik_gitlab._ensure_artefact_markers
+      }
+      When call run_no_workspace
+      The status should equal 4
+      The error should include "workspace required"
+    End
+
+    It "fails when workspace path is not a directory"
+      When call _brik_gitlab._ensure_artefact_markers "/nonexistent/path/xyz"
+      The status should equal 4
+      The error should include "not a directory"
+    End
+
+    It "creates a marker in .npm under the given workspace"
+      run_markers() {
+        _brik_gitlab._ensure_artefact_markers "$_markers_ws"
+        [[ -f "$_markers_ws/.npm/.brik-keep" ]]
+      }
+      When call run_markers
+      The status should be success
+    End
+
+    It "does not alter the caller's PWD"
+      run_pwd_check() {
+        local before="$PWD"
+        _brik_gitlab._ensure_artefact_markers "$_markers_ws" >/dev/null 2>&1
+        [[ "$PWD" == "$before" ]]
+      }
+      When call run_pwd_check
+      The status should be success
+    End
+
+    It "creates markers in every stacks.cache_paths entry"
+      check_all_cache() {
+        _brik_gitlab._ensure_artefact_markers "$_markers_ws"
+        local p
+        while IFS= read -r p; do
+          [[ -f "$_markers_ws/$p/.brik-keep" ]] || return 1
+        done < <(stacks.cache_paths)
+      }
+      When call check_all_cache
+      The status should be success
+    End
+
+    It "creates markers in coverage and reports under workspace"
+      check_test_dirs() {
+        _brik_gitlab._ensure_artefact_markers "$_markers_ws"
+        [[ -f "$_markers_ws/coverage/.brik-keep" && -f "$_markers_ws/reports/.brik-keep" ]]
+      }
+      When call check_test_dirs
+      The status should be success
+    End
+
+    It "creates markers in build output dirs (build/target/bin/dist)"
+      check_build_dirs() {
+        _brik_gitlab._ensure_artefact_markers "$_markers_ws"
+        for p in build target bin dist; do
+          [[ -f "$_markers_ws/$p/.brik-keep" ]] || return 1
+        done
+      }
+      When call check_build_dirs
+      The status should be success
+    End
+
+    It "creates glob placeholders for *.whl, *.tar.gz, reports/*.xml"
+      check_globs() {
+        _brik_gitlab._ensure_artefact_markers "$_markers_ws"
+        [[ -f "$_markers_ws/.brik-keep.whl" \
+        && -f "$_markers_ws/.brik-keep.tar.gz" \
+        && -f "$_markers_ws/reports/.brik-keep.xml" ]]
+      }
+      When call check_globs
+      The status should be success
+    End
+
+    It "is idempotent on re-run"
+      run_twice() {
+        _brik_gitlab._ensure_artefact_markers "$_markers_ws"
+        _brik_gitlab._ensure_artefact_markers "$_markers_ws"
+        [[ -f "$_markers_ws/.npm/.brik-keep" ]]
+      }
+      When call run_twice
+      The status should be success
+    End
+
+    It "preserves real cache content alongside the marker"
+      check_coexistence() {
+        mkdir -p "$_markers_ws/.npm"
+        : > "$_markers_ws/.npm/real-package.tgz"
+        _brik_gitlab._ensure_artefact_markers "$_markers_ws"
+        [[ -f "$_markers_ws/.npm/.brik-keep" && -f "$_markers_ws/.npm/real-package.tgz" ]]
+      }
+      When call check_coexistence
+      The status should be success
+    End
+
+    It "succeeds even when one path is unwritable"
+      run_partial_failure() {
+        mkdir -p "$_markers_ws/.cargo"
+        chmod a-w "$_markers_ws/.cargo"
+        _brik_gitlab._ensure_artefact_markers "$_markers_ws"
+        local rc=$?
+        chmod u+w "$_markers_ws/.cargo"
+        [[ $rc -eq 0 && -f "$_markers_ws/.npm/.brik-keep" ]]
+      }
+      When call run_partial_failure
+      The status should be success
+    End
+
+    It "honors BRIK_WORKSPACE when no argument is passed"
+      run_via_env() {
+        export BRIK_WORKSPACE="$_markers_ws"
+        _brik_gitlab._ensure_artefact_markers
+        [[ -f "$_markers_ws/.npm/.brik-keep" ]]
+      }
+      When call run_via_env
+      The status should be success
+    End
+  End
 End

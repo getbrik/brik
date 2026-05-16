@@ -12,6 +12,8 @@ brik-sast:
       artifacts: true
   cache:
     key: "${BRIK_BUILD_STACK}-${CI_COMMIT_REF_SLUG}"
+    # Synced from lib/stacks/_deps.sh::stacks.cache_paths.
+    # Drift caught by spec/integration/cache_paths_parity_spec.sh.
     paths:
       - .npm/
       - .cache/pip

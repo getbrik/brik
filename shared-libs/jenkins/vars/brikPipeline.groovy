@@ -83,6 +83,15 @@ def call(Map params = [:]) {
             // of `npm ci` / `pip install` and must be regenerated when
             // their inputs change; keeping them across builds requires
             // every consumer to detect drift, which is a leaky contract.
+            //
+            // EXCLUDE patterns below mirror the top-level directories
+            // emitted by lib/stacks/_deps.sh::stacks.cache_paths. The
+            // master cannot source bash before cleanWs (the brik library
+            // is resolved later by brikResolveHome), so the list is kept
+            // inline. Drift against the canonical SoT is caught by
+            // spec/integration/cache_paths_parity_spec.sh.
+            // .git/** is excluded too (not part of stacks.cache_paths --
+            // it's an unconditional protection for the SCM metadata).
             cleanWs(
                 deleteDirs: true,
                 patterns: [
