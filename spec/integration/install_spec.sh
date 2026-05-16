@@ -32,7 +32,7 @@ Describe "shim integration"
     It "runs brik version via the shim"
       When run script "${TMPDIR_BIN}/brik" version
       The status should eq 0
-      The output should include "brik 0.4.0"
+      The output should include "brik 0.5.0"
     End
 
     It "passes --verbose through the shim"
@@ -48,7 +48,7 @@ Describe "shim integration"
       ln -sfn "${TMPDIR_INSTALL}" "${TMPDIR_ALIAS}"
       When run command env BRIK_HOME="${TMPDIR_ALIAS}" "${TMPDIR_INSTALL}/bin/brik" version
       The status should eq 0
-      The output should include "brik 0.4.0"
+      The output should include "brik 0.5.0"
       The stderr should include "BRIK_HOME overridden"
     End
   End

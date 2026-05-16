@@ -35,8 +35,8 @@ git add -A
 git commit -m "Initial commit"
 git remote add origin http://your-gitlab.example.com/brik/gitlab-templates.git
 git push -u origin main
-git tag v0.4.0
-git push origin v0.4.0
+git tag v0.5.0
+git push origin v0.5.0
 ```
 
 ## 3. Add the bootstrap file to your project
@@ -46,7 +46,7 @@ Add a `.gitlab-ci.yml` to your project root:
 ```yaml
 include:
   - project: 'brik/gitlab-templates'
-    ref: v0.4.0
+    ref: v0.5.0
     file: '/templates/pipeline.yml'
 ```
 

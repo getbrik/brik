@@ -93,7 +93,7 @@ Each GitLab CI job:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `BRIK_LIB_REF` | `v0.4.0` | Git ref of the Brik runtime to clone |
+| `BRIK_LIB_REF` | `v0.5.0` | Git ref of the Brik runtime to clone |
 | `BRIK_REPO` | `${CI_SERVER_URL}/brik/brik.git` | URL of the Brik runtime repository |
 | `BRIK_HOME` | `/opt/brik` | Path where the runtime is cloned |
 | `BRIK_LOG_LEVEL` | `info` | Log verbosity (`debug`, `info`, `warn`, `error`) |
@@ -192,7 +192,7 @@ the templated job:
 ```yaml
 include:
   - project: 'brik/gitlab-templates'
-    ref: v0.4.0
+    ref: v0.5.0
     file: '/templates/pipeline.yml'
 
 # java example: switch the format to jacoco and point at the jacoco file.

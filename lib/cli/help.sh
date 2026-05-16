@@ -84,7 +84,7 @@ Examples:
   brik run pipeline --with-deploy --dry-run
   brik self-update
   brik self-update --channel edge
-  brik self-update --version v0.4.0
+  brik self-update --version v0.5.0
   brik version
   brik version --verbose
 EOF
