@@ -46,38 +46,52 @@ downstream jobs receive `BRIK_CI_IMAGE` (the resolved
 
 ## Env propagation
 
-`pipeline.env` is the single env file across all three platforms (GitLab,
-Jenkins, local). Every stage publishes via `report.record <stage> env <KEY>
-<VALUE>`; a post-stage hook (`_stage.run._project_env`) appends those entries
-to `.brik-logs/pipeline.env`; the next stage runs `pipeline.env.load` and
-sees the cumulative state.
+`pipeline.env` is the single cumulative env file on Jenkins and local. On
+GitLab the contract is more subtle: the file `.brik-logs/pipeline.env`
+exists in every job's workspace, but its on-disk content in downstream
+jobs is **not** guaranteed to be the cumulative state. The cumulative
+state lives in the CI variable environment instead.
 
-GitLab introduces an additional concern: `image:`, `rules:`, and other
-top-level job keys are resolved at **YAML-parse time** (before any job has
-run), and they read CI variables, not files. To bridge this, GitLab provides
-`artifacts.reports.dotenv`: a job declares a dotenv file, and GitLab promotes
-its keys to CI variables in downstream jobs.
+### Two transports, one canonical channel
 
-Brik transports `pipeline.env` two ways on GitLab:
+Each brik job template declares both:
 
-| Transport | Purpose | Consumed at |
+| Transport | What GitLab does with it | Cumulative? |
 |---|---|---|
-| `artifacts.paths: [.brik-logs/]` | The cumulative file | Runtime (sourced by `pipeline.env.load`) |
-| `artifacts.reports.dotenv: .brik-logs/pipeline.env` | The keys promoted to CI vars | YAML-parse time (`${BRIK_CI_IMAGE}`, etc.) |
+| `artifacts.paths: [.brik-logs/]` | Extracts upstream `pipeline.env` files into workspace | **No** -- merge order across colliding paths is undefined ([gitlab-org/gitlab#244714](https://gitlab.com/gitlab-org/gitlab/-/issues/244714), open since 2020). Init's snapshot frequently survives. |
+| `artifacts.reports.dotenv: .brik-logs/pipeline.env` | Parses dotenv keys, promotes them as CI variables | **Yes** -- documented [union with last-wins](https://docs.gitlab.com/ci/variables/dotenv_variables/) across all upstream `needs:` dotenv reports. |
 
-**Every job template declares both.** This is required: a single job missing
-the `reports.dotenv` declaration breaks the cumulative chain (GitLab restores
-that job's *upstream* snapshot of `pipeline.env` in downstream jobs, which
-silently overwrites the keys later stages published). The parity is enforced
-statically by `spec/integration/gitlab_dotenv_parity_spec.sh`.
+The CI variable channel is the one Brik relies on. When `release` exports
+`BRIK_APP_VERSION=0.1.0` and `package` consumes `${BRIK_APP_VERSION}`,
+the value flows through the dotenv promotion, not through the file. The
+file is preserved primarily as a debugging artifact and as the canonical
+mechanism on Jenkins/local where no dotenv-promotion exists.
+
+**Every job template declares `reports.dotenv: .brik-logs/pipeline.env`.**
+A single job missing the declaration drops its keys from the CI variable
+merge in downstream jobs. The parity is enforced statically by
+`spec/integration/gitlab_dotenv_parity_spec.sh`.
 
 ### needs ordering matters
 
-When a job lists multiple `needs:` with `artifacts: true`, GitLab merges the
-dotenv files in declaration order. **The last upstream wins on colliding
-keys.** Templates list producers first (init -> release -> build -> verify)
-and downstream stages last, so the cumulative state always reaches the
-consumer.
+When a job lists multiple `needs:` with `artifacts: true`, GitLab merges
+the dotenv files in declaration order. **The last upstream wins on
+colliding keys.** Templates list producers first
+(init -> release -> build -> verify) and downstream stages last, so the
+cumulative state always reaches the consumer through the CI variable
+channel.
+
+### Why the file is not cumulative
+
+GitLab's artifact extraction order for `paths:` is officially unspecified
+([gitlab-org/gitlab#244714](https://gitlab.com/gitlab-org/gitlab/-/issues/244714))
+and its interaction with `reports.dotenv` is undocumented
+([gitlab-org/gitlab#246777](https://gitlab.com/gitlab-org/gitlab/-/issues/246777)).
+Empirically, downstream jobs receive init's snapshot of `pipeline.env`
+even when later upstream jobs have appended keys. The cumulative state is
+recovered through CI variables (the documented channel), not through the
+file. Consumers should rely on `${VAR}` rather than on the on-disk
+content of `pipeline.env` for cross-stage data on GitLab.
 
 ### Caveat: dotenv-compatible values
 
@@ -88,10 +102,12 @@ GitLab's dotenv parser is strict. Values must:
 - Stay within the [GitLab dotenv size limit](https://docs.gitlab.com/ci/yaml/artifacts_reports/#artifactsreportsdotenv)
   (5 KB per file, 20 keys by default; configurable instance-side).
 
-Stages publishing via `report.record env` should pass simple string literals
-(versions, image refs, paths, flags). If a future stage needs to publish a
-multi-line value or binary blob, switch that value to a separate file under
-`artifacts.paths` rather than the env mechanism.
+Stages publishing via `report.record env` should pass simple string
+literals (versions, image refs, paths, flags). If a future stage needs to
+publish a multi-line value or binary blob, the recommended path is to
+write it to an `artifacts.paths` file and have downstream stages read the
+file from the report aggregate (the dotenv channel is unsuitable for
+non-trivial payloads).
 
 ## Runner images
 
