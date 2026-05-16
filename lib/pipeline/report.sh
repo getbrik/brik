@@ -1201,6 +1201,110 @@ report.render() {
     return 0
 }
 
+# Render a terminal-friendly recap of the aggregate report on stdout.
+#
+# Counterpart to report.render (which produces md/json/html artifacts):
+# this is the post-pipeline CLI summary surfaced by the local wrapper at
+# the end of `brik run pipeline`. ANSI colors auto-detect from $TERM and
+# stdout isatty; output stays plain when piped or running in a dumb term.
+#
+# Status labels per stage:
+#   PASS   tech.status == success
+#   FAIL   tech.status == failed
+#   SKIP   tech.status == skipped (or missing)
+#
+# Note on related output: lib/stages/notify.sh::_notify._emit_recap_table
+# also renders a recap, but from inside the notify stage during pipeline
+# execution and with a different format (format.table, business metrics
+# per stage). The two are intentionally distinct: live-log convenience vs
+# end-of-CLI summary. They share the aggregate JSON, not the formatting.
+#
+# Usage: report.render_terminal [<report_path>]
+# Default path: $BRIK_LOG_DIR/aggregate-report.json
+# Exit codes:
+#   0                       success, or jq missing (best-effort skip)
+#   BRIK_EXIT_IO_FAILURE    report file does not exist
+#   BRIK_EXIT_FAILURE       report cannot be parsed
+report.render_terminal() {
+    local report_path="${1:-$(_brik.log_dir._resolve)/aggregate-report.json}"
+
+    if [[ ! -f "$report_path" ]]; then
+        log.warn "pipeline report not found: $report_path"
+        return "$BRIK_EXIT_IO_FAILURE"
+    fi
+    if ! command -v jq >/dev/null 2>&1; then
+        log.warn "jq not available, skipping summary"
+        return 0
+    fi
+
+    # Detect color support
+    local use_color=false
+    if [[ -t 1 ]] && [[ "${TERM:-}" != "dumb" ]]; then
+        use_color=true
+    fi
+
+    local green="" red="" gray="" bold="" reset=""
+    if $use_color; then
+        green=$'\033[32m'
+        red=$'\033[31m'
+        gray=$'\033[90m'
+        bold=$'\033[1m'
+        reset=$'\033[0m'
+    fi
+
+    # Extract per-stage rows as TAB-separated: name<TAB>status<TAB>duration_ms
+    local rows
+    rows="$(jq -r '.stages[] | [.name, (.tech.status // "skipped"), (.tech.duration_ms // "0")] | @tsv' "$report_path")" || {
+        log.warn "failed to parse pipeline report: $report_path"
+        return "$BRIK_EXIT_FAILURE"
+    }
+
+    local passed=0 failed=0 skipped=0 ran=0 total_duration_ms=0
+    local name status_raw duration_ms label color duration_str
+
+    echo ""
+    echo "${bold}--- Pipeline Summary ---${reset}"
+
+    while IFS=$'\t' read -r name status_raw duration_ms; do
+        [[ -z "$name" ]] && continue
+        case "$status_raw" in
+            success)
+                label="PASS"; color="$green"
+                (( ++passed )); (( ++ran ))
+                duration_str="${duration_ms}ms"
+                total_duration_ms=$(( total_duration_ms + duration_ms ))
+                ;;
+            failed)
+                label="FAIL"; color="$red"
+                (( ++failed )); (( ++ran ))
+                duration_str="${duration_ms}ms"
+                total_duration_ms=$(( total_duration_ms + duration_ms ))
+                ;;
+            *)
+                label="SKIP"; color="$gray"
+                (( ++skipped ))
+                duration_str=""
+                ;;
+        esac
+        printf "  %-14s %s%-4s%s" "$name" "$color" "$label" "$reset"
+        [[ -n "$duration_str" ]] && printf "  %s" "$duration_str"
+        echo ""
+    done <<< "$rows"
+
+    echo "${bold}------------------------${reset}"
+
+    local result_color="$green"
+    local result_label="PASS"
+    if [[ $failed -gt 0 ]]; then
+        result_color="$red"
+        result_label="FAIL"
+    fi
+
+    echo "${bold}Result: ${result_color}${result_label}${reset} (${passed}/${ran} passed, ${skipped} skipped)"
+    echo "${bold}Duration: $(( total_duration_ms / 1000 ))s${reset}"
+    echo ""
+}
+
 # Render the backend JSON as Markdown on stdout.
 _report._render_md() {
     local backend="$1"
