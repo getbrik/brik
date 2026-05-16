@@ -35,6 +35,9 @@ brik-test:
   artifacts:
     when: always
     reports:
+      # dotenv propagates pipeline.env keys as CI variables to downstream
+      # jobs (cf. spec/integration/gitlab_dotenv_parity_spec.sh).
+      dotenv: .brik-logs/pipeline.env
       junit: ${BRIK_TEST_JUNIT_PATH:-brik-artifacts/test/junit.xml}
       # GitLab schema-validates coverage_format at YAML-parse time and
       # only accepts "cobertura" or "jacoco" -- variables resolved from

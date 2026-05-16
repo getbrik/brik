@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **GitLab pipeline.env propagation** -- declare
+  `artifacts.reports.dotenv: .brik-logs/pipeline.env` on every job template
+  (release, build, lint, sast, scan, test, package, container-scan, deploy,
+  notify), not just init. GitLab merges dotenv files from `needs:` in
+  declaration order with the last upstream winning on key collisions, so the
+  cumulative state reaches every consumer. Without this, GitLab restored
+  init's snapshot of `pipeline.env` in every downstream job, dropping keys
+  published by later stages (most visibly `BRIK_APP_VERSION`, which made
+  `package` tag images with a short SHA instead of the release version on
+  tagged commits). Parity enforced by
+  `spec/integration/gitlab_dotenv_parity_spec.sh`. Jenkins and local
+  wrappers are unaffected -- they already source `pipeline.env` directly at
+  each stage start.
+
 ## [0.5.0] - 2026-05-16
 
 99 commits since 0.4.0. Major release built on three converging chantiers:

@@ -12,7 +12,13 @@ change touches the stage entry point, every platform adapter, and the schema.
 
 2. **Shared library template** -- add the stage to
    `shared-libs/gitlab/templates/pipeline.yml` (and the other platform
-   adapters).
+   adapters). For GitLab specifically, the new job template **must declare**
+   `artifacts.reports.dotenv: .brik-logs/pipeline.env`, otherwise downstream
+   jobs will see a stale snapshot of `pipeline.env` and lose any keys
+   published by upstream stages. The parity is enforced by
+   `spec/integration/gitlab_dotenv_parity_spec.sh`; see
+   [GitLab env propagation](../platforms/gitlab.md#env-propagation) for the
+   underlying mechanism.
 
 3. **Pipeline flow** -- add the stage name to the `stages:` list in the GitLab
    template so it appears in the DAG.

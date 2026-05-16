@@ -53,4 +53,10 @@ brik-notify:
       - .brik-logs/*.lock
       - .brik-logs/context-*
     reports:
+      # dotenv propagates pipeline.env keys as CI variables to downstream
+      # jobs (cf. spec/integration/gitlab_dotenv_parity_spec.sh). Notify
+      # is the terminal stage of the fixed flow today, so no consumer
+      # downstream of brik-notify exists -- the declaration is kept for
+      # parity uniformity and future-proofing (child pipelines, retries).
+      dotenv: .brik-logs/pipeline.env
       sast: brik-artifacts/gl-sast-report.json

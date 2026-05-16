@@ -32,10 +32,14 @@ brik-sast:
   artifacts:
     when: always
     expire_in: 1 week
+    # reports.dotenv propagates pipeline.env keys as CI variables to
+    # downstream jobs (cf. spec/integration/gitlab_dotenv_parity_spec.sh).
     # The SARIF file at brik-artifacts/sast/sast.sarif ships via paths
     # below. Surfacing it in the GitLab Security tab requires Ultimate;
     # the conditional overlay jobs/sast-reports.yml adds reports.sarif
     # when CI_GITLAB_FEATURES advertises sast support.
+    reports:
+      dotenv: .brik-logs/pipeline.env
     paths:
       - .brik-logs/
       - brik-artifacts/

@@ -33,6 +33,9 @@ brik-scan:
     when: always
     expire_in: 1 week
     reports:
+      # dotenv propagates pipeline.env keys as CI variables to downstream
+      # jobs (cf. spec/integration/gitlab_dotenv_parity_spec.sh).
+      dotenv: .brik-logs/pipeline.env
       # cyclonedx is free since GitLab 15.6 and surfaces as a Dependency
       # List entry in the project. SARIF reports for deps/secret require
       # Ultimate; the conditional overlay jobs/scan-reports.yml adds

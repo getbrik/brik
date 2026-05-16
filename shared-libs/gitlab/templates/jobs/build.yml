@@ -36,6 +36,10 @@ brik-build:
     - bash -c '. /tmp/brik-bootstrap.sh && brik.gitlab.run_stage build'
   artifacts:
     when: always
+    # reports.dotenv propagates pipeline.env keys as CI variables to
+    # downstream jobs (cf. spec/integration/gitlab_dotenv_parity_spec.sh).
+    reports:
+      dotenv: .brik-logs/pipeline.env
     paths:
       - .brik-logs/
       - dist/

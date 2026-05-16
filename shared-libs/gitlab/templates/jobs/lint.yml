@@ -31,6 +31,10 @@ brik-lint:
   artifacts:
     when: always
     expire_in: 1 week
+    # reports.dotenv propagates pipeline.env keys as CI variables to
+    # downstream jobs (cf. spec/integration/gitlab_dotenv_parity_spec.sh).
+    reports:
+      dotenv: .brik-logs/pipeline.env
     paths:
       - .brik-logs/
       - brik-artifacts/

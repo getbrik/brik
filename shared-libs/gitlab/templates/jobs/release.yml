@@ -9,6 +9,12 @@ brik-release:
   script:
     - bash -c '. /tmp/brik-bootstrap.sh && brik.gitlab.run_stage release'
   artifacts:
+    # reports.dotenv propagates pipeline.env keys (e.g. BRIK_APP_VERSION
+    # exported by release) as CI variables to downstream jobs. Required on
+    # every brik stage for GitLab to see the cumulative pipeline.env at
+    # YAML-parse time (cf. spec/integration/gitlab_dotenv_parity_spec.sh).
+    reports:
+      dotenv: .brik-logs/pipeline.env
     paths:
       - .brik-logs/
       - brik-artifacts/

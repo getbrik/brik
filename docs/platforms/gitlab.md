@@ -44,6 +44,55 @@ The Init job emits `.brik-logs/pipeline.env` as a `reports: dotenv:` artifact
 downstream jobs receive `BRIK_CI_IMAGE` (the resolved
 `brik-runner-<stack>:<version>` for the project) and the trigger gating flags.
 
+## Env propagation
+
+`pipeline.env` is the single env file across all three platforms (GitLab,
+Jenkins, local). Every stage publishes via `report.record <stage> env <KEY>
+<VALUE>`; a post-stage hook (`_stage.run._project_env`) appends those entries
+to `.brik-logs/pipeline.env`; the next stage runs `pipeline.env.load` and
+sees the cumulative state.
+
+GitLab introduces an additional concern: `image:`, `rules:`, and other
+top-level job keys are resolved at **YAML-parse time** (before any job has
+run), and they read CI variables, not files. To bridge this, GitLab provides
+`artifacts.reports.dotenv`: a job declares a dotenv file, and GitLab promotes
+its keys to CI variables in downstream jobs.
+
+Brik transports `pipeline.env` two ways on GitLab:
+
+| Transport | Purpose | Consumed at |
+|---|---|---|
+| `artifacts.paths: [.brik-logs/]` | The cumulative file | Runtime (sourced by `pipeline.env.load`) |
+| `artifacts.reports.dotenv: .brik-logs/pipeline.env` | The keys promoted to CI vars | YAML-parse time (`${BRIK_CI_IMAGE}`, etc.) |
+
+**Every job template declares both.** This is required: a single job missing
+the `reports.dotenv` declaration breaks the cumulative chain (GitLab restores
+that job's *upstream* snapshot of `pipeline.env` in downstream jobs, which
+silently overwrites the keys later stages published). The parity is enforced
+statically by `spec/integration/gitlab_dotenv_parity_spec.sh`.
+
+### needs ordering matters
+
+When a job lists multiple `needs:` with `artifacts: true`, GitLab merges the
+dotenv files in declaration order. **The last upstream wins on colliding
+keys.** Templates list producers first (init -> release -> build -> verify)
+and downstream stages last, so the cumulative state always reaches the
+consumer.
+
+### Caveat: dotenv-compatible values
+
+GitLab's dotenv parser is strict. Values must:
+
+- Fit on one line (no newlines or carriage returns).
+- Not contain binary data.
+- Stay within the [GitLab dotenv size limit](https://docs.gitlab.com/ci/yaml/artifacts_reports/#artifactsreportsdotenv)
+  (5 KB per file, 20 keys by default; configurable instance-side).
+
+Stages publishing via `report.record env` should pass simple string literals
+(versions, image refs, paths, flags). If a future stage needs to publish a
+multi-line value or binary blob, switch that value to a separate file under
+`artifacts.paths` rather than the env mechanism.
+
 ## Runner images
 
 The pipeline uses specialized [brik-images](https://github.com/getbrik/brik-images)
