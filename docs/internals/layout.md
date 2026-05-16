@@ -123,7 +123,7 @@ Notes on the mindmap:
 | 2 | Stack                | `lib/stacks/`                   | Per-stack build, test, install_deps (`node`, `java`, `python`, `rust`, `dotnet`, `docker`). |
 | 3 | Stages               | `lib/stages/`                   | The 11 pipeline stages (`init`, `release`, `build`, `lint`, `sast`, `scan`, `test`, `package`, `container_scan`, `deploy`, `notify`). |
 | 4 | Deployments          | `lib/deployments/`              | Deploy targets (`k8s`, `helm`, `compose`, `ssh`, `gitops`, `argocd`).           |
-| 5 | Transverse           | `lib/transverse/`               | Cross-cutting helpers (`git`, `version`, `env`, `changelog`, `conditions`, `config`, `csv`, `secrets`, `ssh`, `wait`, `yaml`, `tools`). |
+| 5 | Transverse           | `lib/transverse/`               | Cross-cutting helpers (`git`, `version`, `env`, `changelog`, `conditions`, `config`, `csv`, `secrets`, `ssh`, `wait`, `yaml`, `tools`, `binary_path`). |
 | 6 | Execution            | `lib/pipeline/`                 | Runtime mechanics: `stage.run`, `pipeline.run`, `loader`, `logging`, `context`, `report`, `report_html`, `hooks`, `tools`, `bootstrap`, `business` (pipeline gatekeeper aggregating per-stage business results), `error`, `summary`, `runner-images`, `banner`, `_branding`, `pipeline-env`, `version-info`. |
 | 7 | Package managers     | `lib/package-managers/`         | Publish to registries (`npm`, `pypi`, `maven`, `cargo`, `nuget`, `docker`).     |
 | 8 | Rollout              | `lib/rollout/`                  | Post-deploy rollout semantics (`health`, `strategy`, `profile`).                |
@@ -187,6 +187,13 @@ Key relations:
 - No duplicated tool registry. `transverse.tools.{register,resolve,exec}`
   (promoted from the former `verify/_tools.sh`) is the single 3-tier registry
   for all scan modules.
+- Tool registry vs. binary-path resolution are distinct concerns.
+  `transverse.tools` is the registry that scan modules use to declare and
+  invoke their CLI dependencies by category; `transverse.binary_path`
+  (`binary_path.resolve`, `binary_path.is_available`) walks the
+  project -> $PATH -> bundled chain to locate one binary and emit a JSON
+  descriptor (`{path, version, provenance}`). They share neither callers
+  nor return contracts.
 - `lib/cli/` contains the command logic; `bin/brik` is a thin bootstrap + dispatcher.
 
 ## File-to-Notion Cheat Sheet

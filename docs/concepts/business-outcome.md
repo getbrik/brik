@@ -81,7 +81,7 @@ The supporting modules that produce these inputs:
 |--------|------|
 | `lib/transverse/fix_classifier.sh` | Annotates each SARIF result with `brikFixClassification` and, for lint/format, `brikToolBlocking`. |
 | `lib/transverse/severity.sh` | Pure mapping: tool-native severity to the canonical 5-bucket scale, plus an `is_tool_blocking` boolean. |
-| `lib/transverse/tool_resolver.sh` | Locates a CLI binary (workspace, `$PATH`, `BRIK_HOME/tools/`) so a missing tool becomes a typed finding, not a generic failure. |
+| `lib/transverse/binary_path.sh` | Locates a CLI binary (workspace, `$PATH`, `BRIK_HOME/tools/`) so a missing tool becomes a typed finding, not a generic failure. |
 | `lib/transverse/coverage.sh` | Parses Cobertura/Jacoco/LCOV; turns a threshold breach into a SARIF result that flows through the same pipeline. |
 | `lib/transverse/gating.sh` | Reads `release.trigger` / `package.trigger` / `deploy.trigger` and decides whether each schedulable stage runs in the current context. |
 

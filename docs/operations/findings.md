@@ -129,7 +129,7 @@ Consequence: a project with an eslint `error` produces `failing.has_fix > 0` and
 
 ## Tool resolution
 
-`lib/transverse/tool_resolver.sh` (`tool_resolver.resolve <tool>`) walks three
+`lib/transverse/binary_path.sh` (`binary_path.resolve <tool>`) walks three
 layers in priority order and emits a JSON descriptor `{path, version,
 provenance}`:
 
@@ -142,7 +142,7 @@ provenance}`:
 
 Version detection is best-effort: the resolver runs `<path> --version` (then
 `-v`), strips ANSI sequences, and keeps the first dotted numeric token. Silent
-or missing tools report `version=unknown`. `tool_resolver.is_available <tool>`
+or missing tools report `version=unknown`. `binary_path.is_available <tool>`
 returns `true`/`false` without running `--version`, for hot paths.
 
 ## Per-stage artifacts layout

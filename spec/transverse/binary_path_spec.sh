@@ -1,5 +1,5 @@
 #shellcheck shell=bash
-# Contract for lib/transverse/tool_resolver.sh
+# Contract for lib/transverse/binary_path.sh
 #
 # The tool resolver consolidates the "where does this binary come from?"
 # question that today appears inline in every lint/test/format stage:
@@ -10,18 +10,18 @@
 #   4. not found anywhere                         -> provenance=missing
 #
 # Public API:
-#   tool_resolver.resolve <tool>      -> stdout JSON
+#   binary_path.resolve <tool>      -> stdout JSON
 #                                         {path, version, provenance}
 #                                        rc=0 always except empty tool name
-#   tool_resolver.is_available <tool> -> stdout "true"|"false", rc=0
+#   binary_path.is_available <tool> -> stdout "true"|"false", rc=0
 #
 # Version detection is best-effort: the resolver invokes `<path> --version`,
 # strips ANSI, and keeps the first whitespace-separated semver-like token
 # from the first line. On missing/uncooperative tools it reports "unknown".
 
-Describe "lib/transverse/tool_resolver.sh"
+Describe "lib/transverse/binary_path.sh"
   Include "$BRIK_HOME/spec/support/mock_helper.sh"
-  Include "$BRIK_HOME/lib/transverse/tool_resolver.sh"
+  Include "$BRIK_HOME/lib/transverse/binary_path.sh"
 
   setup_resolver() {
     mock.setup
@@ -47,10 +47,10 @@ Describe "lib/transverse/tool_resolver.sh"
   Before 'setup_resolver'
   After  'cleanup_resolver'
 
-  Describe "tool_resolver.resolve"
+  Describe "binary_path.resolve"
     It "returns provenance=missing when the tool exists nowhere"
       do_resolve() {
-        tool_resolver.resolve "no-such-tool"
+        binary_path.resolve "no-such-tool"
       }
       When call do_resolve
       The output should include '"provenance":"missing"'
@@ -64,7 +64,7 @@ Describe "lib/transverse/tool_resolver.sh"
         mkdir -p "$WS/node_modules/.bin"
         printf '#!/bin/sh\necho "v8.57.0"\n' > "$WS/node_modules/.bin/eslint"
         chmod +x "$WS/node_modules/.bin/eslint"
-        tool_resolver.resolve "eslint"
+        binary_path.resolve "eslint"
       }
       When call do_resolve
       The output should include '"provenance":"project"'
@@ -75,7 +75,7 @@ Describe "lib/transverse/tool_resolver.sh"
     It "falls back to PATH when the workspace has no local copy"
       do_resolve() {
         mock.create_output "ruff" "ruff 0.6.9"
-        tool_resolver.resolve "ruff"
+        binary_path.resolve "ruff"
       }
       When call do_resolve
       The output should include '"provenance":"image"'
@@ -86,7 +86,7 @@ Describe "lib/transverse/tool_resolver.sh"
       do_resolve() {
         printf '#!/bin/sh\necho "widget 1.2.3"\n' > "$BUNDLED/tools/widget"
         chmod +x "$BUNDLED/tools/widget"
-        tool_resolver.resolve "widget"
+        binary_path.resolve "widget"
       }
       When call do_resolve
       The output should include '"provenance":"bundled"'
@@ -99,7 +99,7 @@ Describe "lib/transverse/tool_resolver.sh"
         mkdir -p "$WS/node_modules/.bin"
         printf '#!/bin/sh\nexit 0\n' > "$WS/node_modules/.bin/silent"
         chmod +x "$WS/node_modules/.bin/silent"
-        tool_resolver.resolve "silent"
+        binary_path.resolve "silent"
       }
       When call do_resolve
       The output should include '"provenance":"project"'
@@ -108,7 +108,7 @@ Describe "lib/transverse/tool_resolver.sh"
 
     It "rejects an empty tool name with rc=2"
       do_resolve_empty() {
-        tool_resolver.resolve ""
+        binary_path.resolve ""
       }
       When call do_resolve_empty
       The status should equal 2
@@ -116,11 +116,11 @@ Describe "lib/transverse/tool_resolver.sh"
     End
   End
 
-  Describe "tool_resolver.is_available"
+  Describe "binary_path.is_available"
     It "returns true when the tool is on PATH"
       do_avail() {
         mock.create_exit "found" 0
-        tool_resolver.is_available "found"
+        binary_path.is_available "found"
       }
       When call do_avail
       The output should equal "true"
@@ -132,7 +132,7 @@ Describe "lib/transverse/tool_resolver.sh"
         mkdir -p "$WS/node_modules/.bin"
         printf '#!/bin/sh\nexit 0\n' > "$WS/node_modules/.bin/local-only"
         chmod +x "$WS/node_modules/.bin/local-only"
-        tool_resolver.is_available "local-only"
+        binary_path.is_available "local-only"
       }
       When call do_avail
       The output should equal "true"
@@ -142,7 +142,7 @@ Describe "lib/transverse/tool_resolver.sh"
       do_avail() {
         printf '#!/bin/sh\nexit 0\n' > "$BUNDLED/tools/bundled-only"
         chmod +x "$BUNDLED/tools/bundled-only"
-        tool_resolver.is_available "bundled-only"
+        binary_path.is_available "bundled-only"
       }
       When call do_avail
       The output should equal "true"
@@ -150,7 +150,7 @@ Describe "lib/transverse/tool_resolver.sh"
 
     It "returns false for a tool that is nowhere"
       do_avail() {
-        tool_resolver.is_available "absolutely-not-here"
+        binary_path.is_available "absolutely-not-here"
       }
       When call do_avail
       The output should equal "false"
@@ -159,7 +159,7 @@ Describe "lib/transverse/tool_resolver.sh"
 
     It "rejects an empty tool name with rc=2"
       do_avail_empty() {
-        tool_resolver.is_available ""
+        binary_path.is_available ""
       }
       When call do_avail_empty
       The status should equal 2
@@ -176,7 +176,7 @@ Describe "lib/transverse/tool_resolver.sh"
         mock.create_output "clash" "image 2.0.0"
         printf '#!/bin/sh\necho bundled 3.0.0\n' > "$BUNDLED/tools/clash"
         chmod +x "$BUNDLED/tools/clash"
-        tool_resolver.resolve "clash"
+        binary_path.resolve "clash"
       }
       When call do_resolve
       The output should include '"provenance":"project"'
@@ -188,7 +188,7 @@ Describe "lib/transverse/tool_resolver.sh"
         mock.create_output "duo" "image 2.0.0"
         printf '#!/bin/sh\necho bundled 3.0.0\n' > "$BUNDLED/tools/duo"
         chmod +x "$BUNDLED/tools/duo"
-        tool_resolver.resolve "duo"
+        binary_path.resolve "duo"
       }
       When call do_resolve
       The output should include '"provenance":"image"'
@@ -204,7 +204,7 @@ Describe "lib/transverse/tool_resolver.sh"
         mkdir -p node_modules/.bin
         printf '#!/bin/sh\necho 9.9.9\n' > node_modules/.bin/here
         chmod +x node_modules/.bin/here
-        tool_resolver.resolve "here"
+        binary_path.resolve "here"
       }
       When call do_resolve_unset_ws
       The output should include '"provenance":"project"'

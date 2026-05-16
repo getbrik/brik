@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # shellcheck source-path=SCRIPTDIR
-# @module transverse.tool_resolver
+# @module transverse.binary_path
 # @description Resolve an external CLI binary uniformly across the three
 #   layers Brik supports:
 #
@@ -16,10 +16,10 @@
 # detection.
 #
 # Public API:
-#   tool_resolver.resolve <tool>
+#   binary_path.resolve <tool>
 #     -> stdout JSON {"path":"...","version":"...","provenance":"..."}
 #        rc=0 except for empty tool name (rc=2)
-#   tool_resolver.is_available <tool>
+#   binary_path.is_available <tool>
 #     -> stdout "true"|"false", rc=0 except for empty tool name (rc=2)
 #
 # Version detection is best-effort. The resolver runs `<path> --version`
@@ -28,11 +28,11 @@
 # On silence or failure the version is reported as "unknown".
 
 # Guard against double-sourcing
-[[ -n "${_BRIK_TOOL_RESOLVER_LOADED:-}" ]] && return 0
-_BRIK_TOOL_RESOLVER_LOADED=1
+[[ -n "${_BRIK_BINARY_PATH_LOADED:-}" ]] && return 0
+_BRIK_BINARY_PATH_LOADED=1
 
 # JSON-escape a string for embedding inside a "..." literal.
-_tool_resolver._json_escape() {
+_binary_path._json_escape() {
     local s="$1"
     s="${s//\\/\\\\}"
     s="${s//\"/\\\"}"
@@ -40,13 +40,13 @@ _tool_resolver._json_escape() {
 }
 
 # Strip ANSI escape sequences from stdin.
-_tool_resolver._strip_ansi() {
+_binary_path._strip_ansi() {
     sed -E $'s/\x1b\\[[0-9;]*[A-Za-z]//g'
 }
 
 # Print a best-effort version string for the given executable.
 # Falls back to "unknown" when the tool is silent or fails both probes.
-_tool_resolver._probe_version() {
+_binary_path._probe_version() {
     local path="$1"
     [[ -x "$path" ]] || { printf 'unknown'; return; }
 
@@ -60,7 +60,7 @@ _tool_resolver._probe_version() {
         return
     fi
 
-    raw="$(printf '%s' "$raw" | _tool_resolver._strip_ansi)"
+    raw="$(printf '%s' "$raw" | _binary_path._strip_ansi)"
 
     # Extract the first dotted-numeric token, allow optional leading 'v'.
     local token
@@ -74,20 +74,20 @@ _tool_resolver._probe_version() {
 }
 
 # Emit the canonical JSON envelope.
-_tool_resolver._emit() {
+_binary_path._emit() {
     local path="$1" version="$2" provenance="$3"
     local p v
-    p="$(_tool_resolver._json_escape "$path")"
-    v="$(_tool_resolver._json_escape "$version")"
+    p="$(_binary_path._json_escape "$path")"
+    v="$(_binary_path._json_escape "$version")"
     printf '{"path":"%s","version":"%s","provenance":"%s"}' "$p" "$v" "$provenance"
 }
 
-# tool_resolver.resolve <tool>
+# binary_path.resolve <tool>
 # Walk project -> image -> bundled and emit the resolved descriptor.
-tool_resolver.resolve() {
+binary_path.resolve() {
     local tool="${1:-}"
     if [[ -z "$tool" ]]; then
-        printf 'tool_resolver.resolve: tool name is required\n' >&2
+        printf 'binary_path.resolve: tool name is required\n' >&2
         return 2
     fi
 
@@ -95,8 +95,8 @@ tool_resolver.resolve() {
     local project_bin="${workspace}/node_modules/.bin/${tool}"
     if [[ -x "$project_bin" ]]; then
         local version
-        version="$(_tool_resolver._probe_version "$project_bin")"
-        _tool_resolver._emit "$project_bin" "$version" "project"
+        version="$(_binary_path._probe_version "$project_bin")"
+        _binary_path._emit "$project_bin" "$version" "project"
         return 0
     fi
 
@@ -104,29 +104,29 @@ tool_resolver.resolve() {
     path_bin="$(command -v "$tool" 2>/dev/null || true)"
     if [[ -n "$path_bin" && -x "$path_bin" ]]; then
         local version
-        version="$(_tool_resolver._probe_version "$path_bin")"
-        _tool_resolver._emit "$path_bin" "$version" "image"
+        version="$(_binary_path._probe_version "$path_bin")"
+        _binary_path._emit "$path_bin" "$version" "image"
         return 0
     fi
 
     local bundled_bin="${BRIK_HOME:-}/tools/${tool}"
     if [[ -n "${BRIK_HOME:-}" && -x "$bundled_bin" ]]; then
         local version
-        version="$(_tool_resolver._probe_version "$bundled_bin")"
-        _tool_resolver._emit "$bundled_bin" "$version" "bundled"
+        version="$(_binary_path._probe_version "$bundled_bin")"
+        _binary_path._emit "$bundled_bin" "$version" "bundled"
         return 0
     fi
 
-    _tool_resolver._emit "" "unknown" "missing"
+    _binary_path._emit "" "unknown" "missing"
     return 0
 }
 
-# tool_resolver.is_available <tool>
+# binary_path.is_available <tool>
 # Boolean shortcut over resolve: anything other than "missing" is true.
-tool_resolver.is_available() {
+binary_path.is_available() {
     local tool="${1:-}"
     if [[ -z "$tool" ]]; then
-        printf 'tool_resolver.is_available: tool name is required\n' >&2
+        printf 'binary_path.is_available: tool name is required\n' >&2
         return 2
     fi
 
