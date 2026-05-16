@@ -5,7 +5,7 @@ the contract between the runtime and external consumers (CI platforms,
 operators, downstream tooling), and the helpers stages should use to
 write under this layout.
 
-For the code-level domain layout (the `lib/` tree, eight notions), see
+For the code-level domain layout (the `lib/` tree, nine notions), see
 [internals/layout.md](../internals/layout.md). For the architectural
 rationale behind separating code from runtime data, see
 [architecture.md](architecture.md).

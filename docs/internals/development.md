@@ -88,7 +88,7 @@ scripts change.
 
 ## See also
 
-- [Layout](layout.md) -- the eight domain notions and the `lib/` tree
+- [Layout](layout.md) -- the nine domain notions and the `lib/` tree
 - [Extending a stack](extending-stack.md) -- add a language ecosystem
 - [Extending a stage](extending-stage.md) -- add to the fixed flow
 - [Briklab](briklab.md) -- the end-to-end test infrastructure

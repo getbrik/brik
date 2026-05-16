@@ -66,7 +66,7 @@ Running Brik in production: secrets, policy, and the pipeline report.
 
 For contributors and advanced integrators.
 
-- [Layout](internals/layout.md) -- the eight domain notions and the `lib/` tree
+- [Layout](internals/layout.md) -- the nine domain notions and the `lib/` tree
 - [Stage lifecycle](internals/stage-lifecycle.md) -- what `stage.run` does around every stage
 - [Extending a stack](internals/extending-stack.md) -- add support for a new language
 - [Extending a stage](internals/extending-stage.md) -- add a stage to the fixed flow

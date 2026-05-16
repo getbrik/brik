@@ -1,6 +1,6 @@
 # Brik Domain Layout
 
-The `lib/` tree is organized around **eight notions** that form Brik's domain
+The `lib/` tree is organized around **nine notions** that form Brik's domain
 vocabulary. Each notion maps to one directory under `lib/`. Functions are named
 `<notion>.<submodule>.<verb>` (e.g. `stages.build`, `stacks.node.build`,
 `transverse.wait.until`, `cli.validate.run`).
@@ -80,6 +80,15 @@ mindmap
       Wait
       YAML
 
+    Findings
+      SARIF pivot
+      Converters (non-SARIF)
+      Exporters (platform-aware)
+      Fix classification
+      Severity normalization
+      Coverage-as-finding
+      Org policy
+
     CLI
       validate
       doctor
@@ -99,23 +108,26 @@ Notes on the mindmap:
   (optional, deferred) would promote `verify` to a top-level stage.
 - **Stages.sonar** is on the roadmap but blocked on a SonarQube component in
   briklab. Design frozen in `docs/chantiers/20260421_sonar-quality-gate.md`.
-- **Transverse helpers** no longer include `cache` or `artifacts` (removed in
-  Phase 1 YAGNI).
+- **Transverse helpers** still do not include `cache` (out of scope).
+  `artifacts` was reintroduced in v0.5.0 to support `business.artifact.main_file`
+  and the HTML report download, but stays scoped to the `business` / `report`
+  modules -- it is not a transverse helper.
 - **CLI** is not part of the domain notions; it is a command layer that sits
   above the notions and delegates into them.
 
-## The Eight Notions (table)
+## The Nine Notions (table)
 
-| # | Notion               | Directory                 | Responsibility                                                                  |
-|---|----------------------|---------------------------|---------------------------------------------------------------------------------|
-| 1 | Execution environment | `shared-libs/<platform>/` | Map the fixed flow to a CI platform (GitLab, Jenkins, local, GitHub planned).   |
-| 2 | Stack                | `lib/stacks/`             | Per-stack build, test, install_deps (`node`, `java`, `python`, `rust`, `dotnet`, `docker`). |
-| 3 | Stages               | `lib/stages/`             | The 11 pipeline stages (`init`, `release`, `build`, `lint`, `sast`, `scan`, `test`, `package`, `container_scan`, `deploy`, `notify`). |
-| 4 | Deployments          | `lib/deployments/`        | Deploy targets (`k8s`, `helm`, `compose`, `ssh`, `gitops`, `argocd`).           |
-| 5 | Transverse           | `lib/transverse/`         | Cross-cutting helpers (`git`, `version`, `env`, `changelog`, `conditions`, `config`, `csv`, `secrets`, `ssh`, `wait`, `yaml`, `tools`). |
-| 6 | Execution            | `lib/pipeline/`           | Runtime mechanics (`stage.run`, `pipeline.run`, loader, logging, context, report, hooks, tools, bootstrap). |
-| 7 | Package managers     | `lib/package-managers/`   | Publish to registries (`npm`, `pypi`, `maven`, `cargo`, `nuget`, `docker`).     |
-| 8 | Rollout              | `lib/rollout/`            | Post-deploy rollout semantics (`health`, `strategy`, `profile`).                |
+| # | Notion               | Directory                       | Responsibility                                                                  |
+|---|----------------------|---------------------------------|---------------------------------------------------------------------------------|
+| 1 | Execution environment | `shared-libs/<platform>/`      | Map the fixed flow to a CI platform (GitLab, Jenkins, local, GitHub planned).   |
+| 2 | Stack                | `lib/stacks/`                   | Per-stack build, test, install_deps (`node`, `java`, `python`, `rust`, `dotnet`, `docker`). |
+| 3 | Stages               | `lib/stages/`                   | The 11 pipeline stages (`init`, `release`, `build`, `lint`, `sast`, `scan`, `test`, `package`, `container_scan`, `deploy`, `notify`). |
+| 4 | Deployments          | `lib/deployments/`              | Deploy targets (`k8s`, `helm`, `compose`, `ssh`, `gitops`, `argocd`).           |
+| 5 | Transverse           | `lib/transverse/`               | Cross-cutting helpers (`git`, `version`, `env`, `changelog`, `conditions`, `config`, `csv`, `secrets`, `ssh`, `wait`, `yaml`, `tools`). |
+| 6 | Execution            | `lib/pipeline/`                 | Runtime mechanics: `stage.run`, `pipeline.run`, `loader`, `logging`, `context`, `report`, `report_html`, `hooks`, `tools`, `bootstrap`, `business` (pipeline gatekeeper aggregating per-stage business results), `error`, `summary`, `runner-images`, `banner`, `_branding`, `pipeline-env`, `version-info`. |
+| 7 | Package managers     | `lib/package-managers/`         | Publish to registries (`npm`, `pypi`, `maven`, `cargo`, `nuget`, `docker`).     |
+| 8 | Rollout              | `lib/rollout/`                  | Post-deploy rollout semantics (`health`, `strategy`, `profile`).                |
+| 9 | Findings             | `lib/transverse/findings*`      | Quality data normalization: SARIF pivot, non-SARIF converters, platform-aware exporters, fix-classification, severity normalization, coverage-as-finding, org policy resolution. Physically nested under `transverse/` for now; promotion to a top-level `lib/findings/` is left for a follow-up to avoid a mass rename of `transverse.findings.*` callers. |
 
 Plus one CLI-only directory not part of the domain notions but kept under `lib/`
 for consistency with the loader:
@@ -188,6 +200,7 @@ Key relations:
 | `stage.run` lifecycle / pipeline.run / report | 6 (execution)            |
 | An `npm publish` / `docker push` wrapper     | 7 (package managers)      |
 | Post-deploy health / strategy / profile      | 8 (rollout)               |
+| SARIF aggregation / converter / exporter / fix-classification | 9 (findings) |
 | A `brik <cmd>` CLI command                   | CLI (aux)                 |
 | A platform template or wrapper               | 1 (execution environment) |
 
