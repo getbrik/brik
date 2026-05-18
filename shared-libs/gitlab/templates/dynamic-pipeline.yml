@@ -1,0 +1,98 @@
+# Brik GitLab CI Dynamic Pipeline Template (D.5c)
+#
+# Parent pipeline: runs the planner, materializes a child pipeline YAML
+# that contains only the stages the plan marks "run", then triggers it.
+# Use this template instead of pipeline.yml for impact-aware pipelines;
+# docs-only commits will skip the build/lint/test grid without running
+# any container.
+#
+# Usage in your .gitlab-ci.yml:
+#   include:
+#     - project: 'getbrik/brik'
+#       ref: v0.6
+#       file: '/shared-libs/gitlab/templates/dynamic-pipeline.yml'
+#
+# Migration from the legacy pipeline.yml:
+#   - Swap the include file path. brik.yml stays unchanged.
+#   - The fixed flow is still: init -> release -> build -> verify
+#     -> package -> container-scan -> deploy -> notify
+#     (the child pipeline re-uses templates/pipeline.yml unchanged).
+#   - Pipelines that depend on `resource_group:` on the legacy jobs keep
+#     working: the child pipeline carries the same job names, so
+#     resource_group: scheduled at the legacy job is honored across
+#     parent runs (see briklab/docs/e2e-known-issues.md for the
+#     "parallel resource_group" pattern).
+#
+# Legacy templates/pipeline.yml stays available for two minor releases
+# (v0.6.x and v0.7.x).
+
+# ---------------------------------------------------------------------------
+# Variables (mirrors templates/pipeline.yml; the child re-imports them
+# via its include of pipeline.yml so the values here drive ONLY the
+# parent's brik-plan job)
+# ---------------------------------------------------------------------------
+variables:
+  BRIK_LIB_REF: "v0.6.0"
+  BRIK_REPO: "${CI_SERVER_URL}/brik/brik.git"
+  BRIK_HOME: "/opt/brik"
+  BRIK_LOG_LEVEL: "info"
+  BRIK_PLATFORM: "gitlab"
+  BRIK_CI_IMAGE: "ghcr.io/getbrik/brik-runner-base:latest"
+  BRIK_GITLAB_TEMPLATES_PROJECT:
+    value: "getbrik/brik"
+    description: "Project that hosts the Brik GitLab templates (used by the child pipeline). Override to point at a fork."
+  BRIK_GITLAB_TEMPLATES_REF:
+    value: "v0.6"
+    description: "Ref of the Brik GitLab templates project used by the child pipeline."
+  BRIK_DRY_RUN:
+    value: "false"
+    options: ["false", "true"]
+    description: "Skip destructive deploy actions. Same semantics as the Jenkins booleanParam."
+  BRIK_TAG:
+    value: ""
+    description: "Release tag (e.g. v0.1.0). Empty for snapshot builds."
+
+# ---------------------------------------------------------------------------
+# Stages
+# ---------------------------------------------------------------------------
+stages:
+  - plan
+  - downstream
+
+# ---------------------------------------------------------------------------
+# Default job configuration: only the brik-plan job runs on the parent,
+# so the bootstrap mirrors pipeline.yml. The child re-establishes its
+# own default via its include of pipeline.yml.
+# ---------------------------------------------------------------------------
+default:
+  image: ${BRIK_CI_IMAGE}
+  before_script:
+    - |
+      if [ -f "/.brik-runner" ]; then
+        echo "[brik] brik-runner image detected, skipping prerequisite install"
+      elif [ -f "${BRIK_HOME}/scripts/bootstrap-prereqs.sh" ]; then
+        . "${BRIK_HOME}/scripts/bootstrap-prereqs.sh"
+        bootstrap_prereqs
+      fi
+    - |
+      if [ ! -d "${BRIK_HOME}" ]; then
+        echo "[brik] Cloning Brik runtime (${BRIK_LIB_REF})..."
+        git clone --depth 1 --branch "${BRIK_LIB_REF}" "${BRIK_REPO}" "${BRIK_HOME}" 2>/dev/null \
+          || git clone --depth 1 "${BRIK_REPO}" "${BRIK_HOME}"
+      fi
+    - |
+      if [ -d "${CI_PROJECT_DIR}/.git/info" ]; then
+        echo '.brik-logs/' >> "${CI_PROJECT_DIR}/.git/info/exclude"
+      fi
+    - |
+      cat > /tmp/brik-bootstrap.sh << 'BRIK_EOF'
+      . "${BRIK_HOME}/shared-libs/gitlab/scripts/gitlab-wrapper.sh"
+      brik.gitlab.setup "${BRIK_HOME}"
+      BRIK_EOF
+      chmod +x /tmp/brik-bootstrap.sh
+
+# ---------------------------------------------------------------------------
+# Plan job + downstream trigger
+# ---------------------------------------------------------------------------
+include:
+  - local: '/shared-libs/gitlab/templates/jobs/_plan.yml'
