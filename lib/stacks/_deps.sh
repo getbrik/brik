@@ -7,7 +7,13 @@
 [[ -n "${_BRIK_STACKS_DEPS_LOADED:-}" ]] && return 0
 _BRIK_STACKS_DEPS_LOADED=1
 
-# Stack-specific cache paths -- single source of truth.
+# Source the registry to aggregate cache paths from stack manifests
+# (D.2.2 of the architecture refactor chantier). The registry is the
+# source of truth for spec.cache.paths per stack.
+# shellcheck source=../registry/registry.sh
+. "${BASH_SOURCE[0]%/*}/../registry/registry.sh"
+
+# Stack-specific cache paths -- aggregated from the registry.
 #
 # Three consumers query this rather than maintain their own copy:
 #   1. GitLab job templates (build/lint/package/sast/scan/test.yml) declare
@@ -19,19 +25,21 @@ _BRIK_STACKS_DEPS_LOADED=1
 #      with a .brik-keep marker so GitLab's cache step never logs
 #      "no matching files" for stacks the active build doesn't populate.
 #
-# Output: one path per line, in stable order (the order CI templates and
-# the marker function iterate over). Paths are relative to BRIK_WORKSPACE.
+# Iteration order is the canonical language-stack order: node, python, java,
+# rust, dotnet. Docker is excluded - it has a build cache (buildx) but the
+# CI cache mechanism this list feeds is meant for language package managers
+# (npm, pip, maven, gradle, cargo, nuget). Adding a new language stack means
+# appending its id to this array AND declaring spec.cache.paths in its
+# manifest.
+#
+# Output: one path per line, in stable order. Paths are relative to BRIK_WORKSPACE.
+_STACKS_CACHE_PATHS_ORDER=(node python java rust dotnet)
+
 stacks.cache_paths() {
-    cat <<'EOF'
-.npm
-.cache/pip
-.m2/repository
-.gradle/caches
-.gradle/wrapper
-.cargo/registry
-.cargo/git
-.nuget/packages
-EOF
+    local s
+    for s in "${_STACKS_CACHE_PATHS_ORDER[@]}"; do
+        registry.stack.cache_paths "$s" 2>/dev/null || true
+    done
 }
 
 # Install project dependencies for a given stage mode.

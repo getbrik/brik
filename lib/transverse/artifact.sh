@@ -8,6 +8,12 @@
 [[ -n "${_BRIK_TRANSVERSE_ARTIFACT_LOADED:-}" ]] && return 0
 _BRIK_TRANSVERSE_ARTIFACT_LOADED=1
 
+# Source the registry to read stack-specific artifact patterns from manifests
+# (D.2.6 of the architecture refactor chantier). The registry is the source
+# of truth for spec.artifacts.{output_dirs, patterns}.
+# shellcheck source=../registry/registry.sh
+. "${BASH_SOURCE[0]%/*}/../registry/registry.sh"
+
 # Compute size in bytes for a path. Cross-platform: GNU stat uses
 # `-c %s`, BSD/macOS stat uses `-f %z`. For directories, sum the size
 # of regular files via find.
@@ -107,15 +113,14 @@ _artifact._find_main_file() {
     local _project="${3:-${BRIK_PROJECT_NAME:-}}"
     [[ -d "$_dir" ]] || return 0
 
-    local -a _patterns
-    case "$_stack" in
-        java)   _patterns=("*.jar" "*.war" "*.ear") ;;
-        python) _patterns=("*.whl" "*.tar.gz") ;;
-        node)   _patterns=("*.tgz") ;;
-        dotnet) _patterns=("*.nupkg" "*.dll" "*.exe") ;;
-        rust)   _patterns=() ;;
-        *)      _patterns=() ;;
-    esac
+    # Patterns sourced from the stack manifest (spec.artifacts.patterns).
+    # Adding a new stack with artifact glob patterns means publishing a
+    # manifest, no code change here. Falls back to an empty array for stacks
+    # with no patterns (rust binaries on Unix) or unknown stacks.
+    local -a _patterns=()
+    if declare -f registry.stack.artifact_patterns >/dev/null 2>&1; then
+        mapfile -t _patterns < <(registry.stack.artifact_patterns "$_stack" 2>/dev/null || true)
+    fi
 
     local _pat _f
 

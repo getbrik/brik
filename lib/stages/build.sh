@@ -95,17 +95,17 @@ _stages.build._record_artifact() {
     local _ws="$1"
     local _stack="${2:-${BRIK_BUILD_STACK:-auto}}"
 
-    local -a _candidates
+    # Candidate output directories come from the stack manifest
+    # (spec.artifacts.output_dirs). Adding a new simple language stack means
+    # publishing a manifest, no code change here. Two special cases handled
+    # inline:
+    #   - dotnet: multi-project nested layout (src/<proj>/bin/<config>/<TFM>/)
+    #     requires runtime glob expansion beyond a static list.
+    #   - docker: no project-level artifact to record; package stage handles
+    #     container images separately.
+    local -a _candidates=()
     case "$_stack" in
-        java)   _candidates=("target" "build/libs" "build") ;;
-        rust)   _candidates=("target/release" "target") ;;
         dotnet)
-            # .NET solutions often nest output under src/<project>/bin/<config>/<TFM>/
-            # so the workspace-root bin/ stays empty. Expand the multi-project
-            # glob before falling back to the conventional single-project paths.
-            # Strip trailing slashes so that ${_best#"${_dir}/"} in
-            # _find_main_file produces a relative main_file (not absolute).
-            _candidates=()
             local _d _rel
             for _d in "$_ws"/src/*/bin/Release/*/; do
                 [[ -d "$_d" ]] || continue
@@ -119,10 +119,20 @@ _stages.build._record_artifact() {
             done
             _candidates+=("bin/Release" "bin/Debug" "out" "build")
             ;;
-        node)   _candidates=("dist" "build" "out") ;;
-        python) _candidates=("dist" "build") ;;
-        docker) return 0 ;;
-        *)      _candidates=("dist" "target/release" "target" "build/libs" "build" "bin/Release" "out") ;;
+        docker)
+            return 0
+            ;;
+        *)
+            if declare -f registry.stack.artifact_output_dirs >/dev/null 2>&1; then
+                mapfile -t _candidates < <(registry.stack.artifact_output_dirs "$_stack" 2>/dev/null || true)
+            fi
+            # Unknown stack with no manifest registration: permissive fallback
+            # so user projects with a custom stack still get an artifact
+            # recorded under one of the common locations.
+            if [[ ${#_candidates[@]} -eq 0 ]]; then
+                _candidates=("dist" "target/release" "target" "build/libs" "build" "bin/Release" "out")
+            fi
+            ;;
     esac
 
     local _c _abs _first_existing=""
