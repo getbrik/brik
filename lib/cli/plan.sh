@@ -320,18 +320,23 @@ cli.plan._render_gitlab_child() {
 
     # Notify is the report aggregator. It needs the run-decision
     # siblings' artifacts (init's pipeline.env, build's
-    # brik-artifacts/build/, ...) plus the parent's brik-plan artifacts
-    # (skip fragments for plan-driven not-applicable stages).
+    # brik-artifacts/build/, ...).
     #
     # GitLab job overrides REPLACE arrays rather than merging them, so
     # we must re-emit the needs list here. Crucially we DO NOT list
     # jobs that the plan marks skip (`rules: when: never` above):
-    # GitLab tolerates `optional: true` for jobs that are absent or
-    # skipped by their own rules in some edge cases but with the
-    # when:never override above it returns missing_dependency_failure
-    # in 19.x. Listing only the run jobs avoids that and keeps the
-    # report aggregator correct (skip fragments come from the parent).
-    # Requires GitLab >= 14 for needs:pipeline.
+    # GitLab >=19.x returns missing_dependency_failure for those even
+    # with `optional: true`, because the when:never override is not
+    # treated the same as a job that opted itself out.
+    #
+    # The parent-pipeline cross-reference (needs:pipeline:
+    # $CI_PARENT_PIPELINE_ID job: brik-plan artifacts: true) was
+    # intentionally dropped: GitLab 19 returned
+    # missing_dependency_failure on the cross-pipeline artifact lookup
+    # in our smoke runs. The not-applicable fragments are available
+    # in plan.json (run via brik plan gate) for v0.7 aggregator work;
+    # for now the child report covers only the stages that actually
+    # ran in the child pipeline.
     printf '\n'
     printf 'brik-notify:\n'
     printf '  needs:\n'
@@ -342,9 +347,6 @@ cli.plan._render_gitlab_child() {
         printf '    - job: brik-%s\n' "$id"
         printf '      artifacts: true\n'
     done <<<"$run_stages"
-    printf '    - pipeline: $CI_PARENT_PIPELINE_ID\n'
-    printf '      job: brik-plan\n'
-    printf '      artifacts: true\n'
 }
 
 # Render a human-friendly summary of the plan to stdout.

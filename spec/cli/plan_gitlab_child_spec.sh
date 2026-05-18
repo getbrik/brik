@@ -49,9 +49,14 @@ Describe "brik plan --format gitlab-child (D.5c)"
       The output should equal ""
     End
 
-    It "carries needs:pipeline:CI_PARENT_PIPELINE_ID on notify"
+    It "lists run-stage siblings (not skipped ones) in notify needs"
+      # Notify's needs in the child contains only the plan's run
+      # decisions; the cross-pipeline parent reference was dropped
+      # because GitLab >=19.x returns missing_dependency_failure when
+      # the cross-pipeline artifact lookup is attempted from a
+      # trigger:include:artifact child (briklab smoke L.1).
       "$BRIK_BIN" plan --workspace /tmp --mode safe --format gitlab-child --out "$PLAN_JSON" >/dev/null
-      When call grep -qE "pipeline: .CI_PARENT_PIPELINE_ID" "$PLAN_YML"
+      When call grep -qE "job: brik-init" "$PLAN_YML"
       The status should equal 0
     End
 
