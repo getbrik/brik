@@ -1,0 +1,3 @@
+# Compiled registry produced by scripts/compile-registry.sh
+# Generated at runner image build time (cf. ADR-001) and on-demand for tests.
+registry.json

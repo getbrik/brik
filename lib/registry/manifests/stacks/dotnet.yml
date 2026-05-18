@@ -1,0 +1,66 @@
+apiVersion: brik.dev/v1
+kind: Stack
+metadata:
+  id: dotnet
+  displayName: .NET
+  owner: getbrik
+spec:
+  detect:
+    markers:
+      glob:
+        - "*.csproj"
+        - "*.sln"
+  runner:
+    image: ghcr.io/getbrik/brik-runner-dotnet
+    defaultVersion: "9.0"
+    versions: ["9.0", "10.0"]
+  cache:
+    paths:
+      - .nuget/packages
+  frameworks:
+    test:
+      dotnet: {stack: dotnet}
+      xunit: {stack: dotnet}
+      nunit: {stack: dotnet}
+  impact:
+    source:
+      - "**/*.cs"
+      - "**/*.csproj"
+      - "**/*.sln"
+    test:
+      - "**/*Tests.cs"
+      - "**/test/**/*.cs"
+    build:
+      - "**/*.csproj"
+      - "**/*.sln"
+      - "**/*.cs"
+  defaults:
+    build_tool: dotnet
+    test_framework: dotnet
+    lint_tool: dotnet-format
+    format_tool: dotnet-format
+  system:
+    packages:
+      apk: "dotnet{version_major}-sdk"
+      apt: "dotnet-sdk-{version}"
+      yum: "dotnet-sdk-{version}"
+      dnf: "dotnet-sdk-{version}"
+    binary: dotnet
+    mise: dotnet@{version}
+  api:
+    module: stacks.dotnet
+    required:
+      - stacks.dotnet.build
+      - stacks.dotnet.test
+      - stacks.dotnet.test_cmd
+    optional:
+      - config.dotnet.default
+      - config.dotnet.validate_coherence
+  doctor:
+    tools:
+      - dotnet
+  artifacts:
+    patterns:
+      - '*.nupkg'
+      - '*.dll'
+      - '*.exe'

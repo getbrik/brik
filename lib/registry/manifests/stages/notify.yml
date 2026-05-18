@@ -1,0 +1,31 @@
+apiVersion: brik.dev/v1
+kind: Stage
+metadata:
+  id: notify
+  displayName: Notify
+spec:
+  module: stages.notify
+  function: stages.notify
+  placement:
+    slot: notify
+    after: [deploy]
+    before: []
+  runner:
+    class: base
+  gate:
+    mode: opt_in
+    opt_in_flag: --with-deploy
+    contexts: [snapshot, release]
+  dry_run:
+    destructive: true
+  impact:
+    changes:
+      - "**/*"
+  consumes: [deploy.url, deploy.environment, package.registry_url]
+  provides: []
+  artifacts:
+    paths:
+      - brik-artifacts/notify/
+    dotenv: true
+  api:
+    required: [stages.notify]
