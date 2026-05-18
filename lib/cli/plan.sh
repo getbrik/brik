@@ -318,28 +318,30 @@ cli.plan._render_gitlab_child() {
         done <<<"$skipped"
     fi
 
-    # Notify is the report aggregator. It needs ALL its sibling jobs'
-    # artifacts (init's pipeline.env, build's brik-artifacts, etc.) plus
-    # the parent's brik-plan artifacts (skip fragments for plan-driven
-    # not-applicable stages). GitLab's job override semantics REPLACE
-    # arrays rather than merging them, so we must re-emit the full needs
-    # list from notify.yml here and append the cross-pipeline reference;
-    # otherwise notify loses access to its child siblings and fails with
-    # missing_dependency_failure. The sibling list is intentionally
-    # static -- it matches notify.yml at this commit; any change to that
-    # file must be mirrored here (covered by spec/registry/...).
+    # Notify is the report aggregator. It needs the run-decision
+    # siblings' artifacts (init's pipeline.env, build's
+    # brik-artifacts/build/, ...) plus the parent's brik-plan artifacts
+    # (skip fragments for plan-driven not-applicable stages).
+    #
+    # GitLab job overrides REPLACE arrays rather than merging them, so
+    # we must re-emit the needs list here. Crucially we DO NOT list
+    # jobs that the plan marks skip (`rules: when: never` above):
+    # GitLab tolerates `optional: true` for jobs that are absent or
+    # skipped by their own rules in some edge cases but with the
+    # when:never override above it returns missing_dependency_failure
+    # in 19.x. Listing only the run jobs avoids that and keeps the
+    # report aggregator correct (skip fragments come from the parent).
     # Requires GitLab >= 14 for needs:pipeline.
     printf '\n'
     printf 'brik-notify:\n'
     printf '  needs:\n'
-    printf '    - job: brik-init\n'
-    printf '      artifacts: true\n'
-    local sibling
-    for sibling in release build lint sast scan test package container-scan deploy; do
-        printf '    - job: brik-%s\n' "$sibling"
+    local run_stages id
+    run_stages="$(jq -r '.stages[] | select(.decision == "run" and .id != "notify") | .id' "$plan")"
+    while IFS= read -r id; do
+        [[ -z "$id" ]] && continue
+        printf '    - job: brik-%s\n' "$id"
         printf '      artifacts: true\n'
-        printf '      optional: true\n'
-    done
+    done <<<"$run_stages"
     printf '    - pipeline: $CI_PARENT_PIPELINE_ID\n'
     printf '      job: brik-plan\n'
     printf '      artifacts: true\n'
