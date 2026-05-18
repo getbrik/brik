@@ -28,6 +28,14 @@ jobs:
           shellcheck --severity=warning -x shared-libs/jenkins/scripts/*.sh
           shellcheck --severity=warning -x shared-libs/gitlab/scripts/*.sh
 
+      - name: Install jv (JSON Schema validator)
+        run: |
+          go install github.com/santhosh-tekuri/jsonschema/cmd/jv@v0.7.0
+          echo "$HOME/go/bin" >> "$GITHUB_PATH"
+
+      - name: Validate JSON Schemas (V.3)
+        run: scripts/validate-schemas.sh
+
   test:
     runs-on: ubuntu-latest
     steps:
@@ -77,6 +85,85 @@ jobs:
         uses: codecov/codecov-action@v6
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
+
+  bash-compat:
+    # V.6: ensure brik's shell code parses and the registry compiles
+    # under every Bash version we promise to support (5.0 / 5.2 / 5.3).
+    # We don't run the full shellspec suite here -- kcov takes ~3 minutes
+    # to build per matrix entry. Instead we do bash -n on every shipped
+    # script (catches >> redirect ordering, [[ )) syntax, etc.) and
+    # compile the registry end-to-end (exercises associative arrays,
+    # globstar, process substitution, EPOCHREALTIME).
+    strategy:
+      fail-fast: false
+      matrix:
+        bash: ["5.0", "5.2", "5.3"]
+    container:
+      image: bash:${{ matrix.bash }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install minimum deps
+        run: |
+          apk add --no-cache jq yq git findutils coreutils
+
+      - name: Syntax check (bash -n)
+        run: |
+          bash --version
+          fail=0
+          while IFS= read -r f; do
+            if ! bash -n "$f"; then
+              printf '[bash-compat] syntax error: %s\n' "$f" >&2
+              fail=1
+            fi
+          done < <(find bin lib scripts -type f -name '*.sh' -o -path bin/brik)
+          # Include the bare bin/brik dispatcher (no .sh extension)
+          if ! bash -n bin/brik; then
+            printf '[bash-compat] syntax error: bin/brik\n' >&2
+            fail=1
+          fi
+          exit "$fail"
+
+      - name: Smoke compile-registry
+        run: scripts/compile-registry.sh
+
+  bench-plan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq git
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+
+      - name: Compile registry cache
+        run: scripts/compile-registry.sh
+
+      - name: Bench brik plan (V.4)
+        # Gate thresholds: V.4 of the architecture refactor chantier
+        # targets p50 <= 800 ms / p99 <= 2000 ms. We start with a wider
+        # gate (1500/3000) to leave headroom while the cold-shot
+        # registry load is the dominant cost; tighten in a follow-up
+        # once the planner caches the registry across invocations.
+        run: |
+          scripts/bench-plan.sh \
+            --runs 12 \
+            --files 5000 \
+            --max-p50-ms 1500 \
+            --max-p99-ms 3000 \
+            --out /tmp/bench-plan.json
+
+      - name: Upload bench artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-plan-results
+          path: /tmp/bench-plan.json
+          if-no-files-found: ignore
 
   metrics:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
