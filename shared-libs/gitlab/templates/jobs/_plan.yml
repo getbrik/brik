@@ -1,0 +1,50 @@
+# Brik Plan Stage (D.5c)
+#
+# Runs the planner against the working tree, writes plan.json plus the
+# child pipeline YAML, and records "not-applicable" fragments for every
+# stage the plan marks skip. Those fragments are uploaded as artifacts
+# so the downstream child pipeline (and its final notify job) sees the
+# complete set of stage records, with reason, even for stages that the
+# child never runs.
+
+brik-plan:
+  stage: plan
+  needs: []
+  script:
+    - |
+      set -euo pipefail
+      bash -c '. /tmp/brik-bootstrap.sh && command -v brik >/dev/null 2>&1 || ln -sf "${BRIK_HOME}/bin/brik" /usr/local/bin/brik'
+      brik plan --workspace "${CI_PROJECT_DIR}" \
+                --out "${CI_PROJECT_DIR}/.brik-logs/plan.json" \
+                --format gitlab-child
+      export BRIK_PLAN_FILE="${CI_PROJECT_DIR}/.brik-logs/plan.json"
+      export BRIK_WORKSPACE="${CI_PROJECT_DIR}"
+      jq -r '.stages[] | select(.decision == "skip") | .id' "$BRIK_PLAN_FILE" \
+        | while IFS= read -r _stage; do
+            [ -z "${_stage}" ] && continue
+            brik plan gate "${_stage}" || true
+          done
+  artifacts:
+    when: always
+    paths:
+      - .brik-logs/plan.json
+      - .brik-logs/generated-pipeline.yml
+      - brik-artifacts/
+    exclude:
+      - .brik-logs/*.lock
+      - .brik-logs/context-*
+    expire_in: 1 day
+
+# brik-downstream triggers the child pipeline from the YAML produced
+# above. The downstream stage runs after plan so any plan-time failure
+# stops the parent before spinning up child resources.
+brik-downstream:
+  stage: downstream
+  needs:
+    - job: brik-plan
+      artifacts: true
+  trigger:
+    include:
+      - artifact: .brik-logs/generated-pipeline.yml
+        job: brik-plan
+    strategy: depend
