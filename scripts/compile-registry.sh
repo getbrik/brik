@@ -84,34 +84,67 @@ mkdir -p "$(dirname "$output")"
 tmp="$(mktemp "${output}.XXXXXX")"
 trap 'rm -f "$tmp"' EXIT
 
-# Build the registry.json document by streaming each manifest through yq
-# (YAML -> JSON) then jq -c (compact one-line per stack/stage), wrapped in the
-# enclosing object literal. jq -S at the end gives stable key ordering.
+# Build the ordered list of manifest dirs.
+# Builtins (lib/registry/manifests/) always come first; user extensions
+# listed in BRIK_REGISTRY_EXTENSIONS_DIRS (colon-separated) are appended.
+# A user manifest whose metadata.id collides with a builtin or with an
+# earlier extension is a hard error (the v0.7+ chantier will introduce
+# spec.replaces semantics for explicit overrides; v0.6 keeps it simple).
+manifest_dirs=("${MANIFESTS_DIR}")
+if [[ -n "${BRIK_REGISTRY_EXTENSIONS_DIRS:-}" ]]; then
+  _saved_IFS="$IFS"
+  IFS=':' read -r -a _ext_list <<< "${BRIK_REGISTRY_EXTENSIONS_DIRS}"
+  IFS="$_saved_IFS"
+  for ext in "${_ext_list[@]}"; do
+    [[ -z "$ext" ]] && continue
+    if [[ ! -d "$ext" ]]; then
+      printf '[compile-registry] extension dir not found: %s\n' "$ext" >&2
+      exit 66
+    fi
+    manifest_dirs+=("$ext")
+  done
+fi
+
+# Emit one "id": <body> entry per manifest file under <dir>/<kind>/*.yml,
+# in the order of manifest_dirs. Collisions (same metadata.id across
+# dirs) are a hard error -- v0.7+ will introduce spec.replaces for
+# explicit overrides; v0.6 keeps it simple.
+_emit_kind() {
+  local kind="$1"; shift
+  local -a dirs=("$@")
+  local -A seen=()
+  local first=1 d id f
+  for d in "${dirs[@]}"; do
+    compgen -G "${d}/${kind}/*.yml" >/dev/null || continue
+    for f in "${d}/${kind}"/*.yml; do
+      id=$(yq -e '.metadata.id' "$f")
+      if [[ -n "${seen[$id]:-}" ]]; then
+        printf '[compile-registry] collision: %s id=%s in %s (already from %s)\n' \
+          "$kind" "$id" "$f" "${seen[$id]}" >&2
+        return 1
+      fi
+      seen[$id]="$f"
+      [[ $first -eq 0 ]] && printf ',\n'
+      printf '    "%s": ' "$id"
+      yq -o=json '.' "$f" | jq -c '.'
+      first=0
+    done
+  done
+}
+
+# Buffer the raw JSON in a sibling temp file so collision errors from
+# _emit_kind surface cleanly. Piping directly into jq would leave it
+# parsing partial input on collision and obscure the real diagnostic.
+raw="${tmp}.raw"
+trap 'rm -f "$tmp" "$raw"' EXIT
 {
   printf '{\n  "apiVersion": "brik.dev/registry/v1",\n  "stacks": {\n'
-  first=1
-  if compgen -G "${MANIFESTS_DIR}/stacks/*.yml" >/dev/null; then
-    for f in "${MANIFESTS_DIR}"/stacks/*.yml; do
-      id=$(yq -e '.metadata.id' "$f")
-      [[ $first -eq 0 ]] && printf ',\n'
-      printf '    "%s": ' "$id"
-      yq -o=json '.' "$f" | jq -c '.'
-      first=0
-    done
-  fi
+  _emit_kind stacks "${manifest_dirs[@]}" || exit 1
   printf '\n  },\n  "stages": {\n'
-  first=1
-  if compgen -G "${MANIFESTS_DIR}/stages/*.yml" >/dev/null; then
-    for f in "${MANIFESTS_DIR}"/stages/*.yml; do
-      id=$(yq -e '.metadata.id' "$f")
-      [[ $first -eq 0 ]] && printf ',\n'
-      printf '    "%s": ' "$id"
-      yq -o=json '.' "$f" | jq -c '.'
-      first=0
-    done
-  fi
+  _emit_kind stages "${manifest_dirs[@]}" || exit 1
   printf '\n  }\n}\n'
-} | jq -S '.' > "$tmp"
+} > "$raw"
+jq -S '.' "$raw" > "$tmp"
 
 case "$mode" in
   check)
