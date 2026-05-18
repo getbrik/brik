@@ -79,6 +79,10 @@
       "description": "Notify stage configuration for Slack, email, and webhook notifications.",
       "$ref": "#/$defs/notify"
     },
+    "pipeline": {
+      "description": "Pipeline-level configuration (selection mode, per-stage impact globs). Optional; defaults are mode=safe with no per-stage overrides.",
+      "$ref": "#/$defs/pipeline"
+    },
     "hooks": {
       "description": "Inline pre and post stage hook commands. Evaluated by the shared library (Layer 2). File-based hooks (.brik/hooks/pre-build.sh) are handled separately by the Bash Runtime (Layer 0).",
       "$ref": "#/$defs/hooks"
@@ -89,6 +93,44 @@
     }
   },
   "$defs": {
+    "pipeline": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Pipeline-level selection settings consumed by the Brik planner. Aggressive mode is reserved for v0.7+ (see ADR-A.7) and currently errors out with a clear message.",
+      "properties": {
+        "selection": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": ["safe", "balanced", "aggressive"],
+              "default": "safe",
+              "description": "safe = context-only filtering (default). balanced = adds per-file impact filtering using spec.impact.changes from stage manifests, with optional per-stage overrides under selection.stages. aggressive = per-subproject impact graph; reserved for v0.7+, planner errors with rc=64 if requested."
+            },
+            "stages": {
+              "type": "object",
+              "additionalProperties": false,
+              "description": "Per-stage impact overrides. Map keyed by stage id (init, release, build, lint, sast, scan, test, package, container-scan, deploy, notify). Each value supplements or replaces the manifest's spec.impact.changes for THIS project only.",
+              "patternProperties": {
+                "^[a-z][a-z0-9-]*$": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "changes": {
+                      "type": "array",
+                      "items": {"type": "string", "minLength": 1},
+                      "uniqueItems": true,
+                      "description": "Glob patterns to consider when deciding whether this stage is impacted by the changed-files set. Use $project.root as the project root placeholder (currently resolved to the brik.yml directory; see monorepo-plan.md)."
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "release": {
       "type": "object",
       "additionalProperties": false,

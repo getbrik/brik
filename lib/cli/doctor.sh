@@ -106,19 +106,22 @@ doctor.run() {
     printf '\n'
 
     brik.use stacks._detect
+    brik.use registry.registry
     stack="$(stacks.detect "$workspace" 2>/dev/null)" || true
 
     if [[ -n "$stack" ]]; then
         printf '  Detected stack: %s (from %s)\n' "$stack" "$workspace"
         printf '\n'
 
-        case "$stack" in
-            node)   doctor._check_tools passed failed node npm ;;
-            java)   doctor._check_tools passed failed java mvn ;;
-            python) doctor._check_tools passed failed python3 pip3 ;;
-            rust)   doctor._check_tools passed failed rustc cargo ;;
-            dotnet) doctor._check_tools passed failed dotnet ;;
-        esac
+        # Tools to probe come from the stack manifest (spec.doctor.tools).
+        # Adding a new stack means publishing a manifest + module, no code
+        # change here. Silently does nothing when the manifest has no
+        # doctor.tools section (custom stacks may opt out of doctor probing).
+        local -a tools=()
+        mapfile -t tools < <(registry.stack.doctor_tools "$stack" 2>/dev/null || true)
+        if [[ ${#tools[@]} -gt 0 ]]; then
+            doctor._check_tools passed failed "${tools[@]}"
+        fi
     else
         printf '  No stack detected in %s\n' "$workspace"
     fi
