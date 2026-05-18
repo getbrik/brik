@@ -1,0 +1,111 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://brik.dev/schemas/plan/v1/plan.schema.json",
+  "title": "Brik Pipeline Plan v1",
+  "description": "Serialized output of the Brik planner. Produced by `brik plan` and consumed by adapters (GitLab child, Jenkins, local) plus the in-process gatekeeper pipeline.plan.gate. Reproducible: two invocations against the same HEAD and the same brik.yml produce a byte-identical file (timestamps excluded).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "brikVersion", "context", "mode", "stages", "dag", "fingerprint"],
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "v1",
+      "description": "Schema version. Plans tagged v1 are accepted by all v0.6.x runtimes."
+    },
+    "brikVersion": {
+      "type": "string",
+      "description": "Brik runtime version that produced the plan. Informational; not used for gating.",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(-[0-9A-Za-z.-]+)?(\\+[0-9A-Za-z.-]+)?$"
+    },
+    "context": {
+      "type": "string",
+      "enum": ["snapshot", "release"],
+      "description": "Pipeline context resolved from BRIK_COMMIT_TAG at plan time."
+    },
+    "mode": {
+      "type": "string",
+      "enum": ["safe", "balanced", "aggressive"],
+      "description": "Selection mode. safe = context-only filtering, balanced = per-file impact via globs, aggressive = per-subproject impact (deferred to v0.7+, planner errors out)."
+    },
+    "workspace": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Absolute path to the workspace root the plan was computed against. Informational."
+    },
+    "changes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "files"],
+      "description": "Snapshot of the changed-files set used by the planner. Empty when source=none (cold pipeline, no diff available).",
+      "properties": {
+        "source": {
+          "type": "string",
+          "enum": ["gitlab", "jenkins", "local", "none"]
+        },
+        "from_ref": {"type": "string"},
+        "to_ref":   {"type": "string"},
+        "files":    {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true}
+      }
+    },
+    "stages": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "description": "Per-stage plan entries, in the canonical DAG order (registry.stage.list).",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "decision", "reason", "gate", "runner_class"],
+        "properties": {
+          "id":           {"type": "string", "pattern": "^[a-z][a-z0-9-]*$"},
+          "decision":     {"type": "string", "enum": ["run", "skip"]},
+          "reason":       {"type": "string", "minLength": 1, "description": "Short machine-readable reason code (e.g. 'context-mismatch', 'no-impact', 'opt-in-flag-missing', 'forced-by-mode')."},
+          "gate": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["mode"],
+            "properties": {
+              "mode":         {"type": "string", "enum": ["blocking", "opt_in"]},
+              "opt_in_flag":  {"type": "string", "pattern": "^--[a-z][a-z0-9-]*$"},
+              "contexts":     {"type": "array", "items": {"type": "string"}, "uniqueItems": true}
+            }
+          },
+          "runner_class": {"type": "string", "enum": ["base", "stack", "scanner", "analysis", "deploy"]},
+          "function":     {"type": "string", "pattern": "^[a-z][a-z0-9_.]*$"},
+          "matched_globs": {
+            "type": "array",
+            "items": {"type": "string", "minLength": 1},
+            "uniqueItems": true,
+            "description": "Globs (from manifest spec.impact.changes) that matched at least one entry in changes.files. Empty when decision was derived from context alone."
+          }
+        }
+      }
+    },
+    "dag": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["edges"],
+      "description": "Adjacency list of the stage DAG resolved from registry.stage.{after,before}. Reproducible: edges are sorted lexicographically.",
+      "properties": {
+        "edges": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["from", "to"],
+            "properties": {
+              "from": {"type": "string", "pattern": "^[a-z][a-z0-9-]*$"},
+              "to":   {"type": "string", "pattern": "^[a-z][a-z0-9-]*$"}
+            }
+          }
+        }
+      }
+    },
+    "fingerprint": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "sha256 of the canonical JSON of this plan with the fingerprint field replaced by an empty string. Lets adapters cache or short-circuit when the plan has not changed."
+    }
+  }
+}
