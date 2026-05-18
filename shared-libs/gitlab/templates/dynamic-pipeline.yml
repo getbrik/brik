@@ -39,11 +39,11 @@ variables:
   BRIK_PLATFORM: "gitlab"
   BRIK_CI_IMAGE: "ghcr.io/getbrik/brik-runner-base:latest"
   BRIK_GITLAB_TEMPLATES_PROJECT:
-    value: "getbrik/brik"
-    description: "Project that hosts the Brik GitLab templates (used by the child pipeline). Override to point at a fork."
+    value: "brik/gitlab-templates"
+    description: "Project that hosts the Brik GitLab templates (used by the child pipeline). The default matches the conventional brik install. Override to point at a fork."
   BRIK_GITLAB_TEMPLATES_REF:
-    value: "v0.6"
-    description: "Ref of the Brik GitLab templates project used by the child pipeline."
+    value: "$BRIK_LIB_REF"
+    description: "Ref of the Brik GitLab templates project used by the child pipeline. Defaults to BRIK_LIB_REF so the parent and child stay version-locked."
   BRIK_DRY_RUN:
     value: "false"
     options: ["false", "true"]
