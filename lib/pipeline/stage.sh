@@ -42,6 +42,8 @@ _stage._load_runtime() {
     [[ -z "${_BRIK_REPORT_LOADED:-}" ]] && . "${runtime_dir}/report.sh"
     # shellcheck source=business.sh
     [[ -z "${_BRIK_BUSINESS_LOADED:-}" ]] && . "${runtime_dir}/business.sh"
+    # shellcheck source=../registry/registry.sh
+    [[ -z "${_BRIK_REGISTRY_LOADED:-}" ]] && . "${runtime_dir}/../registry/registry.sh"
 }
 
 _stage._load_runtime
@@ -333,20 +335,17 @@ _stage._finalize_fragment() {
         fi
     fi
 
-    # Per-stage dry-run marker. Stamps tech.dry_run=true on the stages
-    # whose bodies consult BRIK_DRY_RUN to skip destructive actions
-    # (release pushes a tag; package publishes to a registry; deploy
-    # invokes k8s/helm/compose/argocd/rsync; notify sends webhooks).
-    # Centralising the stamp here means renderers can rely on the field
-    # being present for every impacted stage without each stage having to
-    # remember to record it. release.sh records it itself for back-compat;
-    # report.record is an upsert so the second write is a no-op.
-    if [[ "${BRIK_DRY_RUN:-}" == "true" ]]; then
-        case "$stage_name" in
-            release|package|deploy|notify)
-                report.record "$stage_name" "tech" "dry_run" "true" 2>/dev/null || true
-                ;;
-        esac
+    # Per-stage dry-run marker. Stamps tech.dry_run=true on stages declared
+    # as destructive in their manifest (spec.dry_run.destructive: true).
+    # The list comes from the registry (D.3 of the architecture refactor
+    # chantier); centralising the stamp here means renderers can rely on
+    # the field being present for every impacted stage without each stage
+    # having to remember to record it. report.record is an upsert so a
+    # stage that records the field itself stays back-compat.
+    if [[ "${BRIK_DRY_RUN:-}" == "true" ]] \
+       && declare -f registry.stage.is_destructive >/dev/null 2>&1 \
+       && registry.stage.is_destructive "$stage_name" 2>/dev/null; then
+        report.record "$stage_name" "tech" "dry_run" "true" 2>/dev/null || true
     fi
 
     _stage._record_business "$stage_name" "$backend" || true
@@ -604,28 +603,36 @@ stage.dispatch() {
     _report_path="$(_brik.log_dir._resolve)/aggregate-report.json"
     [[ -f "$_report_path" ]] || report.init >/dev/null 2>&1 || true
 
+    # Resolve <stage_name> -> <logic_function> via the registry (D.3 of the
+    # architecture refactor chantier). The registry is the source of truth
+    # for stage IDs, aliases (e.g. quality -> lint, security -> scan), and
+    # their Bash logic function name. Adding a builtin stage means publishing
+    # a manifest + module, no change here.
     local logic_function=""
-    case "$stage_name" in
-        init)            logic_function="stages.init" ;;
-        release)         logic_function="stages.release" ;;
-        build)           logic_function="stages.build" ;;
-        lint)            logic_function="stages.lint" ;;
-        sast)            logic_function="stages.sast" ;;
-        scan)            logic_function="stages.scan" ;;
-        test)            logic_function="stages.test" ;;
-        package)         logic_function="stages.package" ;;
-        container-scan)  logic_function="stages.container_scan" ;;
-        deploy)          logic_function="stages.deploy" ;;
-        notify)          logic_function="stages.notify" ;;
-        # Backward-compat aliases (deprecated)
-        quality)         logic_function="stages.lint" ;;
-        security)        logic_function="stages.scan" ;;
-        *)
-            log.error "unknown stage: $stage_name"
-            log.error "valid stages: init, release, build, lint, sast, scan, test, package, container-scan, deploy, notify"
-            return "$BRIK_EXIT_INVALID_INPUT"
-            ;;
-    esac
+    if declare -f registry.stage.function >/dev/null 2>&1; then
+        logic_function="$(registry.stage.function "$stage_name" 2>/dev/null || true)"
+    fi
+    if [[ -z "$logic_function" ]]; then
+        log.error "unknown stage: $stage_name"
+        if declare -f registry.stage.list >/dev/null 2>&1; then
+            local _known
+            _known="$(registry.stage.list 2>/dev/null | paste -sd, -)"
+            [[ -n "$_known" ]] && log.error "valid stages: $_known"
+        fi
+        return "$BRIK_EXIT_INVALID_INPUT"
+    fi
+
+    # The manifest may reference a logic function not yet provided by any
+    # loaded module (e.g. a builtin stage shipped without a body, or a
+    # third-party stage whose module hasn't been brik.use'd yet). Surface
+    # this as a clear error instead of letting stage.run fail opaquely.
+    if ! declare -f "$logic_function" >/dev/null 2>&1; then
+        brik.use "stages.${stage_name//-/_}" 2>/dev/null || true
+    fi
+    if ! declare -f "$logic_function" >/dev/null 2>&1; then
+        log.error "logic function not defined for stage $stage_name: $logic_function"
+        return "$BRIK_EXIT_CONFIG_ERROR"
+    fi
 
     stage.run "$stage_name" "$logic_function" "${BRIK_WORKSPACE}" "${BRIK_CONFIG_FILE}"
 }
