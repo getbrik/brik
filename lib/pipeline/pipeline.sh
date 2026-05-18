@@ -24,6 +24,10 @@ _BRIK_PIPELINE_LOADED=1
 [[ -z "${_BRIK_STAGE_LOADED:-}" ]] && . "${BASH_SOURCE[0]%/*}/stage.sh"
 # shellcheck source=report.sh
 [[ -z "${_BRIK_REPORT_LOADED:-}" ]] && . "${BASH_SOURCE[0]%/*}/report.sh"
+# shellcheck source=../registry/registry.sh
+[[ -z "${_BRIK_REGISTRY_LOADED:-}" ]] && . "${BASH_SOURCE[0]%/*}/../registry/registry.sh"
+# shellcheck source=../planning/plan_reader.sh
+[[ -z "${_BRIK_PLANNING_PLAN_READER_LOADED:-}" ]] && . "${BASH_SOURCE[0]%/*}/../planning/plan_reader.sh"
 
 # Resolve the pipeline context from BRIK_COMMIT_TAG.
 # Empty/unset tag => "snapshot"; any non-empty tag => "release".
@@ -144,18 +148,36 @@ _pipeline._stamp_dry_run() {
 
 # Decide whether a stage should be skipped based on opt-in flags.
 # Returns 0 (true) if the stage should be skipped, 1 otherwise.
+#
+# The gate.mode + gate.opt_in_flag mapping comes from the registry stage
+# manifest (D.3 of the architecture refactor chantier). Blocking stages
+# always run; opt_in stages skip unless the CLI flag named in
+# spec.gate.opt_in_flag was provided. The mapping from a flag string
+# (e.g. "--with-release") to the local boolean stays a CLI-input concern.
+#
 # Usage: _pipeline._should_skip <stage> <with_release> <with_package> <with_deploy>
 _pipeline._should_skip() {
     local stage="$1"
     local with_release="$2"
     local with_package="$3"
     local with_deploy="$4"
-    case "$stage" in
-        release)        [[ "$with_release" != "true" ]] && return 0 ;;
-        package)        [[ "$with_package" != "true" ]] && return 0 ;;
-        container-scan) [[ "$with_package" != "true" ]] && return 0 ;;
-        deploy)         [[ "$with_deploy" != "true" ]] && return 0 ;;
-        notify)         [[ "$with_deploy" != "true" ]] && return 0 ;;
+
+    local mode=""
+    if declare -f registry.stage.gate_mode >/dev/null 2>&1; then
+        mode="$(registry.stage.gate_mode "$stage" 2>/dev/null || true)"
+    fi
+    [[ "$mode" == "opt_in" ]] || return 1
+
+    local flag=""
+    if declare -f registry.stage.gate_opt_in_flag >/dev/null 2>&1; then
+        flag="$(registry.stage.gate_opt_in_flag "$stage" 2>/dev/null || true)"
+    fi
+    case "$flag" in
+        --with-release) [[ "$with_release" != "true" ]] && return 0 ;;
+        --with-package) [[ "$with_package" != "true" ]] && return 0 ;;
+        --with-deploy)  [[ "$with_deploy"  != "true" ]] && return 0 ;;
+        "")             return 1 ;;
+        *)              [[ "${!flag:-}"    != "true" ]] && return 0 ;;
     esac
     return 1
 }
@@ -231,11 +253,41 @@ pipeline.run() {
     # (set BRIK_DISABLE_REPORT_FRAGMENTS=0 to opt back in for debugging).
     export BRIK_DISABLE_REPORT_FRAGMENTS="${BRIK_DISABLE_REPORT_FRAGMENTS:-1}"
 
-    local -a stages=(init release build lint sast scan test package container-scan deploy notify)
+    # Stage sequence comes from the registry (D.3 of the architecture refactor
+    # chantier). The registry is the source of truth for stage order: it
+    # publishes IDs already topologically sorted by spec.placement.{slot,
+    # after, before}. Adding a builtin stage means publishing a manifest, no
+    # change here. Falls back to the historic fixed order if the registry is
+    # absent for any reason (defensive: a missing registry should not break
+    # the orchestrator).
+    local -a stages=()
+    if declare -f registry.stage.list >/dev/null 2>&1; then
+        mapfile -t stages < <(registry.stage.list 2>/dev/null || true)
+    fi
+    if [[ ${#stages[@]} -eq 0 ]]; then
+        stages=(init release build lint sast scan test package container-scan deploy notify)
+    fi
     local had_failure=false
     local stage stage_start_ms stage_end_ms duration_ms rc
 
     for stage in "${stages[@]}"; do
+        # Plan-driven gatekeeper (D.4 of the architecture refactor chantier).
+        # When a plan.json exists and pipeline.plan.should_run returns false,
+        # the stage is recorded as a not-applicable skip BEFORE we touch
+        # stage.dispatch. The dispatcher stays a pure name->function mapper
+        # (SRP); the orchestrator owns the run/skip decision. No-op when no
+        # plan file is present (backward-compat with v0.5.x).
+        if declare -f pipeline.plan.should_run >/dev/null 2>&1 \
+           && ! pipeline.plan.should_run "$stage"; then
+            local _plan_reason=""
+            _plan_reason="$(pipeline.plan.reason "$stage" 2>/dev/null || true)"
+            report.record "$stage" "tech" "status" "skipped" || true
+            report.record "$stage" "tech" "kind" "not-applicable" || true
+            [[ -n "$_plan_reason" ]] && \
+                report.record "$stage" "business" "reason" "$_plan_reason" || true
+            continue
+        fi
+
         if _pipeline._should_skip "$stage" "$with_release" "$with_package" "$with_deploy"; then
             report.record "$stage" "tech" "status" "skipped" || true
             continue
