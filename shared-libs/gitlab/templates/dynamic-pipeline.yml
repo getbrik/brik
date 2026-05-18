@@ -93,6 +93,10 @@ default:
 
 # ---------------------------------------------------------------------------
 # Plan job + downstream trigger
+# `local:` resolves relative to the project hosting THIS file. When the
+# Brik repo is published to GitLab the gitlab-templates project is rooted
+# at brik/shared-libs/gitlab/ (push.sh:e2e.push.brik_repos), so the path
+# below is /templates/... not /shared-libs/gitlab/templates/...
 # ---------------------------------------------------------------------------
 include:
-  - local: '/shared-libs/gitlab/templates/jobs/_plan.yml'
+  - local: '/templates/jobs/_plan.yml'
