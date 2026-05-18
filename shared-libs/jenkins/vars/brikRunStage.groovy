@@ -17,6 +17,11 @@ def call(Map config) {
     def image = config.image      ?: error('brikRunStage: image is required')
     def name  = config.stageName  ?: error('brikRunStage: stageName is required')
     def home  = config.brikHome   ?: error('brikRunStage: brikHome is required')
-    def args  = "-e BRIK_RUNNER_IMAGE=${image} ${config.dockerArgs ?: ''}"
+    // Forward BRIK_PLAN_FILE when set (D.5b of the architecture refactor
+    // chantier). When an operator runs a single stage via `brik run stage`
+    // through the wrapper, the in-container brik picks up the plan and
+    // honours the same skip semantics as the orchestrated path.
+    def planEnv = env.BRIK_PLAN_FILE ? "-e BRIK_PLAN_FILE=${env.BRIK_PLAN_FILE} " : ''
+    def args = "-e BRIK_RUNNER_IMAGE=${image} ${planEnv}${config.dockerArgs ?: ''}"
     docker.image(image).inside(args) { brikStage(name, home) }
 }

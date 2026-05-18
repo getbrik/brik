@@ -214,6 +214,41 @@ def call(Map params = [:]) {
                 stashBrikArtifacts(name)
             }
 
+            // Plan-driven gate helper (D.5b of the architecture refactor
+            // chantier). Returns true when the stage should run, false when
+            // the plan said skip. On skip, `brik plan gate` has already
+            // recorded the per-stage fragment so the aggregate-report
+            // surfaces the stage as a not-applicable skip with reason.
+            // When BRIK_PLAN_FILE is unset (legacy pipelines), the gate
+            // returns true and the stage runs as before.
+            def planSaysRun = { stageId ->
+                if (!env.BRIK_PLAN_FILE?.trim()) {
+                    return true
+                }
+                def rc = sh(
+                    script: "${brikHome}/bin/brik plan gate '${stageId}'",
+                    returnStatus: true
+                )
+                return rc == 0
+            }
+
+            // Wrap a stage with the plan gate: the Jenkins stage block is
+            // still created so the Stage View records "skipped" entries,
+            // but the body only runs when the plan allows it. The fragment
+            // is stashed in both branches so Notify's aggregator sees
+            // either the run output or the skip marker written by
+            // `brik plan gate`.
+            def runStageWithPlan = { stageName, stageId, body ->
+                runStageWithReporting(stageName) {
+                    if (planSaysRun(stageId)) {
+                        body()
+                    } else {
+                        echo "[brik] ${stageId}: skipped per plan (BRIK_PLAN_FILE=${env.BRIK_PLAN_FILE})"
+                        stashBrikArtifacts(stageId)
+                    }
+                }
+            }
+
             try {
                 // Init publishes its env contract through report.record env;
                 // the post-stage projection hook materialises it as
@@ -229,6 +264,25 @@ def call(Map params = [:]) {
                     docker.image(resolvedImage).pull()
                 }
 
+                // Plan stage (D.5b). Produces .brik-logs/plan.json and
+                // points the gate helpers at it via BRIK_PLAN_FILE. Runs
+                // on the master without Docker because the planner only
+                // needs jq/yq/git (already on the Jenkins agent). A
+                // planner failure is non-fatal: we echo and fall back to
+                // the legacy unconditional flow.
+                runStageWithReporting('Plan') {
+                    def planRc = sh(
+                        script: "${brikHome}/bin/brik plan --out .brik-logs/plan.json",
+                        returnStatus: true
+                    )
+                    if (planRc == 0 && fileExists('.brik-logs/plan.json')) {
+                        env.BRIK_PLAN_FILE = "${env.WORKSPACE}/.brik-logs/plan.json"
+                        echo "[brik] plan written: ${env.BRIK_PLAN_FILE}"
+                    } else {
+                        echo "[brik] planner failed (rc=${planRc}); falling back to legacy flow"
+                    }
+                }
+
                 // release: gate-at-platform on tag presence. Two routes:
                 //   - Multibranch tag-scan: Jenkins sets env.TAG_NAME on
                 //     the build automatically.
@@ -241,15 +295,18 @@ def call(Map params = [:]) {
                 //     when env.BRIK_TAG is already "v0.1.0". Check env
                 //     directly to cover both routes.
                 if (env.TAG_NAME?.trim() || env.BRIK_TAG?.trim()) {
-                    runStageWithReporting('Release') { runStage('release') }
+                    runStageWithPlan('Release', 'release') { runStage('release') }
                 }
-                runStageWithReporting('Build')          { runStage('build') }
+                runStageWithPlan('Build', 'build')          { runStage('build') }
                 runStageWithReporting('Verify') {
+                    // Verify groups four checks; the gate applies per child
+                    // so a docs-only commit can skip individual scanners
+                    // without dropping the whole Verify stage.
                     parallel(
-                        'Lint': { runStage('lint') },
-                        'SAST': { runInAnalysis('sast') },
-                        'Scan': { runInScanner('scan') },
-                        'Test': { runStage('test') }
+                        'Lint': { if (planSaysRun('lint')) { runStage('lint') }      else { echo "[brik] lint: skipped per plan";  stashBrikArtifacts('lint') } },
+                        'SAST': { if (planSaysRun('sast')) { runInAnalysis('sast') } else { echo "[brik] sast: skipped per plan";  stashBrikArtifacts('sast') } },
+                        'Scan': { if (planSaysRun('scan')) { runInScanner('scan') }  else { echo "[brik] scan: skipped per plan";  stashBrikArtifacts('scan') } },
+                        'Test': { if (planSaysRun('test')) { runStage('test') }      else { echo "[brik] test: skipped per plan";  stashBrikArtifacts('test') } }
                     )
                     // brik-artifacts/test/junit/**/*.xml covers the Java surefire/gradle layout;
                     // brik-artifacts/test/junit.xml covers node/python/dotnet.
@@ -286,9 +343,9 @@ def call(Map params = [:]) {
                         echo "[brik] recordIssues skipped (Warnings NG plugin unavailable): ${e.message}"
                     }
                 }
-                runStageWithReporting('Package')        { runStage('package') }
-                runStageWithReporting('Container Scan') { runInScanner('container-scan') }
-                runStageWithReporting('Deploy') {
+                runStageWithPlan('Package', 'package')              { runStage('package') }
+                runStageWithPlan('Container Scan', 'container-scan') { runInScanner('container-scan') }
+                runStageWithPlan('Deploy', 'deploy') {
                     sh 'mkdir -p "${WORKSPACE}/.kube" && cp /opt/brik/kubeconfig "${WORKSPACE}/.kube/config" 2>/dev/null || true'
                     runInDeploy('deploy')
                 }
