@@ -118,12 +118,15 @@ cli.run.stage() {
 # cli.run.pipeline - execute the full pipeline via the local wrapper.
 # Usage: cli.run.pipeline [--config <path>] [--workspace <path>] [--dry-run]
 #        [--continue-on-error] [--with-release] [--with-package] [--with-deploy]
+#        [--plan <plan.json>] [--auto-select]
 cli.run.pipeline() {
     brik.use cli.helpers
 
     local config_path=""
     local workspace=""
     local dry_run=""
+    local plan_file=""
+    local auto_select=false
     local -a pipeline_flags=()
 
     workspace="$(pwd)"
@@ -142,6 +145,15 @@ cli.run.pipeline() {
                 ;;
             --dry-run)
                 dry_run="true"
+                shift
+                ;;
+            --plan)
+                brik_require_arg "--plan" "${2-}" || return "$?"
+                plan_file="$2"
+                shift 2
+                ;;
+            --auto-select)
+                auto_select=true
                 shift
                 ;;
             --continue-on-error|--with-release|--with-package|--with-deploy)
@@ -167,6 +179,37 @@ cli.run.pipeline() {
     # Activate dry-run only when the flag was passed. We never demote a
     # pre-existing BRIK_DRY_RUN=true exported by the caller's shell.
     [[ "$dry_run" == "true" ]] && export BRIK_DRY_RUN="true"
+
+    # Plan-driven mode (D.5a of the architecture refactor chantier).
+    # --plan points pipeline.plan.gate at an existing plan.json.
+    # --auto-select runs the planner first and points the gate at the
+    # freshly-written file. --plan takes precedence when both are set.
+    if [[ -n "$plan_file" ]]; then
+        if [[ ! -f "$plan_file" ]]; then
+            brik_error "plan file not found: $plan_file"
+            return "${BRIK_EXIT_INVALID_INPUT}"
+        fi
+        export BRIK_PLAN_FILE="$plan_file"
+    elif [[ "$auto_select" == "true" ]]; then
+        brik.use cli.plan
+        local _auto_plan="${BRIK_LOG_DIR}/plan.json"
+        # The planner inherits the workspace + opt-in flags so the plan
+        # reflects what pipeline.run will be told to execute. Without
+        # this, --auto-select + --with-deploy would still skip deploy
+        # in the plan (opt-in-flag-missing).
+        local -a _plan_pass=(--workspace "$workspace" --out "$_auto_plan")
+        local _f
+        for _f in "${pipeline_flags[@]}"; do
+            case "$_f" in
+                --with-release|--with-package|--with-deploy) _plan_pass+=("$_f") ;;
+            esac
+        done
+        if ! _cli.run._runtime cli.plan.run "${_plan_pass[@]}"; then
+            brik_error "auto-select planner failed; refusing to run pipeline blind"
+            return "${BRIK_EXIT_FAILURE}"
+        fi
+        export BRIK_PLAN_FILE="$_auto_plan"
+    fi
 
     _cli.run._setup_local_env || return "$?"
 
