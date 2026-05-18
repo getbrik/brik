@@ -38,6 +38,15 @@ brik-plan:
 # brik-downstream triggers the child pipeline from the YAML produced
 # above. The downstream stage runs after plan so any plan-time failure
 # stops the parent before spinning up child resources.
+#
+# trigger:forward:yaml_variables: false stops the parent's `variables:`
+# block from being forwarded to the child. Without it, the parent's
+# BRIK_CI_IMAGE (deliberately set to the base runner for brik-plan)
+# would shadow the brik-runner-<stack>:<version> value that the child's
+# brik-init writes into pipeline.env, so the child's brik-build, lint,
+# test, ... would all run on the base runner and fail (e.g. "required
+# tool not found: node"). The child still inherits CI variables defined
+# at the GitLab project level via pipeline_variables forwarding.
 brik-downstream:
   stage: downstream
   needs:
@@ -48,3 +57,6 @@ brik-downstream:
       - artifact: .brik-logs/plan.yml
         job: brik-plan
     strategy: depend
+    forward:
+      yaml_variables: false
+      pipeline_variables: true
