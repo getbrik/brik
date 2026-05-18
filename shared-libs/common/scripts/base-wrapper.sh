@@ -108,6 +108,22 @@ brik.wrapper.bootstrap() {
     # shellcheck source=/dev/null
     . "${_BRIK_PIPELINE_DIR}/pipeline.sh" || return "$BRIK_EXIT_IO_FAILURE"
 
+    # Pre-warm the registry cache if it is missing. The registry loader
+    # has a lazy auto-compile fallback for the same case, but warming up
+    # here -- once, deterministically, before any stage tries to read the
+    # cache -- avoids a Jenkins-specific race where the first stage of
+    # a fresh @libs clone reads a partially-written cache and fails with
+    # "unknown stage". Best-effort: skips silently if yq/jq are missing
+    # (the lazy fallback will then surface the actionable error).
+    if [[ ! -f "${BRIK_HOME}/lib/registry/cache/registry.json" ]] \
+       && [[ -x "${BRIK_HOME}/scripts/compile-registry.sh" ]] \
+       && command -v yq >/dev/null 2>&1 \
+       && command -v jq >/dev/null 2>&1; then
+        "${BRIK_HOME}/scripts/compile-registry.sh" \
+            --output "${BRIK_HOME}/lib/registry/cache/registry.json" \
+            >&2 || true
+    fi
+
     # Load portable config and condition modules
     brik.use config
     brik.use conditions
