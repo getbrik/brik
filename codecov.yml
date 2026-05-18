@@ -3,9 +3,31 @@ coverage:
     project:
       default:
         target: 80%
+      registry:
+        # V.1 of the architecture refactor chantier targets 90% on the
+        # registry surface (new code, central to the OCP claim).
+        target: 90%
+        paths:
+          - lib/registry/
+      planning:
+        # Same 90% bar on the planner (D.4): the gate hook in pipeline.run
+        # plus the gitlab-child emission all hang off these modules.
+        target: 90%
+        paths:
+          - lib/planning/
     patch:
       default:
         target: 80%
+
+flags:
+  registry:
+    paths:
+      - lib/registry/
+    carryforward: true
+  planning:
+    paths:
+      - lib/planning/
+    carryforward: true
 
 ignore:
   - "spec/**"
