@@ -1,0 +1,74 @@
+apiVersion: brik.dev/v1
+kind: Stack
+metadata:
+  id: python
+  displayName: Python
+  owner: getbrik
+spec:
+  detect:
+    markers:
+      any:
+        - requirements.txt
+        - setup.py
+        - pyproject.toml
+  runner:
+    image: ghcr.io/getbrik/brik-runner-python
+    defaultVersion: "3.13"
+    versions: ["3.13", "3.14"]
+  cache:
+    paths:
+      - .cache/pip
+  frameworks:
+    test:
+      pytest: {stack: python}
+      unittest: {stack: python}
+      tox: {stack: python}
+  impact:
+    source:
+      - "**/*.py"
+      - pyproject.toml
+      - requirements.txt
+      - setup.py
+      - setup.cfg
+    test:
+      - "**/test_*.py"
+      - "**/tests/**/*.py"
+      - "**/*_test.py"
+    build:
+      - pyproject.toml
+      - setup.py
+      - requirements.txt
+      - "**/*.py"
+  defaults:
+    build_tool: pip
+    test_framework: pytest
+    lint_tool: ruff
+    format_tool: black
+  system:
+    packages:
+      apk: "python3 py3-pip py3-setuptools"
+      apt: "python3 python3-pip python3-setuptools"
+      yum: "python3 python3-pip"
+      dnf: "python3 python3-pip"
+    binary: python3
+    mise: python@{version}
+  api:
+    module: stacks.python
+    required:
+      - stacks.python.build
+      - stacks.python.test
+      - stacks.python.test_cmd
+    optional:
+      - config.python.default
+      - config.python.validate_coherence
+  doctor:
+    tools:
+      - python3
+      - pip3
+  artifacts:
+    output_dirs:
+      - dist
+      - build
+    patterns:
+      - '*.whl'
+      - '*.tar.gz'

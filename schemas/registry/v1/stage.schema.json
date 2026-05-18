@@ -1,0 +1,150 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://brik.dev/schemas/registry/v1/stage.schema.json",
+  "title": "Brik Stage Manifest v1",
+  "description": "Declarative manifest describing a stage in the Brik flow. Source of truth for stage placement, runner class, gating, and impact patterns.",
+  "type": "object",
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "additionalProperties": false,
+  "properties": {
+    "apiVersion": {"type": "string", "const": "brik.dev/v1"},
+    "kind": {"type": "string", "const": "Stage"},
+    "metadata": {
+      "type": "object",
+      "required": ["id", "displayName"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z][a-z0-9-]*$"},
+        "displayName": {"type": "string", "minLength": 1},
+        "aliases": {
+          "type": "array",
+          "items": {"type": "string", "pattern": "^[a-z][a-z0-9-]*$"},
+          "uniqueItems": true
+        },
+        "minBrikVersion": {"$ref": "#/$defs/semver"},
+        "maxBrikVersion": {"$ref": "#/$defs/semver"}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "required": ["module", "function", "placement", "runner", "gate", "api"],
+      "additionalProperties": false,
+      "properties": {
+        "module": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]*$"},
+        "function": {"$ref": "#/$defs/bashFunctionName"},
+        "placement": {
+          "type": "object",
+          "required": ["slot"],
+          "additionalProperties": false,
+          "properties": {
+            "slot": {
+              "type": "string",
+              "enum": ["init", "release", "pre-build", "build", "post-build", "verify", "pre-package", "package", "post-package", "pre-deploy", "deploy", "post-deploy", "notify"]
+            },
+            "group": {"type": "string", "pattern": "^[a-z][a-z0-9-]*$"},
+            "after":  {"type": "array", "items": {"$ref": "#/$defs/stageId"}, "uniqueItems": true},
+            "before": {"type": "array", "items": {"$ref": "#/$defs/stageId"}, "uniqueItems": true}
+          }
+        },
+        "runner": {
+          "type": "object",
+          "required": ["class"],
+          "additionalProperties": false,
+          "properties": {
+            "class": {"type": "string", "enum": ["base", "stack", "scanner", "analysis", "deploy"]}
+          }
+        },
+        "gate": {
+          "type": "object",
+          "required": ["mode", "contexts"],
+          "additionalProperties": false,
+          "properties": {
+            "mode": {"type": "string", "enum": ["blocking", "opt_in"]},
+            "opt_in_flag": {"type": "string", "pattern": "^--[a-z][a-z0-9-]*$"},
+            "contexts": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": ["snapshot", "release", "merge-train", "pre-release", "hotfix", "docs-only", "lock-only", "feature", "main", "manual"]
+              },
+              "minItems": 1,
+              "uniqueItems": true
+            }
+          },
+          "allOf": [
+            {
+              "if": {"properties": {"mode": {"const": "opt_in"}}, "required": ["mode"]},
+              "then": {"required": ["opt_in_flag"]}
+            }
+          ]
+        },
+        "dry_run": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {"destructive": {"type": "boolean"}}
+        },
+        "impact": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "changes": {"type": "array", "items": {"$ref": "#/$defs/glob"}, "uniqueItems": true},
+            "use_stack_impact": {"type": "string", "enum": ["source", "test", "build"]}
+          }
+        },
+        "consumes": {"type": "array", "items": {"$ref": "#/$defs/capability"}, "uniqueItems": true},
+        "provides": {"type": "array", "items": {"$ref": "#/$defs/capability"}, "uniqueItems": true},
+        "artifacts": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "paths": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+            "dotenv": {"type": "boolean"}
+          }
+        },
+        "api": {
+          "type": "object",
+          "required": ["required"],
+          "additionalProperties": false,
+          "properties": {
+            "required": {
+              "type": "array",
+              "items": {"$ref": "#/$defs/bashFunctionName"},
+              "minItems": 1,
+              "uniqueItems": true
+            },
+            "optional": {
+              "type": "array",
+              "items": {"$ref": "#/$defs/bashFunctionName"},
+              "uniqueItems": true
+            }
+          }
+        },
+        "replaces": {"type": "string", "pattern": "^[a-z][a-z0-9-]*$"},
+        "compatibility": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "mustProvideSameAs": {"$ref": "#/$defs/stageId"},
+            "provides": {"type": "array", "items": {"$ref": "#/$defs/capability"}, "uniqueItems": true}
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {"required": ["replaces"]},
+          "then": {"required": ["compatibility"]}
+        }
+      ]
+    }
+  },
+  "$defs": {
+    "semver": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(-[0-9A-Za-z.-]+)?(\\+[0-9A-Za-z.-]+)?$"
+    },
+    "bashFunctionName": {"type": "string", "pattern": "^[a-z][a-z0-9_.]*$"},
+    "stageId":          {"type": "string", "pattern": "^[a-z][a-z0-9-]*$"},
+    "capability":       {"type": "string", "pattern": "^[a-z][a-z0-9_.-]*$"},
+    "glob":             {"type": "string", "minLength": 1}
+  }
+}

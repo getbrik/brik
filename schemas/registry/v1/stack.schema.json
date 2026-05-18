@@ -1,0 +1,326 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://brik.dev/schemas/registry/v1/stack.schema.json",
+  "title": "Brik Stack Manifest v1",
+  "description": "Declarative manifest describing a stack supported by Brik (node, java, python, etc.). Source of truth for stack detection, runner image resolution, cache paths, and impact globs.",
+  "type": "object",
+  "required": [
+    "apiVersion",
+    "kind",
+    "metadata",
+    "spec"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "apiVersion": {
+      "type": "string",
+      "const": "brik.dev/v1",
+      "description": "Frozen v1 per ADR-003 for 12 months minimum."
+    },
+    "kind": {
+      "type": "string",
+      "const": "Stack"
+    },
+    "metadata": {
+      "type": "object",
+      "required": [
+        "id",
+        "displayName"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$",
+          "description": "Kebab-case identifier. Used as namespace key (registry.stack.<id>)."
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "owner": {
+          "type": "string"
+        },
+        "minBrikVersion": {
+          "$ref": "#/$defs/semver"
+        },
+        "maxBrikVersion": {
+          "$ref": "#/$defs/semver"
+        }
+      }
+    },
+    "spec": {
+      "type": "object",
+      "required": [
+        "detect",
+        "runner",
+        "api"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "detect": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "markers"
+          ],
+          "properties": {
+            "markers": {
+              "type": "object",
+              "additionalProperties": false,
+              "minProperties": 1,
+              "properties": {
+                "any": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "minItems": 1,
+                  "description": "Literal filenames; presence of any triggers detection."
+                },
+                "glob": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "minItems": 1,
+                  "description": "Glob patterns (e.g. *.csproj)."
+                }
+              }
+            }
+          }
+        },
+        "runner": {
+          "type": "object",
+          "required": [
+            "image",
+            "defaultVersion",
+            "versions"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "image": {
+              "type": "string",
+              "pattern": "^[a-z0-9.\\-_/]+$"
+            },
+            "defaultVersion": {
+              "type": "string",
+              "minLength": 1
+            },
+            "versions": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "minItems": 1,
+              "uniqueItems": true
+            }
+          }
+        },
+        "cache": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "paths": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        "frameworks": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "test": {
+              "type": "object",
+              "patternProperties": {
+                "^[a-z][a-z0-9-]*$": {
+                  "type": "object",
+                  "required": [
+                    "stack"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "stack": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9-]*$"
+                    }
+                  }
+                }
+              },
+              "additionalProperties": false
+            }
+          }
+        },
+        "impact": {
+          "$ref": "#/$defs/impactPatterns"
+        },
+        "defaults": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "build_tool": {
+              "type": "string"
+            },
+            "test_framework": {
+              "type": "string"
+            },
+            "lint_tool": {
+              "type": "string"
+            },
+            "format_tool": {
+              "type": "string"
+            }
+          }
+        },
+        "system": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "packages": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "apk": {
+                  "type": "string"
+                },
+                "apt": {
+                  "type": "string"
+                },
+                "yum": {
+                  "type": "string"
+                },
+                "dnf": {
+                  "type": "string"
+                }
+              }
+            },
+            "binary": {
+              "type": "string"
+            },
+            "mise": {
+              "type": "string"
+            }
+          }
+        },
+        "api": {
+          "type": "object",
+          "required": [
+            "module",
+            "required"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "module": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_.-]*$"
+            },
+            "required": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/bashFunctionName"
+              },
+              "minItems": 1,
+              "uniqueItems": true
+            },
+            "optional": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/bashFunctionName"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        "doctor": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "tools": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "uniqueItems": true,
+              "description": "Binaries to probe via brik doctor when this stack is detected."
+            }
+          }
+        },
+        "artifacts": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Conventional locations and filename patterns for build output artifacts.",
+          "properties": {
+            "output_dirs": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "uniqueItems": true,
+              "description": "Workspace-relative directories where build output lands, in priority order."
+            },
+            "patterns": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "uniqueItems": true,
+              "description": "Glob patterns of representative artifact files (*.jar, *.whl, etc.) in priority order."
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "semver": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(-[0-9A-Za-z.-]+)?(\\+[0-9A-Za-z.-]+)?$"
+    },
+    "bashFunctionName": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_.]*$"
+    },
+    "glob": {
+      "type": "string",
+      "minLength": 1
+    },
+    "impactPatterns": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "source": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/glob"
+          },
+          "uniqueItems": true
+        },
+        "test": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/glob"
+          },
+          "uniqueItems": true
+        },
+        "build": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/glob"
+          },
+          "uniqueItems": true
+        }
+      }
+    }
+  }
+}

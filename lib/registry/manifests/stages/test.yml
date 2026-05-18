@@ -1,0 +1,28 @@
+apiVersion: brik.dev/v1
+kind: Stage
+metadata:
+  id: test
+  displayName: Test
+spec:
+  module: stages.test
+  function: stages.test
+  placement:
+    slot: verify
+    group: verify
+    after: [build]
+    before: [package]
+  runner:
+    class: stack
+  gate:
+    mode: blocking
+    contexts: [snapshot, release]
+  impact:
+    use_stack_impact: test
+  consumes: [build.artifact]
+  provides: [test.findings, coverage.report]
+  artifacts:
+    paths:
+      - brik-artifacts/test/
+    dotenv: true
+  api:
+    required: [stages.test]

@@ -1,0 +1,37 @@
+apiVersion: brik.dev/v1
+kind: Stack
+metadata:
+  id: docker
+  displayName: Docker
+  owner: getbrik
+spec:
+  detect:
+    markers:
+      any:
+        - Dockerfile
+        - Containerfile
+        - docker-compose.yml
+  runner:
+    image: ghcr.io/getbrik/brik-runner-base
+    defaultVersion: "latest"
+    versions: ["latest"]
+  cache:
+    paths:
+      - .docker/buildx-cache
+  impact:
+    source:
+      - Dockerfile
+      - Containerfile
+      - "**/Dockerfile"
+      - "**/Containerfile"
+      - ".dockerignore"
+    build:
+      - Dockerfile
+      - Containerfile
+      - "**/*.Dockerfile"
+  api:
+    module: stacks.docker
+    required:
+      - stacks.docker.build
+    optional:
+      - stacks.docker.test

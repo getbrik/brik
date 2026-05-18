@@ -1,0 +1,78 @@
+apiVersion: brik.dev/v1
+kind: Stack
+metadata:
+  id: java
+  displayName: Java
+  owner: getbrik
+spec:
+  detect:
+    markers:
+      any:
+        - pom.xml
+        - build.gradle
+        - build.gradle.kts
+  runner:
+    image: ghcr.io/getbrik/brik-runner-java
+    defaultVersion: "21"
+    versions: ["21", "25"]
+  cache:
+    paths:
+      - .m2/repository
+      - .gradle/caches
+      - .gradle/wrapper
+  frameworks:
+    test:
+      junit: {stack: java}
+      maven: {stack: java}
+      gradle: {stack: java}
+  impact:
+    source:
+      - "**/*.java"
+      - "**/*.kt"
+      - pom.xml
+      - build.gradle
+      - build.gradle.kts
+    test:
+      - "**/src/test/**/*.java"
+      - "**/src/test/**/*.kt"
+    build:
+      - pom.xml
+      - build.gradle
+      - build.gradle.kts
+      - "**/*.java"
+      - "**/*.kt"
+  defaults:
+    build_tool: maven
+    test_framework: junit
+    lint_tool: checkstyle
+    format_tool: google-java-format
+  system:
+    packages:
+      apk: "openjdk{version}-jdk maven"
+      apt: "openjdk-{version}-jdk maven"
+      yum: "java-{version}-openjdk-devel"
+      dnf: "java-{version}-openjdk-devel"
+    binary: java
+    mise: java@{version}
+  api:
+    module: stacks.java
+    required:
+      - stacks.java.build
+      - stacks.java.test
+      - stacks.java.test_cmd
+    optional:
+      - config.java.default
+      - config.java.validate_coherence
+  doctor:
+    tools:
+      - java
+      - mvn
+  artifacts:
+    output_dirs:
+      - target
+      - build/libs
+      - build
+    patterns:
+      - '*.jar'
+      - '*.war'
+      - '*.ear'

@@ -1,0 +1,34 @@
+apiVersion: brik.dev/v1
+kind: Stage
+metadata:
+  id: package
+  displayName: Package
+spec:
+  module: stages.package
+  function: stages.package
+  placement:
+    slot: package
+    after: [lint, sast, scan, test]
+    before: [container-scan]
+  runner:
+    class: stack
+  gate:
+    mode: opt_in
+    opt_in_flag: --with-package
+    contexts: [snapshot, release]
+  dry_run:
+    destructive: true
+  impact:
+    changes:
+      - "**/Dockerfile"
+      - "**/package-lock.json"
+      - "**/pom.xml"
+      - "**/Cargo.lock"
+  consumes: [build.artifact]
+  provides: [package.artifact, package.registry_url]
+  artifacts:
+    paths:
+      - brik-artifacts/package/
+    dotenv: true
+  api:
+    required: [stages.package]

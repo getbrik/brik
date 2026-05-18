@@ -1,0 +1,35 @@
+apiVersion: brik.dev/v1
+kind: Stage
+metadata:
+  id: scan
+  displayName: Scan
+  aliases: [security]
+spec:
+  module: stages.scan
+  function: stages.scan
+  placement:
+    slot: verify
+    group: verify
+    after: [build]
+    before: [package]
+  runner:
+    class: scanner
+  gate:
+    mode: blocking
+    contexts: [snapshot, release]
+  impact:
+    changes:
+      - "**/package-lock.json"
+      - "**/pom.xml"
+      - "**/go.sum"
+      - "**/Cargo.lock"
+      - "**/requirements.txt"
+      - "**/pyproject.toml"
+  consumes: [build.artifact]
+  provides: [dependency.findings, secret.findings]
+  artifacts:
+    paths:
+      - brik-artifacts/scan/
+    dotenv: true
+  api:
+    required: [stages.scan]
