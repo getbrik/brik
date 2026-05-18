@@ -1,0 +1,27 @@
+apiVersion: brik.dev/v1
+kind: Stage
+metadata:
+  id: build
+  displayName: Build
+spec:
+  module: stages.build
+  function: stages.build
+  placement:
+    slot: build
+    after: [init, release]
+    before: [lint, sast, scan, test]
+  runner:
+    class: stack
+  gate:
+    mode: blocking
+    contexts: [snapshot, release]
+  impact:
+    use_stack_impact: build
+  consumes: [release.version]
+  provides: [build.artifact]
+  artifacts:
+    paths:
+      - brik-artifacts/build/
+    dotenv: true
+  api:
+    required: [stages.build]

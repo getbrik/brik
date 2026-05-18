@@ -1,0 +1,65 @@
+apiVersion: brik.dev/v1
+kind: Stack
+metadata:
+  id: rust
+  displayName: Rust
+  owner: getbrik
+spec:
+  detect:
+    markers:
+      any:
+        - Cargo.toml
+  runner:
+    image: ghcr.io/getbrik/brik-runner-rust
+    defaultVersion: "1"
+    versions: ["1"]
+  cache:
+    paths:
+      - .cargo/registry
+      - .cargo/git
+  frameworks:
+    test:
+      cargo: {stack: rust}
+  impact:
+    source:
+      - "**/*.rs"
+      - Cargo.toml
+      - Cargo.lock
+    test:
+      - "**/tests/**/*.rs"
+      - "**/*_test.rs"
+    build:
+      - Cargo.toml
+      - Cargo.lock
+      - "**/*.rs"
+  defaults:
+    build_tool: cargo
+    test_framework: cargo
+    lint_tool: clippy
+    format_tool: rustfmt
+  system:
+    packages:
+      apk: "rust cargo"
+      apt: "rustc cargo"
+      yum: "rust cargo"
+      dnf: "rust cargo"
+    binary: cargo
+    mise: rust@{version}
+  api:
+    module: stacks.rust
+    required:
+      - stacks.rust.build
+      - stacks.rust.test
+      - stacks.rust.test_cmd
+    optional:
+      - config.rust.default
+      - config.rust.validate_coherence
+  doctor:
+    tools:
+      - rustc
+      - cargo
+  artifacts:
+    output_dirs:
+      - target/release
+      - target
+    patterns: []

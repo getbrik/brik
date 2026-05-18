@@ -1,0 +1,30 @@
+apiVersion: brik.dev/v1
+kind: Stage
+metadata:
+  id: container-scan
+  displayName: Container Scan
+spec:
+  module: stages.container_scan
+  function: stages.container_scan
+  placement:
+    slot: post-package
+    after: [package]
+    before: [deploy]
+  runner:
+    class: scanner
+  gate:
+    mode: opt_in
+    opt_in_flag: --with-package
+    contexts: [snapshot, release]
+  impact:
+    changes:
+      - "**/Dockerfile"
+      - "**/docker-compose*.yml"
+  consumes: [package.artifact]
+  provides: [container.findings]
+  artifacts:
+    paths:
+      - brik-artifacts/container-scan/
+    dotenv: true
+  api:
+    required: [stages.container_scan]

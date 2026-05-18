@@ -1,0 +1,29 @@
+apiVersion: brik.dev/v1
+kind: Stage
+metadata:
+  id: lint
+  displayName: Lint
+  aliases: [quality]
+spec:
+  module: stages.lint
+  function: stages.lint
+  placement:
+    slot: verify
+    group: verify
+    after: [build]
+    before: [package]
+  runner:
+    class: stack
+  gate:
+    mode: blocking
+    contexts: [snapshot, release]
+  impact:
+    use_stack_impact: source
+  consumes: [build.artifact]
+  provides: [lint.findings]
+  artifacts:
+    paths:
+      - brik-artifacts/lint/
+    dotenv: true
+  api:
+    required: [stages.lint]

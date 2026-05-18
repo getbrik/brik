@@ -1,0 +1,225 @@
+#!/usr/bin/env bash
+# shellcheck source-path=SCRIPTDIR
+# @module registry/_loader
+# @description Lazy loader for the registry. Reads cache/registry.json once
+# via two jq invocations and populates bash associative arrays. Subsequent
+# accesses via lib/registry/registry.sh are pure shell (no fork) - cf.
+# ADR-001 (eval-cache pattern) and the A.5 perf bench (18.6x speedup over
+# yq-runtime, 11.6x over jq-cache).
+#
+# Public load function: _registry._load (idempotent).
+# Public reload function: _registry._reload (drop caches and reload, for tests).
+
+[[ -n "${_BRIK_REGISTRY_LOADER_LOADED:-}" ]] && return 0
+_BRIK_REGISTRY_LOADER_LOADED=1
+
+# Resolve the loader's directory at source time. BASH_SOURCE[0] is only
+# reliable here (top-level of the script); inside a function it points to
+# the caller of the function, which is not what we want.
+_BRIK_REGISTRY_LOADER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+declare -gA _REGISTRY_STACK_DISPLAY_NAME=()
+declare -gA _REGISTRY_STACK_MARKERS_ANY=()
+declare -gA _REGISTRY_STACK_MARKERS_GLOB=()
+declare -gA _REGISTRY_STACK_CACHE_PATHS=()
+declare -gA _REGISTRY_STACK_RUNNER_IMAGE=()
+declare -gA _REGISTRY_STACK_RUNNER_DEFAULT_VERSION=()
+declare -gA _REGISTRY_STACK_RUNNER_VERSIONS=()
+declare -gA _REGISTRY_STACK_MODULE=()
+declare -gA _REGISTRY_STACK_API_REQUIRED=()
+declare -gA _REGISTRY_STACK_API_OPTIONAL=()
+declare -gA _REGISTRY_STACK_FRAMEWORKS=()
+declare -gA _REGISTRY_STACK_DOCTOR_TOOLS=()
+declare -gA _REGISTRY_STACK_ARTIFACT_OUTPUT_DIRS=()
+declare -gA _REGISTRY_STACK_ARTIFACT_PATTERNS=()
+declare -gA _REGISTRY_STACK_IMPACT_SOURCE=()
+declare -gA _REGISTRY_STACK_IMPACT_TEST=()
+declare -gA _REGISTRY_STACK_IMPACT_BUILD=()
+declare -gA _REGISTRY_STAGE_DISPLAY_NAME=()
+declare -gA _REGISTRY_STAGE_MODULE=()
+declare -gA _REGISTRY_STAGE_FUNCTION=()
+declare -gA _REGISTRY_STAGE_PLACEMENT_SLOT=()
+declare -gA _REGISTRY_STAGE_PLACEMENT_GROUP=()
+declare -gA _REGISTRY_STAGE_PLACEMENT_AFTER=()
+declare -gA _REGISTRY_STAGE_PLACEMENT_BEFORE=()
+declare -gA _REGISTRY_STAGE_RUNNER_CLASS=()
+declare -gA _REGISTRY_STAGE_GATE_MODE=()
+declare -gA _REGISTRY_STAGE_GATE_OPT_IN_FLAG=()
+declare -gA _REGISTRY_STAGE_GATE_CONTEXTS=()
+declare -gA _REGISTRY_STAGE_DRY_RUN_DESTRUCTIVE=()
+declare -gA _REGISTRY_STAGE_ALIASES=()
+declare -gA _REGISTRY_STAGE_API_REQUIRED=()
+declare -gA _REGISTRY_STAGE_IMPACT_CHANGES=()
+declare -gA _REGISTRY_STAGE_IMPACT_USE_STACK_IMPACT=()
+
+declare -ga _REGISTRY_STACK_IDS=()
+declare -ga _REGISTRY_STAGE_IDS=()
+
+_REGISTRY_CACHE_PATH=""
+
+_registry._cache_path() {
+  if [[ -n "${BRIK_REGISTRY_CACHE:-}" ]]; then
+    printf '%s' "$BRIK_REGISTRY_CACHE"
+    return 0
+  fi
+  printf '%s/cache/registry.json' "$_BRIK_REGISTRY_LOADER_DIR"
+}
+
+_registry._reset() {
+  _BRIK_REGISTRY_LOADED=""
+  _REGISTRY_STACK_IDS=()
+  _REGISTRY_STAGE_IDS=()
+  _REGISTRY_CACHE_PATH=""
+  local var
+  for var in _REGISTRY_STACK_DISPLAY_NAME _REGISTRY_STACK_MARKERS_ANY \
+             _REGISTRY_STACK_MARKERS_GLOB _REGISTRY_STACK_CACHE_PATHS \
+             _REGISTRY_STACK_RUNNER_IMAGE _REGISTRY_STACK_RUNNER_DEFAULT_VERSION \
+             _REGISTRY_STACK_RUNNER_VERSIONS _REGISTRY_STACK_MODULE \
+             _REGISTRY_STACK_API_REQUIRED _REGISTRY_STACK_API_OPTIONAL \
+             _REGISTRY_STACK_FRAMEWORKS _REGISTRY_STACK_DOCTOR_TOOLS \
+             _REGISTRY_STACK_ARTIFACT_OUTPUT_DIRS _REGISTRY_STACK_ARTIFACT_PATTERNS \
+             _REGISTRY_STACK_IMPACT_SOURCE _REGISTRY_STACK_IMPACT_TEST \
+             _REGISTRY_STACK_IMPACT_BUILD \
+             _REGISTRY_STAGE_DISPLAY_NAME _REGISTRY_STAGE_MODULE \
+             _REGISTRY_STAGE_FUNCTION _REGISTRY_STAGE_PLACEMENT_SLOT \
+             _REGISTRY_STAGE_PLACEMENT_GROUP _REGISTRY_STAGE_PLACEMENT_AFTER \
+             _REGISTRY_STAGE_PLACEMENT_BEFORE _REGISTRY_STAGE_RUNNER_CLASS \
+             _REGISTRY_STAGE_GATE_MODE _REGISTRY_STAGE_GATE_OPT_IN_FLAG \
+             _REGISTRY_STAGE_GATE_CONTEXTS _REGISTRY_STAGE_DRY_RUN_DESTRUCTIVE \
+             _REGISTRY_STAGE_ALIASES _REGISTRY_STAGE_API_REQUIRED \
+             _REGISTRY_STAGE_IMPACT_CHANGES _REGISTRY_STAGE_IMPACT_USE_STACK_IMPACT; do
+    eval "$var=()"
+  done
+}
+
+_registry._reload() {
+  _registry._reset
+  _registry._load
+}
+
+_registry._load() {
+  [[ -n "${_BRIK_REGISTRY_LOADED:-}" ]] && return 0
+
+  _REGISTRY_CACHE_PATH="$(_registry._cache_path)"
+  if [[ ! -f "$_REGISTRY_CACHE_PATH" ]]; then
+    printf '[registry] cache not found: %s\n' "$_REGISTRY_CACHE_PATH" >&2
+    printf '[registry] run scripts/compile-registry.sh to generate\n' >&2
+    return "${BRIK_EXIT_IO_FAILURE:-74}"
+  fi
+  command -v jq >/dev/null 2>&1 || {
+    printf '[registry] jq required\n' >&2
+    return "${BRIK_EXIT_MISSING_DEP:-69}"
+  }
+
+  _registry._load_stacks
+  _registry._load_stages
+
+  _BRIK_REGISTRY_LOADED=1
+  return 0
+}
+
+_registry._load_stacks() {
+  local id field value
+  while IFS=$'\t' read -r id field value; do
+    [[ -z "$id" ]] && continue
+    case "$field" in
+      display_name)    _REGISTRY_STACK_DISPLAY_NAME[$id]="$value" ;;
+      markers_any)     _REGISTRY_STACK_MARKERS_ANY[$id]="$value" ;;
+      markers_glob)    _REGISTRY_STACK_MARKERS_GLOB[$id]="$value" ;;
+      cache_paths)     _REGISTRY_STACK_CACHE_PATHS[$id]="$value" ;;
+      runner_image)    _REGISTRY_STACK_RUNNER_IMAGE[$id]="$value" ;;
+      runner_default)  _REGISTRY_STACK_RUNNER_DEFAULT_VERSION[$id]="$value" ;;
+      runner_versions) _REGISTRY_STACK_RUNNER_VERSIONS[$id]="$value" ;;
+      module)          _REGISTRY_STACK_MODULE[$id]="$value" ;;
+      api_required)    _REGISTRY_STACK_API_REQUIRED[$id]="$value" ;;
+      api_optional)    _REGISTRY_STACK_API_OPTIONAL[$id]="$value" ;;
+      frameworks)      _REGISTRY_STACK_FRAMEWORKS[$id]="$value" ;;
+      doctor_tools)    _REGISTRY_STACK_DOCTOR_TOOLS[$id]="$value" ;;
+      artifact_output_dirs) _REGISTRY_STACK_ARTIFACT_OUTPUT_DIRS[$id]="$value" ;;
+      artifact_patterns)    _REGISTRY_STACK_ARTIFACT_PATTERNS[$id]="$value" ;;
+      impact_source)   _REGISTRY_STACK_IMPACT_SOURCE[$id]="$value" ;;
+      impact_test)     _REGISTRY_STACK_IMPACT_TEST[$id]="$value" ;;
+      impact_build)    _REGISTRY_STACK_IMPACT_BUILD[$id]="$value" ;;
+      __id)            _REGISTRY_STACK_IDS+=("$id") ;;
+    esac
+  done < <(jq -r '
+    .stacks | to_entries[] | .key as $id | .value as $m | $m.spec as $s |
+      "\($id)\t__id\t",
+      "\($id)\tdisplay_name\t\($m.metadata.displayName // "")",
+      "\($id)\tmarkers_any\t\($s.detect.markers.any // [] | join(":"))",
+      "\($id)\tmarkers_glob\t\($s.detect.markers.glob // [] | join(":"))",
+      "\($id)\tcache_paths\t\($s.cache.paths // [] | join(":"))",
+      "\($id)\trunner_image\t\($s.runner.image // "")",
+      "\($id)\trunner_default\t\($s.runner.defaultVersion // "")",
+      "\($id)\trunner_versions\t\($s.runner.versions // [] | join(":"))",
+      "\($id)\tmodule\t\($s.api.module // "")",
+      "\($id)\tapi_required\t\($s.api.required // [] | join(":"))",
+      "\($id)\tapi_optional\t\($s.api.optional // [] | join(":"))",
+      "\($id)\tframeworks\t\($s.frameworks.test // {} | to_entries | map("\(.key)=\(.value.stack)") | join(":"))",
+      "\($id)\tdoctor_tools\t\($s.doctor.tools // [] | join(":"))",
+      "\($id)\tartifact_output_dirs\t\($s.artifacts.output_dirs // [] | join(":"))",
+      "\($id)\tartifact_patterns\t\($s.artifacts.patterns // [] | join(":"))",
+      "\($id)\timpact_source\t\($s.impact.source // [] | join(":"))",
+      "\($id)\timpact_test\t\($s.impact.test // [] | join(":"))",
+      "\($id)\timpact_build\t\($s.impact.build // [] | join(":"))"
+  ' "$_REGISTRY_CACHE_PATH")
+}
+
+_registry._load_stages() {
+  local id field value
+  while IFS=$'\t' read -r id field value; do
+    [[ -z "$id" ]] && continue
+    case "$field" in
+      display_name)        _REGISTRY_STAGE_DISPLAY_NAME[$id]="$value" ;;
+      module)              _REGISTRY_STAGE_MODULE[$id]="$value" ;;
+      function)            _REGISTRY_STAGE_FUNCTION[$id]="$value" ;;
+      placement_slot)      _REGISTRY_STAGE_PLACEMENT_SLOT[$id]="$value" ;;
+      placement_group)     _REGISTRY_STAGE_PLACEMENT_GROUP[$id]="$value" ;;
+      placement_after)     _REGISTRY_STAGE_PLACEMENT_AFTER[$id]="$value" ;;
+      placement_before)    _REGISTRY_STAGE_PLACEMENT_BEFORE[$id]="$value" ;;
+      runner_class)        _REGISTRY_STAGE_RUNNER_CLASS[$id]="$value" ;;
+      gate_mode)           _REGISTRY_STAGE_GATE_MODE[$id]="$value" ;;
+      gate_opt_in_flag)    _REGISTRY_STAGE_GATE_OPT_IN_FLAG[$id]="$value" ;;
+      gate_contexts)       _REGISTRY_STAGE_GATE_CONTEXTS[$id]="$value" ;;
+      dry_run_destructive) _REGISTRY_STAGE_DRY_RUN_DESTRUCTIVE[$id]="$value" ;;
+      aliases)             _REGISTRY_STAGE_ALIASES[$id]="$value" ;;
+      api_required)        _REGISTRY_STAGE_API_REQUIRED[$id]="$value" ;;
+      impact_changes)      _REGISTRY_STAGE_IMPACT_CHANGES[$id]="$value" ;;
+      impact_use_stack_impact) _REGISTRY_STAGE_IMPACT_USE_STACK_IMPACT[$id]="$value" ;;
+      __id)                _REGISTRY_STAGE_IDS+=("$id") ;;
+    esac
+  done < <(jq -r '
+    .stages as $stages
+    | ($stages | keys) as $ids
+    | reduce range(0; $ids | length) as $_ ({};
+        . as $depth
+        | reduce $ids[] as $id (.;
+            ($stages[$id].spec.placement.after // []) as $after
+            | if ($after | length) == 0 then .[$id] = 0
+              elif ($after | map($depth[.] // null) | all(. != null)) then
+                .[$id] = (($after | map($depth[.])) + [0] | max) + 1
+              else . end))
+    | . as $depths
+    | $ids
+    | sort_by([$depths[.] // 9999, .])
+    | .[] as $id
+    | $stages[$id] as $m | $m.spec as $s
+    | "\($id)\t__id\t",
+      "\($id)\tdisplay_name\t\($m.metadata.displayName // "")",
+      "\($id)\tmodule\t\($s.module // "")",
+      "\($id)\tfunction\t\($s.function // "")",
+      "\($id)\tplacement_slot\t\($s.placement.slot // "")",
+      "\($id)\tplacement_group\t\($s.placement.group // "")",
+      "\($id)\tplacement_after\t\($s.placement.after // [] | join(":"))",
+      "\($id)\tplacement_before\t\($s.placement.before // [] | join(":"))",
+      "\($id)\trunner_class\t\($s.runner.class // "")",
+      "\($id)\tgate_mode\t\($s.gate.mode // "")",
+      "\($id)\tgate_opt_in_flag\t\($s.gate.opt_in_flag // "")",
+      "\($id)\tgate_contexts\t\($s.gate.contexts // [] | join(":"))",
+      "\($id)\tdry_run_destructive\t\($s.dry_run.destructive // false | tostring)",
+      "\($id)\taliases\t\($m.metadata.aliases // [] | join(":"))",
+      "\($id)\tapi_required\t\($s.api.required // [] | join(":"))",
+      "\($id)\timpact_changes\t\($s.impact.changes // [] | join(":"))",
+      "\($id)\timpact_use_stack_impact\t\($s.impact.use_stack_impact // "")"
+  ' "$_REGISTRY_CACHE_PATH")
+}

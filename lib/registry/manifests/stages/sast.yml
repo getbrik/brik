@@ -1,0 +1,28 @@
+apiVersion: brik.dev/v1
+kind: Stage
+metadata:
+  id: sast
+  displayName: SAST
+spec:
+  module: stages.sast
+  function: stages.sast
+  placement:
+    slot: verify
+    group: verify
+    after: [build]
+    before: [package]
+  runner:
+    class: analysis
+  gate:
+    mode: blocking
+    contexts: [snapshot, release]
+  impact:
+    use_stack_impact: source
+  consumes: [build.artifact]
+  provides: [sast.findings, secret.findings]
+  artifacts:
+    paths:
+      - brik-artifacts/sast/
+    dotenv: true
+  api:
+    required: [stages.sast]

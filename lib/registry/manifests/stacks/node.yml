@@ -1,0 +1,76 @@
+apiVersion: brik.dev/v1
+kind: Stack
+metadata:
+  id: node
+  displayName: Node.js
+  owner: getbrik
+spec:
+  detect:
+    markers:
+      any:
+        - package.json
+  runner:
+    image: ghcr.io/getbrik/brik-runner-node
+    defaultVersion: "22"
+    versions: ["22", "24"]
+  cache:
+    paths:
+      - .npm
+  frameworks:
+    test:
+      jest: {stack: node}
+      vitest: {stack: node}
+      npm: {stack: node}
+  impact:
+    source:
+      - "**/*.js"
+      - "**/*.ts"
+      - "**/*.tsx"
+      - "**/*.jsx"
+      - package.json
+      - package-lock.json
+    test:
+      - "**/*.test.js"
+      - "**/*.test.ts"
+      - "**/*.spec.js"
+      - "**/*.spec.ts"
+    build:
+      - package.json
+      - package-lock.json
+      - "**/*.js"
+      - "**/*.ts"
+  defaults:
+    build_tool: npm
+    test_framework: jest
+    lint_tool: eslint
+    format_tool: prettier
+  system:
+    packages:
+      apk: nodejs npm
+      apt: nodejs npm
+      yum: nodejs npm
+      dnf: nodejs npm
+    binary: node
+    mise: node@{version}
+  api:
+    module: stacks.node
+    required:
+      - stacks.node.build
+      - stacks.node.test
+      - stacks.node.test_cmd
+    optional:
+      - stacks.node.install
+      - config.node.default
+      - config.node.export_build_vars
+      - config.node.validate_coherence
+  doctor:
+    tools:
+      - node
+      - npm
+  artifacts:
+    output_dirs:
+      - dist
+      - build
+      - out
+    patterns:
+      - '*.tgz'
