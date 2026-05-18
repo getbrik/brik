@@ -28,7 +28,7 @@ brik-plan:
     when: always
     paths:
       - .brik-logs/plan.json
-      - .brik-logs/generated-pipeline.yml
+      - .brik-logs/plan.yml
       - brik-artifacts/
     exclude:
       - .brik-logs/*.lock
@@ -45,6 +45,6 @@ brik-downstream:
       artifacts: true
   trigger:
     include:
-      - artifact: .brik-logs/generated-pipeline.yml
+      - artifact: .brik-logs/plan.yml
         job: brik-plan
     strategy: depend
