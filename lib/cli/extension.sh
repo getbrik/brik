@@ -182,6 +182,112 @@ cli.extension.test() {
     }
     cli.extension._check_compile
 
+    # Dry-call (ADR-002 mécanisme 1 critère 3). For each function listed
+    # in spec.api.required, source the extension's lib/*.sh in a subshell
+    # with a stub report.record + log.* (so the call is observable and
+    # silent), invoke the function with a minimal workspace fixture, and
+    # check rc=0 plus at least one report.record entry landed.
+    #
+    # The fixture is intentionally minimal: a tempdir workspace with
+    # brik.yml + the manifest's first detect marker (if a stack) or no
+    # extra file (if a stage). Side-effect tools (npm, mvn, ...) are
+    # masked off PATH so a stack-build wrapper degrades to the report
+    # contract check rather than launching a real build.
+    cli.extension._check_dry_call() {
+        local f rel ids fn marker
+        for f in "${ext_dir}/stacks"/*.yml "${ext_dir}/stages"/*.yml; do
+            [[ -f "$f" ]] || continue
+            rel="${f#"${ext_dir}/"}"
+            ids="$(yq -r '.spec.api.required[]?' "$f" 2>/dev/null || true)"
+            [[ -z "$ids" ]] && continue
+            marker=""
+            if [[ "$rel" == stacks/* ]]; then
+                marker="$(yq -r '.spec.detect.markers.any[0] // ""' "$f" 2>/dev/null || true)"
+            fi
+            while IFS= read -r fn; do
+                [[ -z "$fn" ]] && continue
+                cli.extension._dry_call_one "$rel" "$fn" "$marker"
+            done <<<"$ids"
+        done
+    }
+
+    cli.extension._dry_call_one() {
+        local manifest_rel="$1" fn="$2" marker="$3"
+        local ext_lib_root="${ext_dir}/lib"
+        local ws record_log out
+        ws="$(mktemp -d -t brik-ext-dry.XXXXXX)"
+        record_log="$(mktemp -t brik-ext-record.XXXXXX)"
+        printf 'version: 1\nproject:\n  name: %s\n' "ext-dry" > "$ws/brik.yml"
+        [[ -n "$marker" && "$marker" != *"*"* ]] && : > "$ws/$marker"
+
+        # The dry-call subshell keeps stubbed report.record + log.* in
+        # scope, sources every .sh under <ext>/lib/ (so api.required
+        # symbols become available regardless of file layout), then
+        # invokes the function with a clean PATH (mktemp+coreutils only).
+        # `|| true` keeps `set -e` from short-circuiting when the
+        # subshell exits with no-symbol (rc=1). We rely on the textual
+        # output (`no-symbol` vs `rc=<n>`) to decide pass/fail, not on
+        # the subshell rc itself.
+        out="$(BRIK_WORKSPACE="$ws" \
+               BRIK_CONFIG_FILE="$ws/brik.yml" \
+               BRIK_EXT_RECORD_LOG="$record_log" \
+               PATH="/usr/bin:/bin" \
+            bash -c '
+                set +e
+                shopt -s globstar nullglob
+                report.record() { printf "%s\t%s\t%s\t%s\n" "${1-}" "${2-}" "${3-}" "${4-}" >> "$BRIK_EXT_RECORD_LOG"; }
+                log.info()  { :; }
+                log.warn()  { :; }
+                log.error() { :; }
+                log.debug() { :; }
+                for f in "$1"/**/*.sh "$1"/*.sh; do
+                    [[ -f "$f" ]] && . "$f" 2>/dev/null
+                done
+                if ! declare -f "$2" >/dev/null 2>&1; then
+                    printf "no-symbol\n"
+                    exit 1
+                fi
+                "$2" >/dev/null 2>&1
+                printf "rc=%s\n" "$?"
+            ' _ "$ext_lib_root" "$fn" 2>&1)" || true
+        rm -rf "$ws"
+
+        local record_lines=0
+        [[ -s "$record_log" ]] && record_lines="$(wc -l <"$record_log" | tr -d ' ')"
+        rm -f "$record_log"
+
+        if [[ "$out" == *"no-symbol"* ]]; then
+            printf '  [FAIL] dry-call %s -> %s: function not loaded by extension lib/\n' \
+                "$manifest_rel" "$fn" >&2
+            fail=$((fail + 1))
+            return
+        fi
+        # Strip everything up to the last "rc=" so the rc capture is
+        # robust to extra stderr from sourcing.
+        local rc_line="${out##*rc=}"
+        local call_rc="${rc_line%%[!0-9]*}"
+        [[ -z "$call_rc" ]] && call_rc=99
+        if [[ "$call_rc" -ne 0 ]]; then
+            printf '  [FAIL] dry-call %s -> %s: rc=%s on happy-path fixture\n' \
+                "$manifest_rel" "$fn" "$call_rc" >&2
+            fail=$((fail + 1))
+            return
+        fi
+        if [[ "$record_lines" -eq 0 ]]; then
+            printf '  [FAIL] dry-call %s -> %s: no report.record entry on happy-path\n' \
+                "$manifest_rel" "$fn" >&2
+            fail=$((fail + 1))
+            return
+        fi
+        printf '  [OK]   dry-call %s -> %s (rc=0, %s record entries)\n' \
+            "$manifest_rel" "$fn" "$record_lines"
+        pass=$((pass + 1))
+    }
+
+    if [[ -d "${ext_dir}/lib" ]]; then
+        cli.extension._check_dry_call
+    fi
+
     printf '\n[brik extension] %d passed, %d failed\n' "$pass" "$fail"
     [[ "$fail" -gt 0 ]] && return "${BRIK_EXIT_INVALID_INPUT}"
     return 0
