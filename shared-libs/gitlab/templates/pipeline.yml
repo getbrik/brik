@@ -22,6 +22,37 @@
 #       file: '/templates/pipeline.yml'
 
 # ---------------------------------------------------------------------------
+# Workflow rules (upstream pipeline filter, C1 of chantier #15)
+#
+# GitLab evaluates `workflow:` before any job runs and decides whether a
+# pipeline exists at all. Without these rules every push generates a
+# pipeline -- including a duplicate when a push lands on a branch with
+# an open MR, and pipelines on sources that no human asked for
+# (parent_pipeline, trigger, webide).
+#
+# The five permitted sources cover every legitimate Brik trigger:
+#   1. MR pipelines       -- the canonical CI for branch work
+#   2. Tag pipelines      -- release context (cf. docs/concepts/pipeline-context.md)
+#   3. Default-branch     -- the standard "merged to main" flow
+#   4. Scheduled          -- nightly E2E, cron-driven release rebuilds
+#   5. Web (UI / API)     -- on-demand re-runs by an operator
+#
+# Any other source (push to a feature branch with an open MR; push without
+# MR; trigger; webide; ...) is intentionally suppressed.
+# ---------------------------------------------------------------------------
+workflow:
+  rules:
+    # Anti-duplicate push+MR: if the branch has an open MR, skip the
+    # branch pipeline and let the MR pipeline cover the change.
+    - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
+      when: never
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_TAG
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+    - if: $CI_PIPELINE_SOURCE == "web"
+
+# ---------------------------------------------------------------------------
 # Variables
 # ---------------------------------------------------------------------------
 variables:
