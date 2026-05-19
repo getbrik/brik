@@ -99,5 +99,16 @@ Describe "report renderers expose business outcome"
       The output should include "warning=1"
       The output should include "error=1"
     End
+
+    It "names the warning stages and explains the business status semantics"
+      do_render() {
+        write_aggregate "warning" 1 1 0
+        _report._render_aggregate_md "${RB_LOG_DIR}/aggregate-report.json"
+      }
+      When call do_render
+      The output should include "Warning stages:"
+      The output should include "lint"
+      The output should include "policy thresholds"
+    End
   End
 End
