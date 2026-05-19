@@ -50,6 +50,11 @@ def call(Map params = [:]) {
                     name: 'BRIK_TAG',
                     defaultValue: '',
                     description: 'Release tag to associate with this build (e.g. v0.1.0). Leave empty for snapshot builds. Mirrors GitLab CI_COMMIT_TAG.'
+                ),
+                booleanParam(
+                    name: 'BRIK_WITH_DEPLOY',
+                    defaultValue: false,
+                    description: 'Opt into the deploy stage. The planner skips deploy by default even on tag pushes; set to true to actually run it.'
                 )
             ])
         ])
