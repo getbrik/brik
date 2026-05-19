@@ -15,15 +15,16 @@ Usage:
   brik <command> [options]
 
 Commands:
-  validate       Validate brik.yml against the JSON Schema
-  doctor         Check prerequisites (tools, stack detection)
-  init           Scaffold brik.yml and platform bootstrap file
-  run stage      Execute a single pipeline stage locally
-  run pipeline   Execute the full pipeline locally
-  self-update    Update brik to the latest version
-  self-uninstall Remove brik from your system
-  version        Print brik version information
-  help           Print this help message
+  validate         Validate brik.yml against the JSON Schema
+  doctor           Check prerequisites (tools, stack detection)
+  init             Scaffold brik.yml and platform bootstrap file
+  run stage        Execute a single pipeline stage locally
+  run pipeline     Execute the full pipeline locally
+  extension test   Validate an extension manifest+module against the contract
+  self-update      Update brik to the latest version
+  self-uninstall   Remove brik from your system
+  version          Print brik version information
+  help             Print this help message
 
 Options for validate:
   --config <path>   Path to brik.yml (default: brik.yml in current directory)
@@ -56,6 +57,10 @@ Options for run pipeline:
   --with-package          Include the package stage
   --with-deploy           Include deploy and notify stages
 
+Options for extension test:
+  (positional)            Path to the extension directory (must contain
+                          stacks/ or stages/ manifests, and lib/*.sh modules).
+
 Options for self-update:
   --channel <name>        Update channel: stable (default), edge
   --version <tag>         Update to a specific version tag
@@ -82,6 +87,7 @@ Examples:
   brik run pipeline
   brik run pipeline --with-package --continue-on-error
   brik run pipeline --with-deploy --dry-run
+  brik extension test ./my-extension
   brik self-update
   brik self-update --channel edge
   brik self-update --version v0.5.0

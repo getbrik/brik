@@ -175,6 +175,11 @@ checkout when iterating:
 shellspec spec/registry/extensions_spec.sh
 ```
 
+For author-side validation of your own extension (schema, api symbols,
+no-exit, compile, dry-call), use `brik extension test` -- see
+[extension-authoring.md](extension-authoring.md) for the walkthrough
+and the five contract checks it performs.
+
 ## Constraints and gotchas
 
 - **No `replaces` in v0.6.** A custom manifest with the same `id` as a
