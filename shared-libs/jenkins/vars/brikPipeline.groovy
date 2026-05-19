@@ -81,14 +81,22 @@ def call(Map params = [:]) {
             // materialised at deploy time, so wiping them between builds is
             // safe.
             //
-            // Quoting note: we run the host shell directly (no sh -c indirection
-            // through alpine) because Groovy's """...""" interpolation strips
-            // embedded single quotes, which would collapse the alpine command
-            // into a single bare token. The host shell can sequence rm + chown
-            // safely; each line is one alpine invocation, no nested quoting.
+            // Mount caveat: Jenkins runs as a docker-out-of-docker container,
+            // so a plain -v "${WORKSPACE}:/ws" asks the HOST daemon to bind a
+            // path that only exists inside the Jenkins container -- the host
+            // sees nothing and creates an empty dir, leaving the real
+            // workspace untouched. Use --volumes-from on the Jenkins container
+            // (whose name/id equals /etc/hostname inside it) so the alpine
+            // helper sees the same /var/jenkins_home tree.
+            //
+            // Quoting note: we issue each docker command on its own line --
+            // Groovy's """...""" interpolation strips embedded single quotes,
+            // so an alpine "sh -c '...'" wrapper would collapse to a single
+            // bare token. Each line is one argv chain, no nested quoting.
+            def jenkinsContainer = sh(script: 'cat /etc/hostname', returnStdout: true).trim()
             sh """
-                docker run --rm -u 0:0 -v "\${WORKSPACE}:/ws" alpine:latest rm -rf /ws/.ssh /ws/.kube 2>/dev/null || true
-                docker run --rm -u 0:0 -v "\${WORKSPACE}:/ws" alpine:latest chown -R ${rescueUid}:${rescueGid} /ws 2>/dev/null || true
+                docker run --rm -u 0:0 --volumes-from ${jenkinsContainer} alpine:latest rm -rf "\${WORKSPACE}/.ssh" "\${WORKSPACE}/.kube" 2>/dev/null || true
+                docker run --rm -u 0:0 --volumes-from ${jenkinsContainer} alpine:latest chown -R ${rescueUid}:${rescueGid} "\${WORKSPACE}" 2>/dev/null || true
             """
             // Selective cleanup: drop build outputs and materialised dep
             // trees (node_modules, .venv, ...), keep tool-level caches
@@ -217,13 +225,15 @@ def call(Map params = [:]) {
                 } finally {
                     def jenkinsUid = sh(script: 'id -u', returnStdout: true).trim()
                     def jenkinsGid = sh(script: 'id -g', returnStdout: true).trim()
-                    // Same quoting caveat as the rescue at pipeline start:
-                    // Groovy strips the single quotes around `sh -c '...'`,
-                    // so issue the chown directly as the docker CMD. Chown
-                    // the whole /ws to cover any new root-owned path the
-                    // deploy stage may have written (e.g. .helm cache).
+                    // Same docker-out-of-docker + quoting caveats as the
+                    // rescue at pipeline start: bind-mounting "${WORKSPACE}"
+                    // from the host yields an empty dir, so reach the real
+                    // workspace via --volumes-from on the Jenkins container.
+                    // Issue the chown directly as the docker CMD (no sh -c)
+                    // since Groovy strips embedded single quotes.
+                    def jenkinsContainer = sh(script: 'cat /etc/hostname', returnStdout: true).trim()
                     sh """
-                        docker run --rm -u 0:0 -v "\${WORKSPACE}:/ws" alpine:latest chown -R ${jenkinsUid}:${jenkinsGid} /ws 2>/dev/null || true
+                        docker run --rm -u 0:0 --volumes-from ${jenkinsContainer} alpine:latest chown -R ${jenkinsUid}:${jenkinsGid} "\${WORKSPACE}" 2>/dev/null || true
                     """
                 }
                 stashBrikArtifacts(name)
