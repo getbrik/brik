@@ -5,7 +5,7 @@
   "description": "Serialized output of the Brik planner. Produced by `brik plan` and consumed by adapters (GitLab child, Jenkins, local) plus the in-process gatekeeper pipeline.plan.gate. Reproducible: two invocations against the same HEAD and the same brik.yml produce a byte-identical file (timestamps excluded).",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "brikVersion", "context", "mode", "stages", "dag", "fingerprint"],
+  "required": ["schemaVersion", "brikVersion", "context", "mode", "release", "stages", "dag", "fingerprint"],
   "properties": {
     "schemaVersion": {
       "type": "string",
@@ -31,6 +31,28 @@
       "type": "string",
       "minLength": 1,
       "description": "Absolute path to the workspace root the plan was computed against. Informational."
+    },
+    "release": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profile", "version", "is_candidate"],
+      "description": "Release state computed by Phase 9.A. Adapters consume this to decide candidate vs release routing in the promote stage (Phase 9.B-E). Stable per-commit -- two plans on the same SHA produce the same release block.",
+      "properties": {
+        "profile": {
+          "type": "string",
+          "enum": ["trunk-based", "git-flow", "github-flow", "none"],
+          "description": "Git workflow profile from brik.yml .release.profile. Mirrors the schema enum."
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(-[0-9A-Za-z.-]+)?(\\+[0-9A-Za-z.-]+)?$",
+          "description": "Project version derived from the latest git tag (stripped of .release.tag_prefix). Falls back to 0.0.0 when no tag exists."
+        },
+        "is_candidate": {
+          "type": "boolean",
+          "description": "True when the current commit is a release candidate (BRIK_COMMIT_TAG set, or profile-specific condition in Phase 9.B-E). Adapters use this to gate the promote stage."
+        }
+      }
     },
     "changes": {
       "type": "object",

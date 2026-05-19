@@ -15,6 +15,7 @@ adapter author can read the contract without parsing JSON Schema.
 | `mode` | string | yes | enum `safe`, `balanced`, `aggressive` | Selection mode. `aggressive` errors out in v0.6 -- it is reserved for the per-subproject impact graph deferred to v0.7+. |
 | `workspace` | string | no | non-empty | Absolute path to the workspace root the plan was computed against. Informational. |
 | `changes` | object | no | see [Changes block](#changes-block) | Snapshot of the changed-files set used by the planner. |
+| `release` | object | yes | see [Release block](#release-block) | Release state (Phase 9.A): profile + project version + candidate flag. |
 | `stages` | array | yes | min 1, unique | Per-stage plan entries in topological order. See [Stage entries](#stage-entries). |
 | `dag` | object | yes | see [DAG block](#dag-block) | Adjacency list resolved from `spec.placement.{after,before}`. |
 | `fingerprint` | string | yes | 64-hex sha256 | `sha256` of the canonical JSON with `fingerprint=""`. Lets adapters cache / short-circuit unchanged plans. |
@@ -43,6 +44,35 @@ When `source=none`, every blocking stage must be marked `run` by
 construction (the planner's cold-start safety net). Adapters that
 re-derive selection from `changes` alone must respect this -- skipping
 blocking stages on a cold start would defeat the conservative default.
+
+## Release block
+
+Phase 9.A of the release-promotion-model chantier (#4) introduces this
+block so adapters can route candidate vs release artifacts in the
+promote stage (9.B-E) without re-reading `brik.yml` or running `git
+describe`.
+
+```json
+"release": {
+  "profile": "trunk-based",
+  "version": "1.2.3",
+  "is_candidate": true
+}
+```
+
+| Field | Type | Required | Constraint | Meaning |
+|---|---|---|---|---|
+| `profile` | string | yes | enum `trunk-based`, `git-flow`, `github-flow`, `none` | Git workflow profile read from `.release.profile` in `brik.yml`. Drives candidate detection in 9.B-E; informational in v0.6/v0.7. |
+| `version` | string | yes | semver pattern | Project version derived from the latest git tag (stripped of `.release.tag_prefix`, default `v`). `0.0.0` when no tag exists. |
+| `is_candidate` | boolean | yes | -- | `true` when the current commit is a release candidate (`BRIK_COMMIT_TAG` set in v0.7; profile-specific in 9.B-E). Adapters gate the promote stage on this. |
+
+### Consumer rule for `is_candidate=false` + `BRIK_COMMIT_TAG` later in the pipeline
+
+`is_candidate` is a snapshot computed at plan time. If a tag push lands
+between `brik plan` and a downstream stage, the dotenv mirror
+(`BRIK_IS_CANDIDATE`, written by `stages.init`) is the authoritative
+signal for in-pipeline decisions. The plan's value remains correct for
+audit-trail purposes (it records the state observed by the planner).
 
 ## Stage entries
 

@@ -15,6 +15,8 @@ _BRIK_PLANNING_PLAN_LOADED=1
 . "${BASH_SOURCE[0]%/*}/impact.sh"
 # shellcheck source=../transverse/changes.sh
 . "${BASH_SOURCE[0]%/*}/../transverse/changes.sh"
+# shellcheck source=../transverse/release.sh
+. "${BASH_SOURCE[0]%/*}/../transverse/release.sh"
 
 # Echo the canonical stage order (registry topological sort).
 plan.stages.ordered() {
@@ -167,6 +169,20 @@ plan.compute() {
         IFS=$'\t' read -r _ from to <<<"$meta"
     fi
 
+    # Release state (Phase 9.A). The same compute that stages.init uses
+    # for the dotenv; emitted here so plan_writer can stamp them into the
+    # plan.json release block. BRIK_CONFIG_FILE may be unset when the
+    # planner runs outside of a workspace (e.g. `brik plan --workspace`
+    # against a bare repo); release.compute_* degrade to safe defaults
+    # ("none", "0.0.0", "0") in that case.
+    local _release_profile _release_version _is_candidate
+    BRIK_CONFIG_FILE="${BRIK_CONFIG_FILE:-$workspace/brik.yml}" \
+        _release_profile="$(release.compute_profile)"
+    BRIK_CONFIG_FILE="${BRIK_CONFIG_FILE:-$workspace/brik.yml}" \
+    BRIK_WORKSPACE="$workspace" \
+        _release_version="$(release.compute_version)"
+    _is_candidate="$(release.compute_is_candidate)"
+
     printf '# workspace=%s\n' "$workspace"
     printf '# mode=%s\n' "$mode"
     printf '# context=%s\n' "$context"
@@ -174,6 +190,9 @@ plan.compute() {
     printf '# changes_source=%s\n' "$source"
     printf '# changes_from=%s\n' "$from"
     printf '# changes_to=%s\n' "$to"
+    printf '# release_profile=%s\n' "$_release_profile"
+    printf '# release_version=%s\n' "$_release_version"
+    printf '# is_candidate=%s\n' "$_is_candidate"
 
     local stage decision reason gate_mode runner_class fn matched
     while IFS= read -r stage; do

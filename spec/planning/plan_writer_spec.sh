@@ -10,6 +10,25 @@ Describe "planning/plan_writer.sh"
       The output should include '"mode": "safe"'
       The output should include '"fingerprint"'
       The output should include '"dag"'
+      The output should include '"release"'
+    End
+
+    It "stamps a release block with profile, version and is_candidate"
+      release_block() {
+        local out
+        out="$(plan_writer.write -- --workspace /tmp --mode safe)"
+        local profile version candidate
+        profile="$(jq -r '.release.profile' <<<"$out")"
+        version="$(jq -r '.release.version' <<<"$out")"
+        candidate="$(jq -r '.release.is_candidate' <<<"$out")"
+        printf '%s|%s|%s' "$profile" "$version" "$candidate"
+      }
+      # /tmp has no brik.yml and no git tags, so the planner falls back
+      # to the safe defaults (profile=none, version=0.0.0). BRIK_COMMIT_TAG
+      # is not exported in the test env, so is_candidate=false.
+      When call release_block
+      The status should be success
+      The output should equal "none|0.0.0|false"
     End
 
     It "is reproducible: two consecutive runs produce byte-identical bytes"

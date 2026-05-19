@@ -81,4 +81,27 @@ Describe "planning/plan_reader.sh"
       The status should be success
     End
   End
+
+  Describe "pipeline.plan.release_profile (Phase 9.A)"
+    It "returns the profile stamped in the plan"
+      # The default fixture writes a plan from /tmp (no brik.yml), so
+      # the profile falls back to "none".
+      When call pipeline.plan.release_profile "$PLAN_FILE"
+      The output should equal "none"
+    End
+  End
+
+  Describe "pipeline.plan.release_version (Phase 9.A)"
+    It "returns the version stamped in the plan"
+      When call pipeline.plan.release_version "$PLAN_FILE"
+      The output should equal "0.0.0"
+    End
+  End
+
+  Describe "pipeline.plan.is_candidate (Phase 9.A)"
+    It "returns rc=1 when the plan marks the commit as not a candidate"
+      When call pipeline.plan.is_candidate "$PLAN_FILE"
+      The status should equal 1
+    End
+  End
 End

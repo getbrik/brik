@@ -26,21 +26,25 @@ plan_writer.from_stream() {
 
     local workspace="" mode="" context=""
     local source="none" from="" to=""
+    local release_profile="none" release_version="0.0.0" is_candidate="0"
     local -a stage_rows=()
 
     local line
     while IFS= read -r line; do
         case "$line" in
-            "# workspace="*)       workspace="${line#\# workspace=}" ;;
-            "# mode="*)            mode="${line#\# mode=}" ;;
-            "# context="*)         context="${line#\# context=}" ;;
-            "# stack="*)           : ;;
-            "# changes_source="*)  source="${line#\# changes_source=}" ;;
-            "# changes_from="*)    from="${line#\# changes_from=}" ;;
-            "# changes_to="*)      to="${line#\# changes_to=}" ;;
-            "#"*)                  : ;;
-            "")                    : ;;
-            *)                     stage_rows+=("$line") ;;
+            "# workspace="*)         workspace="${line#\# workspace=}" ;;
+            "# mode="*)              mode="${line#\# mode=}" ;;
+            "# context="*)           context="${line#\# context=}" ;;
+            "# stack="*)             : ;;
+            "# changes_source="*)    source="${line#\# changes_source=}" ;;
+            "# changes_from="*)      from="${line#\# changes_from=}" ;;
+            "# changes_to="*)        to="${line#\# changes_to=}" ;;
+            "# release_profile="*)   release_profile="${line#\# release_profile=}" ;;
+            "# release_version="*)   release_version="${line#\# release_version=}" ;;
+            "# is_candidate="*)      is_candidate="${line#\# is_candidate=}" ;;
+            "#"*)                    : ;;
+            "")                      : ;;
+            *)                       stage_rows+=("$line") ;;
         esac
     done
 
@@ -95,6 +99,16 @@ plan_writer.from_stream() {
             '{source:$s, from_ref:$f, to_ref:$t, files:[]}')"
     fi
 
+    # Phase 9.A release block. is_candidate is "0"/"1" in the stream so
+    # it survives the TAB-delimited transport; jq normalizes it back to
+    # a JSON boolean here so the schema enforces type=boolean.
+    local release_obj
+    release_obj="$(jq -nc \
+        --arg p  "$release_profile" \
+        --arg v  "$release_version" \
+        --argjson c "$([[ "$is_candidate" == "1" ]] && printf 'true' || printf 'false')" \
+        '{profile:$p, version:$v, is_candidate:$c}')"
+
     # Self-hash idiom: assemble with fingerprint="", hash the canonical
     # bytes, substitute the real fingerprint. Round-tripping the same
     # plan re-produces the same fingerprint.
@@ -105,9 +119,10 @@ plan_writer.from_stream() {
         --arg ctx "$context" \
         --arg md  "$mode" \
         --arg ws  "$workspace" \
-        --argjson stages "$stages_json" \
-        --argjson edges  "$edges_json" \
-        --argjson chg    "$changes_obj" \
+        --argjson stages  "$stages_json" \
+        --argjson edges   "$edges_json" \
+        --argjson chg     "$changes_obj" \
+        --argjson release "$release_obj" \
         '{
             schemaVersion: $sv,
             brikVersion:   $bv,
@@ -115,6 +130,7 @@ plan_writer.from_stream() {
             mode:          $md,
             workspace:     $ws,
             changes:       $chg,
+            release:       $release,
             stages:        $stages,
             dag:           { edges: $edges },
             fingerprint:   ""
