@@ -231,9 +231,9 @@ def call(Map params = [:]) {
                     // workspace via --volumes-from on the Jenkins container.
                     // Issue the chown directly as the docker CMD (no sh -c)
                     // since Groovy strips embedded single quotes.
-                    def jenkinsContainer = sh(script: 'cat /etc/hostname', returnStdout: true).trim()
+                    def deployHostContainer = sh(script: 'cat /etc/hostname', returnStdout: true).trim()
                     sh """
-                        docker run --rm -u 0:0 --volumes-from ${jenkinsContainer} alpine:latest chown -R ${jenkinsUid}:${jenkinsGid} "\${WORKSPACE}" 2>/dev/null || true
+                        docker run --rm -u 0:0 --volumes-from ${deployHostContainer} alpine:latest chown -R ${jenkinsUid}:${jenkinsGid} "\${WORKSPACE}" 2>/dev/null || true
                     """
                 }
                 stashBrikArtifacts(name)
