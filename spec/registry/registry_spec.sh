@@ -108,6 +108,85 @@ Describe "lib/registry/registry.sh"
     End
   End
 
+  Describe "registry.stack.display_name"
+    It "returns the displayName for node"
+      When call registry.stack.display_name node
+      The output should equal "Node.js"
+    End
+
+    It "fails for an unknown stack id"
+      When call registry.stack.display_name bogus
+      The status should be failure
+    End
+  End
+
+  Describe "registry.stack.module"
+    It "returns the bash module path for node"
+      When call registry.stack.module node
+      The output should equal "stacks.node"
+    End
+  End
+
+  Describe "registry.stack.api_required"
+    It "lists every required function for node"
+      When call registry.stack.api_required node
+      The output should include "stacks.node.build"
+      The output should include "stacks.node.test"
+    End
+  End
+
+  Describe "registry.stack.api_optional"
+    It "lists optional functions for node"
+      When call registry.stack.api_optional node
+      The status should be success
+      The output should include "stacks.node.install"
+    End
+  End
+
+  Describe "registry.stack.impact_source"
+    It "lists source-impact globs for node"
+      When call registry.stack.impact_source node
+      The output should include "**/*.ts"
+    End
+  End
+
+  Describe "registry.stack.impact_test"
+    It "lists test-impact globs for node"
+      When call registry.stack.impact_test node
+      The output should be present
+    End
+  End
+
+  Describe "registry.stack.impact_build"
+    It "lists build-impact globs for node"
+      When call registry.stack.impact_build node
+      The output should include "package-lock.json"
+    End
+  End
+
+  Describe "registry.stack.doctor_tools"
+    It "lists doctor probes for node"
+      When call registry.stack.doctor_tools node
+      The output should include "node"
+    End
+  End
+
+  Describe "registry.stack.artifact_output_dirs"
+    It "lists default artifact dirs for node"
+      When call registry.stack.artifact_output_dirs node
+      The status should be success
+      The output should include "dist"
+    End
+  End
+
+  Describe "registry.stack.artifact_patterns"
+    It "lists default artifact patterns for node"
+      When call registry.stack.artifact_patterns node
+      The status should be success
+      The output should include "*.tgz"
+    End
+  End
+
   Describe "registry.stack.detect_from_framework"
     It "maps pytest to python"
       When call registry.stack.detect_from_framework pytest
