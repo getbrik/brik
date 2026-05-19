@@ -121,3 +121,45 @@ pipeline.plan.fingerprint() {
     command -v jq >/dev/null 2>&1 || return 0
     jq -r '.fingerprint // ""' "$plan_file" 2>/dev/null
 }
+
+# Phase 9.A release accessors. Same resolution as the other readers:
+# explicit plan_file > BRIK_PLAN_FILE > .brik-logs/plan.json. Empty
+# stdout with rc=0 when no plan exists (backward-compat default).
+
+# Print the git-workflow profile (trunk-based|git-flow|github-flow|none)
+# the planner stamped into the plan. Adapters branch on this to decide
+# candidate vs release routing for the promote stage (Phase 9.B-E).
+#
+# Usage: pipeline.plan.release_profile [<plan_file>]
+pipeline.plan.release_profile() {
+    local plan_file
+    plan_file="$(_plan_reader._resolve_path "${1:-}")" || return 0
+    command -v jq >/dev/null 2>&1 || return 0
+    jq -r '.release.profile // ""' "$plan_file" 2>/dev/null
+}
+
+# Print the project version (X.Y.Z) the planner computed at plan time.
+# Falls back to 0.0.0 when no git tag was reachable. Consumers should
+# treat 0.0.0 as "no release ever cut yet", not as "version is invalid".
+#
+# Usage: pipeline.plan.release_version [<plan_file>]
+pipeline.plan.release_version() {
+    local plan_file
+    plan_file="$(_plan_reader._resolve_path "${1:-}")" || return 0
+    command -v jq >/dev/null 2>&1 || return 0
+    jq -r '.release.version // ""' "$plan_file" 2>/dev/null
+}
+
+# Return 0 (rc) when the plan marks the current commit as a release
+# candidate (release.is_candidate=true), 1 otherwise. No stdout. Mirrors
+# the should_run/skip convention so callers can use it in `if`.
+#
+# Usage: pipeline.plan.is_candidate [<plan_file>]
+pipeline.plan.is_candidate() {
+    local plan_file
+    plan_file="$(_plan_reader._resolve_path "${1:-}")" || return 1
+    command -v jq >/dev/null 2>&1 || return 1
+    local val
+    val="$(jq -r '.release.is_candidate // false' "$plan_file" 2>/dev/null)"
+    [[ "$val" == "true" ]]
+}

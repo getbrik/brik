@@ -36,6 +36,9 @@ do not invoke the planner.
 | `pipeline.plan.gate <stage_id> [<plan_file>]` | gate.mode on stdout | `blocking` or `opt_in`. Empty when no plan exists. |
 | `pipeline.plan.stages [<plan_file>]` | one id per line | Canonical stage order from the plan. Empty when no plan exists -- callers can fall back to `registry.stage.list`. |
 | `pipeline.plan.fingerprint [<plan_file>]` | 64-hex sha256 | Empty when no plan exists. Lets adapters cache across pipelines. |
+| `pipeline.plan.release_profile [<plan_file>]` | profile enum on stdout | Phase 9.A. Empty when no plan exists. |
+| `pipeline.plan.release_version [<plan_file>]` | semver on stdout | Phase 9.A. Empty when no plan exists. |
+| `pipeline.plan.is_candidate [<plan_file>]` | rc=0 (candidate) / rc=1 (not) | Phase 9.A. No stdout. rc=1 when no plan exists. |
 
 ### Convention notes
 
