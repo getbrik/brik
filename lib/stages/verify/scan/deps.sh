@@ -90,12 +90,24 @@ verify.scan.deps.run() {
     # both formats here; grype takes a separate path. Failures of the
     # report passes are non-fatal (informational outputs).
     #
-    # Gating on scan_rc == 0 (chantier 20260508 P4 review HIGH 1): a real
-    # tool failure must NOT trigger the SARIF/CycloneDX emission, because a
+    # SARIF stays gated on scan_rc == 0 (chantier 20260508 P4 review HIGH 1):
+    # a real tool failure must NOT trigger SARIF re-emission, because a
     # second osv-scanner invocation could write a clean report that masks
-    # the original error from the policy gate downstream.
-    if [[ "$resolved" == "osv-scanner" && "$scan_rc" -eq 0 ]]; then
-        _verify.scan.deps._emit_reports "$workspace"
+    # the original error from findings.scan_gate downstream.
+    #
+    # The SBOM (CycloneDX) is emitted regardless of scan_rc because the
+    # SBOM is the dependency inventory (the "what was scanned"), not the
+    # scan verdict (the "did it pass"). Even when the scan finds CVEs,
+    # downstream tooling and the user expect the SBOM to be available
+    # for inspection / supply-chain analysis. Emitting it after a vuln-
+    # finding scan does not mask anything: the [ERROR] log + non-zero
+    # return code remain the authoritative failure signal.
+    if [[ "$resolved" == "osv-scanner" ]]; then
+        if [[ "$scan_rc" -eq 0 ]]; then
+            _verify.scan.deps._emit_reports "$workspace"
+        else
+            _verify.scan.deps._emit_sbom "$workspace"
+        fi
     fi
 
     # Run the SARIF (when present) through the unified ingest -> policy ->
@@ -148,12 +160,25 @@ _verify.scan.deps._write_empty_reports() {
 _verify.scan.deps._emit_reports() {
     local workspace="$1"
     local sarif="${BRIK_SECURITY_DEPS_OUTPUT_PATH:-brik-artifacts/scan/deps.sarif}"
-    local sbom="${BRIK_SECURITY_DEPS_SBOM_OUTPUT_PATH:-brik-artifacts/scan/sbom.cdx.json}"
     local sarif_dir; sarif_dir="$(dirname "$sarif")"
-    local sbom_dir;  sbom_dir="$(dirname "$sbom")"
 
     (cd "$workspace" && mkdir -p "$sarif_dir" \
         && osv-scanner scan --format sarif --output "$sarif" . >/dev/null 2>&1 || true)
+
+    _verify.scan.deps._emit_sbom "$workspace"
+}
+
+# Emit the CycloneDX SBOM only (no SARIF). Called both from the success
+# path (_emit_reports) and from the failure path -- in the latter case
+# the SBOM exists as the dependency inventory for downstream
+# supply-chain analysis even when the scan gate marks the stage as
+# failed. The SARIF stays guarded by the chantier 20260508 P4 safety
+# property; the SBOM lists the same components an osv-scanner success
+# would have produced, so emitting it cannot mask the failure signal.
+_verify.scan.deps._emit_sbom() {
+    local workspace="$1"
+    local sbom="${BRIK_SECURITY_DEPS_SBOM_OUTPUT_PATH:-brik-artifacts/scan/sbom.cdx.json}"
+    local sbom_dir;  sbom_dir="$(dirname "$sbom")"
 
     if [[ "${BRIK_SECURITY_DEPS_SBOM_ENABLED:-true}" == "true" ]]; then
         (cd "$workspace" && mkdir -p "$sbom_dir" \
