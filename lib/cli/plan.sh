@@ -21,6 +21,20 @@ cli.plan.run() {
     brik.use cli.helpers
     brik.use planning.plan_writer
     brik.use planning.plan_reader
+    brik.use pipeline
+
+    # Normalize platform CI variables to the BRIK_* contract the planner
+    # reads (BRIK_COMMIT_TAG, BRIK_BRANCH, BRIK_COMMIT_SHA, ...). The
+    # platform wrappers (gitlab-wrapper.sh, jenkins-wrapper.sh) set
+    # BRIK_TAG / BRIK_BRANCH / BRIK_COMMIT_SHA but the canonical names
+    # used by lib/planning/plan.sh include the COMMIT_ prefix; the
+    # mapping was historically performed inside stage.dispatch, which
+    # brik plan does NOT go through. Without this call here, a tag-push
+    # pipeline resolved context=snapshot because BRIK_COMMIT_TAG was
+    # empty even though BRIK_TAG was correctly set by the wrapper.
+    if declare -f _pipeline.detect_metadata >/dev/null 2>&1; then
+        _pipeline.detect_metadata
+    fi
 
     # Sub-command dispatch. The default sub-command "compute" is implicit
     # (no first arg) for backward compat with the v0.6 contract documented
