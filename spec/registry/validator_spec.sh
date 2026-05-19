@@ -136,4 +136,37 @@ YAML
       The stderr should include "manifest not found"
     End
   End
+
+  Describe "rejects manifest with no kind field"
+    setup_no_kind() {
+      BRIK_TEST_NOKIND=$(mktemp -d)
+      cat > "$BRIK_TEST_NOKIND/nokind.yml" <<YAML
+apiVersion: brik.dev/v1
+metadata: {id: foo, displayName: Foo}
+spec: {}
+YAML
+    }
+    BeforeEach 'setup_no_kind'
+
+    It "fails when .kind cannot be read"
+      When call registry.validate_manifest "$BRIK_TEST_NOKIND/nokind.yml"
+      The status should equal "$BRIK_EXIT_INVALID_INPUT"
+      The stderr should include "cannot read .kind"
+    End
+  End
+
+  Describe "rejects a file that is not valid YAML"
+    setup_bad_yaml() {
+      BRIK_TEST_BADYAML=$(mktemp -d)
+      # Unbalanced brace -- yq cannot parse this as YAML.
+      printf 'kind: Stack\nmetadata: {id: foo\n' > "$BRIK_TEST_BADYAML/badyaml.yml"
+    }
+    BeforeEach 'setup_bad_yaml'
+
+    It "fails with a parse error"
+      When call registry.validate_manifest "$BRIK_TEST_BADYAML/badyaml.yml"
+      The status should equal "$BRIK_EXIT_INVALID_INPUT"
+      The stderr should be present
+    End
+  End
 End
