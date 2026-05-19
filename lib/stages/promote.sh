@@ -1,0 +1,125 @@
+#!/usr/bin/env bash
+# @module stages.promote
+# @description Phase 9.B Docker promote. Moves a candidate image from
+#   release.candidate.docker.registry to release.release.docker.registry
+#   on a release context. The candidate is identified by digest; the
+#   release ref is tagged with the project version (BRIK_PROJECT_VERSION)
+#   and 'latest'. Records the candidate+release refs and digests so
+#   downstream stages (deploy) can consume BRIK_PROMOTED_IMAGE_REF
+#   without re-querying the registry.
+#
+# Contract: this stage is gated by gate.contexts=[release] in the registry
+# manifest, so the planner only schedules it on a tag push. The dispatcher
+# also enforces dry-run honoring via BRIK_DRY_RUN=true.
+
+# Guard against double-sourcing.
+[[ -n "${_BRIK_STAGE_PROMOTE_LOADED:-}" ]] && return 0
+_BRIK_STAGE_PROMOTE_LOADED=1
+
+stages.promote() {
+    brik.use transverse.config
+    brik.use pipeline.report
+
+    # Self-gate against snapshot context. The plan-driven path
+    # (BRIK_PLAN_FILE) already filters this via gate.contexts=[release],
+    # but the legacy `pipeline.run` path (no plan) does not enforce
+    # contexts. Skipping silently here keeps promote a no-op in feature
+    # pipelines without forcing users into --auto-select on day one.
+    if [[ -z "${BRIK_COMMIT_TAG:-}" ]]; then
+        report.record "promote" "tech" "status" "skipped"        || true
+        report.record "promote" "tech" "kind"   "not-applicable" || true
+        report.record "promote" "business" "reason" "not-a-release-context" || true
+        return 0
+    fi
+
+    local candidate_registry candidate_image release_registry release_image
+    candidate_registry="$(config.get '.release.candidate.docker.registry' '')"
+    candidate_image="$(config.get '.release.candidate.docker.image' '')"
+    release_registry="$(config.get '.release.release.docker.registry' '')"
+    release_image="$(config.get '.release.release.docker.image' '')"
+
+    if [[ -z "$candidate_registry" || -z "$candidate_image" ]]; then
+        log.error "stages.promote: .release.candidate.docker.{registry,image} are required"
+        report.record "promote" "tech" "status" "failure" || true
+        report.record "promote" "tech" "kind"   "config-error" || true
+        return "${BRIK_EXIT_CONFIG_ERROR:-3}"
+    fi
+    if [[ -z "$release_registry" || -z "$release_image" ]]; then
+        log.error "stages.promote: .release.release.docker.{registry,image} are required"
+        report.record "promote" "tech" "status" "failure" || true
+        report.record "promote" "tech" "kind"   "config-error" || true
+        return "${BRIK_EXIT_CONFIG_ERROR:-3}"
+    fi
+
+    local version="${BRIK_PROJECT_VERSION:-0.0.0}"
+    if [[ "$version" == "0.0.0" ]]; then
+        log.warn "stages.promote: BRIK_PROJECT_VERSION is 0.0.0; promote on a tag push is expected"
+    fi
+
+    local candidate_ref="${candidate_registry}/${candidate_image}:${version}"
+    local release_ref="${release_registry}/${release_image}:${version}"
+    local release_latest="${release_registry}/${release_image}:latest"
+
+    log.info "promoting ${candidate_ref} -> ${release_ref}"
+
+    if [[ "${BRIK_DRY_RUN:-false}" == "true" ]]; then
+        log.info "[dry-run] docker pull ${candidate_ref}"
+        log.info "[dry-run] docker tag ${candidate_ref} ${release_ref}"
+        log.info "[dry-run] docker tag ${candidate_ref} ${release_latest}"
+        log.info "[dry-run] docker push ${release_ref}"
+        log.info "[dry-run] docker push ${release_latest}"
+        report.record "promote" "tech"     "status"           "success"        || true
+        report.record "promote" "tech"     "kind"             "dry-run"        || true
+        report.record "promote" "business" "candidate_ref"    "$candidate_ref" || true
+        report.record "promote" "business" "candidate_digest" "sha256:dry-run" || true
+        report.record "promote" "business" "release_ref"      "$release_ref"   || true
+        report.record "promote" "business" "release_digest"   "sha256:dry-run" || true
+        report.record "promote" "env"      "BRIK_PROMOTED_IMAGE_REF" "$release_ref" || true
+        return 0
+    fi
+
+    if ! command -v docker >/dev/null 2>&1; then
+        log.error "stages.promote: docker not found on PATH"
+        report.record "promote" "tech" "status" "failure" || true
+        report.record "promote" "tech" "kind"   "missing-tool" || true
+        return "${BRIK_EXIT_MISSING_DEP:-69}"
+    fi
+
+    if ! docker pull "$candidate_ref" >/dev/null 2>&1; then
+        log.error "stages.promote: docker pull ${candidate_ref} failed"
+        report.record "promote" "tech" "status" "failure" || true
+        report.record "promote" "tech" "kind"   "candidate-not-found" || true
+        return "${BRIK_EXIT_FAILURE:-1}"
+    fi
+
+    local candidate_digest
+    candidate_digest="$(docker inspect --format '{{index .RepoDigests 0}}' "$candidate_ref" 2>/dev/null \
+                      | sed 's/.*@//')"
+    [[ -z "$candidate_digest" ]] && candidate_digest="unknown"
+
+    docker tag "$candidate_ref" "$release_ref"
+    docker tag "$candidate_ref" "$release_latest"
+    if ! docker push "$release_ref" >/dev/null 2>&1; then
+        log.error "stages.promote: docker push ${release_ref} failed"
+        report.record "promote" "tech" "status" "failure" || true
+        report.record "promote" "tech" "kind"   "push-failed" || true
+        return "${BRIK_EXIT_FAILURE:-1}"
+    fi
+    if ! docker push "$release_latest" >/dev/null 2>&1; then
+        log.warn "stages.promote: docker push ${release_latest} failed (continuing; the versioned tag landed)"
+    fi
+
+    local release_digest
+    release_digest="$(docker inspect --format '{{index .RepoDigests 0}}' "$release_ref" 2>/dev/null \
+                    | sed 's/.*@//')"
+    [[ -z "$release_digest" ]] && release_digest="$candidate_digest"
+
+    report.record "promote" "tech"     "status"           "success"           || true
+    report.record "promote" "business" "candidate_ref"    "$candidate_ref"    || true
+    report.record "promote" "business" "candidate_digest" "$candidate_digest" || true
+    report.record "promote" "business" "release_ref"      "$release_ref"      || true
+    report.record "promote" "business" "release_digest"   "$release_digest"   || true
+    report.record "promote" "env"      "BRIK_PROMOTED_IMAGE_REF" "$release_ref" || true
+
+    return 0
+}

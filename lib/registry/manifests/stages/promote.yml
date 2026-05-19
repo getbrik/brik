@@ -1,0 +1,31 @@
+apiVersion: brik.dev/v1
+kind: Stage
+metadata:
+  id: promote
+  displayName: Promote
+spec:
+  module: stages.promote
+  function: stages.promote
+  placement:
+    slot: pre-deploy
+    after: [container-scan]
+    before: [deploy]
+  runner:
+    class: deploy
+  gate:
+    mode: blocking
+    contexts: [release]
+  dry_run:
+    destructive: true
+  impact:
+    changes:
+      - "**/Dockerfile"
+      - "**/docker-compose*.yml"
+  consumes: [package.artifact, container.findings]
+  provides: [release.image_ref, release.image_digest]
+  artifacts:
+    paths:
+      - brik-artifacts/promote/
+    dotenv: true
+  api:
+    required: [stages.promote]

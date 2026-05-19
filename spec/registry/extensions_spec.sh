@@ -17,7 +17,7 @@ Describe "registry extensions overlay (D.6)"
       When run script "$BRIK_HOME/scripts/compile-registry.sh" --output "$OUT_CACHE"
       The status should equal 0
       The output should include "stacks: 6"
-      The output should include "stages: 11"
+      The output should include "stages: 12"
     End
   End
 
@@ -95,7 +95,7 @@ YAML
     It "extends the builtin stage count by one"
       compile_with_audit >/dev/null 2>&1
       When call jq -r '.stages | keys | length' "$OUT_CACHE"
-      The output should equal "12"
+      The output should equal "13"
     End
   End
 

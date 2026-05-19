@@ -157,6 +157,54 @@
           "enum": ["trunk-based", "git-flow", "github-flow", "none"],
           "default": "none"
         },
+        "candidate": {
+          "description": "Candidate-zone artifact configuration (Phase 9.B-E). The candidate zone receives every successful build; the promote stage moves an audited candidate to the release zone on a tag push.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "docker": {
+              "description": "Candidate Docker registry. Phase 9.B.",
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "registry": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Hostname (and optional port) of the candidate Docker registry, e.g. 'registry.candidate.example.com'."
+                },
+                "image": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Image path within the candidate registry, e.g. 'myteam/api'."
+                }
+              }
+            }
+          }
+        },
+        "release": {
+          "description": "Release-zone artifact configuration (Phase 9.B-E). The release zone holds promoted artifacts; the promote stage tags and pushes there once a candidate is approved.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "docker": {
+              "description": "Release Docker registry. Phase 9.B.",
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "registry": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Hostname (and optional port) of the release Docker registry, e.g. 'registry.release.example.com'."
+                },
+                "image": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Image path within the release registry, e.g. 'myteam/api'."
+                }
+              }
+            }
+          }
+        },
         "tag_prefix": {
           "description": "Prefix for release tags (e.g. 'v').",
           "type": "string",

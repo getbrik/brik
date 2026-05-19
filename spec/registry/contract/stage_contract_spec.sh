@@ -162,7 +162,7 @@ Describe "registry.stage.* contract"
       count_stages() { registry.stage.list | wc -l | tr -d ' '; }
       When call count_stages
       The status should equal 0
-      The output should equal "12"
+      The output should equal "13"
     End
 
     It "preserves the topological order: contract-stage follows init"

@@ -19,6 +19,7 @@ Describe "pipeline.sh"
     stages.test()            { printf 'ran:test\n'; return 0; }
     stages.package()         { printf 'ran:package\n'; return 0; }
     stages.container_scan()  { printf 'ran:container_scan\n'; return 0; }
+    stages.promote()         { printf 'ran:promote\n';        return 0; }
     stages.deploy()          { printf 'ran:deploy\n'; return 0; }
     stages.notify()          { printf 'ran:notify\n'; return 0; }
   }
@@ -38,7 +39,15 @@ Describe "pipeline.sh"
           "$PIPELINE_LOG_DIR/aggregate-report.json"
       }
       When call default_flow_ran_stages
-      The output should equal "init,build,lint,sast,scan,test"
+      # promote has gate.mode=blocking + gate.contexts=[release]. The
+      # legacy pipeline.run path (no plan file) does not enforce
+      # contexts, so promote dispatches through the mocked stages.promote
+      # and lands in the success list alongside the always-run defaults.
+      # The real lib/stages/promote.sh self-gates in snapshot, but this
+      # spec mocks the function (see setup_pipeline) so the mock body
+      # decides the recorded status. Production pipelines rely on the
+      # plan-driven gate for context filtering (D.5a/D.5b/D.5c).
+      The output should equal "init,build,lint,sast,scan,test,promote"
     End
 
     It "marks release/package/container-scan/deploy/notify as skipped"
@@ -89,12 +98,16 @@ Describe "pipeline.sh"
           "$PIPELINE_LOG_DIR/aggregate-report.json"
       }
       When call all_stages_ran
-      The output should equal "init,release,build,lint,sast,scan,test,package,container-scan,deploy,notify"
+      The output should equal "init,release,build,lint,sast,scan,test,package,container-scan,promote,deploy,notify"
     End
 
-    It "marks zero stages as skipped with all opt-in flags"
+    It "marks zero stages as skipped with all opt-in flags (release context)"
       no_skips_with_all_flags() {
-        pipeline.run --with-release --with-package --with-deploy >/dev/null 2>&1
+        # promote self-gates on snapshot context (not-a-release-context).
+        # Setting BRIK_COMMIT_TAG flips the context to release, so promote
+        # also runs and the skipped count stays at 0.
+        BRIK_COMMIT_TAG="v0.0.0-test" \
+          pipeline.run --with-release --with-package --with-deploy >/dev/null 2>&1
         jq -r '.stages | map(select(.tech.status == "skipped")) | length' \
           "$PIPELINE_LOG_DIR/aggregate-report.json"
       }
