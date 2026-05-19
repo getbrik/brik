@@ -125,8 +125,17 @@ jobs:
           fi
           exit "$fail"
 
-      - name: Smoke compile-registry
-        run: scripts/compile-registry.sh
+      - name: Registry cache freshness
+        # Fails if lib/registry/cache/registry.json does not match a fresh
+        # compile of lib/registry/manifests/*.yml. Catches "edited a manifest
+        # but forgot to re-commit the cache" before a stale cache reaches
+        # production.
+        run: scripts/compile-registry.sh --check
+
+      - name: Registry schema-enum sync
+        # Fails if the project.stack enum in schemas/config/v1/brik.schema.json
+        # drifts from the language stacks declared in the manifests.
+        run: scripts/compile-registry.sh --check-schema-enum
 
   bench-plan:
     runs-on: ubuntu-latest
