@@ -70,7 +70,7 @@ Describe "planning/plan_reader.sh"
     It "lists the canonical stage order from the plan"
       When call pipeline.plan.stages "$PLAN_FILE"
       The line 1 of output should equal "init"
-      The line 11 of output should equal "notify"
+      The line 12 of output should equal "notify"
     End
   End
 

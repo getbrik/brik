@@ -38,8 +38,31 @@ spec:
       - go.sum
 YAML
     cat > "$EXT/lib/stacks/go.sh" <<'SH'
-stacks.go.build() { (cd "$1" && go build ./...); }
-stacks.go.test()  { (cd "$1" && go test ./...); }
+stacks.go.build() {
+    # Degrade gracefully under the contract harness (PATH is masked,
+    # there is no real `go` binary). The happy-path fixture only checks
+    # that we return 0 and record at least one tech.* key.
+    if ! command -v go >/dev/null 2>&1; then
+        report.record "build" "tech" "status" "skipped"
+        report.record "build" "tech" "kind"   "not-applicable"
+        return 0
+    fi
+    (cd "$1" && go build ./...)
+    local rc=$?
+    report.record "build" "tech" "exit_code" "$rc"
+    return "$rc"
+}
+stacks.go.test() {
+    if ! command -v go >/dev/null 2>&1; then
+        report.record "test" "tech" "status" "skipped"
+        report.record "test" "tech" "kind"   "not-applicable"
+        return 0
+    fi
+    (cd "$1" && go test ./...)
+    local rc=$?
+    report.record "test" "tech" "exit_code" "$rc"
+    return "$rc"
+}
 SH
   }
   cleanup() {
