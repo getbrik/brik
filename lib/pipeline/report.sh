@@ -920,6 +920,28 @@ _report._render_aggregate_md() {
           | map("\(.key)=\(.value)")
           | join(", ");
 
+        # ----- Business outcome context -----------------------------------
+        # Names the stages contributing to the warning/error buckets and
+        # adds a one-line note explaining what a "warning" business status
+        # means: the stage finished technically but emitted findings that
+        # stay within the active policy thresholds (e.g. container-scan
+        # reporting CVEs that are below the configured fail line).
+        def render_business_context:
+          ([ .stages[]? | select((.business.status // "") == "warning") | (.stage // "-") ]) as $warns
+          | ([ .stages[]? | select((.business.status // "") == "error")   | (.stage // "-") ]) as $errs
+          | if (($warns | length) + ($errs | length)) == 0 then empty
+            else
+              (if ($warns | length) > 0
+                then "- **Warning stages:** \($warns | join(", "))"
+                else empty end),
+              (if ($errs | length) > 0
+                then "- **Error stages:** \($errs | join(", "))"
+                else empty end),
+              "",
+              "_A stage reports `warning` when it finished technically but its findings stay within the active policy thresholds; it reports `error` when those thresholds are breached. See the Failing/Ignored sections below for the per-finding breakdown._",
+              ""
+            end;
+
         def render_active_policy:
           (.summary.policy // null) as $p
           | if $p == null then empty
@@ -1091,6 +1113,7 @@ _report._render_aggregate_md() {
           "- **Status:** \(status_glyph(.pipeline.business.status // "?")) \(.pipeline.business.status // "-")",
           "- **Counts:** success=\(.summary.business.success_count // 0), warning=\(.summary.business.warning_count // 0), error=\(.summary.business.error_count // 0)",
           "",
+          render_business_context,
           render_active_policy,
           render_failing,
           render_ignored,
