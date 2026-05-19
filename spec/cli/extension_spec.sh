@@ -22,7 +22,14 @@ spec:
   api: {module: stacks.myteam, required: [stacks.myteam.build]}
 YAML
     cat > "$EXT/lib/stacks/myteam.sh" <<'SH'
-stacks.myteam.build() { return 0; }
+stacks.myteam.build() {
+    # ADR-002 critère 3: a contract-conformant stack.build returns 0 on
+    # the happy path AND records at least one tech.* key so the planner
+    # can observe the outcome. Skip the actual build tool here -- the
+    # dry-call harness masks PATH so there is no `npm` to invoke.
+    report.record "build" "tech" "status" "success"
+    return 0
+}
 SH
   }
 
@@ -45,7 +52,10 @@ spec:
   api: {required: [stages.audit]}
 YAML
     cat > "$EXT/lib/stages/audit.sh" <<'SH'
-stages.audit() { return 0; }
+stages.audit() {
+    report.record "audit" "tech" "status" "success"
+    return 0
+}
 SH
   }
 
@@ -59,6 +69,41 @@ SH
       The output should include "[OK]   api"
       The output should include "[OK]   no-exit"
       The output should include "[OK]   compile registry merges cleanly"
+    End
+  End
+
+  Describe "dry-call: function returns non-zero"
+    It "fails the dry-call check (rc!=0 on happy-path fixture)"
+      write_valid_stack
+      write_valid_stage
+      # Override the stage function to return 7 on the happy-path
+      # fixture. ADR-002 demands rc=0; the harness must flag this.
+      cat > "$EXT/lib/stages/audit.sh" <<'SH'
+stages.audit() {
+    report.record "audit" "tech" "status" "failure"
+    return 7
+}
+SH
+      When run script "$BRIK_BIN" extension test "$EXT"
+      The status should equal 2
+      The stderr should include "rc=7 on happy-path fixture"
+      The output should be present
+    End
+  End
+
+  Describe "dry-call: function does not record"
+    It "fails the dry-call check (no report.record entry)"
+      write_valid_stack
+      write_valid_stage
+      # Function returns 0 but never calls report.record. ADR-002
+      # critère 3 requires at least one record entry on the happy path.
+      cat > "$EXT/lib/stages/audit.sh" <<'SH'
+stages.audit() { return 0; }
+SH
+      When run script "$BRIK_BIN" extension test "$EXT"
+      The status should equal 2
+      The stderr should include "no report.record entry on happy-path"
+      The output should be present
     End
   End
 
