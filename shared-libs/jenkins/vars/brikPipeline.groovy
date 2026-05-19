@@ -332,6 +332,17 @@ def call(Map params = [:]) {
                     if (env.BRIK_WITH_DEPLOY == 'true') {
                         planOpts << '--with-deploy'
                     }
+                    // The planner derives context (release vs snapshot) from
+                    // BRIK_COMMIT_TAG, with BRIK_TAG as a final fallback (see
+                    // _pipeline.detect_metadata). On a Multibranch tag scan
+                    // Jenkins sets TAG_NAME but not BRIK_TAG, so the planner
+                    // would otherwise classify a tag build as snapshot and
+                    // reject release with context-mismatch even when the
+                    // opt-in flag matches. Bridge the two so the planner
+                    // sees the same context the wrapper does.
+                    if (env.TAG_NAME?.trim() && !env.BRIK_TAG?.trim()) {
+                        env.BRIK_TAG = env.TAG_NAME
+                    }
                     def planRc = sh(
                         script: "${brikHome}/bin/brik plan --out .brik-logs/plan.json ${planOpts.join(' ')}",
                         returnStatus: true
