@@ -86,14 +86,18 @@ def call(Map params = [:]) {
             // path that only exists inside the Jenkins container -- the host
             // sees nothing and creates an empty dir, leaving the real
             // workspace untouched. Use --volumes-from on the Jenkins container
-            // (whose name/id equals /etc/hostname inside it) so the alpine
+            // (resolved via the cgroup id, since /etc/hostname is the
+            // docker-compose hostname not the container name) so the alpine
             // helper sees the same /var/jenkins_home tree.
             //
             // Quoting note: we issue each docker command on its own line --
             // Groovy's """...""" interpolation strips embedded single quotes,
             // so an alpine "sh -c '...'" wrapper would collapse to a single
             // bare token. Each line is one argv chain, no nested quoting.
-            def jenkinsContainer = sh(script: 'cat /etc/hostname', returnStdout: true).trim()
+            def jenkinsContainer = sh(
+                script: "awk -F/ 'NR==1 { id=\$NF; sub(/^docker-/, \"\", id); sub(/\\.scope\$/, \"\", id); print id; exit }' /proc/self/cgroup",
+                returnStdout: true
+            ).trim()
             sh """
                 docker run --rm -u 0:0 --volumes-from ${jenkinsContainer} alpine:latest rm -rf "\${WORKSPACE}/.ssh" "\${WORKSPACE}/.kube" 2>/dev/null || true
                 docker run --rm -u 0:0 --volumes-from ${jenkinsContainer} alpine:latest chown -R ${rescueUid}:${rescueGid} "\${WORKSPACE}" 2>/dev/null || true
@@ -228,10 +232,14 @@ def call(Map params = [:]) {
                     // Same docker-out-of-docker + quoting caveats as the
                     // rescue at pipeline start: bind-mounting "${WORKSPACE}"
                     // from the host yields an empty dir, so reach the real
-                    // workspace via --volumes-from on the Jenkins container.
-                    // Issue the chown directly as the docker CMD (no sh -c)
-                    // since Groovy strips embedded single quotes.
-                    def deployHostContainer = sh(script: 'cat /etc/hostname', returnStdout: true).trim()
+                    // workspace via --volumes-from on the Jenkins container
+                    // (resolved via the cgroup id). Issue the chown directly
+                    // as the docker CMD (no sh -c) since Groovy strips
+                    // embedded single quotes.
+                    def deployHostContainer = sh(
+                        script: "awk -F/ 'NR==1 { id=\$NF; sub(/^docker-/, \"\", id); sub(/\\.scope\$/, \"\", id); print id; exit }' /proc/self/cgroup",
+                        returnStdout: true
+                    ).trim()
                     sh """
                         docker run --rm -u 0:0 --volumes-from ${deployHostContainer} alpine:latest chown -R ${jenkinsUid}:${jenkinsGid} "\${WORKSPACE}" 2>/dev/null || true
                     """
