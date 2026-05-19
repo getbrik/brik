@@ -13,7 +13,15 @@ brik-plan:
   script:
     - |
       set -euo pipefail
-      bash -c '. /tmp/brik-bootstrap.sh && command -v brik >/dev/null 2>&1 || ln -sf "${BRIK_HOME}/bin/brik" /usr/local/bin/brik'
+      # Source the bootstrap DIRECTLY in this shell (not via `bash -c`) so
+      # the BRIK_* env exports set by brik.gitlab.setup (BRIK_COMMIT_TAG,
+      # BRIK_BRANCH, BRIK_COMMIT_SHA, ...) are visible to brik plan
+      # below. The legacy stage jobs use `bash -c '. bootstrap && run'`
+      # which keeps env in a subshell -- fine because the stage runs in
+      # that same subshell. For brik-plan the planner runs as a separate
+      # process line, so it must inherit the env from the outer shell.
+      . /tmp/brik-bootstrap.sh
+      command -v brik >/dev/null 2>&1 || ln -sf "${BRIK_HOME}/bin/brik" /usr/local/bin/brik
       # Auto-resolve the opt-in flags from CI context so the planner
       # default mirrors the legacy fixed-flow semantics:
       #   - tag push (CI_COMMIT_TAG set) -> --with-release --with-package
