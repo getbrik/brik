@@ -278,6 +278,85 @@ brik-test:
 The rest of the templated `brik-test` job (script, cache, dependencies, paths,
 junit) still applies.
 
+## Pipeline workflow filter
+
+Both `pipeline.yml` and `dynamic-pipeline.yml` declare a top-level
+`workflow:` block that gates pipeline creation **before** any job
+evaluates its `rules:`. GitLab evaluates this once per push / API call
+and decides whether the pipeline exists at all.
+
+The permitted pipeline sources are:
+
+| `$CI_PIPELINE_SOURCE` | Purpose |
+|---|---|
+| `merge_request_event` | The canonical CI for branch work |
+| (tag push) | Release context, drives `BRIK_COMMIT_TAG` |
+| (commit on default branch) | "Merged to main" flow |
+| `schedule` | Nightly E2E, scheduled rebuilds |
+| `web` | On-demand re-run from the GitLab UI or API |
+
+A push to a feature branch that already has an open MR is suppressed
+(the MR pipeline is kept; the branch pipeline is dropped) -- this is
+the anti-duplicate rule:
+
+```yaml
+workflow:
+  rules:
+    - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
+      when: never
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_TAG
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+    - if: $CI_PIPELINE_SOURCE == "web"
+```
+
+Other sources (`trigger`, `webide`, `parent_pipeline` for non-Brik
+parents, `pipeline` for external triggers) are intentionally not in
+the allow-list. Add them locally if the project needs them; do not
+remove the existing entries without replacing the parity they provide
+(particularly the `schedule` and `web` entries -- losing them breaks
+the on-call team's ability to re-run a pipeline manually).
+
+## Anti-patterns checklist
+
+Before opening a PR that touches `.gitlab-ci.yml` (or the shared
+`shared-libs/gitlab/templates/*.yml`), confirm each of the following:
+
+- [ ] **`only/except` is never mixed with `rules:`** -- the two
+      mechanisms have intersecting semantics and GitLab's
+      precedence ordering surprises everyone. Brik uses `rules:`
+      exclusively. Override projects that pull our templates must
+      keep this discipline.
+- [ ] **No `deploy` from a Merge Request pipeline** -- in MR
+      pipelines, `$CI_PIPELINE_SOURCE == "merge_request_event"`. A
+      deploy job that fires in this context publishes against the
+      MR's source branch state, not the target branch the
+      reviewer is about to merge. Gate deploys on
+      `$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH` or
+      `$CI_COMMIT_TAG`.
+- [ ] **`workflow:` always allows `schedule` and `web`** -- the
+      template ships both; do not remove them when copy-pasting.
+      Operators rely on `web` for retries and `schedule` for the
+      nightly run.
+- [ ] **Pipeline triggers stay limited to the workflow allow-list**
+      -- `trigger:`, `webide`, and `parent_pipeline` (from a
+      non-Brik orchestrator) all create pipelines outside the
+      Brik flow. If you need to allow one, add an explicit entry
+      with a rationale comment.
+- [ ] **`resource_group:` on every deploy job that touches a
+      shared environment** -- otherwise two pipelines on the same
+      ref can race the same target. The `dynamic-pipeline` child
+      preserves whatever `resource_group:` the legacy template
+      declared, but a project-local override loses it silently.
+
+This checklist enforces the Stephane Robert anti-pattern
+recommendations (cf. <https://blog.stephane-robert.info/docs/pipeline-cicd/anti-patterns/#la-pipeline-monolithe>
+and the `industrialisation/workflows/` follow-up). The 9-context
+commit detection (`BRIK_COMMIT_CONTEXT`) referenced in the chantier is
+not yet implemented; the checklist above is the manual equivalent
+until the runtime detection lands.
+
 ## Requirements
 
 - A GitLab CI Runner with the **Docker executor**.
