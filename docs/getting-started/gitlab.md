@@ -41,14 +41,22 @@ git push origin v0.5.0
 
 ## 3. Add the bootstrap file to your project
 
-Add a `.gitlab-ci.yml` to your project root:
+Add a `.gitlab-ci.yml` to your project root. The recommended include is
+the dynamic parent + child template, which adds impact-driven stage
+selection (docs-only commits skip the lint / test grid without
+spinning up runner containers):
 
 ```yaml
 include:
   - project: 'brik/gitlab-templates'
     ref: v0.5.0
-    file: '/templates/pipeline.yml'
+    file: '/templates/dynamic-pipeline.yml'
 ```
+
+The legacy `/templates/pipeline.yml` still works and is kept until
+v0.8.0; new projects should pick the dynamic template from the start.
+See [platforms/gitlab-dynamic-pipeline.md](../platforms/gitlab-dynamic-pipeline.md)
+for the migration diff if you already include the legacy file.
 
 ## 4. Add a `brik.yml`
 
