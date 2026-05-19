@@ -276,8 +276,26 @@ def call(Map params = [:]) {
                 // planner failure is non-fatal: we echo and fall back to
                 // the legacy unconditional flow.
                 runStageWithReporting('Plan') {
+                    // Mirror gitlab/_plan.yml's flag resolution. The planner
+                    // defaults gate release/package/deploy off; the wrapper
+                    // is responsible for translating CI context into the
+                    // matching --with-* flags:
+                    //   - tag context (BRIK_TAG or TAG_NAME set) -> release+package
+                    //   - BRIK_WITH_DEPLOY=true                  -> deploy
+                    //   - BRIK_WITH_RELEASE/PACKAGE override for finer control.
+                    def tagSet = (env.BRIK_TAG?.trim() || env.TAG_NAME?.trim()) as boolean
+                    def planOpts = []
+                    if (tagSet || env.BRIK_WITH_RELEASE == 'true') {
+                        planOpts << '--with-release'
+                    }
+                    if (tagSet || env.BRIK_WITH_PACKAGE == 'true') {
+                        planOpts << '--with-package'
+                    }
+                    if (env.BRIK_WITH_DEPLOY == 'true') {
+                        planOpts << '--with-deploy'
+                    }
                     def planRc = sh(
-                        script: "${brikHome}/bin/brik plan --out .brik-logs/plan.json",
+                        script: "${brikHome}/bin/brik plan --out .brik-logs/plan.json ${planOpts.join(' ')}",
                         returnStatus: true
                     )
                     if (planRc == 0 && fileExists('.brik-logs/plan.json')) {
