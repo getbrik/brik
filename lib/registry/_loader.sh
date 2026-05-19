@@ -164,6 +164,7 @@ _registry._load_stacks() {
       __id)            _REGISTRY_STACK_IDS+=("$id") ;;
     esac
   done < <(jq -r '
+    # KCOV_EXCL_START -- inline jq script body, not bash code
     .stacks | to_entries[] | .key as $id | .value as $m | $m.spec as $s |
       "\($id)\t__id\t",
       "\($id)\tdisplay_name\t\($m.metadata.displayName // "")",
@@ -183,6 +184,7 @@ _registry._load_stacks() {
       "\($id)\timpact_source\t\($s.impact.source // [] | join(":"))",
       "\($id)\timpact_test\t\($s.impact.test // [] | join(":"))",
       "\($id)\timpact_build\t\($s.impact.build // [] | join(":"))"
+    # KCOV_EXCL_STOP
   ' "$_REGISTRY_CACHE_PATH")
 }
 
@@ -210,6 +212,7 @@ _registry._load_stages() {
       __id)                _REGISTRY_STAGE_IDS+=("$id") ;;
     esac
   done < <(jq -r '
+    # KCOV_EXCL_START -- inline jq script body, not bash code
     .stages as $stages
     | ($stages | keys) as $ids
     # effective_after = after ∪ { S : S.before contains $id }. The schema
@@ -256,5 +259,6 @@ _registry._load_stages() {
       "\($id)\tapi_required\t\($s.api.required // [] | join(":"))",
       "\($id)\timpact_changes\t\($s.impact.changes // [] | join(":"))",
       "\($id)\timpact_use_stack_impact\t\($s.impact.use_stack_impact // "")"
+    # KCOV_EXCL_STOP
   ' "$_REGISTRY_CACHE_PATH")
 }
