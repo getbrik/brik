@@ -80,12 +80,15 @@ def call(Map params = [:]) {
             // the next build. These dirs only hold transient credentials
             // materialised at deploy time, so wiping them between builds is
             // safe.
+            //
+            // Quoting note: we run the host shell directly (no sh -c indirection
+            // through alpine) because Groovy's """...""" interpolation strips
+            // embedded single quotes, which would collapse the alpine command
+            // into a single bare token. The host shell can sequence rm + chown
+            // safely; each line is one alpine invocation, no nested quoting.
             sh """
-                docker run --rm -u 0:0 \
-                    -v "\${WORKSPACE}:/ws" \
-                    alpine:latest \
-                    sh -c 'rm -rf /ws/.ssh /ws/.kube; chown -R ${rescueUid}:${rescueGid} /ws' 2>/dev/null \
-                    || true
+                docker run --rm -u 0:0 -v "\${WORKSPACE}:/ws" alpine:latest rm -rf /ws/.ssh /ws/.kube 2>/dev/null || true
+                docker run --rm -u 0:0 -v "\${WORKSPACE}:/ws" alpine:latest chown -R ${rescueUid}:${rescueGid} /ws 2>/dev/null || true
             """
             // Selective cleanup: drop build outputs and materialised dep
             // trees (node_modules, .venv, ...), keep tool-level caches
