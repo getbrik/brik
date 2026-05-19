@@ -1,6 +1,18 @@
-# Brik GitLab CI Pipeline Template
+# Brik GitLab CI Pipeline Template (LEGACY)
 #
-# This is the main entry point for Brik pipelines on GitLab CI.
+# DEPRECATED: this single-pipeline template is superseded by the parent
+# + child pair declared in `dynamic-pipeline.yml`, which adds
+# impact-driven stage selection (docs-only commits skip the lint/test
+# grid without runner containers). New projects should include
+# `/templates/dynamic-pipeline.yml` instead.
+#
+# This file stays in the catalog for two minor versions (v0.6.x and
+# v0.7.x) so existing pipelines keep working, and remains load-bearing
+# because the dynamic template's child pipeline re-uses it verbatim.
+# It is removed as a public entry point in v0.8.0.
+# See `docs/platforms/gitlab-dynamic-pipeline.md` for the one-line
+# migration diff (swap the include path, brik.yml is unchanged).
+#
 # It implements the fixed flow: Init -> Release -> Build -> Lint||SAST||Scan||Test -> Package -> Container Scan -> Deploy -> Notify
 #
 # Usage in your .gitlab-ci.yml:

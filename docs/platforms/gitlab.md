@@ -5,6 +5,12 @@ The canonical reference for running Brik on GitLab CI. For first-time setup see
 detail of the templates themselves see
 [`shared-libs/gitlab/README.md`](../../shared-libs/gitlab/README.md).
 
+> **Recommended include**: new projects should use the dynamic parent +
+> child template documented in
+> [gitlab-dynamic-pipeline.md](gitlab-dynamic-pipeline.md). The legacy
+> single-pipeline template described below stays available until v0.8.0
+> for projects that have not yet migrated.
+
 ## Platform status
 
 | Platform | Status | Integration | Bootstrap file |
