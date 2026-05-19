@@ -450,7 +450,7 @@ Describe "stages.init"
           "$BRIK_LOG_DIR/aggregate-report.json"
       }
       When call run_init_records_all_env_keys
-      The output should equal "BRIK_BUILD_STACK,BRIK_BUILD_STACK_VERSION,BRIK_CI_IMAGE,BRIK_DEPLOY_ENABLED,BRIK_GIT_USER_EMAIL,BRIK_GIT_USER_NAME,BRIK_PACKAGE_ENABLED,BRIK_PROJECT_NAME,BRIK_RELEASE_PROFILE,BRIK_TEST_COVERAGE_DIR,BRIK_TEST_COVERAGE_FORMAT,BRIK_TEST_JUNIT_PATH,BRIK_TEST_REPORTS_ENABLED"
+      The output should equal "BRIK_BUILD_STACK,BRIK_BUILD_STACK_VERSION,BRIK_CI_IMAGE,BRIK_DEPLOY_ENABLED,BRIK_GIT_USER_EMAIL,BRIK_GIT_USER_NAME,BRIK_IS_CANDIDATE,BRIK_PACKAGE_ENABLED,BRIK_PROJECT_NAME,BRIK_PROJECT_VERSION,BRIK_RELEASE_PROFILE,BRIK_TEST_COVERAGE_DIR,BRIK_TEST_COVERAGE_FORMAT,BRIK_TEST_JUNIT_PATH,BRIK_TEST_REPORTS_ENABLED"
     End
 
     It "no longer creates brik-init.env"
@@ -477,7 +477,7 @@ Describe "stages.init"
         wc -l < "$BRIK_PIPELINE_ENV" | tr -d ' '
       }
       When call run_init_projects_all_keys
-      The output should equal "13"
+      The output should equal "15"
     End
   End
 

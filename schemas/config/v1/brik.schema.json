@@ -151,6 +151,12 @@
           "enum": ["semver", "calver", "custom"],
           "default": "semver"
         },
+        "profile": {
+          "description": "Git workflow profile that drives candidate detection in Phase 9.A. trunk-based: candidate on every push to the default branch; git-flow: candidate on release/* branches; github-flow: candidate on every PR-merged commit on main; none: no candidate detection (status quo, the release stage runs only on a tag push). The profile is informational in v0.6/v0.7 (the planner stamps it into plan.json so adapters can branch on it); the promote stage in 9.B-E consumes it to decide whether to push to the candidate or release registry.",
+          "type": "string",
+          "enum": ["trunk-based", "git-flow", "github-flow", "none"],
+          "default": "none"
+        },
         "tag_prefix": {
           "description": "Prefix for release tags (e.g. 'v').",
           "type": "string",

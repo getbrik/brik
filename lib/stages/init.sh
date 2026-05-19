@@ -332,9 +332,17 @@ _stages.init._record_env_section() {
     _kv BRIK_GIT_USER_EMAIL "${BRIK_GIT_USER_EMAIL:-brik-ci@brik.local}"
     _kv BRIK_GIT_USER_NAME  "${BRIK_GIT_USER_NAME:-Brik CI}"
 
-    # Release / package / deploy gating (placeholder values that downstream
-    # CI rules can read; chantier 9.A will refine release.profile).
-    _kv BRIK_RELEASE_PROFILE "$(config.get '.release.profile' 'none')"
+    # Release state (Phase 9.A). The planner stamps the same three values
+    # into plan.json's release block; init mirrors them into the dotenv so
+    # downstream stages (package, deploy, future promote) can read them as
+    # CI variables without re-reading brik.yml or running git describe.
+    brik.use transverse.release
+    _kv BRIK_RELEASE_PROFILE "$(release.compute_profile)"
+    _kv BRIK_PROJECT_VERSION "$(release.compute_version)"
+    _kv BRIK_IS_CANDIDATE    "$(release.compute_is_candidate)"
+
+    # Package / deploy gating (placeholder values that downstream CI rules
+    # can read; chantier 9.B/E will refine these into the promote contract).
     _kv BRIK_PACKAGE_ENABLED "$(_stages.init._has_block '.package')"
     _kv BRIK_DEPLOY_ENABLED  "$(_stages.init._has_block '.deploy')"
 
@@ -346,7 +354,7 @@ _stages.init._record_env_section() {
     _kv BRIK_TEST_COVERAGE_DIR    "$(config.get '.test.reports.coverage.output_dir' 'brik-artifacts/test/coverage')"
     _kv BRIK_TEST_JUNIT_PATH      "$(config.get '.test.reports.junit.output_path' 'brik-artifacts/test/junit.xml')"
 
-    log.info "recorded 13 env keys for downstream stages"
+    log.info "recorded 15 env keys for downstream stages"
 }
 
 # Fetch + compile the DSI policy file when BRIK_POLICY_URL is set.
