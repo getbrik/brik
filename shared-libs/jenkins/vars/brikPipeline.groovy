@@ -217,12 +217,13 @@ def call(Map params = [:]) {
                 } finally {
                     def jenkinsUid = sh(script: 'id -u', returnStdout: true).trim()
                     def jenkinsGid = sh(script: 'id -g', returnStdout: true).trim()
+                    // Same quoting caveat as the rescue at pipeline start:
+                    // Groovy strips the single quotes around `sh -c '...'`,
+                    // so issue the chown directly as the docker CMD. Chown
+                    // the whole /ws to cover any new root-owned path the
+                    // deploy stage may have written (e.g. .helm cache).
                     sh """
-                        docker run --rm -u 0:0 \
-                            -v "\${WORKSPACE}:/ws" \
-                            alpine:latest \
-                            sh -c 'chown -R ${jenkinsUid}:${jenkinsGid} /ws/.ssh /ws/.kube 2>/dev/null || true' \
-                            || true
+                        docker run --rm -u 0:0 -v "\${WORKSPACE}:/ws" alpine:latest chown -R ${jenkinsUid}:${jenkinsGid} /ws 2>/dev/null || true
                     """
                 }
                 stashBrikArtifacts(name)
