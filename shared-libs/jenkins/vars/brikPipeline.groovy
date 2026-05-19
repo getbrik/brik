@@ -86,22 +86,32 @@ def call(Map params = [:]) {
             // path that only exists inside the Jenkins container -- the host
             // sees nothing and creates an empty dir, leaving the real
             // workspace untouched. Use --volumes-from on the Jenkins container
-            // (resolved via the cgroup id, since /etc/hostname is the
-            // docker-compose hostname not the container name) so the alpine
-            // helper sees the same /var/jenkins_home tree.
+            // so the alpine helper sees the same /var/jenkins_home tree.
             //
-            // Quoting note: we issue each docker command on its own line --
+            // Container id resolution: /proc/self/cgroup is "0::/" under
+            // Docker Desktop's cgroup v2 unified hierarchy, so the legacy
+            // cgroup parse no longer yields an id. Query the docker socket
+            // for the container that matches our /etc/hostname (set by
+            // docker-compose's hostname:). Returns empty if not found, in
+            // which case the cleanup degrades to a best-effort no-op via
+            // the `|| true` guards.
+            //
+            // Quoting note: each docker command goes on its own line --
             // Groovy's """...""" interpolation strips embedded single quotes,
             // so an alpine "sh -c '...'" wrapper would collapse to a single
             // bare token. Each line is one argv chain, no nested quoting.
             def jenkinsContainer = sh(
-                script: "awk -F/ 'NR==1 { id=\$NF; sub(/^docker-/, \"\", id); sub(/\\.scope\$/, \"\", id); print id; exit }' /proc/self/cgroup",
+                script: 'docker ps --no-trunc --filter "label=com.docker.compose.service=jenkins" --format "{{.ID}}" | head -1',
                 returnStdout: true
             ).trim()
-            sh """
-                docker run --rm -u 0:0 --volumes-from ${jenkinsContainer} alpine:latest rm -rf "\${WORKSPACE}/.ssh" "\${WORKSPACE}/.kube" 2>/dev/null || true
-                docker run --rm -u 0:0 --volumes-from ${jenkinsContainer} alpine:latest chown -R ${rescueUid}:${rescueGid} "\${WORKSPACE}" 2>/dev/null || true
-            """
+            if (jenkinsContainer) {
+                sh """
+                    docker run --rm -u 0:0 --volumes-from ${jenkinsContainer} alpine:latest rm -rf "\${WORKSPACE}/.ssh" "\${WORKSPACE}/.kube" 2>/dev/null || true
+                    docker run --rm -u 0:0 --volumes-from ${jenkinsContainer} alpine:latest chown -R ${rescueUid}:${rescueGid} "\${WORKSPACE}" 2>/dev/null || true
+                """
+            } else {
+                echo "[brik] Jenkins container id unresolved; skipping privileged workspace rescue"
+            }
             // Selective cleanup: drop build outputs and materialised dep
             // trees (node_modules, .venv, ...), keep tool-level caches
             // (.npm, .m2, .cache/pip, ...) so the install step on the
@@ -229,20 +239,20 @@ def call(Map params = [:]) {
                 } finally {
                     def jenkinsUid = sh(script: 'id -u', returnStdout: true).trim()
                     def jenkinsGid = sh(script: 'id -g', returnStdout: true).trim()
-                    // Same docker-out-of-docker + quoting caveats as the
-                    // rescue at pipeline start: bind-mounting "${WORKSPACE}"
-                    // from the host yields an empty dir, so reach the real
-                    // workspace via --volumes-from on the Jenkins container
-                    // (resolved via the cgroup id). Issue the chown directly
-                    // as the docker CMD (no sh -c) since Groovy strips
-                    // embedded single quotes.
+                    // Same docker-out-of-docker + container-resolution caveats
+                    // as the rescue at pipeline start: query the docker socket
+                    // for the Jenkins container by its compose service label,
+                    // then --volumes-from it so the alpine chown sees the
+                    // same /var/jenkins_home tree.
                     def deployHostContainer = sh(
-                        script: "awk -F/ 'NR==1 { id=\$NF; sub(/^docker-/, \"\", id); sub(/\\.scope\$/, \"\", id); print id; exit }' /proc/self/cgroup",
+                        script: 'docker ps --no-trunc --filter "label=com.docker.compose.service=jenkins" --format "{{.ID}}" | head -1',
                         returnStdout: true
                     ).trim()
-                    sh """
-                        docker run --rm -u 0:0 --volumes-from ${deployHostContainer} alpine:latest chown -R ${jenkinsUid}:${jenkinsGid} "\${WORKSPACE}" 2>/dev/null || true
-                    """
+                    if (deployHostContainer) {
+                        sh """
+                            docker run --rm -u 0:0 --volumes-from ${deployHostContainer} alpine:latest chown -R ${jenkinsUid}:${jenkinsGid} "\${WORKSPACE}" 2>/dev/null || true
+                        """
+                    }
                 }
                 stashBrikArtifacts(name)
             }
