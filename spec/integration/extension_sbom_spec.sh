@@ -40,9 +40,14 @@ stages.sbom() {
     # absent (the L.5 success criterion explicitly asks for this).
     if ! command -v syft >/dev/null 2>&1; then
         log.warn "sbom: syft not found, skipping SBOM generation (workspace=$1)"
+        report.record "sbom" "tech" "status" "skipped"
+        report.record "sbom" "tech" "kind"   "not-applicable"
         return 0
     fi
     syft "$1" -o cyclonedx-json > "${BRIK_LOG_DIR:-.brik-logs}/sbom.json"
+    local rc=$?
+    report.record "sbom" "tech" "exit_code" "$rc"
+    return "$rc"
 }
 SH
   }
@@ -89,7 +94,7 @@ SH
 
   It "degrades gracefully when the required tool is absent"
     # The stub returns 0 when syft is missing; verify via dry-call.
-    out="$(bash -c '. '"$EXT"'/lib/stages/sbom.sh; log.warn() { :; }; stages.sbom "/tmp"; echo "rc=$?"')"
+    out="$(bash -c '. '"$EXT"'/lib/stages/sbom.sh; log.warn() { :; }; report.record() { :; }; stages.sbom "/tmp"; echo "rc=$?"')"
     When call test "$out" = "rc=0"
     The status should equal 0
   End

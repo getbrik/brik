@@ -182,20 +182,21 @@ Describe "lib/registry/registry.sh"
   End
 
   Describe "registry.stage.list"
-    It "returns the 11 builtin stages in canonical order"
+    It "returns the 12 builtin stages in canonical order"
       When call registry.stage.list
       The status should be success
-      The line 1 of stdout should equal "init"
-      The line 2 of stdout should equal "release"
-      The line 3 of stdout should equal "build"
-      The line 4 of stdout should equal "lint"
-      The line 5 of stdout should equal "sast"
-      The line 6 of stdout should equal "scan"
-      The line 7 of stdout should equal "test"
-      The line 8 of stdout should equal "package"
-      The line 9 of stdout should equal "container-scan"
-      The line 10 of stdout should equal "deploy"
-      The line 11 of stdout should equal "notify"
+      The line 1  of stdout should equal "init"
+      The line 2  of stdout should equal "release"
+      The line 3  of stdout should equal "build"
+      The line 4  of stdout should equal "lint"
+      The line 5  of stdout should equal "sast"
+      The line 6  of stdout should equal "scan"
+      The line 7  of stdout should equal "test"
+      The line 8  of stdout should equal "package"
+      The line 9  of stdout should equal "container-scan"
+      The line 10 of stdout should equal "promote"
+      The line 11 of stdout should equal "deploy"
+      The line 12 of stdout should equal "notify"
     End
   End
 

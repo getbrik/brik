@@ -212,10 +212,24 @@ _registry._load_stages() {
   done < <(jq -r '
     .stages as $stages
     | ($stages | keys) as $ids
+    # effective_after = after ∪ { S : S.before contains $id }. The schema
+    # documents `before:` as semantic (registry.stage.before exposes it,
+    # plan.dag.edges emits the edge), so the topo order must honor it
+    # too -- otherwise a new stage that positions itself via `before: [X]`
+    # without X declaring the reverse `after:` ties on depth with X and
+    # sorts lexicographically.
+    | ($ids | map(. as $id | {
+        key: $id,
+        value: (
+          ($stages[$id].spec.placement.after // [])
+          + ($ids | map(select(($stages[.].spec.placement.before // []) | index($id))))
+          | unique
+        )
+      }) | from_entries) as $effective_after
     | reduce range(0; $ids | length) as $_ ({};
         . as $depth
         | reduce $ids[] as $id (.;
-            ($stages[$id].spec.placement.after // []) as $after
+            $effective_after[$id] as $after
             | if ($after | length) == 0 then .[$id] = 0
               elif ($after | map($depth[.] // null) | all(. != null)) then
                 .[$id] = (($after | map($depth[.])) + [0] | max) + 1
