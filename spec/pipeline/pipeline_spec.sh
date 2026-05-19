@@ -326,4 +326,53 @@ Describe "pipeline.sh"
       The output should equal "true"
     End
   End
+
+  Describe "pipeline.run is registry-driven"
+    # Proves OCP on the stage axis: pipeline.run iterates whatever
+    # registry.stage.list returns, with no hardcoded order embedded in
+    # pipeline.sh. The setup overrides registry.stage.list to publish a
+    # custom 2-stage sequence and asserts the run honors it verbatim.
+    Before 'setup_pipeline'
+    After 'cleanup_pipeline'
+
+    It "iterates the sequence returned by registry.stage.list"
+      registry_drives_order() {
+        # Override the registry list to a synthetic 2-stage sequence
+        # (test before init -- not the canonical fixed-flow order).
+        # Both stages must be blocking (no opt-in flag) so the gate
+        # does not interfere with the order check.
+        registry.stage.list() {
+          printf 'test\n'
+          printf 'init\n'
+        }
+        pipeline.run >/dev/null 2>&1
+        jq -r '.stages | map(select(.tech.status == "success")) | map(.name) | join(",")' \
+          "$PIPELINE_LOG_DIR/aggregate-report.json"
+      }
+      When call registry_drives_order
+      The output should equal "test,init"
+    End
+
+    It "fails fast when registry.stage.list is not loaded"
+      no_registry() {
+        # Hide the registry helper from this shell. pipeline.run must
+        # refuse to run (no hardcoded fallback list).
+        unset -f registry.stage.list 2>/dev/null || true
+        pipeline.run
+      }
+      When call no_registry
+      The status should not equal 0
+      The stderr should include "registry.stage.list is not loaded"
+    End
+
+    It "fails fast when registry.stage.list returns nothing"
+      empty_registry() {
+        registry.stage.list() { :; }
+        pipeline.run
+      }
+      When call empty_registry
+      The status should not equal 0
+      The stderr should include "returned no stages"
+    End
+  End
 End

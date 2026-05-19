@@ -253,19 +253,21 @@ pipeline.run() {
     # (set BRIK_DISABLE_REPORT_FRAGMENTS=0 to opt back in for debugging).
     export BRIK_DISABLE_REPORT_FRAGMENTS="${BRIK_DISABLE_REPORT_FRAGMENTS:-1}"
 
-    # Stage sequence comes from the registry (D.3 of the architecture refactor
-    # chantier). The registry is the source of truth for stage order: it
-    # publishes IDs already topologically sorted by spec.placement.{slot,
-    # after, before}. Adding a builtin stage means publishing a manifest, no
-    # change here. Falls back to the historic fixed order if the registry is
-    # absent for any reason (defensive: a missing registry should not break
-    # the orchestrator).
-    local -a stages=()
-    if declare -f registry.stage.list >/dev/null 2>&1; then
-        mapfile -t stages < <(registry.stage.list 2>/dev/null || true)
+    # Stage sequence comes from the registry. It is the source of truth for
+    # stage order: ids are topologically sorted by spec.placement.{slot, after,
+    # before} at compile time. Adding a builtin stage means publishing a
+    # manifest, no change here. If the registry is absent or empty, fail
+    # fast: a stale snapshot of the stage list embedded in this file would
+    # silently drift from the manifests and bypass extension stages.
+    if ! declare -f registry.stage.list >/dev/null 2>&1; then
+        log.error "pipeline.run: registry.stage.list is not loaded"
+        return "$BRIK_EXIT_CONFIG_ERROR"
     fi
+    local -a stages=()
+    mapfile -t stages < <(registry.stage.list 2>/dev/null || true)
     if [[ ${#stages[@]} -eq 0 ]]; then
-        stages=(init release build lint sast scan test package container-scan deploy notify)
+        log.error "pipeline.run: registry.stage.list returned no stages"
+        return "$BRIK_EXIT_CONFIG_ERROR"
     fi
     local had_failure=false
     local stage stage_start_ms stage_end_ms duration_ms rc
