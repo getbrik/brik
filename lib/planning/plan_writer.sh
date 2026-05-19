@@ -63,6 +63,7 @@ plan_writer.from_stream() {
     # back to a JSON array. Empty string => empty array.
     local stages_json
     stages_json="$(printf '%s\n' "${stage_rows[@]}" | jq -R -s '
+        # KCOV_EXCL_START -- inline jq script body, not bash code
         [ split("\n") | .[] | select(length > 0) | split("\t") |
           {
             id:           .[0],
@@ -75,13 +76,18 @@ plan_writer.from_stream() {
                             then []
                             else (.[6] | split(",")) end)
           }
-        ]' 2>/dev/null)"
+        ]
+        # KCOV_EXCL_STOP
+        ' 2>/dev/null)"
 
     local edges_json
     edges_json="$(printf '%s\n' "${edge_rows[@]}" | jq -R -s '
+        # KCOV_EXCL_START -- inline jq script body, not bash code
         [ split("\n") | .[] | select(length > 0) | split("\t") |
           { from: .[0], to: .[1] }
-        ]' 2>/dev/null)"
+        ]
+        # KCOV_EXCL_STOP
+        ' 2>/dev/null)"
 
     # Empty arrays mean "no stages parsed" / "no edges resolved" - both
     # signal a malformed stream. Surface as exit 64 (invalid input)
@@ -123,7 +129,9 @@ plan_writer.from_stream() {
         --argjson edges   "$edges_json" \
         --argjson chg     "$changes_obj" \
         --argjson release "$release_obj" \
-        '{
+        '
+        # KCOV_EXCL_START -- inline jq object literal, not bash code
+        {
             schemaVersion: $sv,
             brikVersion:   $bv,
             context:       $ctx,
@@ -134,7 +142,9 @@ plan_writer.from_stream() {
             stages:        $stages,
             dag:           { edges: $edges },
             fingerprint:   ""
-        }')"
+        }
+        # KCOV_EXCL_STOP
+        ')"
 
     local fp
     fp="$(printf '%s' "$body" | sha256sum | cut -d' ' -f1)"

@@ -371,6 +371,7 @@ cli.plan._render_explain() {
     command -v jq >/dev/null 2>&1 || { printf '[brik plan] jq required for --explain\n' >&2; return 1; }
 
     jq -r '
+        # KCOV_EXCL_START -- inline jq script body, not bash code
         def pad(n): . + ((" " * (n - (. | length))));
         "Brik plan (\(.schemaVersion), brik \(.brikVersion))",
         "  context     : \(.context)",
@@ -387,5 +388,6 @@ cli.plan._render_explain() {
             "  " + .reason +
             (if (.matched_globs | length) > 0 then "  (" + (.matched_globs | join(", ")) + ")" else "" end)
         )
+        # KCOV_EXCL_STOP
     ' "$plan"
 }
