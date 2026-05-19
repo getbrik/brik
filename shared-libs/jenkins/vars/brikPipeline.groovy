@@ -74,11 +74,17 @@ def call(Map params = [:]) {
             // next cleanWs always has permission to proceed.
             def rescueUid = sh(script: 'id -u', returnStdout: true).trim()
             def rescueGid = sh(script: 'id -g', returnStdout: true).trim()
+            // Drop .ssh / .kube outright before chown: the deploy stage
+            // leaves an ssh-agent unix domain socket under .ssh/agent/ that
+            // Jenkins' cleanWs (Java File.delete) refuses to remove and wedges
+            // the next build. These dirs only hold transient credentials
+            // materialised at deploy time, so wiping them between builds is
+            // safe.
             sh """
                 docker run --rm -u 0:0 \
                     -v "\${WORKSPACE}:/ws" \
                     alpine:latest \
-                    chown -R ${rescueUid}:${rescueGid} /ws 2>/dev/null \
+                    sh -c 'rm -rf /ws/.ssh /ws/.kube; chown -R ${rescueUid}:${rescueGid} /ws' 2>/dev/null \
                     || true
             """
             // Selective cleanup: drop build outputs and materialised dep
