@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **GitLab workflow filter + anti-patterns checklist** -- both
+  `shared-libs/gitlab/templates/pipeline.yml` and the
+  `dynamic-pipeline.yml` parent now declare a top-level `workflow:`
+  block that filters parasite pipelines at the upstream
+  (anti-duplicate push+MR, allow-list of legitimate
+  `$CI_PIPELINE_SOURCE` values, explicit `schedule` + `web` entries).
+  Documented in `docs/platforms/gitlab.md` under "Pipeline workflow
+  filter" plus a project-side checklist under "Anti-patterns
+  checklist" (no `only/except` mixed with `rules:`, no deploy from
+  an MR pipeline, `resource_group:` on shared-env deploys).
+
 ### Fixed
 
 - **GitLab pipeline.env propagation** -- declare
