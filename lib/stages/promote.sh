@@ -38,6 +38,22 @@ stages.promote() {
     release_registry="$(config.get '.release.release.docker.registry' '')"
     release_image="$(config.get '.release.release.docker.image' '')"
 
+    # Opt-in gate. A project that declares no release.{candidate,release}
+    # .docker config has not opted into the 2-zone Docker promotion
+    # model, so promote is not applicable -- skip gracefully. Without
+    # this, the promote stage (a builtin since 9.B) would hard-fail the
+    # release pipeline of every project that does not use promotion.
+    if [[ -z "$candidate_registry" && -z "$candidate_image" \
+          && -z "$release_registry" && -z "$release_image" ]]; then
+        log.info "stages.promote: no release Docker promotion config; skipping"
+        report.record "promote" "tech" "status" "skipped"        || true
+        report.record "promote" "tech" "kind"   "not-applicable" || true
+        report.record "promote" "business" "reason" "no-docker-promotion-config" || true
+        return 0
+    fi
+
+    # Past the opt-in gate a partial config IS an error: the project
+    # asked for promotion but did not fully describe both zones.
     if [[ -z "$candidate_registry" || -z "$candidate_image" ]]; then
         log.error "stages.promote: .release.candidate.docker.{registry,image} are required"
         report.record "promote" "tech" "status" "failure" || true
