@@ -64,7 +64,7 @@ workflow:
 # Variables
 # ---------------------------------------------------------------------------
 variables:
-  BRIK_LIB_REF: "v0.5.0"
+  BRIK_LIB_REF: "v0.6.0"
   BRIK_REPO: "${CI_SERVER_URL}/brik/brik.git"
   BRIK_HOME: "/opt/brik"
   BRIK_LOG_LEVEL: "info"

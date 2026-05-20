@@ -9,7 +9,7 @@
 [[ -n "${_BRIK_VERSION_INFO_LOADED:-}" ]] && return 0
 _BRIK_VERSION_INFO_LOADED=1
 
-export BRIK_VERSION="0.5.0"
+export BRIK_VERSION="0.6.0"
 export BRIK_SCHEMA_VERSION="v1"
 export BRIK_RUNTIME="bash"
 export BRIK_REF="v${BRIK_VERSION}"

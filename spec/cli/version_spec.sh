@@ -4,10 +4,10 @@
 Describe "brik version"
 
   Describe "output content"
-    It "contains 'brik 0.5.0'"
+    It "contains 'brik 0.6.0'"
       When run script "${BRIK_BIN}" version
       The status should eq 0
-      The output should include "brik 0.5.0"
+      The output should include "brik 0.6.0"
       The stderr should be blank
     End
 
