@@ -353,14 +353,25 @@ cli.plan._render_gitlab_child() {
     # ran in the child pipeline.
     printf '\n'
     printf 'brik-notify:\n'
-    printf '  needs:\n'
     local run_stages id
     run_stages="$(jq -r '.stages[] | select(.decision == "run" and .id != "notify") | .id' "$plan")"
-    while IFS= read -r id; do
-        [[ -z "$id" ]] && continue
-        printf '    - job: brik-%s\n' "$id"
-        printf '      artifacts: true\n'
-    done <<<"$run_stages"
+    if [[ -z "${run_stages//[[:space:]]/}" ]]; then
+        # No run-decision siblings (e.g. a docs-only commit skips every
+        # stage). notify must still run as the report aggregator, so it
+        # needs an explicit empty list -- a bare `needs:` is YAML null,
+        # which GitLab does NOT treat as "no dependencies": the template
+        # job's `needs: - job: brik-init` (non-optional) survives, and
+        # since brik-init is skipped here the whole notify job is
+        # dropped, leaving a child pipeline with zero jobs.
+        printf '  needs: []\n'
+    else
+        printf '  needs:\n'
+        while IFS= read -r id; do
+            [[ -z "$id" ]] && continue
+            printf '    - job: brik-%s\n' "$id"
+            printf '      artifacts: true\n'
+        done <<<"$run_stages"
+    fi
 }
 
 # Render a human-friendly summary of the plan to stdout.
