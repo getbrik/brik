@@ -17,6 +17,12 @@ test-quick: ## Run tests, stop on first failure
 BASH_PATH ?= $(shell command -v bash)
 
 coverage: ## Run tests with kcov coverage report (--jobs ignored: kcov disables parallelism)
+	@# Clamp the fd limit to 1024. kcov uses select(), so a file
+	@# descriptor at or above FD_SETSIZE (1024) is unusable; under a
+	@# high limit such as the macOS default soft limit of 1048576 kcov
+	@# aborts with "Failed to exchange stderr for pipe: Bad file
+	@# descriptor". `ulimit -n 1024` both lowers a high default and
+	@# raises a low one -- do not change it to a raise-only guard.
 	ulimit -n 1024 && shellspec --kcov --shell "$(BASH_PATH)"
 
 validate: ## Validate example brik.yml files
