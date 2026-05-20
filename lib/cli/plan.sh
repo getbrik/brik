@@ -84,7 +84,7 @@ cli.plan.run() {
         brik.use transverse.config
         local _cfg="${workspace}/brik.yml"
         if [[ -f "$_cfg" ]]; then
-            BRIK_CONFIG_FILE="$_cfg" mode="$(config.get '.pipeline.selection.mode' 'safe' 2>/dev/null || printf 'safe')"
+            mode="$(BRIK_CONFIG_FILE="$_cfg" config.get '.pipeline.selection.mode' 'safe' 2>/dev/null || printf 'safe')"
             BRIK_CONFIG_FILE="$_cfg" config.get '.pipeline.selection.stages' '' >/dev/null 2>&1 || true
         fi
         [[ -z "$mode" ]] && mode="safe"
