@@ -104,6 +104,7 @@ stages:
   - verify
   - package
   - post-verify
+  - promote
   - deploy
   - notify
 
@@ -192,5 +193,6 @@ include:
   - local: '/templates/jobs/test.yml'
   - local: '/templates/jobs/package.yml'
   - local: '/templates/jobs/container-scan.yml'
+  - local: '/templates/jobs/promote.yml'
   - local: '/templates/jobs/deploy.yml'
   - local: '/templates/jobs/notify.yml'
