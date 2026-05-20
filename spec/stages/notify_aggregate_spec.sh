@@ -154,12 +154,6 @@ Describe "stages.notify - CI mode fragment aggregation"
 
     It "leaves aggregate-report.json untouched (no re-aggregation)"
       check_unchanged() {
-        # This case verifies LOCAL-mode behaviour: a pipeline.run-built
-        # aggregate must not be clobbered. BRIK_PLATFORM=local routes
-        # _notify._is_ci_aggregation_mode through the fragment scan,
-        # which finds nothing and returns "not CI mode". (The enclosing
-        # setup_env forces gitlab for the CI-aggregation cases.)
-        local BRIK_PLATFORM=local
         seed_local_aggregate
         local before
         before="$(jq -r '.pipeline.id' "$NOTIFY_LOG_DIR/aggregate-report.json")"
