@@ -294,6 +294,7 @@ The permitted pipeline sources are:
 | (commit on default branch) | "Merged to main" flow |
 | `schedule` | Nightly E2E, scheduled rebuilds |
 | `web` | On-demand re-run from the GitLab UI or API |
+| `parent_pipeline` | The dynamic child pipeline (the child includes `pipeline.yml`, so this template's `workflow:` gates it too) |
 
 A push to a feature branch that already has an open MR is suppressed
 (the MR pipeline is kept; the branch pipeline is dropped) -- this is
