@@ -68,7 +68,10 @@ YAML
   After 'cleanup_promote'
 
   Describe "config validation"
-    It "fails with config-error when candidate registry is missing"
+    It "skips gracefully when no docker promotion config is present"
+      # A project with no release.{candidate,release}.docker config has
+      # not opted into the 2-zone promotion model: promote is a no-op,
+      # not an error -- otherwise it would break every release pipeline.
       printf 'version: 1\nproject:\n  name: t\n' > "$BRIK_CONFIG_FILE"
       invoke() {
         stages.promote "$CTX_FILE" 2>/dev/null
@@ -76,7 +79,7 @@ YAML
         printf 'rc=%s|kind=%s' "$rc" "$(read_kind)"
       }
       When call invoke
-      The output should equal "rc=7|kind=config-error"
+      The output should equal "rc=0|kind=not-applicable"
     End
 
     It "fails with config-error when release registry is missing"
