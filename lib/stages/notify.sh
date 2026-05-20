@@ -90,9 +90,23 @@ _notify._emit_recap_table() {
 #          1 otherwise (including missing or empty directory).
 _notify._is_ci_aggregation_mode() {
     local dir="$1"
-    [[ -d "$dir" ]] || return 1
     command -v jq >/dev/null 2>&1 || return 1
 
+    # A CI platform always aggregates. Each stage runs as its own CI job
+    # there (no pipeline.run-produced report to protect), so notify must
+    # rebuild the aggregate envelope even when zero fragments exist -- a
+    # dynamic-pipeline child where every stage was plan-skipped still
+    # owes a well-formed aggregate-report.json (schema_version, platform,
+    # summary), not the bare report.init local backend.
+    # report.aggregate_fragments tolerates a missing/empty dir.
+    case "${BRIK_PLATFORM:-local}" in
+        gitlab|jenkins) return 0 ;;
+    esac
+
+    # Local / unknown platform: only switch to aggregation mode when a
+    # real per-stage fragment is present, so a pipeline.run-produced
+    # report is never clobbered by an empty aggregate.
+    [[ -d "$dir" ]] || return 1
     shopt -s nullglob
     local f base
     for f in "$dir"/*/*.json; do
