@@ -58,13 +58,13 @@ stages.promote() {
         log.error "stages.promote: .release.candidate.docker.{registry,image} are required"
         report.record "promote" "tech" "status" "failure" || true
         report.record "promote" "tech" "kind"   "config-error" || true
-        return "${BRIK_EXIT_CONFIG_ERROR:-3}"
+        return "$BRIK_EXIT_CONFIG_ERROR"
     fi
     if [[ -z "$release_registry" || -z "$release_image" ]]; then
         log.error "stages.promote: .release.release.docker.{registry,image} are required"
         report.record "promote" "tech" "status" "failure" || true
         report.record "promote" "tech" "kind"   "config-error" || true
-        return "${BRIK_EXIT_CONFIG_ERROR:-3}"
+        return "$BRIK_EXIT_CONFIG_ERROR"
     fi
 
     local version="${BRIK_PROJECT_VERSION:-0.0.0}"
@@ -98,14 +98,14 @@ stages.promote() {
         log.error "stages.promote: docker not found on PATH"
         report.record "promote" "tech" "status" "failure" || true
         report.record "promote" "tech" "kind"   "missing-tool" || true
-        return "${BRIK_EXIT_MISSING_DEP:-69}"
+        return "$BRIK_EXIT_MISSING_DEP"
     fi
 
     if ! docker pull "$candidate_ref" >/dev/null 2>&1; then
         log.error "stages.promote: docker pull ${candidate_ref} failed"
         report.record "promote" "tech" "status" "failure" || true
         report.record "promote" "tech" "kind"   "candidate-not-found" || true
-        return "${BRIK_EXIT_FAILURE:-1}"
+        return "$BRIK_EXIT_FAILURE"
     fi
 
     local candidate_digest
@@ -119,7 +119,7 @@ stages.promote() {
         log.error "stages.promote: docker push ${release_ref} failed"
         report.record "promote" "tech" "status" "failure" || true
         report.record "promote" "tech" "kind"   "push-failed" || true
-        return "${BRIK_EXIT_FAILURE:-1}"
+        return "$BRIK_EXIT_FAILURE"
     fi
     if ! docker push "$release_latest" >/dev/null 2>&1; then
         log.warn "stages.promote: docker push ${release_latest} failed (continuing; the versioned tag landed)"

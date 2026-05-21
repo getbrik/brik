@@ -21,7 +21,7 @@ _BRIK_PLANNING_PLAN_WRITER_LOADED=1
 plan_writer.from_stream() {
     command -v jq >/dev/null 2>&1 || {
         printf '[plan_writer] jq required\n' >&2
-        return "${BRIK_EXIT_MISSING_DEP:-69}"
+        return "$BRIK_EXIT_MISSING_DEP"
     }
 
     local workspace="" mode="" context=""
@@ -94,7 +94,7 @@ plan_writer.from_stream() {
     # rather than emit an invalid plan.json.
     if [[ -z "$stages_json" || "$stages_json" == "[]" ]]; then
         printf '[plan_writer] no stage records parsed from stream\n' >&2
-        return "${BRIK_EXIT_INVALID_INPUT:-64}"
+        return "$BRIK_EXIT_INVALID_INPUT"
     fi
 
     local changes_obj
@@ -170,13 +170,13 @@ plan_writer.write() {
     tmp="$(mktemp -t brik-plan-stream.XXXXXX)"
     if ! plan.compute "$@" >"$tmp"; then
         rm -f "$tmp"
-        return "${BRIK_EXIT_INVALID_INPUT:-64}"
+        return "$BRIK_EXIT_INVALID_INPUT"
     fi
 
     local json
     if ! json="$(plan_writer.from_stream <"$tmp")"; then
         rm -f "$tmp"
-        return "${BRIK_EXIT_INVALID_INPUT:-64}"
+        return "$BRIK_EXIT_INVALID_INPUT"
     fi
     rm -f "$tmp"
 

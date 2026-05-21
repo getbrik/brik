@@ -31,24 +31,24 @@ _BRIK_MODULE_TRANSVERSE_FINDINGS_EXPORTERS_GITLAB_LOADED=1
 findings.exporters.gitlab.from_sarif() {
     if [[ $# -lt 2 ]]; then
         printf 'findings.exporters.gitlab.from_sarif: missing arguments (input output)\n' >&2
-        return "${BRIK_EXIT_INVALID_INPUT:-2}"
+        return "$BRIK_EXIT_INVALID_INPUT"
     fi
     local input="$1" output="$2"
 
     if ! command -v jq >/dev/null 2>&1; then
         printf 'findings.exporters.gitlab.from_sarif: jq is required\n' >&2
-        return "${BRIK_EXIT_MISSING_DEP:-3}"
+        return "$BRIK_EXIT_MISSING_DEP"
     fi
     if [[ ! -f "$input" ]]; then
         printf 'findings.exporters.gitlab.from_sarif: input not found: %s\n' "$input" >&2
-        return "${BRIK_EXIT_IO_FAILURE:-6}"
+        return "$BRIK_EXIT_IO_FAILURE"
     fi
 
     local out_dir
     out_dir="$(dirname "$output")"
     mkdir -p "$out_dir" || {
         printf 'findings.exporters.gitlab.from_sarif: cannot create %s\n' "$out_dir" >&2
-        return "${BRIK_EXIT_IO_FAILURE:-6}"
+        return "$BRIK_EXIT_IO_FAILURE"
     }
 
     local now
@@ -56,7 +56,7 @@ findings.exporters.gitlab.from_sarif() {
     local brik_version="${BRIK_VERSION:-0.0.0}"
 
     local tmp
-    tmp="$(mktemp "${output}.XXXXXX")" || return "${BRIK_EXIT_IO_FAILURE:-6}"
+    tmp="$(mktemp "${output}.XXXXXX")" || return "$BRIK_EXIT_IO_FAILURE"
 
     # KCOV_EXCL_START -- jq script body is not bash code.
     if ! jq --arg now "$now" --arg brik_version "$brik_version" '
@@ -182,14 +182,14 @@ findings.exporters.gitlab.from_sarif() {
     ' "$input" > "$tmp"; then
         rm -f "$tmp"
         printf 'findings.exporters.gitlab.from_sarif: jq filter failed\n' >&2
-        return "${BRIK_EXIT_IO_FAILURE:-6}"
+        return "$BRIK_EXIT_IO_FAILURE"
     fi
     # KCOV_EXCL_STOP
 
     mv "$tmp" "$output" || {
         rm -f "$tmp"
         printf 'findings.exporters.gitlab.from_sarif: cannot write %s\n' "$output" >&2
-        return "${BRIK_EXIT_IO_FAILURE:-6}"
+        return "$BRIK_EXIT_IO_FAILURE"
     }
     return 0
 }

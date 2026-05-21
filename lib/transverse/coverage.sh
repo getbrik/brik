@@ -199,12 +199,12 @@ brik.coverage.emit_sarif() {
 
     if ! printf '%s' "$threshold" | grep -qE '^[0-9]+([.][0-9]+)?$'; then
         printf 'brik.coverage.emit_sarif: invalid threshold %q\n' "$threshold" >&2
-        return "${BRIK_EXIT_INVALID_INPUT:-2}"
+        return "$BRIK_EXIT_INVALID_INPUT"
     fi
 
     if ! command -v jq >/dev/null 2>&1; then
         printf 'brik.coverage.emit_sarif: jq is required\n' >&2
-        return "${BRIK_EXIT_MISSING_DEP:-3}"
+        return "$BRIK_EXIT_MISSING_DEP"
     fi
 
     local out_dir

@@ -22,7 +22,7 @@ _BRIK_REGISTRY_SCHEMA_DIR=""
 
 _validator._fail() {
   printf '[registry:validator] %s\n' "$*" >&2
-  return "${BRIK_EXIT_INVALID_INPUT:-64}"
+  return "$BRIK_EXIT_INVALID_INPUT"
 }
 
 _validator._kind() {
@@ -71,7 +71,7 @@ registry.validate_manifest() {
   if ! yq -o=json '.' "$file" > "$instance" 2>/dev/null; then
     _validator._fail "yq parse error on $file"
     rm -f "$instance"
-    return "${BRIK_EXIT_INVALID_INPUT:-64}"
+    return "$BRIK_EXIT_INVALID_INPUT"
   fi
   diagnostic="$(jv "$schema" "$instance" 2>&1)"
   rc=$?
@@ -79,7 +79,7 @@ registry.validate_manifest() {
   if [[ $rc -ne 0 ]]; then
     _validator._fail "manifest invalid: $file"
     printf '%s\n' "$diagnostic" >&2
-    return "${BRIK_EXIT_INVALID_INPUT:-64}"
+    return "$BRIK_EXIT_INVALID_INPUT"
   fi
   return 0
 }

@@ -27,27 +27,27 @@ _BRIK_MODULE_TRANSVERSE_FINDINGS_CONVERTERS_JUNIT_LOADED=1
 findings.converters.junit.to_sarif() {
     if [[ $# -lt 2 ]]; then
         printf 'findings.converters.junit.to_sarif: missing arguments (input output)\n' >&2
-        return "${BRIK_EXIT_INVALID_INPUT:-2}"
+        return "$BRIK_EXIT_INVALID_INPUT"
     fi
     local input="$1" output="$2"
 
     if ! command -v yq >/dev/null 2>&1; then
         printf 'findings.converters.junit.to_sarif: yq is required\n' >&2
-        return "${BRIK_EXIT_MISSING_DEP:-3}"
+        return "$BRIK_EXIT_MISSING_DEP"
     fi
     if ! command -v jq >/dev/null 2>&1; then
         printf 'findings.converters.junit.to_sarif: jq is required\n' >&2
-        return "${BRIK_EXIT_MISSING_DEP:-3}"
+        return "$BRIK_EXIT_MISSING_DEP"
     fi
 
     local json
     json="$(yq -p xml -o json "$input" 2>/dev/null)" || {
         printf 'findings.converters.junit.to_sarif: yq failed to parse %s\n' "$input" >&2
-        return "${BRIK_EXIT_CONFIG_ERROR:-7}"
+        return "$BRIK_EXIT_CONFIG_ERROR"
     }
 
     local tmp
-    tmp="$(mktemp "${output}.XXXXXX")" || return "${BRIK_EXIT_IO_FAILURE:-6}"
+    tmp="$(mktemp "${output}.XXXXXX")" || return "$BRIK_EXIT_IO_FAILURE"
 
     # KCOV_EXCL_START -- jq script body is not bash code.
     if ! printf '%s' "$json" | jq '
@@ -136,14 +136,14 @@ findings.converters.junit.to_sarif() {
     ' > "$tmp"; then
         rm -f "$tmp"
         printf 'findings.converters.junit.to_sarif: jq filter failed\n' >&2
-        return "${BRIK_EXIT_IO_FAILURE:-6}"
+        return "$BRIK_EXIT_IO_FAILURE"
     fi
     # KCOV_EXCL_STOP
 
     mv "$tmp" "$output" || {
         rm -f "$tmp"
         printf 'findings.converters.junit.to_sarif: cannot write %s\n' "$output" >&2
-        return "${BRIK_EXIT_IO_FAILURE:-6}"
+        return "$BRIK_EXIT_IO_FAILURE"
     }
     return 0
 }

@@ -31,7 +31,7 @@ registry.stack.exists() {
   _registry._load || return $?
   local id="$1"
   [[ -v _REGISTRY_STACK_DISPLAY_NAME[$id] ]] && return 0
-  return "${BRIK_EXIT_INVALID_INPUT:-64}"
+  return "$BRIK_EXIT_INVALID_INPUT"
 }
 
 registry.stack.display_name() {
@@ -162,7 +162,7 @@ registry.stack.detect() {
       done < <(_registry._explode "${_REGISTRY_STACK_MARKERS_GLOB[$id]}")
     fi
   done
-  return "${BRIK_EXIT_FAILURE:-1}"
+  return "$BRIK_EXIT_FAILURE"
 }
 
 registry.stack.detect_from_framework() {
@@ -174,7 +174,7 @@ registry.stack.detect_from_framework() {
       [[ "$pair" == "${framework}="* ]] && { printf '%s\n' "${pair#*=}"; return 0; }
     done < <(_registry._explode "${_REGISTRY_STACK_FRAMEWORKS[$id]:-}")
   done
-  return "${BRIK_EXIT_FAILURE:-1}"
+  return "$BRIK_EXIT_FAILURE"
 }
 
 # --- Stage accessors ---
@@ -197,7 +197,7 @@ registry.stage.exists() {
       done < <(_registry._explode "${_REGISTRY_STAGE_ALIASES[$canonical]}")
     fi
   done
-  return "${BRIK_EXIT_INVALID_INPUT:-64}"
+  return "$BRIK_EXIT_INVALID_INPUT"
 }
 
 registry.stage.resolve_alias() {
@@ -213,7 +213,7 @@ registry.stage.resolve_alias() {
     fi
   done
   printf '%s\n' "$name"
-  return "${BRIK_EXIT_INVALID_INPUT:-64}"
+  return "$BRIK_EXIT_INVALID_INPUT"
 }
 
 # Helper: load registry, resolve alias to canonical id (in same shell scope
@@ -235,7 +235,7 @@ _registry._resolve_stage_id_or_die() {
       done < <(_registry._explode "${_REGISTRY_STAGE_ALIASES[$canonical]}")
     fi
   done
-  return "${BRIK_EXIT_INVALID_INPUT:-64}"
+  return "$BRIK_EXIT_INVALID_INPUT"
 }
 
 registry.stage.display_name() {
