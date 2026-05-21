@@ -73,7 +73,7 @@ to silently skip critical verification.
 
 ```text
 plan.compute --mode aggressive
-# -> exits 64 (BRIK_EXIT_INVALID_INPUT)
+# -> exits 2 (BRIK_EXIT_INVALID_INPUT)
 # -> stderr explains: per-subproject impact graph is not yet implemented
 ```
 

@@ -53,7 +53,7 @@ publish:
 | Test | `cargo test` |
 | Lint | `clippy` |
 | Format | `rustfmt` |
-| Coverage format (`auto`) | `lcov` |
+| Coverage format (`auto`) | `cobertura` |
 
 ## Gotchas
 

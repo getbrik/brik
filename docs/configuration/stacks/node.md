@@ -59,7 +59,7 @@ publish:
 | Test | `npm test` then `npx jest` fallback |
 | Lint | `eslint` |
 | Format | `prettier` |
-| Coverage format (`auto`) | `lcov` |
+| Coverage format (`auto`) | `cobertura` |
 
 ## Gotchas
 

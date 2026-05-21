@@ -189,12 +189,15 @@ deploy:
   environments:
     staging:
       when: "branch == 'main'"
-      target: ssh
+      target: compose
       host: staging.example.com
       remote_path: /opt/my-app
       compose_file: docker-compose.staging.yml
-      restart_cmd: docker compose up -d
 ```
+
+The `compose` target copies `compose_file` to `host:remote_path` and runs
+`docker compose up -d` there. With no `host`, the same target deploys the
+compose stack locally instead.
 
 ## See also
 

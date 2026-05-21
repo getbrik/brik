@@ -63,7 +63,7 @@ brik run pipeline --with-release --with-package --with-deploy
 ```
 
 Valid stages for `brik run stage`: `init`, `release`, `build`, `lint`, `sast`,
-`scan`, `test`, `package`, `container-scan`, `deploy`, `notify`.
+`scan`, `test`, `package`, `container-scan`, `promote`, `deploy`, `notify`.
 
 The opt-in flags (`--with-release`, `--with-package`, `--with-deploy`) enable
 the trigger-gated stages; see [fixed flow](../concepts/fixed-flow.md#opt-in-stages-and-triggers).
@@ -90,6 +90,9 @@ caller shell; the CLI flag is the supported way to surface it.
 | `brik init` | Scaffold `brik.yml` and a platform bootstrap file |
 | `brik run stage <name>` | Execute a single pipeline stage locally |
 | `brik run pipeline` | Execute the full pipeline locally |
+| `brik plan` | Compute the per-stage selection plan (`--explain`, `--mode <safe\|balanced>`, `--validate-only`, `--out`) |
+| `brik plan gate <stage>` | Decide run/skip for a stage against the active plan |
+| `brik extension test <dir>` | Run the contract harness against a Brik extension directory |
 | `brik self-update` | Update brik to the latest version |
 | `brik self-uninstall` | Remove brik from your system |
 | `brik version` | Print version, schema, and runtime info |
@@ -111,5 +114,5 @@ brik version --verbose
 ## Next steps
 
 - [Configuration overview](../configuration/overview.md) -- what you can put in `brik.yml`
-- [Fixed flow](../concepts/fixed-flow.md) -- the 11 stages a pipeline runs
+- [Fixed flow](../concepts/fixed-flow.md) -- the 12 stages a pipeline runs
 - [Development](../internals/development.md) -- working on Brik itself

@@ -35,8 +35,9 @@ Output on stdout:
 
 Exit code: `0` on success, `BRIK_EXIT_INVALID_INPUT` (`2`) on a malformed flag.
 
-The runtime calls `business.evaluate` from `_stage._finalize_fragment` for every
-stage that runs through `stage.run`. Inputs come from the report backend
+For every stage that runs through `stage.run`, `_stage._finalize_fragment` calls
+`_stage._record_business`, and `_stage._record_business` is the function that
+invokes `business.evaluate`. Inputs come from the report backend
 (`tech.status`, `tech.kind`, `business.findings.ignored.total`) and the resolved
 [pipeline context](pipeline-context.md). The result is persisted under
 `business.{status, reason}` and snapshotted into the per-stage fragment.
@@ -58,7 +59,7 @@ context -- and emits one row:
 | `failed` | `fix_class = no_fix` | release | `warning` | `"<kind> (no fix available, accepted)"` |
 | `failed` | `fix_class = unknown` | snapshot | `warning` | `"<kind> (fix classification unknown)"` |
 | `failed` | `fix_class = unknown` | release | `error` | `"<kind> (fix classification unknown, strict)"` |
-| `skipped` (not-applicable) | * | * | `success` | `"not applicable"` |
+| `skipped` | * | * | `success` | `"not applicable"` |
 
 When several `fix_class` counters are non-zero the priority is
 `has_fix > unknown > no_fix-only`. When all three are zero the default is

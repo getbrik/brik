@@ -42,7 +42,7 @@ with a warning -- the pipeline does not fail.
 |-------|------|---------|-------------|
 | `publish.docker.image` | string | -- | Full image name including registry and repository (e.g. ghcr.io/org/app). |
 | `publish.docker.registry` | string | -- | Container registry URL for docker login. |
-| `publish.docker.tags` | array of strings | -- | List of tags to push. If empty, uses BRIK_VERSION. |
+| `publish.docker.tags` | array of strings | -- | List of tags to push. If empty, uses BRIK_APP_VERSION. |
 | `publish.docker.username_var` | string | -- | Name of the environment variable holding the registry username. |
 | `publish.docker.password_var` | string | -- | Name of the environment variable holding the registry password or token. |
 

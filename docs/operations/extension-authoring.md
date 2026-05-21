@@ -5,9 +5,10 @@ the contract harness exposed by `brik extension test`. If you only want
 to *consume* an existing extension, read
 [`extensions.md`](extensions.md) instead.
 
-The contract harness implements [ADR-002 -- Contract testing Bash](../../docs/adr/ADR-002-contract-testing.md).
-Authors run it locally before publishing; CI runs it as a gate against
-the merged extension set.
+The contract harness is how Brik keeps the registry public API stable:
+it asserts that an extension honors the same function-and-reporting
+contract every builtin does. Authors run it locally before publishing;
+CI runs it as a gate against the merged extension set.
 
 ## What `brik extension test` checks
 
@@ -83,7 +84,7 @@ spec:
 #!/usr/bin/env bash
 
 stacks.myteam.build() {
-    # ADR-002: return 0 on success and record at least one tech.* key.
+    # Contract: return 0 on success and record at least one tech.* key.
     # The dry-call harness masks PATH so external tools are not invoked;
     # production code lives behind a `[[ -n "$BRIK_WORKSPACE" ]]` guard
     # or a feature flag if needed for the harness path.
@@ -172,7 +173,7 @@ stages.audit() {
   [FAIL] dry-call stages/audit.yml -> stages.audit: no report.record entry on happy-path
 ```
 
-ADR-002 critère 3: every contract-conformant function records at least
+The contract requires every conformant function to record at least
 one `tech.*` key. Without it, the aggregate report has no signal for
 the stage and the planner cannot reason about its outcome. Call
 `report.record` even on the skip path -- it is what makes a stage
@@ -197,10 +198,9 @@ error, and the aggregate report misses the record. Replace `exit` with
 ```
 
 A manifest's `metadata.id` must be unique across the merged registry.
-Pick a namespaced id (e.g. `myteam-node`) or accept that an extension
-named `node` overrides the builtin. The compile script refuses the
-collision unless `metadata.replaces` is declared -- a capability not
-yet exposed.
+`compile-registry.sh` aborts unconditionally on any id collision --
+there is no `metadata.replaces` override and no `brik.lock` escape
+hatch. Pick a namespaced id (e.g. `myteam-node`) instead.
 
 ## See also
 
@@ -208,5 +208,3 @@ yet exposed.
 - [`docs/registry/`](../registry/) -- registry author reference.
 - [`docs/planning/`](../planning/) -- planner reference (how the
   registry feeds `plan.json`).
-- [ADR-002](../../docs/adr/ADR-002-contract-testing.md) -- the
-  rationale for the contract harness.

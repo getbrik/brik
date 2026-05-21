@@ -119,8 +119,8 @@ BRIK_REGISTRY_EXTENSIONS_DIRS="/path/to/my-extensions" \
 The script:
 
 - merges builtins + extensions into one canonical `registry.json`,
-- refuses any `metadata.id` collision with a hard error (a future
-  release will introduce `spec.replaces` for explicit overrides),
+- refuses any `metadata.id` collision with a hard, unconditional error
+  (there is no override flag; pick a unique id),
 - emits the sha256 of the cache so CI can detect drift.
 
 ## Step 3: ship the Bash module
@@ -180,27 +180,34 @@ and the five contract checks it performs.
 
 ## Constraints and gotchas
 
-- **No `replaces` yet.** A custom manifest with the same `id` as a
-  builtin is refused. Once `brik.lock` lands, explicit replace
-  semantics will be reintroduced; for now, fork the builtin.
+- **No override path for a colliding id.** `compile-registry.sh`
+  unconditionally aborts when the same `metadata.id` appears in a
+  builtin and an extension. There is no `metadata.replaces` override
+  and no `brik.lock` escape hatch -- if you need to supersede a
+  builtin, fork it under a distinct id.
 - **No cycle detection across extensions.** A stage that declares
   `placement.after: [my-other-stage]` works only if `my-other-stage` is
-  also resolvable. Builtin cycles are caught by the topological sort in
-  `_loader.sh`; extensions inherit the same check.
+  also resolvable. Neither `compile-registry.sh` nor the `_loader.sh`
+  topological sort aborts on a cycle: the sort applies a depth fallback
+  and an unresolvable stage simply sorts last, so an extension with a
+  bad `after`/`before` edge produces a surprising order rather than a
+  clear error. Author your placement edges carefully.
 - **Cache must be re-compiled.** The runtime reads
-  `lib/registry/cache/registry.json`. Forgetting to re-run
-  `compile-registry.sh` after editing a manifest is the most common
-  mistake; the schema-drift CI job catches it before merge.
-- **Schema versioning is fixed for 12 months** per ADR-003. Manifests
-  written against `apiVersion: brik.dev/v1` keep working for the full
-  12-month window.
+  `lib/registry/cache/registry.json`, a gitignored build artifact.
+  Forgetting to re-run `compile-registry.sh` after editing a manifest
+  is the most common mistake; the schema-drift CI job catches it
+  before merge.
+- **Schema versioning is fixed for 12 months.** Manifests written
+  against `apiVersion: brik.dev/v1` keep working for the full 12-month
+  window; a breaking change ships under a parallel `v2` schema.
 
 ## Reopening full extension support
 
 Revisit extension distribution when:
 
 - at least one external consumer documents a real use case, AND
-- ADR-003 has been in application for 3+ months without re-revision.
+- the `brik.dev/v1` manifest contract has held stable for 3+ months
+  without re-revision.
 
 The deferred scope covers `brik.lock`, signing, allowlists, and a
 discovery mechanism. Until then, the in-repo overlay above is the

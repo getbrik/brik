@@ -65,7 +65,7 @@ HEAD with the same flags produce strictly identical bytes.
 |---|---|---|
 | `safe` | Context only (`gate.contexts`) and opt-in flags | Default. Runs every blocking stage applicable to the current context. |
 | `balanced` | Above + per-stage impact globs vs the changed-file set | Skip a stage when none of the changed files match its `spec.impact.changes` (or the inherited `spec.impact.use_stack_impact` set). |
-| `aggressive` | Per-subproject impact graph | **Not yet implemented.** The planner returns rc=64 with an actionable message. |
+| `aggressive` | Per-subproject impact graph | **Not yet implemented.** The planner returns rc=2 with an actionable message. |
 
 Set the default mode for a project in `brik.yml`:
 
@@ -100,6 +100,9 @@ pipeline.plan.runner_class <stage>   # which runner image the adapter should pic
 pipeline.plan.gate       <stage>     # gate.mode
 pipeline.plan.stages                 # canonical stage order from the plan
 pipeline.plan.fingerprint            # sha256 of the current plan
+pipeline.plan.release_profile        # release profile enum
+pipeline.plan.release_version        # release semver
+pipeline.plan.is_candidate           # 0 if candidate release, 1 otherwise
 ```
 
 ## Producing a plan

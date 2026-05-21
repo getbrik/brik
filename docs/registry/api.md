@@ -33,14 +33,14 @@ accessors operate on in-memory arrays.
 | `registry.stack.markers <id>` | one path per line | `spec.detect.markers.any`. |
 | `registry.stack.markers_glob <id>` | one glob per line | Globbed form of markers (handles bash glob expansion). |
 | `registry.stack.cache_paths <id>` | one path per line | From `spec.cache.paths`. |
-| `registry.stack.runner_image <id>` | image (no tag) | Returns the bare image ref. The version tag is fetched separately via `runner_default_version` / `runner_versions`. |
+| `registry.stack.runner_image <id>` | image (no tag) | Returns the bare image ref. Takes only the stack `<id>`; the version tag is fetched separately via `runner_default_version` / `runner_versions`. |
 | `registry.stack.runner_default_version <id>` | string | `spec.runner.defaultVersion`. |
 | `registry.stack.runner_versions <id>` | one version per line | `spec.runner.versions`. |
 | `registry.stack.module <id>` | dotted path | The stack's Bash module path. |
 | `registry.stack.api_required <id>` | one function per line | `spec.api.required`. |
 | `registry.stack.api_optional <id>` | one function per line | `spec.api.optional`. |
 | `registry.stack.doctor_tools <id>` | one binary per line | `spec.doctor.tools`. |
-| `registry.stack.artifact_output_dirs <id>` | one dir per line | From `spec.artifacts.outputDirs`. |
+| `registry.stack.artifact_output_dirs <id>` | one dir per line | From `spec.artifacts.output_dirs`. |
 | `registry.stack.artifact_patterns <id>` | one glob per line | From `spec.artifacts.patterns`. |
 | `registry.stack.impact_source <id>` | one glob per line | `spec.impact.source`. |
 | `registry.stack.impact_test <id>` | one glob per line | `spec.impact.test`. |
@@ -53,7 +53,7 @@ accessors operate on in-memory arrays.
 | Function | Returns | Notes |
 |---|---|---|
 | `registry.stage.list` | one id per line | Topological order from `spec.placement`. |
-| `registry.stage.exists <id>` | rc=0 if exists | Alias-aware: resolves `replaces` first. |
+| `registry.stage.exists <id>` | rc=0 if exists | Alias-aware: resolves `metadata.aliases` first. |
 | `registry.stage.resolve_alias <id>` | id on stdout | Returns the canonical id when `<id>` is an alias. |
 | `registry.stage.display_name <id>` | string | `metadata.displayName`. |
 | `registry.stage.function <id>` | dotted name | `spec.function`. |
@@ -67,7 +67,7 @@ accessors operate on in-memory arrays.
 | `registry.stage.gate_opt_in_flag <id>` | `--with-...` | `spec.gate.opt_in_flag`. |
 | `registry.stage.gate_contexts <id>` | one context per line | `spec.gate.contexts`. |
 | `registry.stage.is_destructive <id>` | rc=0 if true | Reads `spec.dry_run.destructive`. |
-| `registry.stage.aliases <id>` | one alias per line | `spec.replaces`. |
+| `registry.stage.aliases <id>` | one alias per line | `metadata.aliases`. |
 | `registry.stage.api_required <id>` | one function per line | `spec.api.required`. |
 | `registry.stage.impact_changes <id>` | one glob per line | `spec.impact.changes`. |
 | `registry.stage.impact_use_stack_impact <id>` | `source` / `test` / `build` | `spec.impact.use_stack_impact`. |
@@ -76,7 +76,7 @@ accessors operate on in-memory arrays.
 
 | Function | Returns |
 |---|---|
-| `registry.explain` | Multi-line dump of every stack and stage with their resolved fields. Used by `brik doctor --explain-registry` for debugging. |
+| `registry.explain` | Multi-line dump of every stack and stage with their resolved fields. Useful for debugging a registry or extension setup. |
 
 ## Idioms
 
@@ -136,10 +136,10 @@ that bypass the planner replicate the same case.
 
 ## Versioning policy
 
-The function signatures above are part of the v1 contract pinned by
-[ADR-002](../../docs/adr/ADR-002-contract-testing.md). Removing or
-renaming a function is a breaking change that requires a deprecation
-window. Adding a function is a minor change.
+The function signatures above are part of the v1 contract, enforced by
+the contract test harness so a signature cannot change silently.
+Removing or renaming a function is a breaking change that requires a
+deprecation window. Adding a function is a minor change.
 
 The `spec/registry/contract/` test harness exercises every function
 listed here against both the builtin manifests and a synthetic

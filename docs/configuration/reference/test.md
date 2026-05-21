@@ -61,11 +61,11 @@ rejects any other value before the test command is built.
 
 | Stack | `test.framework` default | Coverage format produced |
 |-------|-------------------------|--------------------------|
-| `node` | `jest` | `lcov` (cobertura on `reports.enabled: true`) |
+| `node` | `jest` | `cobertura` |
 | `python` | `pytest` | `cobertura` |
 | `java` | `junit` (Maven) | `jacoco` |
 | `rust` | `cargo` | `cobertura` (when `cargo-llvm-cov` is available) |
-| `dotnet` | `dotnet` | `cobertura` |
+| `dotnet` | `xunit` | `cobertura` |
 
 ## Examples
 

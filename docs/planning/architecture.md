@@ -5,43 +5,20 @@ ends up as a serialized `plan.json` on disk.
 
 ## The five layers
 
-```text
-                +-----------------------------+
-                |  lib/cli/plan.sh            |  (1) CLI surface
-                |    cli.plan.run             |
-                |    cli.plan.gate            |
-                +-----------------------------+
-                              |
-                              v
-                +-----------------------------+
-                |  lib/planning/plan_writer.sh |  (2) serializer
-                |    plan_writer.write         |
-                |    plan_writer.from_stream   |
-                +-----------------------------+
-                              |
-                              v
-                +-----------------------------+
-                |  lib/planning/plan.sh        |  (3) compute
-                |    plan.compute              |
-                |    plan.decide               |
-                |    plan.stages.ordered       |
-                |    plan.dag.edges            |
-                +-----------------------------+
-                              |          |
-                              v          v
-       +-----------------------+   +-----------------------+
-       | lib/transverse/       |   | lib/planning/         |  (4) inputs
-       |   changes.sh          |   |   impact.sh           |
-       |   changes.diff        |   |   impact.match_*      |
-       |   changes.metadata    |   |   impact.stage_*      |
-       +-----------------------+   +-----------------------+
-                              |          |
-                              v          v
-                +-----------------------------+
-                |  lib/registry/registry.sh    |  (5) registry SoT
-                |    registry.stack.*          |
-                |    registry.stage.*          |
-                +-----------------------------+
+```mermaid
+flowchart TD
+    cli["(1) CLI surface -- lib/cli/plan.sh<br/>cli.plan.run, cli.plan.gate"]
+    writer["(2) Serializer -- lib/planning/plan_writer.sh<br/>plan_writer.write, plan_writer.from_stream"]
+    compute["(3) Compute -- lib/planning/plan.sh<br/>plan.compute, plan.decide, plan.stages.ordered, plan.dag.edges"]
+    changes["(4) Inputs -- lib/transverse/changes.sh<br/>changes.diff, changes.metadata"]
+    impact["(4) Inputs -- lib/planning/impact.sh<br/>impact.match_*, impact.stage_*"]
+    registry["(5) Registry SoT -- lib/registry/registry.sh<br/>registry.stack.*, registry.stage.*"]
+    cli --> writer
+    writer --> compute
+    compute --> changes
+    compute --> impact
+    changes --> registry
+    impact --> registry
 ```
 
 Each layer has one responsibility (SRP); arrows point down because the
@@ -172,12 +149,12 @@ Hot path observations:
 
 | Failure | Exit code | Where |
 |---|---|---|
-| Unknown CLI flag | `BRIK_EXIT_INVALID_INPUT` (64) | `cli.plan.run` |
-| `--mode aggressive` | `BRIK_EXIT_INVALID_INPUT` (64) | `plan.compute` (stub: not yet implemented) |
-| `--mode <bogus>` | `BRIK_EXIT_INVALID_INPUT` (64) | `plan.compute` |
-| Empty stream after compute | `BRIK_EXIT_INVALID_INPUT` (64) | `plan_writer.from_stream` |
+| Unknown CLI flag | `BRIK_EXIT_INVALID_INPUT` (2) | `cli.plan.run` |
+| `--mode aggressive` | `BRIK_EXIT_INVALID_INPUT` (2) | `plan.compute` (stub: not yet implemented) |
+| `--mode <bogus>` | `BRIK_EXIT_INVALID_INPUT` (2) | `plan.compute` |
+| Empty stream after compute | `BRIK_EXIT_INVALID_INPUT` (2) | `plan_writer.from_stream` |
 | `jq` missing | `BRIK_EXIT_MISSING_DEP` (69) | `plan_writer.from_stream`, `cli.plan._render_*` |
 | `jv` and `check-jsonschema` both missing under `--validate-only` | `BRIK_EXIT_MISSING_DEP` (69) | `cli.plan.run` |
-| `--validate-only` schema mismatch | `BRIK_EXIT_INVALID_INPUT` (64) | `cli.plan.run` |
+| `--validate-only` schema mismatch | `BRIK_EXIT_INVALID_INPUT` (2) | `cli.plan.run` |
 | `plan gate <id>` skip decision | rc=1 (run/skip convention) | `cli.plan.gate` |
-| `plan gate` missing stage id | `BRIK_EXIT_INVALID_INPUT` (64) | `cli.plan.gate` |
+| `plan gate` missing stage id | `BRIK_EXIT_INVALID_INPUT` (2) | `cli.plan.gate` |

@@ -53,7 +53,7 @@ This is the **default** for pipelines that do not invoke the planner.
 
 ## The `brik plan` CLI
 
-Sourced from `lib/cli/plan.sh`. Five surface forms:
+Sourced from `lib/cli/plan.sh`. Four surface forms:
 
 ### `brik plan` (compute mode)
 
@@ -96,7 +96,7 @@ Stages:
 Computes the plan and validates the bytes against
 `schemas/plan/v1/plan.schema.json` using `jv` (or `check-jsonschema`
 as a fallback). On success prints `plan.json: valid against schema`
-and exits 0. On failure exits with `BRIK_EXIT_INVALID_INPUT` (64).
+and exits 0. On failure exits with `BRIK_EXIT_INVALID_INPUT` (2).
 
 Useful in CI before pushing a plan downstream: catches a planner
 regression at the boundary rather than at the adapter that consumes it.
@@ -176,10 +176,11 @@ printf '%s\n' "$fp_now" > .brik-cache/last-fingerprint
 ## Versioning policy
 
 The functions and CLI flags documented above are part of the v1 plan
-contract pinned by [ADR-003](../../docs/adr/ADR-003-manifest-versioning.md).
-Removing or renaming a function is a breaking change that requires a
-deprecation window. Adding a function (or a new optional CLI flag) is
-a minor change.
+contract: the format is frozen at `schemaVersion: v1`, a breaking
+change ships under a parallel `v2` schema kept alongside `v1` for the
+deprecation window. Removing or renaming a function is a breaking
+change that requires that window. Adding a function (or a new optional
+CLI flag) is a minor change.
 
 The `spec/planning/`, `spec/cli/plan_*`, `spec/pipeline/pipeline_plan_*`
 and `spec/integration/plan_*` test suites collectively exercise every

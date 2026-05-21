@@ -31,8 +31,7 @@ The full schema is at `schemas/policy/v1/brik-policy.schema.json`.
 A minimal valid file:
 
 ```yaml
-# brik-policy.yml -- versioned, lives at a stable URL
-version: 1
+# brik-policy.yml -- schema version is the URL path (v1/), not an in-file field
 preset: pragmatic           # optional: overrides project-level preset
 
 allow:
@@ -83,7 +82,7 @@ defaults.
 The compiled, project-filtered policy lands at:
 
 ```
-${BRIK_WORKSPACE}/brik-artifacts/.policy.cache.json
+${BRIK_WORKSPACE}/.brik-logs/policy.cache.json
 ```
 
 Override the path with `BRIK_POLICY_CACHE_PATH` if you want the cache in
@@ -97,7 +96,7 @@ is in effect on the next CI run -- no per-project bump required.
 Inspect the compiled cache:
 
 ```bash
-cat brik-artifacts/.policy.cache.json | jq
+cat .brik-logs/policy.cache.json | jq
 # {
 #   "preset_override": "pragmatic",
 #   "cve_allowlist": ["CVE-2025-15366"],
