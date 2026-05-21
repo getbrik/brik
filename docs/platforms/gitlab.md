@@ -5,12 +5,6 @@ The canonical reference for running Brik on GitLab CI. For first-time setup see
 detail of the templates themselves see
 [`shared-libs/gitlab/README.md`](../../shared-libs/gitlab/README.md).
 
-> **Recommended include**: new projects should use the dynamic parent +
-> child template documented in
-> [gitlab-dynamic-pipeline.md](gitlab-dynamic-pipeline.md). The legacy
-> single-pipeline template described below stays available until v0.8.0
-> for projects that have not yet migrated.
-
 ## Platform status
 
 | Platform | Status | Integration | Bootstrap file |
@@ -24,13 +18,15 @@ The GitLab shared library is the primary platform adapter. It maps the
 
 ## The job graph
 
-`shared-libs/gitlab/templates/pipeline.yml` declares one job per stage. Lint,
-SAST, Scan, and Test share the single GitLab `verify` stage and run in parallel
-via separate `needs`:
+`shared-libs/gitlab/templates/pipeline.yml` is a single classic pipeline. A
+`brik-plan` job computes the execution plan first; then one job per stage runs,
+each gating itself on the plan. Lint, SAST, Scan, and Test share the single
+GitLab `verify` stage and run in parallel via separate `needs`:
 
 ```mermaid
 flowchart LR
-    init["brik-init"] --> release["brik-release"]
+    plan["brik-plan"] --> init["brik-init"]
+    init --> release["brik-release"]
     release --> build["brik-build"]
     build --> lint["brik-lint"]
     build --> sast["brik-sast"]
@@ -41,7 +37,8 @@ flowchart LR
     scan --> package
     test --> package
     package --> cscan["brik-container-scan"]
-    cscan --> deploy["brik-deploy"]
+    cscan --> promote["brik-promote"]
+    promote --> deploy["brik-deploy"]
     deploy --> notify["brik-notify"]
 ```
 
@@ -49,6 +46,24 @@ The Init job emits `.brik-logs/pipeline.env` as a `reports: dotenv:` artifact
 (produced by the post-stage projection hook from the report env section), so
 downstream jobs receive `BRIK_CI_IMAGE` (the resolved
 `brik-runner-<stack>:<version>` for the project) and the trigger gating flags.
+
+## Stage selection (the plan gate)
+
+The `brik-plan` job runs first and computes `.brik-logs/plan.json`, the
+provider-agnostic execution plan (see [concepts/plan.md](../concepts/plan.md)).
+Every stage job then sources `/tmp/brik-plan-gate.sh <stage>` as its first
+script step, which calls `brik plan gate <stage>`:
+
+- the plan says **run** -> the job proceeds with the stage;
+- the plan says **skip** -> `brik plan gate` records a not-applicable
+  fragment (`tech.kind=not-applicable`, `business.reason=<plan reason>`)
+  and the job exits 0, showing as a green "skipped (per plan)" job.
+
+Every job stays visible in the GitLab UI, in its natural stage. The
+`brik-notify` job aggregates the run fragments and the not-applicable
+fragments into the final report, so a skipped stage still appears in
+`aggregate-report.{md,json}` with its reason. This is the same
+`brik plan gate` mechanism the Jenkins adapter uses.
 
 ## Env propagation
 
@@ -280,10 +295,9 @@ junit) still applies.
 
 ## Pipeline workflow filter
 
-Both `pipeline.yml` and `dynamic-pipeline.yml` declare a top-level
-`workflow:` block that gates pipeline creation **before** any job
-evaluates its `rules:`. GitLab evaluates this once per push / API call
-and decides whether the pipeline exists at all.
+`pipeline.yml` declares a top-level `workflow:` block that gates
+pipeline creation **before** any job runs. GitLab evaluates this once
+per push / API call and decides whether the pipeline exists at all.
 
 The permitted pipeline sources are:
 
@@ -294,7 +308,6 @@ The permitted pipeline sources are:
 | (commit on default branch) | "Merged to main" flow |
 | `schedule` | Nightly E2E, scheduled rebuilds |
 | `web` | On-demand re-run from the GitLab UI or API |
-| `parent_pipeline` | The dynamic child pipeline (the child includes `pipeline.yml`, so this template's `workflow:` gates it too) |
 
 A push to a feature branch that already has an open MR is suppressed
 (the MR pipeline is kept; the branch pipeline is dropped) -- this is
@@ -312,9 +325,8 @@ workflow:
     - if: $CI_PIPELINE_SOURCE == "web"
 ```
 
-Other sources (`trigger`, `webide`, `parent_pipeline` for non-Brik
-parents, `pipeline` for external triggers) are intentionally not in
-the allow-list. Add them locally if the project needs them; do not
+Other sources (`trigger`, `webide`, `pipeline` for external triggers)
+are intentionally not in the allow-list. Add them locally if the project needs them; do not
 remove the existing entries without replacing the parity they provide
 (particularly the `schedule` and `web` entries -- losing them breaks
 the on-call team's ability to re-run a pipeline manually).
@@ -341,15 +353,13 @@ Before opening a PR that touches `.gitlab-ci.yml` (or the shared
       Operators rely on `web` for retries and `schedule` for the
       nightly run.
 - [ ] **Pipeline triggers stay limited to the workflow allow-list**
-      -- `trigger:`, `webide`, and `parent_pipeline` (from a
-      non-Brik orchestrator) all create pipelines outside the
-      Brik flow. If you need to allow one, add an explicit entry
-      with a rationale comment.
+      -- `trigger:`, `webide`, and `pipeline` (from an external
+      orchestrator) all create pipelines outside the Brik flow. If
+      you need to allow one, add an explicit entry with a rationale
+      comment.
 - [ ] **`resource_group:` on every deploy job that touches a
       shared environment** -- otherwise two pipelines on the same
-      ref can race the same target. The `dynamic-pipeline` child
-      preserves whatever `resource_group:` the legacy template
-      declared, but a project-local override loses it silently.
+      ref can race the same target.
 
 This checklist enforces the Stephane Robert anti-pattern
 recommendations (cf. <https://blog.stephane-robert.info/docs/pipeline-cicd/anti-patterns/#la-pipeline-monolithe>

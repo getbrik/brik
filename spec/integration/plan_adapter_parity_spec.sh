@@ -1,11 +1,10 @@
 Describe "plan.json adapter parity"
-  # The promise of D.4 is: same plan.json, same decisions, every
-  # adapter. This spec writes one hand-crafted plan.json and reads it
-  # back through the three D.5 paths to assert they agree:
+  # The promise is: same plan.json, same decisions, every adapter. This
+  # spec writes one hand-crafted plan.json and reads it back through the
+  # two consumption paths to assert they agree:
   #
-  #   D.5a local   -> pipeline.plan.should_run        (bash API)
-  #   D.5b Jenkins -> brik plan gate <id>             (CLI sub-command)
-  #   D.5c GitLab  -> cli.plan._render_gitlab_child   (YAML emit)
+  #   local             -> pipeline.plan.should_run   (bash API)
+  #   Jenkins + GitLab  -> brik plan gate <id>        (CLI sub-command)
   #
   # A divergence here is silent in unit tests and only surfaces in
   # briklab E2E. This spec catches it at the lib boundary.
@@ -87,7 +86,7 @@ JSON
     End
   End
 
-  Describe "D.5b Jenkins adapter: brik plan gate (CLI)"
+  Describe "Jenkins + GitLab adapters: brik plan gate (CLI)"
     It "exits 0 for stages the plan marks run"
       When run script "$BRIK_BIN" plan gate build
       The status should equal 0
@@ -116,38 +115,13 @@ JSON
     End
   End
 
-  Describe "D.5c GitLab adapter: cli.plan._render_gitlab_child"
-    It "marks the same skipped non-notify jobs with rules:when:never"
-      render_child() {
-        "$BRIK_BIN" plan --workspace "$PARITY_DIR" --mode safe \
-            --format gitlab-child --out "$BRIK_LOG_DIR/plan-rendered.json" \
-            >/dev/null 2>&1
-        cat "$BRIK_LOG_DIR/plan-rendered.yml"
-      }
-      # The yml is generated from a fresh compute against the workspace
-      # (no diff -> source=none -> blocking stages run, opt_in stages
-      # skip), which mirrors the hand-crafted PARITY_PLAN. We assert
-      # the skipped jobs in the YAML match the skip set the API + CLI
-      # gates produced above.
-      When call render_child
-      The output should include "brik-release:"
-      The output should include "brik-package:"
-      The output should include "brik-deploy:"
-      The output should include "when: never"
-      # brik-notify is the report aggregator: it must NOT be overridden
-      # to rules:when:never, otherwise the child has no aggregator job.
-      The output should not include $'brik-notify:\n  rules:\n    - when: never'
-    End
-  End
-
   Describe "round-trip parity"
     Include "$BRIK_HOME/lib/planning/plan_reader.sh"
 
-    It "the three adapters agree on the {run,skip} set of every stage"
+    It "the bash API and the plan file agree on the {run,skip} set of every stage"
       # Compare the bash API's decisions stage by stage against jq
-      # reading the same plan file directly (the CLI gate and the
-      # GitLab renderer both go through jq, so this is a fair proxy
-      # for cross-adapter consistency).
+      # reading the same plan file directly (the CLI gate goes through
+      # jq too, so this is a fair proxy for cross-adapter consistency).
       check_parity() {
         local mismatch="" stage api jq_decision
         for stage in init release build lint sast scan test package container-scan deploy notify; do

@@ -58,7 +58,6 @@ opt-ins) and decides which downstream action to take:
 | (default) | call `plan_writer.write` -> write `plan.json` to `${BRIK_WORKSPACE}/.brik-logs/plan.json` or to `--out`. |
 | `--explain` | call `plan_writer.write` -> pretty-print via `cli.plan._render_explain` (jq template). |
 | `--validate-only` | call `plan_writer.write` -> validate the bytes with `jv` (or `check-jsonschema` fallback). |
-| `--format gitlab-child` | call `plan_writer.write` then `cli.plan._render_gitlab_child` to emit a sibling YAML. |
 | `plan gate <id>` | call `pipeline.plan.should_run` against an existing plan; on skip, record the not-applicable fragment in the per-stage report. |
 
 The CLI also normalizes platform CI variables via `_pipeline.detect_metadata`

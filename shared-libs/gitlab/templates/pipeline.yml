@@ -1,28 +1,25 @@
-# Brik GitLab CI Pipeline Template (LEGACY)
+# Brik GitLab CI Pipeline Template
 #
-# DEPRECATED: this single-pipeline template is superseded by the parent
-# + child pair declared in `dynamic-pipeline.yml`, which adds
-# impact-driven stage selection (docs-only commits skip the lint/test
-# grid without runner containers). New projects should include
-# `/templates/dynamic-pipeline.yml` instead.
+# The Brik GitLab adapter: a single classic pipeline that runs the fixed
+# flow. A `brik-plan` job computes the execution plan (plan.json); every
+# stage job then consults it via `brik plan gate <stage>` and skips
+# itself (exit 0) when the plan marks the stage not-applicable, recording
+# a not-applicable fragment so the final report still covers every stage.
 #
-# This file stays in the catalog for two minor versions (v0.6.x and
-# v0.7.x) so existing pipelines keep working, and remains load-bearing
-# because the dynamic template's child pipeline re-uses it verbatim.
-# It is removed as a public entry point in v0.8.0.
-# See `docs/platforms/gitlab-dynamic-pipeline.md` for the one-line
-# migration diff (swap the include path, brik.yml is unchanged).
+# Every job stays visible in the GitLab UI within one pipeline -- no child
+# pipeline, no generated YAML. plan.json is the single source of truth,
+# byte-identical to the plan consumed by the Jenkins and local adapters.
 #
-# It implements the fixed flow: Init -> Release -> Build -> Lint||SAST||Scan||Test -> Package -> Container Scan -> Deploy -> Notify
+# It implements the fixed flow: Init -> Release -> Build -> Lint||SAST||Scan||Test -> Package -> Container Scan -> Promote -> Deploy -> Notify
 #
 # Usage in your .gitlab-ci.yml:
 #   include:
 #     - project: 'brik/gitlab-templates'
-#       ref: v1
+#       ref: v0.6.0
 #       file: '/templates/pipeline.yml'
 
 # ---------------------------------------------------------------------------
-# Workflow rules (upstream pipeline filter, C1 of chantier #15)
+# Workflow rules (upstream pipeline filter)
 #
 # GitLab evaluates `workflow:` before any job runs and decides whether a
 # pipeline exists at all. Without these rules every push generates a
@@ -30,16 +27,12 @@
 # an open MR, and pipelines on sources that no human asked for
 # (trigger, webide).
 #
-# The six permitted sources cover every legitimate Brik trigger:
+# The five permitted sources cover every legitimate Brik trigger:
 #   1. MR pipelines       -- the canonical CI for branch work
 #   2. Tag pipelines      -- release context (cf. docs/concepts/pipeline-context.md)
 #   3. Default-branch     -- the standard "merged to main" flow
 #   4. Scheduled          -- nightly E2E, cron-driven release rebuilds
 #   5. Web (UI / API)     -- on-demand re-runs by an operator
-#   6. parent_pipeline    -- the dynamic child: dynamic-pipeline.yml's
-#                            brik-plan job triggers a child that includes
-#                            THIS template. Without this rule the child
-#                            is rejected wholesale and produces zero jobs.
 #
 # Any other source (push to a feature branch with an open MR; push without
 # MR; trigger; webide; ...) is intentionally suppressed.
@@ -55,10 +48,6 @@ workflow:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
     - if: $CI_PIPELINE_SOURCE == "schedule"
     - if: $CI_PIPELINE_SOURCE == "web"
-    # The dynamic child pipeline (templates/dynamic-pipeline.yml triggers
-    # a child that includes this file). Required: a child runs with
-    # CI_PIPELINE_SOURCE=parent_pipeline.
-    - if: $CI_PIPELINE_SOURCE == "parent_pipeline"
 
 # ---------------------------------------------------------------------------
 # Variables
@@ -96,8 +85,12 @@ variables:
 
 # ---------------------------------------------------------------------------
 # Stages - Fixed Flow
+#
+# The `plan` stage runs first: brik-plan computes plan.json, which every
+# downstream stage job consults via `brik plan gate`.
 # ---------------------------------------------------------------------------
 stages:
+  - plan
   - init
   - release
   - build
@@ -159,6 +152,9 @@ default:
         git clone --depth 1 --branch "${BRIK_LIB_REF}" "${BRIK_REPO}" "${BRIK_HOME}" 2>/dev/null \
           || git clone --depth 1 "${BRIK_REPO}" "${BRIK_HOME}"
       fi
+    # Put the brik CLI on PATH (needed by brik-plan and the per-job plan gate)
+    - |
+      command -v brik >/dev/null 2>&1 || ln -sf "${BRIK_HOME}/bin/brik" /usr/local/bin/brik
     # Protect .brik-logs from accidental git add
     - |
       if [ -d "${CI_PROJECT_DIR}/.git/info" ]; then
@@ -173,11 +169,41 @@ default:
       brik.gitlab.setup "${BRIK_HOME}"
       BRIK_EOF
       chmod +x /tmp/brik-bootstrap.sh
+    # Prepare the plan-gate helper. Each stage job sources it BEFORE the heavy
+    # bootstrap (`. /tmp/brik-plan-gate.sh <stage>`): a stage the plan marks
+    # skip exits 0 immediately, without paying for brik.gitlab.setup (stack
+    # tool install). The `brik plan gate` call is the if-condition so a skip
+    # decision (rc=1) does not abort the job under `set -e`.
+    - |
+      cat > /tmp/brik-plan-gate.sh << 'BRIK_GATE_EOF'
+      # Usage: . /tmp/brik-plan-gate.sh <stage_id>
+      #   rc 0  -> stage runs, control returns to the job script
+      #   rc 1  -> stage skipped per plan; `brik plan gate` already recorded
+      #            the not-applicable fragment, the job exits 0 (green)
+      #   rc >1 -> planner error, the job fails with that code
+      _brik_gate_stage="${1:?brik-plan-gate: stage id required}"
+      if BRIK_WORKSPACE="${CI_PROJECT_DIR}" \
+         BRIK_LOG_DIR="${CI_PROJECT_DIR}/.brik-logs" \
+         BRIK_PLAN_FILE="${CI_PROJECT_DIR}/.brik-logs/plan.json" \
+         brik plan gate "${_brik_gate_stage}"; then
+        echo "[brik] ${_brik_gate_stage}: runs (per plan)"
+      else
+        _brik_gate_rc=$?
+        if [ "${_brik_gate_rc}" -eq 1 ]; then
+          echo "[brik] ${_brik_gate_stage}: skipped (per plan)"
+          exit 0
+        fi
+        echo "[brik] ${_brik_gate_stage}: plan gate error (rc=${_brik_gate_rc})" >&2
+        exit "${_brik_gate_rc}"
+      fi
+      BRIK_GATE_EOF
+      chmod +x /tmp/brik-plan-gate.sh
 
 # ---------------------------------------------------------------------------
 # Include job templates
 # ---------------------------------------------------------------------------
 include:
+  - local: '/templates/jobs/plan.yml'
   - local: '/templates/jobs/init.yml'
   - local: '/templates/jobs/release.yml'
   - local: '/templates/jobs/build.yml'

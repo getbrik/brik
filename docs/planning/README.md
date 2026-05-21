@@ -28,7 +28,7 @@ lib/planning/plan.sh              <- per-stage decide() + topo order + DAG edges
 lib/planning/plan_writer.sh       <- serialize the compute stream to plan.json (+ sha256)
 lib/planning/plan_reader.sh       <- pipeline.plan.* consumer API
 lib/cli/plan.sh                   <- brik plan CLI (compute + --explain + --validate-only
-                                     + --format gitlab-child + plan gate sub-command)
+                                     + plan gate sub-command)
 schemas/plan/v1/plan.schema.json  <- JSON Schema 2020-12 contract
 ```
 

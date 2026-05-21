@@ -11,7 +11,7 @@ coverage:
           - lib/registry/
       planning:
         # Same 90% bar on the planner (D.4): the gate hook in pipeline.run
-        # plus the gitlab-child emission all hang off these modules.
+        # and the per-stage `brik plan gate` all hang off these modules.
         target: 90%
         paths:
           - lib/planning/

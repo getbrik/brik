@@ -5,6 +5,8 @@
 brik-lint:
   stage: verify
   needs:
+    - job: brik-plan
+      artifacts: true
     - job: brik-init
       artifacts: true
     - job: brik-build
@@ -27,6 +29,7 @@ brik-lint:
       - "${BRIK_BUILD_STACK}-default"
     policy: pull
   script:
+    - . /tmp/brik-plan-gate.sh lint
     - bash -c '. /tmp/brik-bootstrap.sh && brik.gitlab.run_stage lint'
   artifacts:
     when: always

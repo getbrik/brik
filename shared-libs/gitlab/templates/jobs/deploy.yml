@@ -1,13 +1,17 @@
 # Brik Deploy Stage
-# Deploys to target environments configured in brik.yml.
-# The runtime evaluates deploy.environments[].when conditions
-# and skips environments that don't match the current Git context.
-# If no deploy.environments is configured, the runtime skips gracefully.
+# Deploys to target environments configured in brik.yml. The plan gates
+# this stage on the --with-deploy opt-in (resolved by brik-plan from
+# BRIK_WITH_DEPLOY). The runtime evaluates deploy.environments[].when
+# conditions and skips environments that don't match the current Git
+# context. If no deploy.environments is configured, the runtime skips
+# gracefully.
 
 brik-deploy:
   stage: deploy
   image: ${BRIK_DEPLOY_IMAGE}
   needs:
+    - job: brik-plan
+      artifacts: true
     - job: brik-init
       artifacts: true
     - job: brik-release
@@ -30,6 +34,7 @@ brik-deploy:
       artifacts: false
       optional: true
   script:
+    - . /tmp/brik-plan-gate.sh deploy
     - bash -c '. /tmp/brik-bootstrap.sh && brik.gitlab.run_stage deploy'
   artifacts:
     # reports.dotenv propagates pipeline.env keys as CI variables to

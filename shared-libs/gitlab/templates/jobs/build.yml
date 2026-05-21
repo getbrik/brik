@@ -9,6 +9,8 @@
 brik-build:
   stage: build
   needs:
+    - job: brik-plan
+      artifacts: true
     - job: brik-init
       artifacts: true
     - job: brik-release
@@ -33,6 +35,7 @@ brik-build:
     policy: pull-push
     when: always
   script:
+    - . /tmp/brik-plan-gate.sh build
     - bash -c '. /tmp/brik-bootstrap.sh && brik.gitlab.run_stage build'
   artifacts:
     when: always

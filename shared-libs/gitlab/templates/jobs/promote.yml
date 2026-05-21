@@ -1,14 +1,16 @@
 # Brik Promote Stage (Phase 9.B)
 # Re-tags the candidate Docker image to the release registry. The
 # registry manifest gates this stage on gate.contexts=[release], so the
-# planner emits rules:when:never for it on snapshot pipelines; it runs
-# on a release (tag) pipeline. The runtime self-skips when no candidate
-# Docker config is present in brik.yml.
+# planner marks it skip on snapshot pipelines; `brik plan gate promote`
+# then records a not-applicable fragment and the job exits 0. The runtime
+# self-skips when no candidate Docker config is present in brik.yml.
 
 brik-promote:
   stage: promote
   image: ${BRIK_DEPLOY_IMAGE}
   needs:
+    - job: brik-plan
+      artifacts: true
     - job: brik-init
       artifacts: true
     - job: brik-package
@@ -18,6 +20,7 @@ brik-promote:
       artifacts: false
       optional: true
   script:
+    - . /tmp/brik-plan-gate.sh promote
     - bash -c '. /tmp/brik-bootstrap.sh && brik.gitlab.run_stage promote'
   artifacts:
     when: always

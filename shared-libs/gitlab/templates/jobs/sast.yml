@@ -6,6 +6,8 @@ brik-sast:
   stage: verify
   image: "${BRIK_ANALYSIS_IMAGE}"
   needs:
+    - job: brik-plan
+      artifacts: true
     - job: brik-init
       artifacts: true
     - job: brik-build
@@ -28,6 +30,7 @@ brik-sast:
       - "${BRIK_BUILD_STACK}-default"
     policy: pull
   script:
+    - . /tmp/brik-plan-gate.sh sast
     - bash -c '. /tmp/brik-bootstrap.sh && brik.gitlab.run_stage sast'
   artifacts:
     when: always

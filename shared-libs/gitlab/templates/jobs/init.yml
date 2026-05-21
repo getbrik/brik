@@ -1,8 +1,15 @@
 # Brik Init Stage
 # Detects stack, validates brik.yml, sets up environment.
+#
+# Init is not plan-gated: it is a blocking stage in every context and runs
+# unconditionally. It still depends on brik-plan so it shares the same
+# dependency edge as the rest of the flow.
 
 brik-init:
   stage: init
+  needs:
+    - job: brik-plan
+      artifacts: true
   script:
     - bash -c '. /tmp/brik-bootstrap.sh && brik.gitlab.run_stage init'
   artifacts:

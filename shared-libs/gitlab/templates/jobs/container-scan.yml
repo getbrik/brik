@@ -6,9 +6,12 @@ brik-container-scan:
   stage: post-verify
   image: "${BRIK_SCANNER_IMAGE}"
   needs:
+    - job: brik-plan
+      artifacts: true
     - job: brik-package
       artifacts: true
   script:
+    - . /tmp/brik-plan-gate.sh container-scan
     - bash -c '. /tmp/brik-bootstrap.sh && brik.gitlab.run_stage container-scan'
   artifacts:
     when: always
