@@ -36,7 +36,7 @@
           "type": "string"
         },
         "commit": {
-          "description": "Git commit metadata. Optional in v1 because each enrichment subchantier writes its slice via init.business.commit.*.",
+          "description": "Git commit metadata. Optional in v1 because each enrichment writes its slice via init.business.commit.*.",
           "type": "object",
           "additionalProperties": false,
           "properties": {
@@ -96,7 +96,7 @@
       }
     },
     "summary": {
-      "description": "Cross-stage aggregated metrics. Open object: keys may be absent when a stage did not run, and additional keys may be added in subchantiers without bumping schema_version.",
+      "description": "Cross-stage aggregated metrics. Open object: keys may be absent when a stage did not run, and additional keys may be added later without bumping schema_version.",
       "type": "object",
       "required": ["stages"],
       "additionalProperties": true,
@@ -209,7 +209,7 @@
       }
     },
     "proof": {
-      "description": "Optional proof envelope: hash of the report itself, links to retained artefacts, signature flag. v1 always emits signed=false; supply-chain signing is a Phase 4 concern.",
+      "description": "Optional proof envelope: hash of the report itself, links to retained artefacts, signature flag. v1 always emits signed=false; supply-chain signing is a future concern.",
       "type": "object",
       "additionalProperties": false,
       "properties": {

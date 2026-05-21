@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://brik.dev/schemas/report/v1.1/fragment.schema.json",
   "title": "Brik Pipeline Report Fragment v1.1",
-  "description": "Per-stage report fragment emitted by stage.run after each stage completes. v1.1 introduces a typed business outcome (status, reason) and the tech.kind label, while removing the legacy tech.warning / tech.warning_reason fields that conflated technical and business concerns. See chantier docs/chantiers/20260510_tech-business-orthogonal-axes.md for the full rationale.",
+  "description": "Per-stage report fragment emitted by stage.run after each stage completes. v1.1 introduces a typed business outcome (status, reason) and the tech.kind label, while removing the legacy tech.warning / tech.warning_reason fields that conflated technical and business concerns.",
   "type": "object",
   "required": ["schema_version", "stage", "timestamp", "rc", "status", "runner", "business"],
   "additionalProperties": false,
@@ -129,7 +129,7 @@
           "type": "string"
         },
         "findings": {
-          "description": "Open sub-block carrying findings counts and metadata for security / quality stages. The block stays open (additionalProperties: true) so FMF L4 fields (total, by_severity, ignored.*) continue to land without a schema bump. The 'failing' sub-block is typed strict: it carries the fix-exists classification counters introduced in v1.1 by the master pipeline-behavior-model chantier.",
+          "description": "Open sub-block carrying findings counts and metadata for security / quality stages. The block stays open (additionalProperties: true) so FMF L4 fields (total, by_severity, ignored.*) continue to land without a schema bump. The 'failing' sub-block is typed strict: it carries the fix-exists classification counters introduced in v1.1.",
           "type": "object",
           "additionalProperties": true,
           "properties": {
