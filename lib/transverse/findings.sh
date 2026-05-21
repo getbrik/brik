@@ -59,24 +59,24 @@ fi
 findings.from_sarif() {
     if [[ $# -lt 2 ]]; then
         printf 'findings.from_sarif: missing arguments (expected: stage sarif_path)\n' >&2
-        return "${BRIK_EXIT_INVALID_INPUT:-2}"
+        return "$BRIK_EXIT_INVALID_INPUT"
     fi
     local stage="$1" sarif_path="$2"
     if [[ -z "$stage" ]]; then
         printf 'findings.from_sarif: stage must not be empty\n' >&2
-        return "${BRIK_EXIT_INVALID_INPUT:-2}"
+        return "$BRIK_EXIT_INVALID_INPUT"
     fi
     if [[ ! -f "$sarif_path" ]]; then
         printf 'findings.from_sarif: SARIF file not found: %s\n' "$sarif_path" >&2
-        return "${BRIK_EXIT_IO_FAILURE:-6}"
+        return "$BRIK_EXIT_IO_FAILURE"
     fi
     if ! declare -f sarif.is_valid >/dev/null 2>&1; then
         printf 'findings.from_sarif: transverse.sarif module not loaded\n' >&2
-        return "${BRIK_EXIT_MISSING_DEP:-3}"
+        return "$BRIK_EXIT_MISSING_DEP"
     fi
     if ! sarif.is_valid "$sarif_path"; then
         printf 'findings.from_sarif: invalid SARIF document: %s\n' "$sarif_path" >&2
-        return "${BRIK_EXIT_CONFIG_ERROR:-7}"
+        return "$BRIK_EXIT_CONFIG_ERROR"
     fi
     return 0
 }
@@ -120,12 +120,12 @@ findings.from_sarif() {
 findings.apply_policy() {
     if [[ $# -lt 2 ]]; then
         printf 'findings.apply_policy: missing arguments (expected: sarif_in sarif_out)\n' >&2
-        return "${BRIK_EXIT_INVALID_INPUT:-2}"
+        return "$BRIK_EXIT_INVALID_INPUT"
     fi
     local sarif_in="$1" sarif_out="$2"
     if [[ ! -f "$sarif_in" ]]; then
         printf 'findings.apply_policy: input not found: %s\n' "$sarif_in" >&2
-        return "${BRIK_EXIT_IO_FAILURE:-6}"
+        return "$BRIK_EXIT_IO_FAILURE"
     fi
 
     # Project preset (default pragmatic). The org policy cache may override
@@ -135,7 +135,7 @@ findings.apply_policy() {
         pragmatic|strict|permissive) ;;
         *)
             printf 'findings.apply_policy: unknown preset %s (expected pragmatic|strict|permissive)\n' "$preset" >&2
-            return "${BRIK_EXIT_CONFIG_ERROR:-7}"
+            return "$BRIK_EXIT_CONFIG_ERROR"
             ;;
     esac
 
@@ -158,7 +158,7 @@ findings.apply_policy() {
                     ;;
                 *)
                     printf 'findings.apply_policy: unknown preset %s in org cache (expected pragmatic|strict|permissive)\n' "$override" >&2
-                    return "${BRIK_EXIT_CONFIG_ERROR:-7}"
+                    return "$BRIK_EXIT_CONFIG_ERROR"
                     ;;
             esac
         fi
@@ -175,7 +175,7 @@ findings.apply_policy() {
         critical) floor_rank=4 ;;
         *)
             printf 'findings.apply_policy: unknown severity threshold %s (expected info|low|medium|high|critical)\n' "$floor_raw" >&2
-            return "${BRIK_EXIT_CONFIG_ERROR:-7}"
+            return "$BRIK_EXIT_CONFIG_ERROR"
             ;;
     esac
 
@@ -183,16 +183,16 @@ findings.apply_policy() {
     out_dir="$(dirname "$sarif_out")"
     mkdir -p "$out_dir" || {
         printf 'findings.apply_policy: cannot create output directory: %s\n' "$out_dir" >&2
-        return "${BRIK_EXIT_IO_FAILURE:-6}"
+        return "$BRIK_EXIT_IO_FAILURE"
     }
 
     if ! command -v jq >/dev/null 2>&1; then
         printf 'findings.apply_policy: jq not on PATH\n' >&2
-        return "${BRIK_EXIT_MISSING_DEP:-3}"
+        return "$BRIK_EXIT_MISSING_DEP"
     fi
 
     local tmp
-    tmp="$(mktemp "${sarif_out}.XXXXXX")" || return "${BRIK_EXIT_IO_FAILURE:-6}"
+    tmp="$(mktemp "${sarif_out}.XXXXXX")" || return "$BRIK_EXIT_IO_FAILURE"
 
     # KCOV_EXCL_START -- jq script body is not bash code
     jq --arg     preset        "$preset" \
@@ -345,14 +345,14 @@ findings.apply_policy() {
     ' "$sarif_in" > "$tmp" || {
         rm -f "$tmp"
         printf 'findings.apply_policy: jq processing failed for %s\n' "$sarif_in" >&2
-        return "${BRIK_EXIT_IO_FAILURE:-6}"
+        return "$BRIK_EXIT_IO_FAILURE"
     }
     # KCOV_EXCL_STOP
 
     mv "$tmp" "$sarif_out" || {
         rm -f "$tmp"
         printf 'findings.apply_policy: cannot write %s\n' "$sarif_out" >&2
-        return "${BRIK_EXIT_IO_FAILURE:-6}"
+        return "$BRIK_EXIT_IO_FAILURE"
     }
     return 0
 }
@@ -383,12 +383,12 @@ findings.apply_policy() {
 findings.aggregate() {
     if [[ $# -lt 2 ]]; then
         printf 'findings.aggregate: missing arguments (expected: stage sarif_path)\n' >&2
-        return "${BRIK_EXIT_INVALID_INPUT:-2}"
+        return "$BRIK_EXIT_INVALID_INPUT"
     fi
     local stage="$1" sarif_path="$2"
     if [[ -z "$stage" ]]; then
         printf 'findings.aggregate: stage must not be empty\n' >&2
-        return "${BRIK_EXIT_INVALID_INPUT:-2}"
+        return "$BRIK_EXIT_INVALID_INPUT"
     fi
 
     [[ -f "$sarif_path" ]] || return 0
@@ -527,12 +527,12 @@ findings.aggregate() {
 findings.process() {
     if [[ $# -lt 2 ]]; then
         printf 'findings.process: missing arguments (expected: stage tool_sarif)\n' >&2
-        return "${BRIK_EXIT_INVALID_INPUT:-2}"
+        return "$BRIK_EXIT_INVALID_INPUT"
     fi
     local stage="$1" tool_sarif="$2"
     if [[ -z "$stage" ]]; then
         printf 'findings.process: stage must not be empty\n' >&2
-        return "${BRIK_EXIT_INVALID_INPUT:-2}"
+        return "$BRIK_EXIT_INVALID_INPUT"
     fi
 
     [[ -f "$tool_sarif" ]] || return 0
@@ -591,12 +591,12 @@ findings.process() {
 findings.scan_gate() {
     if [[ $# -lt 3 ]]; then
         printf 'findings.scan_gate: missing arguments (expected: stage tool_rc sarif_path)\n' >&2
-        return "${BRIK_EXIT_INVALID_INPUT:-2}"
+        return "$BRIK_EXIT_INVALID_INPUT"
     fi
     local stage="$1" tool_rc="$2" sarif_path="$3"
     if [[ -z "$stage" ]]; then
         printf 'findings.scan_gate: stage must not be empty\n' >&2
-        return "${BRIK_EXIT_INVALID_INPUT:-2}"
+        return "$BRIK_EXIT_INVALID_INPUT"
     fi
 
     if [[ -f "$sarif_path" ]]; then
@@ -614,7 +614,7 @@ findings.scan_gate() {
                 if findings.gate "$stage" 2>/dev/null; then
                     return 0
                 fi
-                return "${BRIK_EXIT_CHECK_FAILED:-10}"
+                return "$BRIK_EXIT_CHECK_FAILED"
             fi
         fi
     fi
@@ -633,12 +633,12 @@ findings.scan_gate() {
 findings.gate() {
     if [[ $# -lt 1 ]]; then
         printf 'findings.gate: missing argument (expected: stage)\n' >&2
-        return "${BRIK_EXIT_INVALID_INPUT:-2}"
+        return "$BRIK_EXIT_INVALID_INPUT"
     fi
     local stage="$1"
     if [[ -z "$stage" ]]; then
         printf 'findings.gate: stage must not be empty\n' >&2
-        return "${BRIK_EXIT_INVALID_INPUT:-2}"
+        return "$BRIK_EXIT_INVALID_INPUT"
     fi
 
     local backend
@@ -670,7 +670,7 @@ findings.gate() {
     failing="${failing:-0}"
 
     if (( failing > 0 )); then
-        return "${BRIK_EXIT_CHECK_FAILED:-10}"
+        return "$BRIK_EXIT_CHECK_FAILED"
     fi
     return 0
 }
@@ -697,55 +697,55 @@ findings.gate() {
 findings.from_json() {
     if [[ $# -lt 3 ]]; then
         printf 'findings.from_json: missing arguments (expected: tool input output)\n' >&2
-        return "${BRIK_EXIT_INVALID_INPUT:-2}"
+        return "$BRIK_EXIT_INVALID_INPUT"
     fi
     local tool="$1" input="$2" output="$3"
 
     if [[ -z "$tool" ]]; then
         printf 'findings.from_json: tool must not be empty\n' >&2
-        return "${BRIK_EXIT_INVALID_INPUT:-2}"
+        return "$BRIK_EXIT_INVALID_INPUT"
     fi
     # Tool names interpolate into a path and a function name; constrain to
     # alnum + underscore to keep the dispatcher safe against directory
     # traversal (e.g. "../../sarif") even when tool is supplied dynamically.
     if [[ ! "$tool" =~ ^[A-Za-z][A-Za-z0-9_]*$ ]]; then
         printf 'findings.from_json: invalid tool name (expected ^[A-Za-z][A-Za-z0-9_]*$): %s\n' "$tool" >&2
-        return "${BRIK_EXIT_INVALID_INPUT:-2}"
+        return "$BRIK_EXIT_INVALID_INPUT"
     fi
     if [[ ! -f "$input" ]]; then
         printf 'findings.from_json: input not found: %s\n' "$input" >&2
-        return "${BRIK_EXIT_IO_FAILURE:-6}"
+        return "$BRIK_EXIT_IO_FAILURE"
     fi
 
     local converter_path="${BASH_SOURCE[0]%/*}/findings/converters/${tool}.sh"
     if [[ ! -f "$converter_path" ]]; then
         printf 'findings.from_json: no converter registered for tool %s (expected %s)\n' \
             "$tool" "$converter_path" >&2
-        return "${BRIK_EXIT_CONFIG_ERROR:-7}"
+        return "$BRIK_EXIT_CONFIG_ERROR"
     fi
 
     # shellcheck source=/dev/null
     . "$converter_path" || {
         printf 'findings.from_json: failed to source converter %s\n' "$converter_path" >&2
-        return "${BRIK_EXIT_FAILURE:-1}"
+        return "$BRIK_EXIT_FAILURE"
     }
 
     local fn="findings.converters.${tool}.to_sarif"
     if ! declare -f "$fn" >/dev/null 2>&1; then
         printf 'findings.from_json: converter module did not define %s\n' "$fn" >&2
-        return "${BRIK_EXIT_CONFIG_ERROR:-7}"
+        return "$BRIK_EXIT_CONFIG_ERROR"
     fi
 
     local out_dir
     out_dir="$(dirname "$output")"
     mkdir -p "$out_dir" || {
         printf 'findings.from_json: cannot create output directory: %s\n' "$out_dir" >&2
-        return "${BRIK_EXIT_IO_FAILURE:-6}"
+        return "$BRIK_EXIT_IO_FAILURE"
     }
 
     "$fn" "$input" "$output" || {
         printf 'findings.from_json: converter failed for tool %s\n' "$tool" >&2
-        return "${BRIK_EXIT_FAILURE:-1}"
+        return "$BRIK_EXIT_FAILURE"
     }
 
     findings.from_sarif "$tool" "$output"
@@ -804,11 +804,11 @@ findings.merge_pipeline() {
 
     if ! command -v jq >/dev/null 2>&1; then
         printf 'findings.merge_pipeline: jq is required\n' >&2
-        return "${BRIK_EXIT_MISSING_DEP:-3}"
+        return "$BRIK_EXIT_MISSING_DEP"
     fi
     if [[ ! -d "$artifacts" ]]; then
         printf 'findings.merge_pipeline: no brik-artifacts directory: %s\n' "$artifacts" >&2
-        return "${BRIK_EXIT_IO_FAILURE:-6}"
+        return "$BRIK_EXIT_IO_FAILURE"
     fi
 
     local sarif_files=()
@@ -832,11 +832,11 @@ findings.merge_pipeline() {
 
     mkdir -p "$artifacts" || {
         printf 'findings.merge_pipeline: cannot create %s\n' "$artifacts" >&2
-        return "${BRIK_EXIT_IO_FAILURE:-6}"
+        return "$BRIK_EXIT_IO_FAILURE"
     }
 
     local tmp
-    tmp="$(mktemp "${out}.XXXXXX")" || return "${BRIK_EXIT_IO_FAILURE:-6}"
+    tmp="$(mktemp "${out}.XXXXXX")" || return "$BRIK_EXIT_IO_FAILURE"
 
     if [[ ${#sarif_files[@]} -eq 0 ]]; then
         # Atomic empty-aggregate write so a disk-full / read-only mount
@@ -850,13 +850,13 @@ findings.merge_pipeline() {
         }' > "$tmp"; then
             rm -f "$tmp"
             printf 'findings.merge_pipeline: jq init failed\n' >&2
-            return "${BRIK_EXIT_IO_FAILURE:-6}"
+            return "$BRIK_EXIT_IO_FAILURE"
         fi
         # KCOV_EXCL_STOP
         mv "$tmp" "$out" || {
             rm -f "$tmp"
             printf 'findings.merge_pipeline: cannot write %s\n' "$out" >&2
-            return "${BRIK_EXIT_IO_FAILURE:-6}"
+            return "$BRIK_EXIT_IO_FAILURE"
         }
         return 0
     fi
@@ -873,14 +873,14 @@ findings.merge_pipeline() {
     ' "${sarif_files[@]}" > "$tmp"; then
         rm -f "$tmp"
         printf 'findings.merge_pipeline: jq merge failed\n' >&2
-        return "${BRIK_EXIT_IO_FAILURE:-6}"
+        return "$BRIK_EXIT_IO_FAILURE"
     fi
     # KCOV_EXCL_STOP
 
     mv "$tmp" "$out" || {
         rm -f "$tmp"
         printf 'findings.merge_pipeline: cannot write %s\n' "$out" >&2
-        return "${BRIK_EXIT_IO_FAILURE:-6}"
+        return "$BRIK_EXIT_IO_FAILURE"
     }
     return 0
 }

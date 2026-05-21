@@ -119,17 +119,17 @@ _registry._load() {
             : # fall through to the normal load path
         else
             printf '[registry] auto-compile failed; run scripts/compile-registry.sh manually\n' >&2
-            return "${BRIK_EXIT_IO_FAILURE:-74}"
+            return "$BRIK_EXIT_IO_FAILURE"
         fi
     else
         printf '[registry] cache not found: %s\n' "$_REGISTRY_CACHE_PATH" >&2
         printf '[registry] run scripts/compile-registry.sh to generate\n' >&2
-        return "${BRIK_EXIT_IO_FAILURE:-74}"
+        return "$BRIK_EXIT_IO_FAILURE"
     fi
   fi
   command -v jq >/dev/null 2>&1 || {
     printf '[registry] jq required\n' >&2
-    return "${BRIK_EXIT_MISSING_DEP:-69}"
+    return "$BRIK_EXIT_MISSING_DEP"
   }
 
   _registry._load_stacks

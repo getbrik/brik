@@ -93,7 +93,7 @@ cli.plan.run() {
     if [[ -n "$format" && "$format" != "json" ]]; then
         printf '[brik plan] --format=%s is not a known format (json)\n' \
             "$format" >&2
-        return "${BRIK_EXIT_INVALID_INPUT:-64}"
+        return "$BRIK_EXIT_INVALID_INPUT"
     fi
 
     passthrough+=(--workspace "$workspace" --mode "$mode")
@@ -110,7 +110,7 @@ cli.plan.run() {
 
     if ! plan_writer.write -- "${passthrough[@]}" >"$tmp_json"; then
         rm -f "$tmp_json"
-        return "${BRIK_EXIT_INVALID_INPUT:-64}"
+        return "$BRIK_EXIT_INVALID_INPUT"
     fi
 
     if [[ "$validate_only" == "true" ]]; then
@@ -124,7 +124,7 @@ cli.plan.run() {
                 jv "$schema" "$tmp_json" >&2 || true
                 rm -f "$tmp_json"
                 printf 'plan.json: schema validation failed\n' >&2
-                return "${BRIK_EXIT_INVALID_INPUT:-64}"
+                return "$BRIK_EXIT_INVALID_INPUT"
             fi
         elif command -v check-jsonschema >/dev/null 2>&1; then
             if check-jsonschema --schemafile "$schema" "$tmp_json" >/dev/null 2>&1; then
@@ -133,12 +133,12 @@ cli.plan.run() {
                 return 0
             else
                 rm -f "$tmp_json"
-                return "${BRIK_EXIT_INVALID_INPUT:-64}"
+                return "$BRIK_EXIT_INVALID_INPUT"
             fi
         else
             rm -f "$tmp_json"
             printf '[brik plan] no JSON Schema validator available (install jv or check-jsonschema)\n' >&2
-            return "${BRIK_EXIT_MISSING_DEP:-69}"
+            return "$BRIK_EXIT_MISSING_DEP"
         fi
     fi
 

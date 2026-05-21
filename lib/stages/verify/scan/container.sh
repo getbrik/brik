@@ -75,7 +75,7 @@ verify.scan.container.run() {
         # propagate the failure as an external dep issue instead of hiding
         # it under the policy gate.
         log.error "container scan tool ${resolved} failed unexpectedly"
-        return "${BRIK_EXIT_EXTERNAL_FAIL:-5}"
+        return "$BRIK_EXIT_EXTERNAL_FAIL"
     fi
 
     # Process the SARIF through the unified ingest -> policy -> aggregate

@@ -136,7 +136,7 @@ plan.compute() {
             --with-package) with_package=true; shift ;;
             --with-deploy)  with_deploy=true; shift ;;
             *) printf '[plan] unknown argument: %s\n' "$1" >&2
-               return "${BRIK_EXIT_INVALID_INPUT:-64}" ;;
+               return "$BRIK_EXIT_INVALID_INPUT" ;;
         esac
     done
 
@@ -147,10 +147,10 @@ plan.compute() {
             printf 'version. Use mode=balanced for per-file impact, or mode=safe for context-only\n' >&2
             printf 'selection. The aggressive mode (per-subproject impact graph) is scheduled for\n' >&2
             printf 'v0.7+. Track at docs/chantiers/20260518_refonte/analysis/monorepo-plan.md\n' >&2
-            return "${BRIK_EXIT_INVALID_INPUT:-64}"
+            return "$BRIK_EXIT_INVALID_INPUT"
             ;;
         *)  printf '[plan] invalid mode: %s (expected safe|balanced|aggressive)\n' "$mode" >&2
-            return "${BRIK_EXIT_INVALID_INPUT:-64}" ;;
+            return "$BRIK_EXIT_INVALID_INPUT" ;;
     esac
 
     local context="snapshot"

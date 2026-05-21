@@ -97,20 +97,20 @@ org_policy.load() {
     cache="$(org_policy.cache_path)"
     mkdir -p "$(dirname "$cache")" || {
         printf 'org_policy.load: cannot create cache directory for %s\n' "$cache" >&2
-        return "${BRIK_EXIT_IO_FAILURE:-6}"
+        return "$BRIK_EXIT_IO_FAILURE"
     }
 
     if ! command -v curl >/dev/null 2>&1; then
         printf 'org_policy.load: curl not on PATH\n' >&2
-        return "${BRIK_EXIT_MISSING_DEP:-3}"
+        return "$BRIK_EXIT_MISSING_DEP"
     fi
     if ! command -v yq >/dev/null 2>&1; then
         printf 'org_policy.load: yq not on PATH\n' >&2
-        return "${BRIK_EXIT_MISSING_DEP:-3}"
+        return "$BRIK_EXIT_MISSING_DEP"
     fi
     if ! command -v jq >/dev/null 2>&1; then
         printf 'org_policy.load: jq not on PATH\n' >&2
-        return "${BRIK_EXIT_MISSING_DEP:-3}"
+        return "$BRIK_EXIT_MISSING_DEP"
     fi
 
     local raw rc
@@ -119,13 +119,13 @@ org_policy.load() {
     if [[ $rc -ne 0 ]]; then
         printf 'org_policy.load: cannot fetch BRIK_POLICY_URL %s (curl rc=%d)\n' \
             "$BRIK_POLICY_URL" "$rc" >&2
-        return "${BRIK_EXIT_CONFIG_ERROR:-7}"
+        return "$BRIK_EXIT_CONFIG_ERROR"
     fi
 
     local json
     if ! json="$(printf '%s\n' "$raw" | yq -o json '.' 2>/dev/null)"; then
         printf 'org_policy.load: malformed YAML at BRIK_POLICY_URL %s\n' "$BRIK_POLICY_URL" >&2
-        return "${BRIK_EXIT_CONFIG_ERROR:-7}"
+        return "$BRIK_EXIT_CONFIG_ERROR"
     fi
 
     local schema="${BRIK_HOME:-/opt/brik}/schemas/policy/v1/brik-policy.schema.json"
@@ -137,7 +137,7 @@ org_policy.load() {
         if ! printf '%s\n' "$json" | jv "$schema" - >/dev/null 2>&1; then
             printf 'org_policy.load: schema validation failed for BRIK_POLICY_URL %s\n' \
                 "$BRIK_POLICY_URL" >&2
-            return "${BRIK_EXIT_CONFIG_ERROR:-7}"
+            return "$BRIK_EXIT_CONFIG_ERROR"
         fi
     fi
 
@@ -171,7 +171,7 @@ org_policy.load() {
         }
     ' 2>/dev/null)" || {
         printf 'org_policy.load: jq filter failed\n' >&2
-        return "${BRIK_EXIT_IO_FAILURE:-6}"
+        return "$BRIK_EXIT_IO_FAILURE"
     }
     # KCOV_EXCL_STOP
 
@@ -204,7 +204,7 @@ org_policy.load() {
     local cache_tmp
     cache_tmp="$(mktemp "${cache}.XXXXXX")" || {
         printf 'org_policy.load: cannot create cache tmp file in %s\n' "$(dirname "$cache")" >&2
-        return "${BRIK_EXIT_IO_FAILURE:-6}"
+        return "$BRIK_EXIT_IO_FAILURE"
     }
     # KCOV_EXCL_START -- jq script body is not bash code
     if ! jq -n \
@@ -224,13 +224,13 @@ org_policy.load() {
     ' > "$cache_tmp"; then
         rm -f "$cache_tmp"
         printf 'org_policy.load: cannot build compiled cache for %s\n' "$cache" >&2
-        return "${BRIK_EXIT_IO_FAILURE:-6}"
+        return "$BRIK_EXIT_IO_FAILURE"
     fi
     # KCOV_EXCL_STOP
     if ! mv "$cache_tmp" "$cache"; then
         rm -f "$cache_tmp"
         printf 'org_policy.load: cannot install compiled cache to %s\n' "$cache" >&2
-        return "${BRIK_EXIT_IO_FAILURE:-6}"
+        return "$BRIK_EXIT_IO_FAILURE"
     fi
 
     return 0
