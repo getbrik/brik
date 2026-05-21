@@ -223,7 +223,9 @@ cli.extension.test() {
         # The dry-call subshell keeps stubbed report.record + log.* in
         # scope, sources every .sh under <ext>/lib/ (so api.required
         # symbols become available regardless of file layout), then
-        # invokes the function with a clean PATH (mktemp+coreutils only).
+        # invokes the function with an empty PATH so external toolchains
+        # (go, npm, mvn, ...) are unavailable and a build wrapper degrades
+        # to its skip path instead of launching a real build.
         # `|| true` keeps `set -e` from short-circuiting when the
         # subshell exits with no-symbol (rc=1). We rely on the textual
         # output (`no-symbol` vs `rc=<n>`) to decide pass/fail, not on
@@ -231,9 +233,13 @@ cli.extension.test() {
         out="$(BRIK_WORKSPACE="$ws" \
                BRIK_CONFIG_FILE="$ws/brik.yml" \
                BRIK_EXT_RECORD_LOG="$record_log" \
-               PATH="/usr/bin:/bin" \
             bash -c '
                 set +e
+                # Empty PATH: external toolchains (go, npm, mvn, ...) become
+                # unavailable so a build wrapper degrades to its skip path.
+                # Set inside the body, not as a command prefix, so the bash
+                # binary itself is still resolved via the caller PATH.
+                PATH=""
                 shopt -s globstar nullglob
                 report.record() { printf "%s\t%s\t%s\t%s\n" "${1-}" "${2-}" "${3-}" "${4-}" >> "$BRIK_EXT_RECORD_LOG"; }
                 log.info()  { :; }
