@@ -102,17 +102,6 @@ and exits 0. On failure exits with `BRIK_EXIT_INVALID_INPUT` (64).
 Useful in CI before pushing a plan downstream: catches a planner
 regression at the boundary rather than at the adapter that consumes it.
 
-### `brik plan --format gitlab-child --out <path>`
-
-Computes the plan, writes it to `<path>`, and emits a sibling GitLab
-child-pipeline YAML at `${path%.json}.yml`. The child includes the
-parent `pipeline.yml` template, overrides every skipped non-notify job
-with `rules: when: never`, and re-emits a custom `brik-notify` job
-that needs only the run-decision siblings.
-
-Without `--out`, the YAML is printed on stdout and the plan is
-discarded -- useful for `--dry-run`-style adapter scripts.
-
 ### `brik plan gate <stage_id> [--strict]`
 
 Decides run/skip for `<stage_id>` against the active plan. Return
@@ -130,8 +119,7 @@ codes:
 
 Without `--strict`, a missing plan file returns rc=0 (run) so
 pre-v0.6 setups keep working. Adapters that **require** a plan to
-exist (e.g. the GitLab dynamic-child orchestrator) pass `--strict` to
-fail loudly on a misconfigured pipeline.
+exist pass `--strict` to fail loudly on a misconfigured pipeline.
 
 ## Idioms
 
@@ -158,8 +146,8 @@ done
 This is exactly what `pipeline.run` does today
 ([`lib/pipeline/pipeline.sh:275-291`](../../lib/pipeline/pipeline.sh)).
 Adapters that orchestrate outside of `pipeline.run` (Jenkins Groovy,
-GitLab dynamic child) call `brik plan gate <id>` from their host
-language instead of sourcing the bash API.
+GitLab job templates) call `brik plan gate <id>` from their host
+context instead of sourcing the bash API.
 
 ### Adapter: pick a runner image per stage
 

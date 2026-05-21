@@ -1,7 +1,7 @@
 Describe "brik plan (CLI surface)"
-  # Covers the cli.plan.run forms not exercised by plan_gate_spec.sh or
-  # plan_gitlab_child_spec.sh: default compute + --out, --explain,
-  # --validate-only, and the --format rejection path.
+  # Covers the cli.plan.run forms not exercised by plan_gate_spec.sh:
+  # default compute + --out, --explain, --validate-only, and the
+  # --format rejection path.
 
   setup_ws() {
     PLAN_WS="$(mktemp -d)"

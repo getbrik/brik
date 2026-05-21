@@ -9,6 +9,8 @@ brik-test:
   # underlying coverage file may be cobertura or jacoco.
   coverage: '/\[brik\] coverage: ([\d\.]+)%/'
   needs:
+    - job: brik-plan
+      artifacts: true
     - job: brik-init
       artifacts: true
     - job: brik-build
@@ -31,6 +33,7 @@ brik-test:
       - "${BRIK_BUILD_STACK}-default"
     policy: pull
   script:
+    - . /tmp/brik-plan-gate.sh test
     - bash -c '. /tmp/brik-bootstrap.sh && brik.gitlab.run_stage test'
   artifacts:
     when: always

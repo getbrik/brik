@@ -1,0 +1,46 @@
+# Brik Plan Stage
+#
+# Runs the planner against the working tree and writes plan.json. Every
+# downstream stage job consults it via `brik plan gate <stage>` (sourced
+# from /tmp/brik-plan-gate.sh): when the plan marks the stage skip, the
+# job records a not-applicable fragment and exits 0; otherwise it runs
+# the stage. plan.json is the single source of truth, byte-identical to
+# the plan consumed by the Jenkins and local adapters.
+
+brik-plan:
+  stage: plan
+  needs: []
+  script:
+    - |
+      set -euo pipefail
+      # Source the bootstrap DIRECTLY in this shell (not via `bash -c`) so the
+      # BRIK_* env exports set by brik.gitlab.setup (BRIK_COMMIT_TAG,
+      # BRIK_BRANCH, BRIK_COMMIT_SHA, ...) are visible to `brik plan` below:
+      # the planner runs as a separate process line, so it must inherit the
+      # env from the outer shell.
+      . /tmp/brik-bootstrap.sh
+      # Auto-resolve the opt-in flags from CI context so the planner default
+      # mirrors the fixed-flow semantics:
+      #   - tag push (CI_COMMIT_TAG set) -> --with-release --with-package
+      #     (a release pipeline always cuts a release and a package).
+      #   - BRIK_WITH_DEPLOY=true CI variable -> --with-deploy.
+      # Projects that need finer control set the CI vars BRIK_WITH_RELEASE,
+      # BRIK_WITH_PACKAGE, BRIK_WITH_DEPLOY directly.
+      _opts=()
+      if [ -n "${CI_COMMIT_TAG:-}" ] || [ "${BRIK_WITH_RELEASE:-false}" = "true" ]; then
+        _opts+=(--with-release)
+      fi
+      if [ -n "${CI_COMMIT_TAG:-}" ] || [ "${BRIK_WITH_PACKAGE:-false}" = "true" ]; then
+        _opts+=(--with-package)
+      fi
+      if [ "${BRIK_WITH_DEPLOY:-false}" = "true" ]; then
+        _opts+=(--with-deploy)
+      fi
+      brik plan --workspace "${CI_PROJECT_DIR}" \
+                --out "${CI_PROJECT_DIR}/.brik-logs/plan.json" \
+                "${_opts[@]}"
+  artifacts:
+    when: always
+    paths:
+      - .brik-logs/plan.json
+    expire_in: 1 week

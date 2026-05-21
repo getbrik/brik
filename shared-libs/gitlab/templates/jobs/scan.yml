@@ -6,6 +6,8 @@ brik-scan:
   stage: verify
   image: "${BRIK_SCANNER_IMAGE}"
   needs:
+    - job: brik-plan
+      artifacts: true
     - job: brik-init
       artifacts: true
     - job: brik-build
@@ -28,6 +30,7 @@ brik-scan:
       - "${BRIK_BUILD_STACK}-default"
     policy: pull
   script:
+    - . /tmp/brik-plan-gate.sh scan
     - bash -c '. /tmp/brik-bootstrap.sh && brik.gitlab.run_stage scan'
   artifacts:
     when: always

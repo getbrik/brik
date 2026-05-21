@@ -88,7 +88,7 @@ Override at the CLI with `brik plan --mode <m>`.
 |---|---|
 | Local (`brik run pipeline --auto-select`) | `${BRIK_WORKSPACE}/.brik-logs/plan.json` |
 | Jenkins (`brikPipeline`) | `${WORKSPACE}/.brik-logs/plan.json`, exposed as `BRIK_PLAN_FILE` |
-| GitLab dynamic child | parent's `brik-plan` job artifact at `.brik-logs/plan.json` |
+| GitLab | the `brik-plan` job artifact at `.brik-logs/plan.json` |
 
 The `pipeline.plan.*` API in [`lib/planning/plan_reader.sh`](../../lib/planning/plan_reader.sh)
 is the consumer interface:
@@ -108,7 +108,6 @@ pipeline.plan.fingerprint            # sha256 of the current plan
 brik plan --out .brik-logs/plan.json          # default: safe mode
 brik plan --explain                            # human summary, no file
 brik plan --mode balanced --with-deploy        # flip a stage's opt-in
-brik plan --format gitlab-child --out child.json  # also emits child.yml for the GitLab adapter
 brik plan --validate-only                      # produces a plan, validates schema, discards
 brik plan gate lint                            # 0/1 per stage; on skip, writes the
                                                # not-applicable fragment for the report
@@ -127,10 +126,11 @@ In Jenkins (`brikPipeline.groovy`), each downstream stage runs through
 skipped stage stays in the Stage View as "skipped per plan" and its
 fragment is still stashed so `brik-notify` aggregates it.
 
-In GitLab (dynamic child), the parent's `brik-plan` job produces the
-child YAML. Skipped stages get a `rules: when: never` override; the
-child's `brik-notify` pulls the parent's skip fragments via
-`needs:pipeline:job:` so the final report is complete.
+In GitLab, the `brik-plan` job computes the plan and every stage job
+sources `/tmp/brik-plan-gate.sh <id>` -- the same `brik plan gate`
+round-trip as Jenkins. A skipped stage shows as a green "skipped (per
+plan)" job and its not-applicable fragment is uploaded so `brik-notify`
+aggregates it into the final report.
 
 ## Adding a stage to the plan
 

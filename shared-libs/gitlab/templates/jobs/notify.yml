@@ -1,9 +1,13 @@
 # Brik Notify Stage
-# Prints pipeline summary. Always runs regardless of previous stage results.
+# Prints pipeline summary and aggregates the per-stage report fragments
+# (including the not-applicable fragments written by the plan gate of
+# skipped stages). Always runs regardless of previous stage results.
 
 brik-notify:
   stage: notify
   needs:
+    - job: brik-plan
+      artifacts: true
     - job: brik-init
       artifacts: true
     - job: brik-release
@@ -28,6 +32,9 @@ brik-notify:
       artifacts: true
       optional: true
     - job: brik-container-scan
+      artifacts: true
+      optional: true
+    - job: brik-promote
       artifacts: true
       optional: true
     - job: brik-deploy
@@ -57,6 +64,6 @@ brik-notify:
       # jobs (cf. spec/integration/gitlab_dotenv_parity_spec.sh). Notify
       # is the terminal stage of the fixed flow today, so no consumer
       # downstream of brik-notify exists -- the declaration is kept for
-      # parity uniformity and future-proofing (child pipelines, retries).
+      # parity uniformity and future-proofing (retries).
       dotenv: .brik-logs/pipeline.env
       sast: brik-artifacts/gl-sast-report.json

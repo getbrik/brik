@@ -41,22 +41,21 @@ git push origin v0.6.0
 
 ## 3. Add the bootstrap file to your project
 
-Add a `.gitlab-ci.yml` to your project root. The recommended include is
-the dynamic parent + child template, which adds impact-driven stage
-selection (docs-only commits skip the lint / test grid without
-spinning up runner containers):
+Add a `.gitlab-ci.yml` to your project root:
 
 ```yaml
 include:
   - project: 'brik/gitlab-templates'
     ref: v0.6.0
-    file: '/templates/dynamic-pipeline.yml'
+    file: '/templates/pipeline.yml'
 ```
 
-The legacy `/templates/pipeline.yml` still works and is kept until
-v0.8.0; new projects should pick the dynamic template from the start.
-See [platforms/gitlab-dynamic-pipeline.md](../platforms/gitlab-dynamic-pipeline.md)
-for the migration diff if you already include the legacy file.
+This is a single classic pipeline: a `brik-plan` job computes the
+execution plan, then every stage job consults it and skips itself when
+the plan marks the stage not-applicable -- a docs-only commit shows the
+skipped stages as green "skipped (per plan)" jobs without running their
+work. See [platforms/gitlab.md](../platforms/gitlab.md) for the full
+job graph.
 
 ## 4. Add a `brik.yml`
 
