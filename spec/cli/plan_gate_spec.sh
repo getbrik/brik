@@ -70,5 +70,17 @@ JSON
       The status should equal 2
       The stderr should include "requires a stage id"
     End
+
+    It "rejects an unknown option"
+      When run script "$BRIK_BIN" plan gate --bogus
+      The status should equal 2
+      The stderr should include "unknown option"
+    End
+
+    It "rejects a second positional argument"
+      When run script "$BRIK_BIN" plan gate init build
+      The status should equal 2
+      The stderr should include "unexpected argument"
+    End
   End
 End

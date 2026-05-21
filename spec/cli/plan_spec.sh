@@ -70,4 +70,46 @@ Describe "brik plan (CLI surface)"
       The stderr should be present
     End
   End
+
+  Describe "opt-in gate flags"
+    # --with-release / --with-package / --with-deploy flip the opt-in gates
+    # so the matching stages decide "run" in the plan.
+    It "accepts --with-release"
+      When run script "$BRIK_BIN" plan --workspace "$PLAN_WS" --mode safe \
+        --with-release --explain
+      The status should equal 0
+      The output should include "release"
+    End
+
+    It "accepts --with-package"
+      When run script "$BRIK_BIN" plan --workspace "$PLAN_WS" --mode safe \
+        --with-package --explain
+      The status should equal 0
+      The output should include "package"
+    End
+
+    It "accepts --with-deploy"
+      When run script "$BRIK_BIN" plan --workspace "$PLAN_WS" --mode safe \
+        --with-deploy --explain
+      The status should equal 0
+      The output should include "deploy"
+    End
+  End
+
+  Describe "pipeline.selection.mode from brik.yml"
+    # When --mode is omitted, cli.plan.run reads pipeline.selection.mode
+    # from the workspace brik.yml via config.get.
+    setup_cfg() {
+      printf 'version: 1\nproject:\n  name: plan-cfg\n  stack: node\npipeline:\n  selection:\n    mode: balanced\n' \
+        > "$PLAN_WS/brik.yml"
+    }
+    Before 'setup_cfg'
+
+    It "reads the selection mode from the project brik.yml"
+      When run script "$BRIK_BIN" plan --workspace "$PLAN_WS" --explain
+      The status should equal 0
+      The output should include "mode"
+      The output should include "balanced"
+    End
+  End
 End
