@@ -58,7 +58,7 @@
       }
     },
     "tech": {
-      "description": "Technical traceability payload. Open object: per-stage sub-chantiers (Phase 3) populate stack-specific fields without bumping schema_version. v1.0 also recognises the typed v1.1 field tech.kind (forward-compat) so producers can opt into the new enum-constrained label without bumping schema_version.",
+      "description": "Technical traceability payload. Open object: per-stage producers populate stack-specific fields without bumping schema_version. v1.0 also recognises the typed v1.1 field tech.kind (forward-compat) so producers can opt into the new enum-constrained label without bumping schema_version.",
       "type": "object",
       "additionalProperties": true,
       "properties": {
@@ -83,7 +83,7 @@
       }
     },
     "business": {
-      "description": "Business outcome payload. Open object: per-stage sub-chantiers (Phase 3) populate domain-specific fields without bumping schema_version. v1.0 also recognises the typed v1.1 fields business.status and business.reason (forward-compat) so producers can opt into the new enum-constrained outcome without bumping schema_version.",
+      "description": "Business outcome payload. Open object: per-stage producers populate domain-specific fields without bumping schema_version. v1.0 also recognises the typed v1.1 fields business.status and business.reason (forward-compat) so producers can opt into the new enum-constrained outcome without bumping schema_version.",
       "type": "object",
       "additionalProperties": true,
       "properties": {
@@ -99,7 +99,7 @@
       }
     },
     "env": {
-      "description": "Cross-stage environment variables published by the stage (chantier env-channels-unification). Each entry is a KEY=VALUE pair appended to .brik-logs/pipeline.env by the post-stage projection hook so downstream stages can read it via pipeline.env.load. Keys SHOULD follow the BRIK_* convention; values are strings.",
+      "description": "Cross-stage environment variables published by the stage. Each entry is a KEY=VALUE pair appended to .brik-logs/pipeline.env by the post-stage projection hook so downstream stages can read it via pipeline.env.load. Keys SHOULD follow the BRIK_* convention; values are strings.",
       "type": "object",
       "additionalProperties": {
         "type": "string"

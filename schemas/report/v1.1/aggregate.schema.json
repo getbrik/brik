@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://brik.dev/schemas/report/v1.1/aggregate.schema.json",
   "title": "Brik Pipeline Report Aggregate v1.1",
-  "description": "Cross-stage aggregated pipeline report. v1.1 introduces pipeline.context (snapshot vs release) which drives the business filter, pipeline.business (overall outcome derived from per-stage business.status), and summary.business (counts of success / warning / error across stages). The legacy summary.warnings array is removed: warnings now live as business.status=warning on individual fragments. See chantier docs/chantiers/20260510_tech-business-orthogonal-axes.md.",
+  "description": "Cross-stage aggregated pipeline report. v1.1 introduces pipeline.context (snapshot vs release) which drives the business filter, pipeline.business (overall outcome derived from per-stage business.status), and summary.business (counts of success / warning / error across stages). The legacy summary.warnings array is removed: warnings now live as business.status=warning on individual fragments.",
   "type": "object",
   "required": ["schema_version", "pipeline", "stages", "summary"],
   "additionalProperties": false,
@@ -263,7 +263,7 @@
       }
     },
     "proof": {
-      "description": "Optional proof envelope: hash of the report itself, links to retained artefacts, signature flag. v1.1 inherits the v1.0 contract; supply-chain signing remains a Phase 4 concern.",
+      "description": "Optional proof envelope: hash of the report itself, links to retained artefacts, signature flag. v1.1 inherits the v1.0 contract; supply-chain signing remains a future concern.",
       "type": "object",
       "additionalProperties": false,
       "properties": {
