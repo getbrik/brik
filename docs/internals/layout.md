@@ -104,12 +104,12 @@ Notes on the mindmap:
 
 - **Stages** lists the 11 CI-visible stages. The internal umbrella directory
   `lib/stages/verify/` (host of `format.sh`, `type_check.sh`, `scan/`) is used
-  by `lint`, `sast`, and `scan`, but is not itself a CI-visible stage. Phase 4bis
-  (optional, deferred) would promote `verify` to a top-level stage.
+  by `lint`, `sast`, and `scan`, but is not itself a CI-visible stage. Promoting
+  `verify` to a top-level stage is an optional, deferred change.
 - **Stages.sonar** is on the roadmap but blocked on a SonarQube component in
-  briklab. Design frozen in `docs/chantiers/20260421_sonar-quality-gate.md`.
+  briklab.
 - **Transverse helpers** still do not include `cache` (out of scope).
-  `artifacts` was reintroduced in v0.5.0 to support `business.artifact.main_file`
+  `artifacts` was reintroduced to support `business.artifact.main_file`
   and the HTML report download, but stays scoped to the `business` / `report`
   modules -- it is not a transverse helper.
 - **CLI** is not part of the domain notions; it is a command layer that sits
@@ -175,7 +175,7 @@ Key relations:
 ## Invariants
 
 - No `lib/core/` directory. The old dispatcher layer was inlined into the stages
-  and CLI it fed (Phase 4.5 Lot 1-8).
+  and CLI it fed.
 - No indirect expansion (`${!var}`) outside `lib/transverse/env.sh`. All indirect
   reads go through `transverse.env.resolve_indirect`.
 - No manual poll loops. The only `while elapsed < timeout; check; sleep` pattern

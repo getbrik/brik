@@ -23,8 +23,7 @@ Every function below resolves the plan file in this order:
 
 When none of these exist, the API defaults to "run everything"
 (`should_run` returns 0, other accessors return empty stdout with rc=0).
-This is the **backward-compat default** for v0.5.x-style pipelines that
-do not invoke the planner.
+This is the **default** for pipelines that do not invoke the planner.
 
 ### Functions
 
@@ -36,9 +35,9 @@ do not invoke the planner.
 | `pipeline.plan.gate <stage_id> [<plan_file>]` | gate.mode on stdout | `blocking` or `opt_in`. Empty when no plan exists. |
 | `pipeline.plan.stages [<plan_file>]` | one id per line | Canonical stage order from the plan. Empty when no plan exists -- callers can fall back to `registry.stage.list`. |
 | `pipeline.plan.fingerprint [<plan_file>]` | 64-hex sha256 | Empty when no plan exists. Lets adapters cache across pipelines. |
-| `pipeline.plan.release_profile [<plan_file>]` | profile enum on stdout | Phase 9.A. Empty when no plan exists. |
-| `pipeline.plan.release_version [<plan_file>]` | semver on stdout | Phase 9.A. Empty when no plan exists. |
-| `pipeline.plan.is_candidate [<plan_file>]` | rc=0 (candidate) / rc=1 (not) | Phase 9.A. No stdout. rc=1 when no plan exists. |
+| `pipeline.plan.release_profile [<plan_file>]` | profile enum on stdout | Empty when no plan exists. |
+| `pipeline.plan.release_version [<plan_file>]` | semver on stdout | Empty when no plan exists. |
+| `pipeline.plan.is_candidate [<plan_file>]` | rc=0 (candidate) / rc=1 (not) | No stdout. rc=1 when no plan exists. |
 
 ### Convention notes
 
@@ -50,7 +49,7 @@ do not invoke the planner.
   (CLI sub-command, see below).
 - The accessors all require `jq` to be on `PATH`. If `jq` is missing,
   `should_run` defaults to rc=0 (run) so a misconfigured runtime
-  degrades to v0.5.x behavior rather than blocking the pipeline.
+  degrades to run-everything behavior rather than blocking the pipeline.
 
 ## The `brik plan` CLI
 
@@ -118,7 +117,7 @@ codes:
   `--strict`.
 
 Without `--strict`, a missing plan file returns rc=0 (run) so
-pre-v0.6 setups keep working. Adapters that **require** a plan to
+setups without a plan keep working. Adapters that **require** a plan to
 exist pass `--strict` to fail loudly on a misconfigured pipeline.
 
 ## Idioms

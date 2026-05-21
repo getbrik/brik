@@ -36,7 +36,7 @@
       "type": "object",
       "additionalProperties": false,
       "required": ["profile", "version", "is_candidate"],
-      "description": "Release state computed by Phase 9.A. Adapters consume this to decide candidate vs release routing in the promote stage (Phase 9.B-E). Stable per-commit -- two plans on the same SHA produce the same release block.",
+      "description": "Release state computed by the init stage. Adapters consume this to decide candidate vs release routing in the promote stage. Stable per-commit -- two plans on the same SHA produce the same release block.",
       "properties": {
         "profile": {
           "type": "string",
@@ -50,7 +50,7 @@
         },
         "is_candidate": {
           "type": "boolean",
-          "description": "True when the current commit is a release candidate (BRIK_COMMIT_TAG set, or profile-specific condition in Phase 9.B-E). Adapters use this to gate the promote stage."
+          "description": "True when the current commit is a release candidate (BRIK_COMMIT_TAG set, or a profile-specific condition). Adapters use this to gate the promote stage."
         }
       }
     },

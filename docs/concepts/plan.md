@@ -48,7 +48,7 @@ Key fields:
 | Field | Meaning |
 |---|---|
 | `context` | `snapshot` for tag-less commits, `release` when `BRIK_COMMIT_TAG` is set. Mirrors the `pipeline.context` concept. |
-| `mode` | `safe` (default), `balanced`, or `aggressive` (v0.7+, currently errors). |
+| `mode` | `safe` (default), `balanced`, or `aggressive` (not yet implemented; currently errors). |
 | `stages[].decision` | `run` or `skip`. |
 | `stages[].reason` | Machine-readable code: `context-match`, `context-mismatch`, `opt-in-flag-missing`, `no-impact`, `no-impact-declared`, `no-diff`, `impacted`. |
 | `stages[].gate.mode` | `blocking` or `opt_in`, mirroring the manifest's `spec.gate.mode`. |
@@ -65,7 +65,7 @@ HEAD with the same flags produce strictly identical bytes.
 |---|---|---|
 | `safe` | Context only (`gate.contexts`) and opt-in flags | Default. Runs every blocking stage applicable to the current context. |
 | `balanced` | Above + per-stage impact globs vs the changed-file set | Skip a stage when none of the changed files match its `spec.impact.changes` (or the inherited `spec.impact.use_stack_impact` set). |
-| `aggressive` | Per-subproject impact graph | **Deferred to v0.7+.** Planner returns rc=64 with an actionable message. See [`docs/chantiers/20260518_refonte/analysis/monorepo-plan.md`](../chantiers/20260518_refonte/analysis/monorepo-plan.md). |
+| `aggressive` | Per-subproject impact graph | **Not yet implemented.** The planner returns rc=64 with an actionable message. |
 
 Set the default mode for a project in `brik.yml`:
 
@@ -75,7 +75,7 @@ pipeline:
     mode: balanced
     stages:
       # Optional per-stage glob overrides (not yet wired into the
-      # planner in v0.6 -- the registry's spec.impact wins).
+      # planner -- the registry's spec.impact wins).
       lint:
         changes: ["src/**/*.ts"]
 ```
@@ -119,7 +119,7 @@ In the bash runtime, `pipeline.run` honors `BRIK_PLAN_FILE`
 automatically: when set, the in-process gatekeeper skips every stage
 the plan marks `skip` and records a `not-applicable` fragment with the
 plan's reason. Without the env var, the runtime behaves exactly like
-v0.5.x (the gate is a no-op).
+the pre-planner runtime (the gate is a no-op).
 
 In Jenkins (`brikPipeline.groovy`), each downstream stage runs through
 `planSaysRun(<id>)` -- a `sh "brik plan gate <id>"` round-trip. A

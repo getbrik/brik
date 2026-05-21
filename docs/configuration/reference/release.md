@@ -13,7 +13,7 @@ SemVer + Conventional Commits + `CHANGELOG.md` workflow.
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `release.strategy` | enum (`semver`, `calver`, `custom`) | `semver` | Release strategy. |
-| `release.profile` | enum (`trunk-based`, `git-flow`, `github-flow`, `none`) | `none` | Git workflow profile that drives candidate detection in Phase 9.A. trunk-based: candidate on every push to the default branch; git-flow: candidate on release/* branches; github-flow: candidate on every PR-merged commit on main; none: no candidate detection (status quo, the release stage runs only on a tag push). The profile is informational in v0.6/v0.7 (the planner stamps it into plan.json so adapters can branch on it); the promote stage in 9.B-E consumes it to decide whether to push to the candidate or release registry. |
+| `release.profile` | enum (`trunk-based`, `git-flow`, `github-flow`, `none`) | `none` | Git workflow profile that drives candidate detection. trunk-based: candidate on every push to the default branch; git-flow: candidate on release/* branches; github-flow: candidate on every PR-merged commit on main; none: no candidate detection (status quo, the release stage runs only on a tag push). The profile is informational (the planner stamps it into plan.json so adapters can branch on it); the promote stage consumes it to decide whether to push to the candidate or release registry. |
 | `release.tag_prefix` | string | `v` | Prefix for release tags (e.g. 'v'). |
 
 ### `release.trigger`
@@ -28,13 +28,13 @@ SemVer + Conventional Commits + `CHANGELOG.md` workflow.
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `release.candidate.docker` | object | -- | Candidate Docker registry. Phase 9.B. |
+| `release.candidate.docker` | object | -- | Candidate Docker registry. |
 
 ### `release.release`
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `release.release.docker` | object | -- | Release Docker registry. Phase 9.B. |
+| `release.release.docker` | object | -- | Release Docker registry. |
 
 ### `release.changelog`
 

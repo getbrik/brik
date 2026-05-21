@@ -176,9 +176,8 @@ node stack's source globs propagate to every code-touching stage.
 ## spec.consumes + spec.provides
 
 Document the data contract between stages. Currently informational
-(used by `registry.explain` and the HTML report). Future planner
-phases (chantier 20260518 D.5) will use these for parallelism graph
-resolution.
+(used by `registry.explain` and the HTML report). A future planner
+release will use these for parallelism graph resolution.
 
 ```yaml
 consumes: [pipeline.context]

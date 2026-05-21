@@ -143,8 +143,8 @@ intent, the answer is almost always one of:
    `expires`  this is the supported path.
 2. Adjust `quality.findings.policy` at the project level to pick a
    different preset.
-3. Open a chantier to change the matrix itself  reserved for
-   org-wide policy shifts (cf. `docs/chantiers/`).
+3. Change the matrix itself -- an org-wide policy shift decided
+   outside an individual project.
 
 Never disable the matrix by exporting `BRIK_CONTINUE_ON_ERROR=1` in CI;
 that hides risk without recording it, which is the watermelon failure

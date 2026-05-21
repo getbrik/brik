@@ -10,7 +10,7 @@ what filters the planner applies before emitting a decision.
 |---|---|---|---|---|
 | `safe` | yes | yes | no | run all (no filter to begin with) |
 | `balanced` | yes | yes | yes (glob match) | run all (no-diff conservative) |
-| `aggressive` | -- | -- | -- | -- (errors: deferred to v0.7+) |
+| `aggressive` | -- | -- | -- | -- (errors: not yet implemented) |
 
 The two filters above the impact filter (context + opt-in) are common
 across `safe` and `balanced`; only the impact filter and the cold-start
@@ -74,14 +74,13 @@ to silently skip critical verification.
 ```text
 plan.compute --mode aggressive
 # -> exits 64 (BRIK_EXIT_INVALID_INPUT)
-# -> stderr explains: per-subproject impact graph is scheduled for v0.7+
+# -> stderr explains: per-subproject impact graph is not yet implemented
 ```
 
 The aggressive mode is reserved for a per-subproject impact graph (the
 monorepo case: each subproject's stages only run if its own paths
-changed). It is intentionally a hard error in v0.6 so users do not
-configure it and silently get balanced behavior. Tracking:
-[`docs/chantiers/20260518_refonte/analysis/monorepo-plan.md`](../chantiers/20260518_refonte/analysis/monorepo-plan.md).
+changed). It is intentionally a hard error so users do not configure
+it and silently get balanced behavior.
 
 ## Reason taxonomy
 
@@ -107,7 +106,7 @@ closed set:
 | Stable monorepo subproject with declared impact globs | `balanced` |
 | Release/tag pipelines (must run every blocking stage) | `safe` |
 | Doc-only PRs in a busy repo | `balanced` (the planner skips lint/test/build with `no-impact`) |
-| Multi-subproject monorepo with cross-cutting changes | `safe` until aggressive lands in v0.7+ |
+| Multi-subproject monorepo with cross-cutting changes | `safe` until aggressive mode is implemented |
 
 ## Switching modes safely
 

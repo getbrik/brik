@@ -1,8 +1,7 @@
 # Extensions: adding a custom stack or stage
 
-Brik's registry was built from the start to be extended (D.1-D.5 of the
-architecture refactor). This page covers the **minimal extension
-surface** that ships in v0.6:
+Brik's registry was built from the start to be extended. This page
+covers the **minimal extension surface** that ships today:
 
 - declare a new stack or stage by dropping a manifest into a directory
   you control,
@@ -10,17 +9,16 @@ surface** that ships in v0.6:
   `BRIK_REGISTRY_EXTENSIONS_DIRS`,
 - ship the matching Bash module alongside the manifest.
 
-What v0.6 does **not** provide (deferred to v0.7+):
+What Brik does **not** provide yet:
 
 - a marketplace / discovery mechanism,
 - signed manifests or lockfiles (no `brik.lock` enforcement),
 - CI allowlists,
 - runtime hot-reload.
 
-The decision rationale is documented in
-[`docs/chantiers/20260518_refonte_architecture-extensive-phases.md`](../chantiers/20260518_refonte_architecture-extensive-phases.md)
-section D.6: until at least one external consumer documents a real use
-case, adding distribution machinery would be premature complexity.
+The decision rationale: until at least one external consumer documents
+a real use case, adding distribution machinery would be premature
+complexity.
 
 ## Anatomy of an extension
 
@@ -121,8 +119,8 @@ BRIK_REGISTRY_EXTENSIONS_DIRS="/path/to/my-extensions" \
 The script:
 
 - merges builtins + extensions into one canonical `registry.json`,
-- refuses any `metadata.id` collision with a hard error (v0.7+ will
-  introduce `spec.replaces` for explicit overrides),
+- refuses any `metadata.id` collision with a hard error (a future
+  release will introduce `spec.replaces` for explicit overrides),
 - emits the sha256 of the cache so CI can detect drift.
 
 ## Step 3: ship the Bash module
@@ -182,8 +180,8 @@ and the five contract checks it performs.
 
 ## Constraints and gotchas
 
-- **No `replaces` in v0.6.** A custom manifest with the same `id` as a
-  builtin is refused. Once `brik.lock` lands in v0.7+, explicit replace
+- **No `replaces` yet.** A custom manifest with the same `id` as a
+  builtin is refused. Once `brik.lock` lands, explicit replace
   semantics will be reintroduced; for now, fork the builtin.
 - **No cycle detection across extensions.** A stage that declares
   `placement.after: [my-other-stage]` works only if `my-other-stage` is
@@ -194,13 +192,12 @@ and the five contract checks it performs.
   `compile-registry.sh` after editing a manifest is the most common
   mistake; the schema-drift CI job catches it before merge.
 - **Schema versioning is fixed for 12 months** per ADR-003. Manifests
-  written against `apiVersion: brik.dev/v1` keep working through v0.6
-  and v0.7.
+  written against `apiVersion: brik.dev/v1` keep working for the full
+  12-month window.
 
-## Reopening the full extension chantier
+## Reopening full extension support
 
-Open a new chantier
-`docs/chantiers/20260YYY_extension-distribution.md` when:
+Revisit extension distribution when:
 
 - at least one external consumer documents a real use case, AND
 - ADR-003 has been in application for 3+ months without re-revision.
