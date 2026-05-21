@@ -69,6 +69,6 @@ accept both during the deprecation window.
   `plan.json`.
 - [`docs/registry/`](../registry/) -- the registry the planner reads
   from. Stages and stacks declare their `gate`, `impact`, and
-  `runner_class` here.
-- [ADR-001 -- manifest format](../../docs/adr/ADR-001-manifest-format.md)
-  -- why YAML at author time, JSON at runtime.
+  `runner_class` here. Manifests are authored in YAML (comments,
+  multi-line strings, natural nesting) and compiled to JSON, which is
+  what the runtime parses with `jq`.

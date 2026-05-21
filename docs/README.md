@@ -30,7 +30,7 @@ Install Brik and run your first pipeline.
 
 How Brik works, and why it is shaped this way.
 
-- [Fixed flow](concepts/fixed-flow.md) -- the 11 stages, their order, the parallel verify group, the quality gate
+- [Fixed flow](concepts/fixed-flow.md) -- the 12 stages, their order, the parallel verify group, the quality gate
 - [Pipeline context](concepts/pipeline-context.md) -- snapshot vs release, and how that decides fail-fast behavior
 - [Plan](concepts/plan.md) -- the reproducible per-commit plan: which stages run, why, and the safe/balanced selection modes
 - [Business outcome](concepts/business-outcome.md) -- the tech/business two-axis model and the decision matrix
@@ -68,7 +68,7 @@ Running Brik in production: secrets, policy, and the pipeline report.
 
 For contributors and advanced integrators.
 
-- [Layout](internals/layout.md) -- the nine domain notions and the `lib/` tree
+- [Layout](internals/layout.md) -- the domain notions and the `lib/` tree (ten domain directories)
 - [Stage lifecycle](internals/stage-lifecycle.md) -- what `stage.run` does around every stage
 - [Extending a stack](internals/extending-stack.md) -- add support for a new language
 - [Extending a stage](internals/extending-stage.md) -- add a stage to the fixed flow

@@ -18,6 +18,7 @@ your `PATH` (for example `~/.local/bin/jv`).
 
 | Target | What it does |
 |--------|--------------|
+| `make help` | Show available targets |
 | `make test` | Run all ShellSpec tests (parallel) |
 | `make test-quick` | Run tests, stop on first failure |
 | `make lint` | Run ShellCheck on all production scripts |
@@ -88,7 +89,7 @@ scripts change.
 
 ## See also
 
-- [Layout](layout.md) -- the nine domain notions and the `lib/` tree
+- [Layout](layout.md) -- the domain notions and the `lib/` tree (ten domain directories)
 - [Extending a stack](extending-stack.md) -- add a language ecosystem
 - [Extending a stage](extending-stage.md) -- add to the fixed flow
 - [Briklab](briklab.md) -- the end-to-end test infrastructure

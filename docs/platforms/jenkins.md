@@ -15,6 +15,13 @@ Jenkinsfile (2 lines)
         -> portable stages  (lib/stages/*.sh via stage.run)
 ```
 
+The fixed flow is:
+
+```
+Init -> Plan -> Release -> Build -> Lint||SAST||Scan||Test -> Package
+     -> Container Scan -> Deploy -> Notify
+```
+
 All stage logic lives in portable Bash. The Groovy layer only handles SCM
 checkout, stash/unstash, `archiveArtifacts`, and the Notify `finally`
 orchestration. `shared-libs/jenkins/vars/` defines six small variables:
@@ -57,6 +64,24 @@ Specialized images, same as on GitLab:
 If `stack` is unset or unrecognized, no image is resolved and stages run
 directly on the Jenkins agent (same as `useDockerAgent: false`).
 
+## Stage selection
+
+After Init, `brikPipeline` runs a **Plan** stage. The planner runs on the
+agent (it only needs `jq`/`yq`/`git`) and writes `.brik-logs/plan.json`,
+pointed at via the `BRIK_PLAN_FILE` env var. Every subsequent stage is
+plan-driven: the `runStageWithPlan` helper still creates the Jenkins stage
+block -- so the Stage View records skipped entries -- but the stage body
+only runs when `brik plan gate <stage>` (the `planSaysRun` check) returns
+zero. On a skip, the gate records a not-applicable fragment so the
+aggregate report explains why the stage did not run.
+
+The planner gates Release, Package, and Deploy off by default. `brikPipeline`
+translates CI context into the matching opt-in flags: a tag context
+(`BRIK_TAG` or `TAG_NAME` set) enables `--with-release` and `--with-package`,
+and the `BRIK_WITH_DEPLOY` job parameter enables `--with-deploy`. If the
+planner fails, the pipeline echoes a notice and falls back to the legacy
+unconditional flow (`BRIK_PLAN_FILE` unset means every gate returns true).
+
 ## Parameters
 
 `brikPipeline` accepts:
@@ -76,13 +101,14 @@ brikPipeline(useDockerAgent: false)   // run on the agent instead of containers
 
 ### Job parameters (user-overridable inputs)
 
-`brikPipeline.groovy` declares two job parameters via
+`brikPipeline.groovy` declares three job parameters via
 `properties([parameters([...])])`:
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `BRIK_DRY_RUN` | `booleanParam` | `false` | Skip destructive deploy actions (compose up, k8s apply, helm upgrade, argocd sync, rsync). Print what would run instead. |
 | `BRIK_TAG` | `stringParam` | `""` | Release tag for this build (e.g. `v0.1.0`). Leave empty for snapshot builds. Mirrors GitLab `CI_COMMIT_TAG`. |
+| `BRIK_WITH_DEPLOY` | `booleanParam` | `false` | Opt into the deploy stage. The planner skips deploy by default even on tag pushes; set to true to actually run it. |
 
 **First-build gotcha**: Jenkins registers parameters declared via
 `properties([parameters([...])])` only *after* the first build of a job
@@ -99,7 +125,7 @@ same parameters on the job itself to make them visible from creation.
 | Jenkins variable | Brik variable | Notes |
 |------------------|---------------|-------|
 | `GIT_BRANCH` | `BRIK_BRANCH` | `origin/` prefix stripped automatically |
-| `TAG_NAME` | `BRIK_TAG` | |
+| `TAG_NAME` | `BRIK_TAG` | Precedence: a pre-existing `BRIK_TAG` env var (e.g. set via `buildWithParameters`) wins, then `TAG_NAME`, then `git describe --tags --exact-match` on true tag-scan builds. |
 | `GIT_COMMIT` | `BRIK_COMMIT_SHA` | |
 | `GIT_COMMIT[0:7]` | `BRIK_COMMIT_SHORT_SHA` | |
 | `BRIK_TAG` or `BRIK_BRANCH` | `BRIK_COMMIT_REF` | Tag takes priority |
@@ -117,14 +143,16 @@ as `BRIK_HOME` -- no extra clone.
 
 With `useDockerAgent: true`, `brikPipeline` runs Init on the agent to read
 `brik.yml`, resolves the stack image, pulls it, and runs Build, Lint, Test, and
-Package inside it; SAST, Scan, and Deploy use their specialized images. It
+Package inside it. Init and Notify run in the base image; SAST runs in the
+analysis image; Scan and Container Scan run in the scanner image; Deploy runs
+in the deploy image. It
 auto-detects the Docker network from the Jenkins container, mounts
 `/var/run/docker.sock` for the Package stage, and sets `HOME=$WORKSPACE` so tool
 caches (`npm`, `pip`, `Maven`, `Gradle`, `Cargo`, `NuGet`) persist in the
 workspace across builds. The `cleanWs` step preserves those cache directories.
 
-Environment variables matching `NEXUS_*`, `BRIK_*`, `REGISTRY_*`, or `ARGOCD_*`
-are forwarded into the containers via an env file.
+Environment variables matching `NEXUS_*`, `BRIK_*`, `REGISTRY_*`, `ARGOCD_*`,
+`CARGO_*`, or `SSH_*` are forwarded into the containers via an env file.
 
 ## Prerequisites
 

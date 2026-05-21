@@ -68,16 +68,17 @@ pipeline failed on a finding (CVE / rule / vulnerability)
 A `brik-policy.yml` entry that records an accepted risk looks like:
 
 ```yaml
-cve_allowlist:
-  - id: CVE-2026-04141
-    reason: |
-      Reachable via the legacy /admin endpoint which is behind the
-      internal VPN gateway; not exposed publicly. Upstream wont-fix
-      because the affected version is past EOL.
-      Upstream issue: https://github.com/example/lib/issues/4231
-    expires: 2026-09-30
-    projects:
-      - getbrik/legacy-admin
+allow:
+  cve:
+    - id: CVE-2026-04141
+      reason: |
+        Reachable via the legacy /admin endpoint which is behind the
+        internal VPN gateway; not exposed publicly. Upstream wont-fix
+        because the affected version is past EOL.
+        Upstream issue: https://github.com/example/lib/issues/4231
+      expires: 2026-09-30
+      projects:
+        - getbrik/legacy-admin
 ```
 
 The required fields per entry are the schema-level minimum

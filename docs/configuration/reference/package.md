@@ -63,7 +63,8 @@ non-release builds.
 `docker buildx build --load` is preferred when buildx is available on
 the runner; otherwise the wrapper falls back to legacy `docker build`
 with a warning. The image is loaded into the local Docker daemon by
-default so the subsequent `publish.docker` stage can push it.
+default so the publish targets, which run later within the same
+`package` stage, can push it.
 
 ## Registry UI link
 

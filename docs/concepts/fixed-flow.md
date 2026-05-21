@@ -1,6 +1,6 @@
 # The Fixed Flow
 
-Every Brik pipeline runs the same 11 stages in the same order. You do not
+Every Brik pipeline runs the same 12 stages in the same order. You do not
 define pipeline structure; you configure behavior *within* each stage through
 `brik.yml`. This is deliberate: a fixed flow makes pipelines consistent,
 auditable, and predictable across every project and every platform.
@@ -20,8 +20,9 @@ flowchart LR
     scan -. quality gate .-> package
     test --> package
     package --> cscan["Container Scan"]
-    test --> deploy["Deploy"]
-    cscan -. optional .-> deploy
+    cscan --> promote["Promote"]
+    promote --> deploy["Deploy"]
+    test --> deploy
     deploy --> notify["Notify"]
 ```
 
@@ -30,7 +31,11 @@ single `verify` stage; on other platforms, the same fan-out pattern). The order
 is implemented by `lib/pipeline/pipeline.sh` (`pipeline.run`) and mirrored by
 each platform adapter.
 
-## The 11 stages
+Before the 12 stages, a platform-level **plan gate** runs: a `brik-plan` job
+computes `plan.json` and each stage job consults it via `brik plan gate`,
+selecting which stages actually run. See [plan](plan.md) for the details.
+
+## The 12 stages
 
 | Stage | File | What happens |
 |-------|------|--------------|
@@ -43,8 +48,9 @@ each platform adapter.
 | Test | `lib/stages/test.sh` | Install dependencies and run the test suite via `stacks.<stack>.test`. |
 | Package | `lib/stages/package.sh` | Build the container image (`stacks.docker.build`). Opt-in (`--with-package`) and gated by `package.trigger`. |
 | Container Scan | `lib/stages/container_scan.sh` | Scan the built image for vulnerabilities. |
+| Promote | `lib/stages/promote.sh` | Re-tag the audited image from the candidate registry to the release registry. Runs only in a release context (a tag push); self-skips when no promotion is configured. |
 | Deploy | `lib/stages/deploy.sh` | Deploy each configured environment (k8s, helm, gitops, compose, ssh). Opt-in (`--with-deploy`) and gated by `deploy.trigger`. |
-| Notify | `lib/stages/notify.sh` | Assemble the pipeline report and send notifications (Slack, email, webhook). |
+| Notify | `lib/stages/notify.sh` | Assemble the pipeline report and send notifications (Slack, email, webhook). Opt-in (gated by `--with-deploy`). When the Notify stage is skipped, the aggregate report is still rendered by `pipeline.run` outside the stage loop. |
 
 Lint, SAST, and Scan are three distinct CI-visible stages. They share an
 internal implementation library under `lib/stages/verify/`, but that directory
@@ -60,12 +66,13 @@ packaged or deployed" a structural property, not a convention.
 
 ## Opt-in stages and triggers
 
-The pipeline is deterministic -- there are no manual gates inside it. Three
-stages are *opt-in* and *trigger-gated*:
+The pipeline is deterministic -- there are no manual gates inside it. Five
+stage manifests (`lib/registry/manifests/stages/`) declare `gate.mode: opt_in`:
 
-- **Release**, **Package**, and **Deploy** only run when the matching flag is
-  passed (`--with-release`, `--with-package`, `--with-deploy`). On GitLab and
-  Jenkins the platform adapter sets these from the pipeline context.
+- **Release** (`--with-release`), **Package** (`--with-package`),
+  **Container Scan** (`--with-package`), **Deploy** (`--with-deploy`), and
+  **Notify** (`--with-deploy`) only run when the matching flag is passed. On
+  GitLab and Jenkins the platform adapter sets these from the pipeline context.
 - When a `release.trigger` / `package.trigger` / `deploy.trigger` block is
   present in `brik.yml`, the stage runs only if at least one trigger flag
   matches the current context; otherwise it is short-circuited with
@@ -84,12 +91,11 @@ selects which image; the stage logic is identical regardless.
 
 | Stage | Image | Why |
 |-------|-------|-----|
-| Init | `brik-runner-base` | Reads `brik.yml`, validates the schema, resolves the stack image for downstream stages |
-| Release, Build, Lint, Test, Package | `brik-runner-<stack>` | Stack-native tools (npm, mvn, cargo, eslint, ruff, ...) |
+| Init, Release, Notify | `brik-runner-base` | Init reads `brik.yml` and resolves the stack image; Release (`runner.class: base`) computes the version; Notify aggregates fragments and posts notifications |
+| Build, Lint, Test, Package | `brik-runner-<stack>` | Stack-native tools (npm, mvn, cargo, eslint, ruff, ...) |
 | SAST | `brik-runner-analysis` | semgrep, checkov, scancode, license_finder |
 | Scan, Container Scan | `brik-runner-scanner` | grype, syft, osv-scanner, gitleaks, trufflehog, hadolint, dockle |
-| Deploy | `brik-runner-deploy` | helm, kubectl, argocd, docker compose, ssh, rsync |
-| Notify | `brik-runner-base` | Aggregates per-stage fragments, posts notifications |
+| Promote, Deploy | `brik-runner-deploy` | Promote re-tags images across registries; Deploy runs helm, kubectl, argocd, docker compose, ssh, rsync |
 
 Images come from [brik-images](https://github.com/getbrik/brik-images). The Init
 stage resolves `brik-runner-<stack>` from `project.stack` and

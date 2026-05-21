@@ -30,7 +30,8 @@ sources can provide a value:
 | 3 | Stack default (auto, from `project.stack`) | `eslint` for `node`, `ruff` for `python` |
 
 Tier 1 always wins. Tier 2 is consulted when Tier 1 is unset. Tier 3 is
-the silent fallback when neither is set, derived from `lib/stacks/<stack>.sh`.
+the silent fallback when neither is set, derived from the config modules
+`lib/transverse/config/<stack>.sh` (`config.<stack>.default`).
 
 The same pattern applies to `build.{command,tool}`, `test.{command,framework}`,
 `quality.{format,type_check}.{command,tool}`, and most `security.*.{command,tool}`

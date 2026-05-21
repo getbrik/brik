@@ -24,6 +24,7 @@ spec:
     image: ghcr.io/my-org/brik-runner-my-stack
     defaultVersion: "1"
   api:
+    module: stacks.<id>
     required:
       - stacks.<id>.build
       - stacks.<id>.test
@@ -86,9 +87,11 @@ runner:
 | `versions` | Allowed values for `project.stackVersion`. Validated at config load time. |
 
 Consumers: `lib/pipeline/runner-images.sh` resolves the image to pull
-via `registry.stack.runner_image <id> [--version <v>]`. The Jenkins
-wrapper, the GitLab template, and the local wrapper all go through the
-same resolver -- the manifest is the only place that knows the image.
+via `registry.stack.runner_image <id>`, which takes only the stack id
+and returns the bare image ref; the version tag is resolved separately
+from `defaultVersion` / `versions`. The Jenkins wrapper, the GitLab
+template, and the local wrapper all go through the same resolver -- the
+manifest is the only place that knows the image.
 
 ## spec.cache
 
@@ -159,6 +162,7 @@ exports.
 
 ```yaml
 api:
+  module: stacks.<id>
   required:
     - stacks.<id>.build
     - stacks.<id>.test
@@ -167,9 +171,15 @@ api:
     - stacks.<id>.package
 ```
 
-`registry.stack.api_required <id>` returns the list. The runtime then
-checks `declare -f stacks.<id>.build` for each required function and
-fails the build with a precise error if any is missing.
+| Field | Required | Semantics |
+|---|---|---|
+| `module` | yes | Dotted path to the Bash module the loader sources for this stack. |
+| `required` | yes | Functions that must be defined; the loader fails the build if any is missing. |
+| `optional` | no | Functions the stack may define; absence is not an error. |
+
+`registry.stack.api_required <id>` returns the required list. The
+runtime then checks `declare -f stacks.<id>.build` for each required
+function and fails the build with a precise error if any is missing.
 
 ## spec.doctor
 
@@ -193,14 +203,15 @@ package stage to know what to archive.
 
 ```yaml
 artifacts:
-  outputDirs: [dist, build]
+  output_dirs: [dist, build]
   patterns:
     - "dist/**/*"
     - "*.tgz"
 ```
 
 `registry.stack.artifact_output_dirs <id>` / `artifact_patterns <id>`
-serve these to consumers.
+serve these to consumers. The schema field is `output_dirs`
+(snake_case).
 
 ## spec.system
 
@@ -242,6 +253,7 @@ spec:
     test:   ["**/*.test.js", "**/*.test.ts", "**/*.spec.js", "**/*.spec.ts"]
     build:  [package.json, tsconfig.json, .nvmrc]
   api:
+    module: stacks.node
     required:
       - stacks.node.build
       - stacks.node.test

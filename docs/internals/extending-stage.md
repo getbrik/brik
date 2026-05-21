@@ -40,7 +40,7 @@ brik/
     pipeline/               Execution engine: stage.run, pipeline.run, loader,
                             logging, context, report, hooks, tools, bootstrap
     cli/                    CLI command modules (validate, doctor, init, run, ...)
-    stages/                 The 11 pipeline stages
+    stages/                 The 12 pipeline stages
       verify/               Internal umbrella consumed by lint/sast/scan/container-scan
         verify.sh           verify.run dispatcher
         format.sh, lint.sh, type_check.sh

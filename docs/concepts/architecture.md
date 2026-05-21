@@ -62,7 +62,7 @@ wraps every stage: `stage.run` (lifecycle engine), structured logging,
 execution context, pre/post hooks, error handling, step summaries. It knows
 nothing about CI/CD -- it only runs functions with observability.
 
-**Layer 1 -- brik-lib** (`lib/{stages,stacks,deployments,rollout,package-managers,transverse,cli}/`).
+**Layer 1 -- brik-lib** (`lib/{stages,stacks,deployments,rollout,package-managers,planning,registry,transverse,cli}/`).
 Reusable CI/CD business functions organized by domain. Each function performs
 one CI/CD action for one stack or tool. Layer 1 depends on Layer 0 for logging
 and context but knows nothing about any CI platform.
@@ -106,8 +106,8 @@ single command with clear error messages.
 
 ## See also
 
-- [Fixed flow](fixed-flow.md) -- the 11 stages and their order
+- [Fixed flow](fixed-flow.md) -- the 12 stages and their order
 - [Data layout](data-layout.md) -- the runtime on-disk contract (`brik-artifacts/` vs `.brik-logs/`)
-- [Layout](../internals/layout.md) -- the nine domain notions and the `lib/` tree
+- [Layout](../internals/layout.md) -- the domain notions and the `lib/` tree (ten domain directories)
 - [Stage lifecycle](../internals/stage-lifecycle.md) -- the `stage.run` lifecycle in detail
 - [Business outcome](business-outcome.md) -- the tech/business two-axis result model

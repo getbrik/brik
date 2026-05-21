@@ -25,7 +25,7 @@ spec:
   runner:
     class: stack                    # stack | base | scanner | analysis | deploy
   gate:
-    mode: opt_in                    # always | opt_in | context_only
+    mode: opt_in                    # blocking | opt_in
     opt_in_flag: --with-my-stage
     contexts: [snapshot, release]
 ```
@@ -89,10 +89,11 @@ Stages in the same slot with no `after`/`before` between them are
 free to run in parallel on platforms that support it (GitLab matrix,
 Jenkins parallel).
 
-The compiler resolves all placements into a total order accessible
-via `registry.stage.list` and field
-`registry.stage.placement_rank <id>`. Cycles abort the compile with
-the offending path.
+The loader resolves all placements into a total order accessible via
+`registry.stage.list` -- that ordered list is the only thing exposed,
+there is no per-stage rank accessor. The topological sort applies a
+depth fallback rather than aborting, so an unresolvable `after`/`before`
+edge sorts the stage last instead of failing the load.
 
 ## spec.runner
 
@@ -165,13 +166,15 @@ impact:
 ```
 
 A stage with `impact.changes` runs when the diff touches at least one
-matching path. Stages without `impact.changes` either always run
-(`gate.mode: always`) or rely on opt-in / context filters.
+matching path. Stages without `impact.changes` either run on every
+applicable context (`gate.mode: blocking`) or rely on opt-in / context
+filters.
 
-The flag `impact.use_stack_impact: true` (boolean) makes the planner
-delegate to the active stack's `spec.impact.source` instead of
-declaring stage-local globs. Used by `build`, `lint`, `test` so the
-node stack's source globs propagate to every code-touching stage.
+The field `impact.use_stack_impact` is a string enum (`source`,
+`test`, or `build`) that makes the planner delegate to the named glob
+set on the active stack's `spec.impact` instead of declaring
+stage-local globs. Used by `build`, `lint`, `test` so the node stack's
+source globs propagate to every code-touching stage.
 
 ## spec.consumes + spec.provides
 
@@ -213,30 +216,54 @@ api:
   optional: [stages.release.preflight]
 ```
 
-## spec.replaces
+## metadata.aliases
 
-Stage-level aliases. When a manifest declares `replaces: [old-name]`,
-the runtime treats `brik run stage old-name` as
-`brik run stage <new-id>`. Used during migrations where a stage was
-renamed but consumers still reference the old name.
+Stage-level aliases. `metadata.aliases` is an array of alternate ids;
+when a manifest declares them, the runtime treats `brik run stage
+<alias>` as `brik run stage <canonical-id>`. Used during migrations
+where a stage was renamed but consumers still reference the old name.
 
 ```yaml
-replaces: [quality]                # lint stage absorbed the old "quality" stage
+metadata:
+  id: lint
+  displayName: Lint
+  aliases: [quality]               # lint stage absorbed the old "quality" stage
 ```
 
 `registry.stage.aliases <id>` returns the list. The dispatcher
 consults it before failing with "unknown stage".
 
+## spec.replaces
+
+`spec.replaces` is a separate, single-string field naming one stage
+this manifest supersedes. It is not a list and not an alias map. A
+manifest that declares `spec.replaces` **must** also declare
+`spec.compatibility` (the schema requires the pair) so the runtime can
+verify the replacement honors the same contract as the stage it
+replaces.
+
+```yaml
+spec:
+  replaces: legacy-scan            # single string, not a list
+  compatibility:
+    mustProvideSameAs: legacy-scan
+```
+
 ## spec.compatibility
 
-Declares cross-stage compatibility requirements. Used by extensions
-that depend on a specific runtime range.
+Declares the contract a replacing stage must honor. Required whenever
+`spec.replaces` is set. The schema allows exactly two keys:
 
 ```yaml
 compatibility:
-  minBrikVersion: "0.6.0"
-  requiresStages: [init, release]   # refuse to load if these stages are absent
+  mustProvideSameAs: legacy-scan    # this stage must provide everything the named stage provides
+  provides: [scan.report]           # capabilities this stage guarantees to emit
 ```
+
+| Field | Semantics |
+|---|---|
+| `mustProvideSameAs` | A stage id. The replacing stage must provide at least every capability the named stage provides. |
+| `provides` | Explicit list of dotted capability keys this stage emits. |
 
 ## Worked example: the release manifest
 

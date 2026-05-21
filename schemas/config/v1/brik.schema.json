@@ -699,7 +699,7 @@
               "minLength": 1
             },
             "tags": {
-              "description": "List of tags to push. If empty, uses BRIK_VERSION.",
+              "description": "List of tags to push. If empty, uses BRIK_APP_VERSION.",
               "type": "array",
               "items": {
                 "type": "string",
@@ -841,7 +841,7 @@
           "minLength": 1
         },
         "when": {
-          "description": "Condition expression evaluated by the shared library to decide whether this environment is deployed. Supports branch equality (branch == 'main'), glob matching (tag =~ 'v*'), and native CI variables ($CI_PIPELINE_SOURCE == 'merge_request_event').",
+          "description": "Condition expression evaluated by the shared library to decide whether this environment is deployed. Supports branch equality (branch == 'main'), glob matching (tag =~ 'v*'), the pipeline_source subject (pipeline_source == 'merge_request_event'), and BRIK_* environment variables.",
           "type": "string",
           "minLength": 1
         },

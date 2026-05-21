@@ -1,32 +1,18 @@
 # Registry architecture
 
-```text
-                  +-------------------------+
-   author edits   |   manifests/*.yml       |
-   YAML --------> |   (stacks + stages)     |
-                  +-----------+-------------+
-                              |
-                              | scripts/compile-registry.sh
-                              | (yq build -> jq -S -> sha256)
-                              v
-                  +-------------------------+
-                  |   cache/registry.json   |   <- deterministic, checked in
-                  +-----------+-------------+
-                              |
-                              | lib/registry/_loader.sh
-                              | (single jq pass at first call)
-                              v
-                  +-------------------------+
-                  |   in-memory associative |
-                  |   arrays per stack/stage|
-                  +-----------+-------------+
-                              |
-                              | lib/registry/registry.sh
-                              v
-                  +-------------------------+
-   consumers ---> |   registry.stack.*      |
-                  |   registry.stage.*      |
-                  +-------------------------+
+```mermaid
+flowchart TD
+    author["author edits YAML"]
+    manifests["manifests/*.yml<br/>(stacks + stages)"]
+    cache["cache/registry.json<br/>deterministic, gitignored build artifact"]
+    memory["in-memory associative arrays<br/>per stack / stage"]
+    api["registry.stack.*<br/>registry.stage.*"]
+    consumers["consumers"]
+    author --> manifests
+    manifests -->|"compile-registry.sh: yq build, jq -S, sha256"| cache
+    cache -->|"_loader.sh: single jq pass at first call"| memory
+    memory -->|"registry.sh"| api
+    api --> consumers
 ```
 
 Four layers, decoupled by file formats and one function boundary:
@@ -40,8 +26,7 @@ Four layers, decoupled by file formats and one function boundary:
 
 ## Why YAML at author time and JSON at runtime
 
-[ADR-001](../../docs/adr/ADR-001-manifest-format.md) records the
-decision. The short version:
+The rationale, in short:
 
 - YAML is what humans edit. It supports comments, multi-line strings,
   and reads naturally for the shape of a manifest (nested
@@ -64,9 +49,10 @@ manifest tree produce byte-identical output:
 - no timestamps, no working directory paths, no machine-specific data
   baked into the cache.
 
-CI runs `scripts/compile-registry.sh --check`. The job fails if the
-committed cache does not match a fresh compile, which prevents drift
-between manifests and cache.
+CI runs `scripts/compile-registry.sh --check`. The cache is a
+gitignored build artifact, not a committed file; the check recompiles
+from the manifests and fails if the result is not byte-stable, which
+guards the reproducibility contract.
 
 ## Loader lifecycle
 
@@ -113,13 +99,16 @@ unambiguously (`acme-java`, not `java`).
 ## Stage placement and topological order
 
 Stage manifests declare `spec.placement.{slot, after, before}`. The
-compiler resolves these into a total order written into the cache as
-`stages.<id>.placement.rank`. `registry.stage.list` returns ids in
-ascending rank.
+loader (`_loader.sh`) resolves these into a total order via a
+depth-based topological sort run at cache load time; `registry.stage.list`
+returns ids in that order. The order is the only thing exposed -- there
+is no per-stage rank field in the cache or the public API.
 
-If two stages have conflicting `after`/`before` constraints, the
-compiler aborts with the cycle path. This is checked at compile time
-once, never at runtime.
+The sort has a depth fallback: a stage whose `after`/`before`
+constraints cannot be resolved (e.g. a circular dependency) is assigned
+a sentinel depth and sorted last rather than aborting the load. Neither
+the loader nor `compile-registry.sh` performs an explicit cycle-detection
+abort, so author your `after`/`before` edges carefully.
 
 ## What lives outside the registry
 

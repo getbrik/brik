@@ -70,8 +70,8 @@ when the tool itself treats the finding as blocking by default.
 | eslint | `error` / `2` | high | yes |
 | eslint | `warn` / `warning` / `1` | low | no |
 | eslint | `off` / `0` / other | info | no |
-| ruff | `error` / `E.*` / `F.*` | high | yes |
-| ruff | `warning` / `W.*` / `I.*` | low | no |
+| ruff | `error` / `E#` / `F#` | high | yes |
+| ruff | `warning` / `W#` / `I#` | low | no |
 | ruff | `info` / `note` / other | info | no |
 | checkstyle | `error` | high | yes |
 | checkstyle | `warning` | low | no |
@@ -118,7 +118,7 @@ Per-tool blocking decisions (driver name lowercased):
 | Tool | Blocking when |
 |------|---------------|
 | eslint | `result.level == "error"` |
-| ruff | `ruleId` starts with `E` / `F`, or `level=error` and `ruleId` is not `I*` / `W*` |
+| ruff | `ruleId` starts with `E#` / `F#`, or `level=error` |
 | checkstyle | `result.level == "error"` |
 | dotnet-format | `result.level == "error"` |
 | other | `result.level == "error"` (default fallback) |

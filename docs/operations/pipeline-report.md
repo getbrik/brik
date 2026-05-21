@@ -84,7 +84,8 @@ a dry-run from a real run at a glance.
 
 Each entry in `stages[]` carries `tech` (machine-targeted) and `business`
 (persona-targeted) sub-objects alongside the runtime fields (`stage`, `status`,
-`rc`, `runner`, `duration_ms`, `timestamp`).
+`rc`, `runner`, `duration_ms`, `timestamp`). An optional `env` object is also
+emitted per stage when the fragment producer has stage env data to record.
 
 ### `init`
 
