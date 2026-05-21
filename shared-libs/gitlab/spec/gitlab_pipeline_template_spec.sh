@@ -31,6 +31,14 @@ Describe "shared-libs/gitlab templates - classic plan-aware pipeline"
       The status should be success
     End
 
+    It "seeds cache/artefact markers on the plan-gate skip path"
+      # A plan-skipped job exits before brik.gitlab.run_stage; the gate
+      # helper must seed the markers itself or GitLab logs "no files to
+      # cache/upload" for a green skipped job.
+      When run grep -qF "brik.gitlab.mark_skipped" "$PIPELINE"
+      The status should be success
+    End
+
     It "no longer references the dynamic child pipeline"
       When run grep -qE 'parent_pipeline|dynamic-pipeline|child pipeline' "$PIPELINE"
       The status should be failure

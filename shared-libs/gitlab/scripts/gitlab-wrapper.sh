@@ -171,6 +171,17 @@ _brik_gitlab._ensure_artefact_markers() {
     return 0
 }
 
+# Pre-create the cache/artefact markers for a stage the plan skipped.
+# A plan-skipped stage job exits (via /tmp/brik-plan-gate.sh) before
+# brik.gitlab.run_stage runs, so GitLab's cache/artifact steps would log
+# "no files to cache/upload" for the declared paths. Seeding the markers
+# keeps a skipped job's log as quiet as a job that actually ran.
+# Usage: brik.gitlab.mark_skipped [workspace]
+brik.gitlab.mark_skipped() {
+    _brik_gitlab._ensure_artefact_markers \
+        "${1:-${BRIK_WORKSPACE:-${CI_PROJECT_DIR:-$PWD}}}" >/dev/null 2>&1 || true
+}
+
 # Run a stage by name. Dispatches to portable stages.* functions via stage.run.
 # Usage: brik.gitlab.run_stage <stage_name>
 brik.gitlab.run_stage() {
