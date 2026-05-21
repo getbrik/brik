@@ -306,6 +306,69 @@ Describe "lib/registry/registry.sh"
       When call registry.stage.resolve_alias init
       The output should equal "init"
     End
+
+    It "echoes the input and fails for an unknown name"
+      When call registry.stage.resolve_alias unknown_stage_xyz
+      The status should equal "$BRIK_EXIT_INVALID_INPUT"
+      The output should equal "unknown_stage_xyz"
+    End
+  End
+
+  Describe "registry.stage.display_name"
+    It "returns the displayName for a canonical stage"
+      When call registry.stage.display_name init
+      The status should be success
+      The output should be present
+    End
+
+    It "resolves an alias before reading the displayName"
+      When call registry.stage.display_name quality
+      The status should be success
+      The output should equal "$(registry.stage.display_name lint)"
+    End
+
+    It "fails for an unknown stage name"
+      When call registry.stage.display_name unknown_stage_xyz
+      The status should be failure
+    End
+  End
+
+  Describe "registry.stage.api_required"
+    It "lists the required functions for init"
+      When call registry.stage.api_required init
+      The status should be success
+      The output should be present
+    End
+
+    It "resolves an alias before listing required functions"
+      When call registry.stage.api_required quality
+      The status should be success
+      The output should equal "$(registry.stage.api_required lint)"
+    End
+
+    It "fails for an unknown stage name"
+      When call registry.stage.api_required unknown_stage_xyz
+      The status should be failure
+    End
+  End
+
+  Describe "registry.stage.impact_changes"
+    It "returns success for a canonical stage"
+      When call registry.stage.impact_changes deploy
+      The status should be success
+      The output should be present
+    End
+
+    It "resolves an alias before reading impact changes"
+      When call registry.stage.impact_changes security
+      The status should be success
+      The output should equal "$(registry.stage.impact_changes scan)"
+    End
+
+    It "fails for an unknown stage name"
+      When call registry.stage.impact_changes unknown_stage_xyz
+      The status should be failure
+    End
   End
 
   Describe "registry.stage.function via alias"
@@ -545,9 +608,39 @@ Describe "lib/registry/registry.sh"
       The status should be success
     End
 
+    It "returns success for the security alias of scan"
+      When call registry.stage.exists security
+      The status should be success
+    End
+
     It "returns BRIK_EXIT_INVALID_INPUT (64) for unknown stage"
       When call registry.stage.exists unknown_stage_xyz
       The status should equal "$BRIK_EXIT_INVALID_INPUT"
+    End
+  End
+
+  Describe "registry.explain"
+    It "prints the registry apiVersion and cache path"
+      When call registry.explain
+      The status should be success
+      The output should include "apiVersion: brik.dev/registry/v1"
+      The output should include "cache:"
+    End
+
+    It "lists the stacks section with the builtin stacks"
+      When call registry.explain
+      The status should be success
+      The output should include "Stacks (6):"
+      The output should include "node"
+      The output should include "Node.js"
+    End
+
+    It "lists the stages section in canonical order"
+      When call registry.explain
+      The status should be success
+      The output should include "Stages (12, canonical order):"
+      The output should include "init"
+      The output should include "notify"
     End
   End
 End
