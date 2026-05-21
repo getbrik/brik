@@ -110,6 +110,7 @@ flowchart LR
     test["Test"]
     package["Package"]
     cscan["Container<br/>Scan"]
+    promote["Promote"]
     deploy["Deploy"]
     notify["Notify"]
 
@@ -124,8 +125,9 @@ flowchart LR
     scan -.->|quality gate| package
     test --> package
     package --> cscan
+    cscan --> promote
+    promote --> deploy
     test --> deploy
-    cscan -.-> deploy
     deploy --> notify
 ```
 
@@ -133,6 +135,24 @@ Lint, SAST, Scan, and Test all run **in parallel** after Build. The quality gate
 applies at **Package**: it waits for Test to pass and for Lint/SAST/Scan to
 succeed. See [the fixed flow](docs/concepts/fixed-flow.md) for the full stage
 table and behavior.
+
+## Plan-aware execution
+
+The stage *sequence* is fixed -- but Brik does not blindly run all of it on
+every commit. Before the pipeline starts, a planner computes a **plan**:
+which stages run, and why, for this commit.
+
+- A **docs-only commit** skips the build / lint / test grid -- no runner
+  container is spun up for a stage nothing changed.
+- A **tag push** runs the release path (Release, Package, Promote).
+- The plan is one provider-agnostic object (`plan.json`): GitLab, Jenkins,
+  and local `brik run` consume the same plan, so a commit behaves the same
+  everywhere.
+
+Selection is `safe` by default (commit context only). Set
+`pipeline.selection.mode: balanced` in `brik.yml` to also skip stages that
+no changed file impacts. Inspect the decision for the current commit with
+`brik plan --explain`. See [the plan](docs/concepts/plan.md).
 
 ## Getting started
 
