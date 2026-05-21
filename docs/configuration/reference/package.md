@@ -128,7 +128,7 @@ package:
 ```
 
 The schema validates the value, but the multi-arch build is a runtime
-gap -- track it via a future chantier.
+gap -- it is not yet implemented.
 
 ### Registry with a separate UI host
 

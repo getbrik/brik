@@ -136,7 +136,7 @@
       "additionalProperties": false,
       "properties": {
         "trigger": {
-          "description": "When the release stage should run (SC20). At least one of the flags must be true for the stage to execute. When the entire block is absent, the legacy always-run behaviour is preserved.",
+          "description": "When the release stage should run. At least one of the flags must be true for the stage to execute. When the entire block is absent, the legacy always-run behaviour is preserved.",
           "type": "object",
           "additionalProperties": false,
           "properties": {
@@ -152,18 +152,18 @@
           "default": "semver"
         },
         "profile": {
-          "description": "Git workflow profile that drives candidate detection in Phase 9.A. trunk-based: candidate on every push to the default branch; git-flow: candidate on release/* branches; github-flow: candidate on every PR-merged commit on main; none: no candidate detection (status quo, the release stage runs only on a tag push). The profile is informational in v0.6/v0.7 (the planner stamps it into plan.json so adapters can branch on it); the promote stage in 9.B-E consumes it to decide whether to push to the candidate or release registry.",
+          "description": "Git workflow profile that drives candidate detection. trunk-based: candidate on every push to the default branch; git-flow: candidate on release/* branches; github-flow: candidate on every PR-merged commit on main; none: no candidate detection (status quo, the release stage runs only on a tag push). The profile is informational (the planner stamps it into plan.json so adapters can branch on it); the promote stage consumes it to decide whether to push to the candidate or release registry.",
           "type": "string",
           "enum": ["trunk-based", "git-flow", "github-flow", "none"],
           "default": "none"
         },
         "candidate": {
-          "description": "Candidate-zone artifact configuration (Phase 9.B-E). The candidate zone receives every successful build; the promote stage moves an audited candidate to the release zone on a tag push.",
+          "description": "Candidate-zone artifact configuration. The candidate zone receives every successful build; the promote stage moves an audited candidate to the release zone on a tag push.",
           "type": "object",
           "additionalProperties": false,
           "properties": {
             "docker": {
-              "description": "Candidate Docker registry. Phase 9.B.",
+              "description": "Candidate Docker registry.",
               "type": "object",
               "additionalProperties": false,
               "properties": {
@@ -182,12 +182,12 @@
           }
         },
         "release": {
-          "description": "Release-zone artifact configuration (Phase 9.B-E). The release zone holds promoted artifacts; the promote stage tags and pushes there once a candidate is approved.",
+          "description": "Release-zone artifact configuration. The release zone holds promoted artifacts; the promote stage tags and pushes there once a candidate is approved.",
           "type": "object",
           "additionalProperties": false,
           "properties": {
             "docker": {
-              "description": "Release Docker registry. Phase 9.B.",
+              "description": "Release Docker registry.",
               "type": "object",
               "additionalProperties": false,
               "properties": {
@@ -586,7 +586,7 @@
       "additionalProperties": false,
       "properties": {
         "trigger": {
-          "description": "When the package stage should run (SC20). At least one of the flags must be true for the stage to execute. When the entire block is absent, the legacy always-run behaviour is preserved.",
+          "description": "When the package stage should run. At least one of the flags must be true for the stage to execute. When the entire block is absent, the legacy always-run behaviour is preserved.",
           "type": "object",
           "additionalProperties": false,
           "properties": {
@@ -806,7 +806,7 @@
       "additionalProperties": false,
       "properties": {
         "trigger": {
-          "description": "When the deploy stage should run (SC20). At least one of the flags must be true for the stage to execute. When the entire block is absent, the legacy always-run behaviour is preserved.",
+          "description": "When the deploy stage should run. At least one of the flags must be true for the stage to execute. When the entire block is absent, the legacy always-run behaviour is preserved.",
           "type": "object",
           "additionalProperties": false,
           "properties": {

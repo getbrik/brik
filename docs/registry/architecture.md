@@ -105,8 +105,8 @@ The compiler supports `BRIK_REGISTRY_EXTENSIONS_DIRS` (colon-separated)
 to overlay user-supplied manifests on top of the builtins. See
 [`extensions.md`](../operations/extensions.md) for the walkthrough.
 
-Conflict policy in v0.6: if the same `metadata.id` appears in both a
-builtin and an extension, the compile aborts. A future chantier
+Conflict policy: if the same `metadata.id` appears in both a
+builtin and an extension, the compile aborts. A future release
 introduces explicit overrides; until then, name your stack
 unambiguously (`acme-java`, not `java`).
 

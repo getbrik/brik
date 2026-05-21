@@ -132,7 +132,7 @@ handled by *this* stack. The reverse-lookup
 ## spec.impact
 
 Glob lists feeding the planner's impact filter. Used by
-`brik plan` (chantier 20260518 phase D.4) to decide whether a commit
+`brik plan` to decide whether a commit
 touches code that this stack cares about.
 
 ```yaml

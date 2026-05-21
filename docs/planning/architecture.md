@@ -173,7 +173,7 @@ Hot path observations:
 | Failure | Exit code | Where |
 |---|---|---|
 | Unknown CLI flag | `BRIK_EXIT_INVALID_INPUT` (64) | `cli.plan.run` |
-| `--mode aggressive` | `BRIK_EXIT_INVALID_INPUT` (64) | `plan.compute` (stub: v0.7+) |
+| `--mode aggressive` | `BRIK_EXIT_INVALID_INPUT` (64) | `plan.compute` (stub: not yet implemented) |
 | `--mode <bogus>` | `BRIK_EXIT_INVALID_INPUT` (64) | `plan.compute` |
 | Empty stream after compute | `BRIK_EXIT_INVALID_INPUT` (64) | `plan_writer.from_stream` |
 | `jq` missing | `BRIK_EXIT_MISSING_DEP` (69) | `plan_writer.from_stream`, `cli.plan._render_*` |

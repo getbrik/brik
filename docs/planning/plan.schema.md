@@ -12,10 +12,10 @@ adapter author can read the contract without parsing JSON Schema.
 | `schemaVersion` | string | yes | const `"v1"` | Plans tagged `v1` are accepted by every v0.6.x runtime. |
 | `brikVersion` | string | yes | semver pattern | Informational; never used for gating. Lets adapters log which runtime produced the plan. |
 | `context` | string | yes | enum `snapshot`, `release` | Resolved from `BRIK_COMMIT_TAG` at plan time. `release` when the env var is set; `snapshot` otherwise. |
-| `mode` | string | yes | enum `safe`, `balanced`, `aggressive` | Selection mode. `aggressive` errors out in v0.6 -- it is reserved for the per-subproject impact graph deferred to v0.7+. |
+| `mode` | string | yes | enum `safe`, `balanced`, `aggressive` | Selection mode. `aggressive` errors out -- it is reserved for the per-subproject impact graph, not yet implemented. |
 | `workspace` | string | no | non-empty | Absolute path to the workspace root the plan was computed against. Informational. |
 | `changes` | object | no | see [Changes block](#changes-block) | Snapshot of the changed-files set used by the planner. |
-| `release` | object | yes | see [Release block](#release-block) | Release state (Phase 9.A): profile + project version + candidate flag. |
+| `release` | object | yes | see [Release block](#release-block) | Release state: profile + project version + candidate flag. |
 | `stages` | array | yes | min 1, unique | Per-stage plan entries in topological order. See [Stage entries](#stage-entries). |
 | `dag` | object | yes | see [DAG block](#dag-block) | Adjacency list resolved from `spec.placement.{after,before}`. |
 | `fingerprint` | string | yes | 64-hex sha256 | `sha256` of the canonical JSON with `fingerprint=""`. Lets adapters cache / short-circuit unchanged plans. |
@@ -47,9 +47,8 @@ blocking stages on a cold start would defeat the conservative default.
 
 ## Release block
 
-Phase 9.A of the release-promotion-model chantier (#4) introduces this
-block so adapters can route candidate vs release artifacts in the
-promote stage (9.B-E) without re-reading `brik.yml` or running `git
+This block lets adapters route candidate vs release artifacts in the
+promote stage without re-reading `brik.yml` or running `git
 describe`.
 
 ```json
@@ -62,9 +61,9 @@ describe`.
 
 | Field | Type | Required | Constraint | Meaning |
 |---|---|---|---|---|
-| `profile` | string | yes | enum `trunk-based`, `git-flow`, `github-flow`, `none` | Git workflow profile read from `.release.profile` in `brik.yml`. Drives candidate detection in 9.B-E; informational in v0.6/v0.7. |
+| `profile` | string | yes | enum `trunk-based`, `git-flow`, `github-flow`, `none` | Git workflow profile read from `.release.profile` in `brik.yml`. Drives candidate detection; informational. |
 | `version` | string | yes | semver pattern | Project version derived from the latest git tag (stripped of `.release.tag_prefix`, default `v`). `0.0.0` when no tag exists. |
-| `is_candidate` | boolean | yes | -- | `true` when the current commit is a release candidate (`BRIK_COMMIT_TAG` set in v0.7; profile-specific in 9.B-E). Adapters gate the promote stage on this. |
+| `is_candidate` | boolean | yes | -- | `true` when the current commit is a release candidate (`BRIK_COMMIT_TAG` set, or a profile-specific condition). Adapters gate the promote stage on this. |
 
 ### Consumer rule for `is_candidate=false` + `BRIK_COMMIT_TAG` later in the pipeline
 

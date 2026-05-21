@@ -49,7 +49,7 @@ sections.
 | `when` | string | (always true) | Condition evaluated by the shared library: `branch == 'main'`, `tag =~ 'v*'`, `$CI_PIPELINE_SOURCE == 'merge_request_event'`. |
 | `env_file` | string | -- | Path to a `KEY=VALUE` env file sourced before the deploy. Brik fails if the file is declared but missing. CI environment variables take precedence over file entries. |
 | `source` | string | -- | Local path to the artifact directory uploaded by the `ssh` and `compose` targets, or to the rendered manifest tree pushed to the GitOps repo by the `gitops` target. Relative to the project root. |
-| `strategy` | enum | -- | Rollout strategy: `rolling`, `blue-green`, `canary`. Wired for `k8s` and `helm` targets - the deploy stage routes through `rollout.strategy.run` when set. `ssh` and `compose` targets ignore the field (no native primitive). Rollback callbacks are not yet implemented for `k8s` and `helm`, so `blue-green` and `canary` currently behave like `rolling` on deploy failure (no automatic switch-back); a follow-up chantier wires the rollback path. |
+| `strategy` | enum | -- | Rollout strategy: `rolling`, `blue-green`, `canary`. Wired for `k8s` and `helm` targets - the deploy stage routes through `rollout.strategy.run` when set. `ssh` and `compose` targets ignore the field (no native primitive). Rollback callbacks are not yet implemented for `k8s` and `helm`, so `blue-green` and `canary` currently behave like `rolling` on deploy failure (no automatic switch-back); the rollback path is not yet wired. |
 
 ### Target-specific fields
 

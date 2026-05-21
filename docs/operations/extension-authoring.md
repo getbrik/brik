@@ -199,8 +199,8 @@ error, and the aggregate report misses the record. Replace `exit` with
 A manifest's `metadata.id` must be unique across the merged registry.
 Pick a namespaced id (e.g. `myteam-node`) or accept that an extension
 named `node` overrides the builtin. The compile script refuses the
-collision unless `metadata.replaces` is declared (gated to allowlist
-in v0.7+; not exposed in v0.6).
+collision unless `metadata.replaces` is declared -- a capability not
+yet exposed.
 
 ## See also
 

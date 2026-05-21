@@ -364,7 +364,7 @@ Before opening a PR that touches `.gitlab-ci.yml` (or the shared
 This checklist enforces the Stephane Robert anti-pattern
 recommendations (cf. <https://blog.stephane-robert.info/docs/pipeline-cicd/anti-patterns/#la-pipeline-monolithe>
 and the `industrialisation/workflows/` follow-up). The 9-context
-commit detection (`BRIK_COMMIT_CONTEXT`) referenced in the chantier is
+commit detection (`BRIK_COMMIT_CONTEXT`) is
 not yet implemented; the checklist above is the manual equivalent
 until the runtime detection lands.
 

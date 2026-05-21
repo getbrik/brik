@@ -120,8 +120,8 @@ jq '.stages[].business.findings.ignored.by_source' brik-artifacts/aggregate-repo
 
 ## Expiration
 
-Every allowlist entry **must** carry `expires` -- the chantier mandates
-the field at the schema level. The runner emits a non-blocking warning at
+Every allowlist entry **must** carry `expires` -- the schema makes
+the field mandatory. The runner emits a non-blocking warning at
 init when an entry expires within `BRIK_FINDINGS_EXPIRING_SOON_DAYS`
 (default 30) and lists it in the aggregate report's "Expiring soon"
 section. Past `expires` -> the entry is silently dropped and the
