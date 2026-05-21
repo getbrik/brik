@@ -32,7 +32,9 @@ How Brik works, and why it is shaped this way.
 
 - [Fixed flow](concepts/fixed-flow.md) -- the 11 stages, their order, the parallel verify group, the quality gate
 - [Pipeline context](concepts/pipeline-context.md) -- snapshot vs release, and how that decides fail-fast behavior
+- [Plan](concepts/plan.md) -- the reproducible per-commit plan: which stages run, why, and the safe/balanced selection modes
 - [Business outcome](concepts/business-outcome.md) -- the tech/business two-axis model and the decision matrix
+- [Data layout](concepts/data-layout.md) -- the on-disk layout (`brik-artifacts/`, `.brik-logs/`) Brik produces at runtime
 - [Architecture](concepts/architecture.md) -- the 4-layer model and the design principles behind it
 
 ## Configuration
