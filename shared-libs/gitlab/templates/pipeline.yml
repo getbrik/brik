@@ -191,6 +191,10 @@ default:
         _brik_gate_rc=$?
         if [ "${_brik_gate_rc}" -eq 1 ]; then
           echo "[brik] ${_brik_gate_stage}: skipped (per plan)"
+          # The job exits before brik.gitlab.run_stage; seed the cache and
+          # artefact markers so GitLab's cache/artifact steps stay quiet
+          # (otherwise: "no files to cache/upload" on a plan-skipped job).
+          bash -c '. "${BRIK_HOME}/shared-libs/gitlab/scripts/gitlab-wrapper.sh" && brik.gitlab.mark_skipped "${CI_PROJECT_DIR}"' || true
           exit 0
         fi
         echo "[brik] ${_brik_gate_stage}: plan gate error (rc=${_brik_gate_rc})" >&2
