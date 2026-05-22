@@ -99,20 +99,22 @@ SH
   End
 
   # The validator-selection branches need a controlled PATH so exactly one
-  # (or neither) of jv / check-jsonschema is visible. A curated bin dir with
-  # symlinks to coreutils + the base tools keeps `brik extension test` and
-  # compile-registry.sh fully functional under the restricted PATH.
+  # (or neither) of jv / check-jsonschema is visible. The fake bin mirrors
+  # every executable currently on PATH -- portable, no hardcoded prefix --
+  # so `brik extension test` and compile-registry.sh keep working; the
+  # per-Describe setup then removes the validator(s) it wants hidden.
   build_fake_bin() {
-    local dst="$1" p t resolved
-    for p in /opt/homebrew/opt/coreutils/libexec/gnubin/*; do
-      [[ -e "$p" ]] && ln -sf "$p" "$dst/$(basename "$p")"
+    local dst="$1" dir entry base
+    local -a dirs
+    IFS=: read -ra dirs <<<"$PATH"
+    for dir in "${dirs[@]}"; do
+      [[ -d "$dir" ]] || continue
+      for entry in "$dir"/*; do
+        [[ -x "$entry" && ! -d "$entry" ]] || continue
+        base="${entry##*/}"
+        [[ -e "$dst/$base" ]] || ln -sf "$entry" "$dst/$base"
+      done
     done
-    for t in bash grep awk jq yq git shasum perl mktemp; do
-      resolved="$(command -v "$t" 2>/dev/null)"
-      [[ -n "$resolved" ]] && ln -sf "$resolved" "$dst/$t"
-    done
-    [[ -e /opt/homebrew/opt/gnu-sed/libexec/gnubin/sed ]] \
-      && ln -sf /opt/homebrew/opt/gnu-sed/libexec/gnubin/sed "$dst/sed"
   }
 
   Describe "validator selection: check-jsonschema branch"
