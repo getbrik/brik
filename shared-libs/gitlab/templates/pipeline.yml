@@ -59,6 +59,11 @@ variables:
   BRIK_LOG_LEVEL: "info"
   BRIK_PLATFORM: "gitlab"
   BRIK_CI_IMAGE: "ghcr.io/getbrik/brik-runner-base:latest"
+  # Pinned base runner image, intentionally NOT overridden by init's
+  # stack-specific resolution. Used by the notify stage so the report
+  # rendering toolchain (glow for terminal-friendly markdown) is always
+  # available, regardless of the project's language stack.
+  BRIK_BASE_IMAGE: "ghcr.io/getbrik/brik-runner-base:latest"
   BRIK_ANALYSIS_IMAGE: "ghcr.io/getbrik/brik-runner-analysis:latest"
   BRIK_SCANNER_IMAGE: "ghcr.io/getbrik/brik-runner-scanner:latest"
   BRIK_DEPLOY_IMAGE: "ghcr.io/getbrik/brik-runner-deploy:latest"

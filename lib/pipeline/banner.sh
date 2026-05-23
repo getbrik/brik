@@ -69,15 +69,19 @@ _banner._meta_line() {
 }
 
 # Display a stage banner: a single-trait box with the stage name spaced
-# and centered on the title line, then a blank line, then runner and tech
-# metadata. Missing metadata is shown as '-'.
-# Usage: banner.stage <stage_name> [<runner>] [<tech>]
+# and centered on the title line, then a blank line, then the runner
+# metadata. Missing runner is shown as '-'.
+# Usage: banner.stage <stage_name> [<runner>]
+#
+# Note: a third positional argument was historically accepted for a
+# per-stage "tech" identifier (e.g. "node 22.5.0"). It was never wired up
+# (BRIK_STAGE_TECH was never set anywhere in lib/), always rendered as '-',
+# and was removed for clarity. Callers passing a 3rd arg are silently
+# ignored.
 banner.stage() {
     local stage_name="${1:-}"
     local runner="${2:-}"
-    local tech="${3:-}"
     [[ -z "$runner" ]] && runner="-"
-    [[ -z "$tech" ]] && tech="-"
 
     local upper
     upper="$(printf '%s' "$stage_name" | tr '[:lower:]' '[:upper:]')"
@@ -107,9 +111,8 @@ banner.stage() {
     left_sp="$(_banner._repeat ' ' "$pad_left")"
     right_sp="$(_banner._repeat ' ' "$pad_right")"
 
-    local runner_line tech_line
+    local runner_line
     runner_line="$(_banner._meta_line "runner" "$runner" "$inner")"
-    tech_line="$(_banner._meta_line "tech" "$tech" "$inner")"
 
     {
         echo
@@ -117,7 +120,6 @@ banner.stage() {
         printf '│%s%s%s│\n' "$left_sp" "$spaced" "$right_sp"
         printf '│%s│\n' "$blank"
         printf '│%s│\n' "$runner_line"
-        printf '│%s│\n' "$tech_line"
         printf '└%s┘\n' "$hr"
     } >&2
 }

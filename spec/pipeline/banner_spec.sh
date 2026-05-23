@@ -56,23 +56,27 @@ Describe "banner.sh"
     End
 
     It "shows runner metadata when provided"
-      When call banner.stage "sast" "ghcr.io/getbrik/runner:1" "semgrep"
+      When call banner.stage "sast" "ghcr.io/getbrik/runner:1"
       The stderr should include "runner:"
       The stderr should include "ghcr.io/getbrik/runner:1"
     End
 
-    It "shows tech metadata when provided"
+    It "ignores extra positional arguments (legacy tech arg)"
+      # banner.stage used to accept a 3rd "tech" argument that was never
+      # populated and always rendered as 'tech: -'. The arg was removed in
+      # the 0.6.x cleanup but bash silently accepts extra args, so legacy
+      # callers do not break.
       When call banner.stage "sast" "ghcr.io/getbrik/runner:1" "semgrep"
-      The stderr should include "tech:"
-      The stderr should include "semgrep"
+      The stderr should include "runner:"
+      The stderr should not include "tech:"
+      The stderr should not include "semgrep"
     End
 
-    It "falls back to '-' when runner and tech are missing"
+    It "falls back to '-' when runner is missing"
       When call banner.stage "build"
       The stderr should include "runner:"
-      The stderr should include "tech:"
       The stderr should match pattern "*runner:*-*"
-      The stderr should match pattern "*tech:*-*"
+      The stderr should not include "tech:"
     End
 
     It "does not write anything to stdout"
