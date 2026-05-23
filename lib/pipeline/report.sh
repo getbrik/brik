@@ -884,6 +884,43 @@ _report._render_aggregate_md() {
               end
           end;
 
+        # 0 -> "0B", 1142 -> "1.1KB", 1500000 -> "1.4MB". Used to render
+        # artifact sizes in the stages table Metrics column.
+        def round1($x): (($x * 10) | round) / 10;
+        def human_size($b):
+          if $b == null or (($b | type) != "number") then "-"
+          elif $b < 1024    then "\($b)B"
+          elif $b < 1048576 then "\(round1($b / 1024.0))KB"
+          else                   "\(round1($b / 1048576.0))MB"
+          end;
+
+        # Business status label (success/warning/error) emitted in the
+        # Business column of the stages table. "-" when the stage has
+        # no business payload (rare; legacy local-only stages).
+        def biz_label($b):
+          if $b == null or $b.status == null then "-"
+          else $b.status
+          end;
+
+        # Single-line summary of the business payload for the Metrics
+        # column. Picks the first applicable signal, ordered by
+        # operator-relevance: failing/total findings, tests passed/total,
+        # artifact size, image full name, commit short sha.
+        def metrics_for($b):
+          if $b == null then "-"
+          elif ($b.findings.total // null) != null then
+            "findings \((($b.findings.failing | objects | .total) // ($b.findings.failing | numbers) // 0))/\($b.findings.total)"
+          elif ($b.tests.total // null) != null then
+            "\($b.tests.passed // 0)/\($b.tests.total) passed"
+          elif ($b.artifact.size_bytes // null) != null then
+            "artifact \(human_size($b.artifact.size_bytes))"
+          elif ($b.image.full_name // null) != null then
+            "image \($b.image.full_name)"
+          elif ($b.commit.short_sha // null) != null then
+            "commit \($b.commit.short_sha)"
+          else "-"
+          end;
+
         # Best-effort ISO 8601 to epoch seconds. Handles "...Z" and
         # "...+0000" forms; returns null on anything else (renders as "-").
         def parse_iso($s):
@@ -1029,11 +1066,26 @@ _report._render_aggregate_md() {
             end;
 
         # ----- Phase 2: stages table (ordered, glyphed, human, linked) ----
+        # Columns:
+        #   Stage     -- stage id (init, build, lint, ...)
+        #   Status    -- technical outcome (success/failed/skipped/warning)
+        #   Business  -- business outcome (success/warning/error) from
+        #                business.status
+        #   Duration  -- human-readable elapsed time
+        #   Metrics   -- one-line summary of the most relevant business
+        #                signal per stage (findings ratio, tests passed,
+        #                artifact size, image full name, commit sha)
+        #   Job       -- link to the CI job page
+        # Business + Metrics were previously surfaced only via the live
+        # CI log recap (_notify._emit_recap_table). Folding them into the
+        # markdown report avoids duplication and means the published
+        # aggregate-report.md is the single source of truth for both
+        # live and archived consumption.
         def render_stages_table:
           "## Stages",
           "",
-          "| Stage | Status | Duration | Job |",
-          "|---|---|---|---|",
+          "| Stage | Status | Business | Duration | Metrics | Job |",
+          "|---|---|---|---|---|---|",
           (.stages // []
            | sort_by([stage_rank(.stage), .stage])
            | .[]
@@ -1041,7 +1093,9 @@ _report._render_aggregate_md() {
                "| " + (.stage // "-")
                + " | " + status_glyph(.status // "?") + " " + (.status // "-")
                        + (if ((.tech.dry_run // false) | tostring) == "true" then " _(dry-run)_" else "" end)
+               + " | " + biz_label(.business // null)
                + " | " + human_duration_ms(.duration_ms)
+               + " | " + metrics_for(.business // null)
                + " | " + (if (.runner.job_url // "") != "" then "[job](\(.runner.job_url))" else "-" end)
                + " |"
              )),

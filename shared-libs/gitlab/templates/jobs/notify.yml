@@ -5,6 +5,10 @@
 
 brik-notify:
   stage: notify
+  # Force the base runner image so glow (markdown-to-terminal renderer) is
+  # available, regardless of the stack-specific image that init resolved for
+  # build/lint/test/etc. Matches the Jenkins runInBase('notify') convention.
+  image: "${BRIK_BASE_IMAGE}"
   needs:
     - job: brik-plan
       artifacts: true

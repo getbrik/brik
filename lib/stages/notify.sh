@@ -10,78 +10,81 @@ _BRIK_STAGES_NOTIFY_LOADED=1
 # Private helpers
 # -----------------------------------------------------------------------------
 
-# Render a Unicode recap table on stderr summarizing each stage in the
-# pipeline aggregate, with adaptive metrics per stage type. Best-effort:
-# silently no-op when jq is missing or the aggregate JSON is absent --
-# the aggregate-report.{md,json,html} artifacts are the structured
-# rollup; this is a live-log convenience for operators.
-#
-# Usage: _notify._emit_recap_table <aggregate_json_path>
-_notify._emit_recap_table() {
-    local report="$1"
-    [[ -f "$report" ]] || return 0
-    command -v jq >/dev/null 2>&1 || return 0
-    brik.use transverse.format 2>/dev/null || return 0
-
-    local jq_filter
-    # KCOV_EXCL_START -- jq filter body is not bash code
-    jq_filter='
-        def stage_rank($name):
-          ["init","release","build",
-           "lint","sast","scan","test",
-           "package","container-scan","deploy","notify"]
-          | index($name) // 99 ;
-        def status_glyph(s):
-          if s == "success" then "✓ success"
-          elif s == "failed"  then "✗ failed"
-          elif s == "skipped" then "- skipped"
-          else "? \(s|tostring)" end ;
-        def round1(x): ((x * 10) | round) / 10 ;
-        def human_dur(ms):
-          if ms == null then "-"
-          elif ms < 1000  then "\(ms)ms"
-          elif ms < 60000 then "\(round1(ms / 1000.0))s"
-          else "\((ms/60000)|floor)m\(((ms%60000)/1000)|floor)s" end ;
-        def human_size(b):
-          if b == null then "-"
-          elif b < 1024    then "\(b)B"
-          elif b < 1048576 then "\(round1(b / 1024.0))KB"
-          else "\(round1(b / 1048576.0))MB" end ;
-        def metrics_for(b):
-          if b == null then "-"
-          elif (b.findings.total // null) != null then
-            "findings \((b.findings.failing | objects | .total) // (b.findings.failing | numbers) // 0)/\(b.findings.total)"
-          elif (b.tests.total // null) != null then
-            "\(b.tests.passed // 0)/\(b.tests.total) passed"
-          elif (b.artifact.size_bytes // null) != null then
-            "artifact \(human_size(b.artifact.size_bytes))"
-          elif (b.image.full_name // null) != null then
-            "image \(b.image.full_name)"
-          elif (b.commit.short_sha // null) != null then
-            "commit \(b.commit.short_sha)"
-          else "-" end ;
-        def biz_label(b):
-          if b == null then "-"
-          elif b.status == null then "-"
-          else b.status end ;
-        .stages
-        | sort_by([stage_rank(.stage), .stage])
-        | ["Stage|Status|Business|Duration|Metrics"]
-          + map("\(.stage)|\(status_glyph(.status))|\(biz_label(.business // null))|\(human_dur(.duration_ms))|\(metrics_for(.business // null))")
-        | .[]'
-    # KCOV_EXCL_STOP
-
-    local data
-    data="$(jq -r "$jq_filter" "$report" 2>/dev/null)" || return 0
-    [[ -z "$data" ]] && return 0
-
-    log.info "pipeline recap:"
-    printf '%s\n' "$data" | format.table --delim '|'
-}
+# (Historical: _notify._emit_recap_table rendered a Unicode summary
+# table on stderr alongside the markdown report on stdout. Removed
+# 2026-05-23: the Business + Metrics columns it surfaced were folded
+# into the markdown Stages table -- see _report._render_aggregate_md
+# in lib/pipeline/report.sh -- so the recap was duplicating
+# information that glow now renders inline.)
 
 # Detect "CI aggregation mode" by looking for at least one valid fragment
 # file in <dir>. Per-stage fragments produced by report.write_fragment in
 # upstream stages have a stable signature (.stage + .schema_version).
+# Wrap brik status tokens in ANSI color escapes on stdin -> stdout. Glamour
+# styles glow's output structurally (heading, list, table, ...) but cannot
+# color text by content. This filter adds per-status semantic colors:
+#
+#   green  (32): [OK]   success
+#   red    (31): [FAIL] failed error
+#   yellow (33): [WARN] warning
+#   gray   (90): [SKIP] skipped
+#
+# Reset uses \033[39m (default foreground color only) rather than \033[0m
+# (reset all): glamour may have applied bold / italic / underline around
+# the colorized token via the structural style, and \033[0m would strip
+# those attributes for the rest of the line. \033[39m undoes only the
+# color we set, preserving glamour's styling.
+#
+# Portability: avoids GNU sed extensions like \b (word boundary) which
+# BSD sed (macOS default) does not support. Pattern anchors on the
+# brik-specific contexts:
+#   1. The square-bracket markers themselves ([OK], [FAIL], [WARN], [SKIP])
+#      which are unique brik tokens.
+#   2. The bare status words preceded by `] ` (i.e., right after a marker)
+#      to color "success" in "[OK] success" without matching arbitrary
+#      occurrences of "success" elsewhere.
+#   3. The status field value pattern `**status:** <word>` from the
+#      per-stage business sections.
+#
+# Usage: <command-producing-text> | _notify._colorize_statuses
+_notify._colorize_statuses() {
+    # Statuses are the operator's primary scan signal in CI logs — they
+    # need to pop out of the surrounding muted brik palette. Use bold +
+    # vivid 256-color codes (46/196/208) instead of the dimmer palette
+    # used for headings/labels. Skipped stays in subtle gray (244) to
+    # de-emphasize visually -- it's a non-event, not a failure to
+    # investigate.
+    #   bold + 46  (Green1)        success
+    #   bold + 196 (Red1)          failed, error
+    #   bold + 208 (DarkOrange)    warning
+    #   bold + 244 (Grey54)        skipped
+    # Reset = \033[22;39m: undoes bold + default fg. Avoid \033[0m which
+    # would strip glamour's surrounding bold/italic/underline.
+    local g=$'\033[1;38;5;46m' r=$'\033[1;38;5;196m' y=$'\033[1;38;5;208m' k=$'\033[1;38;5;244m' z=$'\033[22;39m'
+    # Anchor on word boundaries (\b) rather than literal `] <word>` or
+    # `[OK]` contexts: with CLICOLOR_FORCE=1, glow wraps each character
+    # chunk in its own ANSI escape (`\x1b[37m[\x1b[0m\x1b[37mOK]\x1b[0m
+    # \x1b[37m success\x1b[0m`), so `[OK]` itself is fractured into
+    # `[` and `OK]` and the bracket marker patterns no longer match.
+    # `\b` still works because ESC is a non-word character, so the
+    # boundary between glow's ANSI escape and the leading `s` of
+    # `success` is preserved.
+    #
+    # We therefore only colorize the bare status words. The bracket
+    # markers ([OK], [FAIL], [WARN], [SKIP]) stay in their default
+    # color but the trailing status word is colored, which gives the
+    # semantic signal the operator needs to scan results visually.
+    #
+    # Also color count fields like `success=11, warning=0` -- bracketing
+    # the same colors makes the counts line visually scannable.
+    sed -E \
+        -e "s/\\bsuccess\\b/${g}success${z}/g" \
+        -e "s/\\bfailed\\b/${r}failed${z}/g" \
+        -e "s/\\bwarning\\b/${y}warning${z}/g" \
+        -e "s/\\bskipped\\b/${k}skipped${z}/g" \
+        -e "s/\\berror\\b/${r}error${z}/g"
+}
+
 # aggregate-report.json (the aggregate target) is filtered out by basename so
 # a previous run does not re-trigger aggregation in local mode.
 #
@@ -516,11 +519,52 @@ stages.notify() {
     # brik-artifacts/ so the published report is the patched one.
     _notify._inject_notify_metadata "$_report_json" "$business_status"
 
-    # Emit the rendered aggregate-report.md on stdout so the full stage table +
-    # business section are visible in CI job logs. Falls back to a minimal
-    # banner if the report is absent (e.g. single-stage run outside pipeline.run).
+    # Emit the rendered aggregate-report on stdout so the full stage table +
+    # business section are visible in CI job logs. Prefer `glow` (renders the
+    # markdown with ANSI colors, box drawings, and emoji) when available
+    # (brik-runner-base ships it); fall back to a `cat` of the raw markdown
+    # when glow is absent (older runners, local mode without glow installed)
+    # and finally to a minimal banner if the report itself is missing.
     if [[ -f "$_report_md" ]]; then
-        cat "$_report_md"
+        if command -v glow >/dev/null 2>&1; then
+            # stdin must be closed (</dev/null) otherwise glow enters a
+            # bubbletea interactive-read mode that produces ~2 bytes of
+            # output even with a non-auto --style. GitLab Runner's
+            # `docker exec -i` keeps stdin open and triggers this case;
+            # the </dev/null redirect makes glow fall through to plain
+            # stdout rendering.
+            #
+            # CLICOLOR_FORCE=1 tells termenv (Charm's terminal lib used
+            # by glamour) to emit color escapes even when stdout is a
+            # pipe. Without this, glow detects non-TTY and strips ALL
+            # color codes from the output, producing a monochrome render
+            # despite the style JSON specifying colors. CI log viewers
+            # (GitLab, Jenkins) DO render the ANSI sequences, so forcing
+            # them is the right behavior here.
+            #
+            # Prefer the brik custom style (replaces ## markdown literals
+            # with visual prefixes ▸ › »; brik orange/cyan palette) if it
+            # ships with this runtime; fall back to the built-in `dark`
+            # style otherwise. --width=120 matches the report HTML layout.
+            local _style="${BRIK_HOME:-/opt/brik}/lib/pipeline/glow-style.json"
+            [[ -f "$_style" ]] || _style="dark"
+            # Post-process glow output through _notify._colorize_statuses
+            # to wrap [OK]/[FAIL]/[WARN]/[SKIP] markers and the canonical
+            # status words (success/failed/warning/error/skipped) in ANSI
+            # color escapes. Glamour cannot color by content; this filter
+            # adds the per-status color layer on top of the structural
+            # rendering. On glow failure (rare with </dev/null + non-auto
+            # style), fall back to a plain cat.
+            if CLICOLOR_FORCE=1 glow --style="$_style" --width=120 \
+                    "$_report_md" </dev/null \
+                    | _notify._colorize_statuses; then
+                :
+            else
+                cat "$_report_md"
+            fi
+        else
+            cat "$_report_md"
+        fi
     else
         echo "========================================"
         echo "  Brik Pipeline Summary"
@@ -532,9 +576,10 @@ stages.notify() {
         echo "========================================"
     fi
 
-    # Compact recap table on stderr alongside the MD on stdout so operators
-    # see the per-stage rollup at a glance in the live CI log.
-    _notify._emit_recap_table "$_report_json"
+    # (The per-stage recap table previously emitted here was folded into
+    # the markdown Stages section -- see _report._render_aggregate_md
+    # for the Business + Metrics columns. Avoids the duplicated
+    # information in the CI log.)
 
     # Map business status to the legacy {success|failed} channel labels for
     # downstream notification helpers (Slack/email/webhook subjects).

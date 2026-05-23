@@ -107,32 +107,10 @@ Describe "stages.notify - CI mode fragment aggregation"
       The output should include "aggregate-report.html"
     End
 
-    It "emits the Unicode recap table on stderr"
-      do_notify_recap_table() {
-        seed_ci_fragments
-        stages.notify "$NOTIFY_CONFIG" 2>&1 >/dev/null
-      }
-      When call do_notify_recap_table
-      The output should include "pipeline recap:"
-      The output should include "Stage"
-      The output should include "Status"
-      The output should include "Duration"
-      The output should include "Metrics"
-      The output should include "┌"
-      The output should include "└"
-    End
-
-    It "orders stages by execution rank in the recap table"
-      do_notify_recap_order() {
-        seed_ci_fragments
-        stages.notify "$NOTIFY_CONFIG" 2>&1 >/dev/null \
-          | grep -oE 'init|build|test' \
-          | head -3 \
-          | tr '\n' ' '
-      }
-      When call do_notify_recap_order
-      The output should equal "init build test "
-    End
+    # (The Unicode recap table previously emitted on stderr was removed
+    # in favor of folding Business + Metrics columns into the markdown
+    # Stages table -- see _report._render_aggregate_md. Per-stage
+    # ordering is covered by spec/pipeline/report_aggregate_business_spec.sh.)
   End
 
   # ---------------------------------------------------------------------------

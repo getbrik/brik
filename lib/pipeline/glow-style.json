@@ -1,0 +1,149 @@
+{
+  "_comment": "Brik aggregate-report.md style. Designed for CI log viewers (GitLab/Jenkins) which render ANSI escape sequences. 256-color palette chosen for readability on BOTH dark and light terminal backgrounds: medium saturation values (33-67-100-130-132 range) avoid the eye-strain of bright colors (228, 51, 208) and stay visible against any background. Test locally: CLICOLOR_FORCE=1 glow --style=lib/pipeline/glow-style.json /path/to/aggregate-report.md </dev/null",
+
+  "document": {
+    "block_prefix": "\n",
+    "block_suffix": "\n",
+    "margin": 2
+  },
+
+  "paragraph": {},
+
+  "heading": {
+    "block_suffix": "\n",
+    "bold": true
+  },
+
+  "h1": {
+    "prefix": "┃ ",
+    "suffix": "",
+    "color": "33",
+    "bold": true
+  },
+
+  "h2": {
+    "prefix": "▸ ",
+    "suffix": "",
+    "color": "38",
+    "bold": true,
+    "underline": true
+  },
+
+  "h3": {
+    "prefix": "› ",
+    "suffix": "",
+    "color": "100",
+    "bold": true
+  },
+
+  "h4": {
+    "prefix": "» ",
+    "suffix": "",
+    "color": "132",
+    "bold": true
+  },
+
+  "h5": {
+    "prefix": "› ",
+    "suffix": "",
+    "color": "244",
+    "bold": true
+  },
+
+  "h6": {
+    "prefix": "• ",
+    "suffix": "",
+    "color": "244"
+  },
+
+  "block_quote": {
+    "indent": 1,
+    "indent_token": "▎ ",
+    "color": "38"
+  },
+
+  "list": {
+    "indent": 4,
+    "level_indent": 2
+  },
+
+  "item": {
+    "block_prefix": "▸ "
+  },
+
+  "enumeration": {
+    "indent": 4,
+    "block_prefix": ". ",
+    "color": "130"
+  },
+
+  "task": {
+    "ticked": "[✓] ",
+    "unticked": "[ ] "
+  },
+
+  "text": {},
+
+  "strong": {
+    "bold": true,
+    "color": "67"
+  },
+
+  "emph": {
+    "italic": true,
+    "color": "244"
+  },
+
+  "strikethrough": {
+    "crossed_out": true,
+    "color": "244"
+  },
+
+  "hr": {
+    "color": "244",
+    "format": "\n────────────────────────────────────────────────────────────────────────────────────────────────────────\n"
+  },
+
+  "link": {
+    "color": "38",
+    "underline": true
+  },
+
+  "link_text": {
+    "color": "38"
+  },
+
+  "image": {
+    "color": "132",
+    "underline": true
+  },
+
+  "image_text": {
+    "color": "244",
+    "format": "Image: {{.text}} →"
+  },
+
+  "code": {
+    "prefix": " ",
+    "suffix": " ",
+    "background_color": "237"
+  },
+
+  "code_block": {
+    "margin": 2
+  },
+
+  "table": {},
+
+  "definition_list": {},
+  "definition_term": {
+    "bold": true,
+    "color": "67"
+  },
+  "definition_description": {
+    "block_prefix": "\n  ↳ "
+  },
+
+  "html_block": {},
+  "html_span": {}
+}
