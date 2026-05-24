@@ -286,7 +286,9 @@ def call(Map params = [:]) {
                     if (planSaysRun(stageId)) {
                         body()
                     } else {
-                        echo "[brik] ${stageId}: skipped per plan (BRIK_PLAN_FILE=${env.BRIK_PLAN_FILE})"
+                        // Plain "[SKIP]" tag: matches render.status format
+                        // (color omitted -- Groovy cannot call render.status).
+                        echo "[brik] [SKIP] ${stageId}: per plan (BRIK_PLAN_FILE=${env.BRIK_PLAN_FILE})"
                         stashBrikArtifacts(stageId)
                     }
                 }
@@ -375,10 +377,10 @@ def call(Map params = [:]) {
                     // so a docs-only commit can skip individual scanners
                     // without dropping the whole Verify stage.
                     parallel(
-                        'Lint': { if (planSaysRun('lint')) { runStage('lint') }      else { echo "[brik] lint: skipped per plan";  stashBrikArtifacts('lint') } },
-                        'SAST': { if (planSaysRun('sast')) { runInAnalysis('sast') } else { echo "[brik] sast: skipped per plan";  stashBrikArtifacts('sast') } },
-                        'Scan': { if (planSaysRun('scan')) { runInScanner('scan') }  else { echo "[brik] scan: skipped per plan";  stashBrikArtifacts('scan') } },
-                        'Test': { if (planSaysRun('test')) { runStage('test') }      else { echo "[brik] test: skipped per plan";  stashBrikArtifacts('test') } }
+                        'Lint': { if (planSaysRun('lint')) { runStage('lint') }      else { echo "[brik] [SKIP] lint: per plan";  stashBrikArtifacts('lint') } },
+                        'SAST': { if (planSaysRun('sast')) { runInAnalysis('sast') } else { echo "[brik] [SKIP] sast: per plan";  stashBrikArtifacts('sast') } },
+                        'Scan': { if (planSaysRun('scan')) { runInScanner('scan') }  else { echo "[brik] [SKIP] scan: per plan";  stashBrikArtifacts('scan') } },
+                        'Test': { if (planSaysRun('test')) { runStage('test') }      else { echo "[brik] [SKIP] test: per plan";  stashBrikArtifacts('test') } }
                     )
                     // brik-artifacts/test/junit/**/*.xml covers the Java surefire/gradle layout;
                     // brik-artifacts/test/junit.xml covers node/python/dotnet.

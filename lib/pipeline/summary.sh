@@ -44,12 +44,19 @@ summary.build() {
         fi
     fi
 
-    # Collect errors from log file
+    # Collect errors from log file.
+    # New log format (VIS-3): "<ts>  ERROR  <scope>  <msg>" with optional
+    # surrounding ANSI escapes for whole-line color. Match the inner
+    # "  ERROR  " separator (anchored by a non-space timestamp tail) and
+    # strip the prefix + scope + trailing ANSI reset to keep just the
+    # message.
     local errors_json="[]"
     if [[ -f "$log_file" ]] && command -v jq >/dev/null 2>&1; then
         local error_lines
-        # optional: grep returns 1 when no match
-        error_lines="$(grep '\[ERROR\]' "$log_file" 2>/dev/null | sed 's/.*\[ERROR\] \[.*\] //' || true)"
+        # grep returns 1 when no match; tolerate it.
+        error_lines="$(grep -E '[^ ]  ERROR  ' "$log_file" 2>/dev/null \
+            | sed -E 's/^[^ ]+  ERROR  [^ ]+  //; s/'$'\x1b''\[0m$//' \
+            || true)"
         if [[ -n "$error_lines" ]]; then
             errors_json="$(printf '%s\n' "$error_lines" | jq -R -s 'split("\n") | map(select(length > 0))')"
         fi

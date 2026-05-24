@@ -31,7 +31,8 @@ Describe "error.sh"
     It "returns the given exit code and logs"
       When call error.raise 5 "external command failed"
       The status should equal 5
-      The stderr should include "[ERROR]"
+      # New logging format: no brackets, label padded to 5 chars
+      The stderr should include "ERROR"
       The stderr should include "external command failed"
     End
 

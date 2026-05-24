@@ -32,7 +32,7 @@ JSON
     It "returns 1 when the plan decides skip"
       When run script "$BRIK_BIN" plan gate build
       The status should equal 1
-      The output should include "build: skipped (reason=no-impact)"
+      The output should include "[SKIP] build: no changed file matched"
     End
 
     It "writes a stage fragment with status=skipped + kind=not-applicable + reason"

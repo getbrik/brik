@@ -95,7 +95,7 @@ JSON
     It "exits 1 for stages the plan marks skip"
       When run script "$BRIK_BIN" plan gate deploy
       The status should equal 1
-      The output should include "deploy: skipped (reason=opt-in-flag-missing)"
+      The output should include "[SKIP] deploy: the --with-deploy flag was not passed"
     End
 
     It "exits 1 for context-mismatch and writes the not-applicable fragment"

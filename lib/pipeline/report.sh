@@ -1314,20 +1314,17 @@ report.render_terminal() {
         return 0
     fi
 
-    # Detect color support
-    local use_color=false
-    if [[ -t 1 ]] && [[ "${TERM:-}" != "dumb" ]]; then
-        use_color=true
-    fi
-
-    local green="" red="" gray="" bold="" reset=""
-    if $use_color; then
-        green=$'\033[32m'
-        red=$'\033[31m'
-        gray=$'\033[90m'
-        bold=$'\033[1m'
-        reset=$'\033[0m'
-    fi
+    # Centralized color handling via render.color (auto-detects TTY,
+    # CI markers, NO_COLOR; cached at source time so $() inherits the
+    # right decision). Each helper returns empty when colors are
+    # disabled.
+    brik.use transverse.render 2>/dev/null || true
+    local green red gray bold reset
+    green="$(render.color green)"
+    red="$(render.color red)"
+    gray="$(render.color gray)"
+    bold="$(render.color bold)"
+    reset="$(render.color reset)"
 
     # Extract per-stage rows as TAB-separated: name<TAB>status<TAB>duration_ms
     local rows
@@ -1380,6 +1377,160 @@ report.render_terminal() {
     echo "${bold}Result: ${result_color}${result_label}${reset} (${passed}/${ran} passed, ${skipped} skipped)"
     echo "${bold}Duration: $(( total_duration_ms / 1000 ))s${reset}"
     echo ""
+}
+
+# Render the full aggregate report on stdout using the render lib (ASCII
+# box-drawing, no markdown). Designed as the replacement for the
+# glow-based stdout rendering previously used by the notify stage:
+# preserves the operator-relevant sections (header, stages table, summary
+# counts, business outcome, findings counts, active policy) while keeping
+# the markdown archive (aggregate-report.md) untouched for HTML report and
+# downstream tooling.
+#
+# Per-stage business sections (the long "## Business" block with one
+# subsection per stage) are NOT rendered here: they're available in the
+# markdown archive and in aggregate-report.json. Keeping them out of the
+# CI log avoids drowning the operator in detail.
+#
+# Usage: report.render_aggregate_terminal [<aggregate_json_path>]
+# Default path: $BRIK_LOG_DIR/aggregate-report.json
+# Exit codes:
+#   0                       success, or jq missing (best-effort skip)
+#   BRIK_EXIT_IO_FAILURE    report file does not exist
+#   BRIK_EXIT_FAILURE       report cannot be parsed
+report.render_aggregate_terminal() {
+    local report_path="${1:-$(_brik.log_dir._resolve)/aggregate-report.json}"
+
+    if [[ ! -f "$report_path" ]]; then
+        log.warn "aggregate report not found: $report_path"
+        return "$BRIK_EXIT_IO_FAILURE"
+    fi
+    if ! command -v jq >/dev/null 2>&1; then
+        log.warn "jq not available, skipping aggregate render"
+        return 0
+    fi
+    brik.use transverse.render 2>/dev/null || true
+
+    # Header
+    local pipeline_id project platform biz_status started finished duration_ms duration_str
+    pipeline_id="$(jq -r '.pipeline.id // .pipeline_id // "-"' "$report_path" 2>/dev/null)"
+    project="$(jq -r '.pipeline.project // .project // "-"' "$report_path" 2>/dev/null)"
+    platform="$(jq -r '.pipeline.platform // "-"' "$report_path" 2>/dev/null)"
+    biz_status="$(jq -r '.pipeline.business.status // "unknown"' "$report_path" 2>/dev/null)"
+    started="$(jq -r '.pipeline.started_at // "-"' "$report_path" 2>/dev/null)"
+    finished="$(jq -r '.pipeline.finished_at // "-"' "$report_path" 2>/dev/null)"
+
+    # Total pipeline wallclock duration in ms (finished_at - started_at).
+    # Returns 0 when either timestamp is missing or unparseable; the
+    # formatter below maps that to "-".
+    duration_ms="$(jq -r '
+        def parse_iso($s):
+            if $s == null then null
+            elif ($s | type) != "string" then null
+            elif ($s | test("Z$")) then (try ($s | fromdateiso8601) catch null)
+            elif ($s | test("[+-][0-9]{4}$"))
+                then (try ($s | strptime("%Y-%m-%dT%H:%M:%S%z") | mktime) catch null)
+            else null end;
+        (parse_iso(.pipeline.started_at)) as $b
+        | (parse_iso(.pipeline.finished_at)) as $e
+        | if $b == null or $e == null then 0
+          else (($e - $b) * 1000) | floor
+          end
+    ' "$report_path" 2>/dev/null || printf '0')"
+    [[ "$duration_ms" =~ ^[0-9]+$ ]] || duration_ms=0
+    if (( duration_ms == 0 )); then
+        duration_str="-"
+    elif (( duration_ms < 1000 )); then
+        duration_str="${duration_ms}ms"
+    elif (( duration_ms < 60000 )); then
+        duration_str="$((duration_ms / 1000))s"
+    else
+        duration_str="$((duration_ms / 60000))m$(( (duration_ms / 1000) % 60 ))s"
+    fi
+
+    render.blank
+    render.section "Pipeline Report"
+    render.kv "Pipeline ID" "$pipeline_id" --key-width 14
+    render.kv "Project"     "$project"     --key-width 14
+    render.kv "Platform"    "$platform"    --key-width 14
+    render.kv "Status"      "$(render.icon "$biz_status") $biz_status" --key-width 14
+    render.kv "Started"     "$started"     --key-width 14
+    render.kv "Finished"    "$finished"    --key-width 14
+    render.kv "Duration"    "$duration_str" --key-width 14
+    render.blank
+
+    # Stages table -- Stage | Status | Business | Duration
+    # Status + Business columns carry the user-validated emoji set
+    # (✅ ❌ ⚠️ ⏭️ ℹ️ 🔍). Bash counts emoji code points inconsistently
+    # so render.table may have ≤1-cell column-edge drift; all icons share
+    # the same display width so rows stay visually consistent in practice.
+    render.section "Stages"
+    {
+        printf 'Stage\tStatus\tBusiness\tDuration\n'
+        jq -r '
+            def fmt_ms($s):
+                if $s == null or $s == "" then "-"
+                else (try ($s | tonumber) catch null) as $n
+                    | if $n == null then "-"
+                      elif $n < 1000 then "\($n)ms"
+                      else "\(($n / 1000) | floor)s" end
+                end;
+            def tech_glyph($s):
+                if   $s == "success" then "✅ success"
+                elif $s == "failed"  then "❌ failed"
+                elif $s == "skipped" then "⏭️ skipped"
+                elif $s == "warning" then "⚠️ warning"
+                else "🔍 " + $s end;
+            def biz_glyph($b):
+                if   $b == "success" then "✅ success"
+                elif $b == "warning" then "⚠️ warning"
+                elif $b == "error"   then "❌ error"
+                elif $b == null      then "-"
+                else $b end;
+            .stages[] | [
+                (.stage // .name // .id // "?"),
+                tech_glyph((.tech.status // .status // "skipped")),
+                biz_glyph(.business.status),
+                fmt_ms(.tech.duration_ms // .duration_ms)
+            ] | @tsv
+        ' "$report_path"
+    } | render.table
+    render.blank
+
+    # Counts: total, passed, failed, skipped
+    local total passed failed skipped
+    total="$(jq -r '.stages | length' "$report_path" 2>/dev/null)"
+    passed="$(jq -r '[.stages[] | select((.tech.status // .status) == "success")] | length' "$report_path" 2>/dev/null)"
+    failed="$(jq -r '[.stages[] | select((.tech.status // .status) == "failed")]  | length' "$report_path" 2>/dev/null)"
+    skipped="$(jq -r '[.stages[] | select(((.tech.status // .status // null) == "skipped") or ((.tech.status // .status // null) == null))] | length' "$report_path" 2>/dev/null)"
+
+    render.section "Summary"
+    render.kv "Total stages" "$total"   --key-width 14
+    render.kv "Passed"       "$passed"  --key-width 14
+    render.kv "Failed"       "$failed"  --key-width 14
+    render.kv "Skipped"      "$skipped" --key-width 14
+    render.blank
+
+    # Business outcome with per-status counts
+    local biz_success biz_warning biz_error
+    biz_success="$(jq -r '[.stages[] | select(.business.status == "success")] | length' "$report_path" 2>/dev/null)"
+    biz_warning="$(jq -r '[.stages[] | select(.business.status == "warning")] | length' "$report_path" 2>/dev/null)"
+    biz_error="$(jq -r '[.stages[] | select(.business.status == "error")]   | length' "$report_path" 2>/dev/null)"
+
+    render.section "Business outcome"
+    render.kv "Status" "$(render.icon "$biz_status") $biz_status" --key-width 14
+    render.kv "Counts" "success=${biz_success}, warning=${biz_warning}, error=${biz_error}" --key-width 14
+    render.blank
+
+    # Findings counts (just totals; details live in the markdown archive)
+    local failing_total ignored_total
+    failing_total="$(jq -r '[.stages[] | (.business.findings.failing.total // 0)] | add // 0' "$report_path" 2>/dev/null)"
+    ignored_total="$(jq -r '[.stages[] | (.business.findings.ignored.total // 0)] | add // 0' "$report_path" 2>/dev/null)"
+
+    render.section "Findings"
+    render.kv "Failing" "$failing_total" --key-width 14
+    render.kv "Ignored" "$ignored_total" --key-width 14
+    render.blank
 }
 
 # Render the backend JSON as Markdown on stdout.

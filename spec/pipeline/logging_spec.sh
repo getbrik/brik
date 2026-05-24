@@ -2,29 +2,30 @@ Describe "logging.sh"
   Include "$BRIK_PIPELINE_LIB/logging.sh"
 
   Describe "log.info"
-    It "emits a formatted line to stderr"
+    It "emits a formatted line to stderr (no brackets, padded label)"
       When call log.info "hello world"
       The status should be success
-      The stderr should include "[INFO]"
+      # New format: "<ts>  INFO   <scope>  <msg>" (label padded to 5)
+      The stderr should include "  INFO   "
       The stderr should include "hello world"
     End
 
     It "includes a timestamp"
       When call log.info "test"
-      The stderr should match pattern "*T*:*:*[INFO]*"
+      The stderr should match pattern "*T*:*:*INFO*"
     End
 
-    It "includes the scope from BRIK_LOG_SCOPE"
+    It "includes the scope from BRIK_LOG_SCOPE (no brackets)"
       export BRIK_LOG_SCOPE="build"
       When call log.info "scoped message"
-      The stderr should include "[build]"
+      The stderr should include "  build  "
       unset BRIK_LOG_SCOPE
     End
 
     It "uses 'brik' as default scope"
       unset BRIK_LOG_SCOPE
       When call log.info "default scope"
-      The stderr should include "[brik]"
+      The stderr should include "  brik  "
     End
   End
 
@@ -39,7 +40,7 @@ Describe "logging.sh"
     It "is emitted when BRIK_LOG_LEVEL=debug"
       export BRIK_LOG_LEVEL="debug"
       When call log.debug "visible"
-      The stderr should include "[DEBUG]"
+      The stderr should include "DEBUG"
       The stderr should include "visible"
       unset BRIK_LOG_LEVEL
     End
@@ -48,7 +49,7 @@ Describe "logging.sh"
   Describe "log.warn"
     It "emits a WARN level line"
       When call log.warn "caution"
-      The stderr should include "[WARN]"
+      The stderr should include "WARN"
       The stderr should include "caution"
     End
   End
@@ -56,14 +57,14 @@ Describe "logging.sh"
   Describe "log.error"
     It "emits an ERROR level line"
       When call log.error "failure"
-      The stderr should include "[ERROR]"
+      The stderr should include "ERROR"
       The stderr should include "failure"
     End
 
     It "is emitted even when BRIK_LOG_LEVEL=error"
       export BRIK_LOG_LEVEL="error"
       When call log.error "critical"
-      The stderr should include "[ERROR]"
+      The stderr should include "ERROR"
       unset BRIK_LOG_LEVEL
     End
   End
@@ -71,7 +72,7 @@ Describe "logging.sh"
   Describe "log.success"
     It "emits an OK level line"
       When call log.success "stage done"
-      The stderr should include "[OK]"
+      The stderr should include "  OK    "
       The stderr should include "stage done"
     End
 
@@ -94,7 +95,7 @@ Describe "logging.sh"
     It "shows warn when BRIK_LOG_LEVEL=warn"
       export BRIK_LOG_LEVEL="warn"
       When call log.warn "visible"
-      The stderr should include "[WARN]"
+      The stderr should include "WARN"
       unset BRIK_LOG_LEVEL
     End
   End
@@ -108,24 +109,38 @@ Describe "logging.sh"
       The stderr should not include $'\033'"["
     End
 
-    It "wraps the level label in ANSI when BRIK_LOG_FORCE_COLOR=1"
+    It "wraps the whole line in red when BRIK_LOG_FORCE_COLOR=1 (error)"
       export BRIK_LOG_FORCE_COLOR=1
       When call log.error "boom"
-      The stderr should include $'\033'"[31mERROR"$'\033'"[0m"
+      # Whole-line color: prefix red escape, suffix reset escape
+      The stderr should start with $'\033'"[31m"
+      The stderr should include "ERROR"
+      The stderr should include "boom"
+      The stderr should include $'\033'"[0m"
       unset BRIK_LOG_FORCE_COLOR
     End
 
-    It "uses green for success when colors are forced"
+    It "uses green for the success line when colors are forced"
       export BRIK_LOG_FORCE_COLOR=1
       When call log.success "yay"
-      The stderr should include $'\033'"[32mOK"$'\033'"[0m"
+      The stderr should start with $'\033'"[32m"
+      The stderr should include "OK"
       unset BRIK_LOG_FORCE_COLOR
     End
 
-    It "uses yellow for warn when colors are forced"
+    It "uses yellow for the warn line when colors are forced"
       export BRIK_LOG_FORCE_COLOR=1
       When call log.warn "careful"
-      The stderr should include $'\033'"[33mWARN"$'\033'"[0m"
+      The stderr should start with $'\033'"[33m"
+      The stderr should include "WARN"
+      unset BRIK_LOG_FORCE_COLOR
+    End
+
+    It "uses blue for the info line when colors are forced"
+      export BRIK_LOG_FORCE_COLOR=1
+      When call log.info "neutral"
+      The stderr should start with $'\033'"[34m"
+      The stderr should include "INFO"
       unset BRIK_LOG_FORCE_COLOR
     End
 
@@ -151,13 +166,6 @@ Describe "logging.sh"
       When call log.warn "test"
       The stderr should include $'\033'"[33m"
       unset BRIK_LOG_NO_COLOR
-      unset BRIK_LOG_FORCE_COLOR
-    End
-
-    It "info level remains uncolored even when colors are forced"
-      export BRIK_LOG_FORCE_COLOR=1
-      When call log.info "neutral"
-      The stderr should not include $'\033'"["
       unset BRIK_LOG_FORCE_COLOR
     End
   End

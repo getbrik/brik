@@ -195,7 +195,11 @@ default:
       else
         _brik_gate_rc=$?
         if [ "${_brik_gate_rc}" -eq 1 ]; then
-          echo "[brik] ${_brik_gate_stage}: skipped (per plan)"
+          # Plain "[SKIP]" tag: matches render.status output. Color is dropped
+          # here for cross-platform parity with the Jenkins wrapper (Groovy
+          # cannot easily call render.status); the inner `brik plan gate`
+          # message above carries the colored tag in CI log viewers.
+          echo "[brik] [SKIP] ${_brik_gate_stage}: per plan"
           # The job exits before brik.gitlab.run_stage; seed the cache and
           # artefact markers so GitLab's cache/artifact steps stay quiet
           # (otherwise: "no files to cache/upload" on a plan-skipped job).

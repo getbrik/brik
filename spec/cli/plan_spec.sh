@@ -37,7 +37,7 @@ Describe "brik plan (CLI surface)"
       When run script "$BRIK_BIN" plan --workspace "$PLAN_WS" --mode safe --explain
       The status should equal 0
       The output should include "Brik plan"
-      The output should include "Stages:"
+      The output should include "Stages"
       The output should include "init"
     End
   End

@@ -80,7 +80,8 @@ Describe "summary.sh"
 
     It "collects errors from log file"
       verify_errors() {
-        printf '[ERROR] [build] something went wrong\n' > "$LOG_FILE"
+        # New log format (VIS-3): "<ts>  ERROR  <scope>  <msg>"
+        printf '2026-05-24T12:00:00+0000  ERROR  build  something went wrong\n' > "$LOG_FILE"
         summary.build "build" "$CTX_FILE" "$LOG_FILE" 1
         local summary_path="${BRIK_LOG_DIR}/build-summary.json"
         jq -e '.errors | length > 0' "$summary_path" >/dev/null

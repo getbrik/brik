@@ -152,6 +152,7 @@ cli.plan.run() {
         mkdir -p "$(dirname "$out")"
         mv "$tmp_json" "$out"
         printf 'plan: %s\n' "$out"
+        cli.plan._render_explain "$out"
     else
         cat "$tmp_json"
         rm -f "$tmp_json"
@@ -229,35 +230,132 @@ cli.plan.gate() {
     # report.aggregate_fragments (Jenkins stash/unstash, GitLab artifacts).
     report.write_fragment "$stage_id" 2>/dev/null || true
 
-    printf '[brik plan] %s: skipped (reason=%s)\n' "$stage_id" "${reason:-unknown}"
+    # Render a one-line, user-facing skip message with a colored [SKIP]
+    # status indicator and a concrete blocker (which flag, which context,
+    # ...) instead of just the machine-readable reason code. The JSON
+    # fragment above keeps the short code in business.reason for
+    # downstream consumers.
+    brik.use planning.plan 2>/dev/null || true     # for registry helpers
+    brik.use transverse.render 2>/dev/null || true # for render.status
+    local _plan_context _matched_globs _reason_text
+    _plan_context="$(jq -r '.context // ""' "$plan_file" 2>/dev/null)"
+    _matched_globs="$(jq -r --arg id "$stage_id" '.stages[] | select(.id == $id) | (.matched_globs // [] | join(","))' "$plan_file" 2>/dev/null || true)"
+    _reason_text="$(cli.plan._reason_text "$stage_id" "${reason:-unknown}" "$_plan_context" "$_matched_globs")"
+    printf '[brik plan] %s %s: %s\n' "$(render.status skipped)" "$stage_id" "$_reason_text"
     return 1
 }
 
+# Translate a plan reason code into a one-line, user-facing explanation.
+# Names the concrete condition (which flag, which context, which globs)
+# instead of just the machine-readable code. Shared by the per-stage gate
+# message and the explain table.
+#
+# Args:
+#   $1 stage_id
+#   $2 reason_code   (context-match | context-mismatch | opt-in-flag-missing
+#                     | no-impact | impacted | no-diff | no-impact-declared)
+#   $3 context       (snapshot | release) from plan.json
+#   $4 matched_globs (comma-separated, may be empty)
+cli.plan._reason_text() {
+    local stage_id="$1" reason="$2" context="${3:-}" matched_globs="${4:-}"
+
+    case "$reason" in
+        context-match)
+            printf 'applicable to context [%s]' "$context"
+            ;;
+        context-mismatch)
+            local req_contexts current_explain
+            req_contexts="$(registry.stage.gate_contexts "$stage_id" 2>/dev/null \
+                | tr '\n' ',' | sed -e 's/^,//' -e 's/,$//')"
+            [[ -z "$req_contexts" ]] && req_contexts="unknown"
+            case "$context" in
+                snapshot) current_explain=" (BRIK_COMMIT_TAG is empty)" ;;
+                release)  current_explain=" (BRIK_COMMIT_TAG is set)" ;;
+                *)        current_explain="" ;;
+            esac
+            printf 'current context is [%s]%s; requires [%s]' \
+                "$context" "$current_explain" "$req_contexts"
+            ;;
+        opt-in-flag-missing)
+            local flag
+            flag="$(registry.stage.gate_opt_in_flag "$stage_id" 2>/dev/null)"
+            if [[ -n "$flag" ]]; then
+                printf 'the %s flag was not passed (this stage is opt-in)' "$flag"
+            else
+                printf 'the required opt-in flag was not passed'
+            fi
+            ;;
+        no-impact)
+            printf "no changed file matched this stage's impact patterns"
+            ;;
+        impacted)
+            if [[ -n "$matched_globs" ]]; then
+                printf 'changed files match: %s' "$matched_globs"
+            else
+                printf "changed files match this stage's impact patterns"
+            fi
+            ;;
+        no-diff)
+            printf 'no diff context available; running conservatively'
+            ;;
+        no-impact-declared)
+            printf 'no impact patterns declared; runs by default'
+            ;;
+        *)
+            printf '%s' "$reason"
+            ;;
+    esac
+}
+
 # Render a human-friendly summary of the plan to stdout.
-# Intentionally narrow: enough to spot "did I get balanced filtering?"
-# and "which stages run?" without unwrapping the whole JSON.
+# Delegates table rendering to transverse/render.sh, which handles
+# ASCII box-drawing with computed column widths. The REASON column is
+# computed via cli.plan._reason_text so it matches the per-stage gate
+# message verbatim.
 cli.plan._render_explain() {
     local plan="$1"
     command -v jq >/dev/null 2>&1 || { printf '[brik plan] jq required for --explain\n' >&2; return 1; }
+    brik.use planning.plan 2>/dev/null || true   # for registry helpers
+    brik.use transverse.render 2>/dev/null || true
 
-    jq -r '
-        # KCOV_EXCL_START -- inline jq script body, not bash code
-        def pad(n): . + ((" " * (n - (. | length))));
-        "Brik plan (\(.schemaVersion), brik \(.brikVersion))",
-        "  context     : \(.context)",
-        "  mode        : \(.mode)",
-        "  workspace   : \(.workspace)",
-        "  changes     : source=\(.changes.source)" +
-                       (if (.changes.from_ref // "") != "" then " range=\(.changes.from_ref)..\(.changes.to_ref)" else "" end),
-        "  fingerprint : \(.fingerprint)",
-        "",
-        "Stages:",
-        (.stages[] | "  " +
-            (if .decision == "run" then "[ RUN ]" else "[SKIP ]" end) +
-            " " + (.id | pad(15)) +
-            "  " + .reason +
-            (if (.matched_globs | length) > 0 then "  (" + (.matched_globs | join(", ")) + ")" else "" end)
-        )
-        # KCOV_EXCL_STOP
-    ' "$plan"
+    # Pull header data
+    local schema brik_v context mode workspace
+    local changes_src changes_from changes_to fingerprint
+    schema=$(jq -r '.schemaVersion' "$plan")
+    brik_v=$(jq -r '.brikVersion' "$plan")
+    context=$(jq -r '.context' "$plan")
+    mode=$(jq -r '.mode' "$plan")
+    workspace=$(jq -r '.workspace' "$plan")
+    changes_src=$(jq -r '.changes.source' "$plan")
+    changes_from=$(jq -r '.changes.from_ref // ""' "$plan")
+    changes_to=$(jq -r '.changes.to_ref // ""' "$plan")
+    fingerprint=$(jq -r '.fingerprint' "$plan")
+
+    # Plain-text header: title line + aligned key/value block.
+    printf '\n'
+    printf 'Brik plan (%s, brik %s)\n' "$schema" "$brik_v"
+    render.kv "context"     "$context"   --key-width 11
+    render.kv "mode"        "$mode"      --key-width 11
+    render.kv "workspace"   "$workspace" --key-width 11
+    if [[ -n "$changes_from" ]]; then
+        render.kv "changes" "source=${changes_src} range=${changes_from}..${changes_to}" --key-width 11
+    else
+        render.kv "changes" "source=${changes_src}" --key-width 11
+    fi
+    render.kv "fingerprint" "$fingerprint" --key-width 11
+    printf '\n'
+
+    # Section heading + TSV table piped through render.table.
+    # The REASON column is computed per-row via cli.plan._reason_text
+    # so the same text appears here and in the per-stage gate message.
+    render.section "Stages"
+    {
+        printf 'ID\tDECISION\tGATE\tCODE\tREASON\n'
+        local id decision gate_mode reason matched_globs reason_text
+        while IFS=$'\t' read -r id decision gate_mode reason matched_globs; do
+            reason_text=$(cli.plan._reason_text "$id" "$reason" "$context" "$matched_globs")
+            printf '%s\t%s\t%s\t%s\t%s\n' \
+                "$id" "$decision" "$gate_mode" "$reason" "$reason_text"
+        done < <(jq -r '.stages[] | [.id, .decision, .gate.mode, .reason, (.matched_globs // [] | join(","))] | @tsv' "$plan")
+    } | render.table
 }

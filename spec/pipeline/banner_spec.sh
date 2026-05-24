@@ -57,7 +57,8 @@ Describe "banner.sh"
 
     It "shows runner metadata when provided"
       When call banner.stage "sast" "ghcr.io/getbrik/runner:1"
-      The stderr should include "runner:"
+      # render.kv now uses padding-as-separator (no colon)
+      The stderr should include "runner  "
       The stderr should include "ghcr.io/getbrik/runner:1"
     End
 
@@ -67,16 +68,16 @@ Describe "banner.sh"
       # the 0.6.x cleanup but bash silently accepts extra args, so legacy
       # callers do not break.
       When call banner.stage "sast" "ghcr.io/getbrik/runner:1" "semgrep"
-      The stderr should include "runner:"
-      The stderr should not include "tech:"
+      The stderr should include "runner  "
+      The stderr should not include "tech "
       The stderr should not include "semgrep"
     End
 
     It "falls back to '-' when runner is missing"
       When call banner.stage "build"
-      The stderr should include "runner:"
-      The stderr should match pattern "*runner:*-*"
-      The stderr should not include "tech:"
+      The stderr should include "runner  "
+      The stderr should match pattern "*runner *-*"
+      The stderr should not include "tech "
     End
 
     It "does not write anything to stdout"

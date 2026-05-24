@@ -3,11 +3,16 @@
 # @description Structured logging API for the Brik runtime.
 #
 # Outputs to stderr in the format:
-#   <ISO 8601 timestamp> [<LABEL>] [<scope>] <message>
+#   <ISO 8601 timestamp>  <LABEL>  <scope>  <message>
 #
-# Levels (label):
+# Two-space separators (whitespace, no brackets). LABEL is left-padded to
+# 5 chars so columns align across levels. When colors are enabled the
+# WHOLE line is wrapped in the level color so a quick glance distinguishes
+# OK / WARN / ERROR / SKIP / INFO / DEBUG lines.
+#
+# Levels (label / line color):
 #   debug   -> DEBUG (dim)
-#   info    -> INFO  (no color)
+#   info    -> INFO  (blue)
 #   success -> OK    (green)
 #   warn    -> WARN  (yellow)
 #   error   -> ERROR (red)
@@ -23,20 +28,26 @@
 [[ -n "${_BRIK_LOGGING_LOADED:-}" ]] && return 0
 _BRIK_LOGGING_LOADED=1
 
+# shellcheck source=../transverse/render.sh
+. "${BASH_SOURCE[0]%/*}/../transverse/render.sh"
+
 # Level constants (lower = more verbose)
 readonly _BRIK_LOG_LEVEL_DEBUG=0
 readonly _BRIK_LOG_LEVEL_INFO=1
 readonly _BRIK_LOG_LEVEL_WARN=2
 readonly _BRIK_LOG_LEVEL_ERROR=3
 
-# ANSI color escapes. Defined as constants so they remain bytewise stable
-# even if locale tooling rewrites the escape character; using $'\033' once.
-_BRIK_C_ESC=$'\033'
-readonly _BRIK_C_RESET="${_BRIK_C_ESC}[0m"
-readonly _BRIK_C_DIM="${_BRIK_C_ESC}[2m"
-readonly _BRIK_C_RED="${_BRIK_C_ESC}[31m"
-readonly _BRIK_C_GREEN="${_BRIK_C_ESC}[32m"
-readonly _BRIK_C_YELLOW="${_BRIK_C_ESC}[33m"
+# ANSI color escapes for log levels. Resolved via render.color (force-on)
+# at source time so the escape sequences themselves come from a single
+# source of truth (render.sh); the per-call decision to *emit* them is
+# kept inside this module via _log._color_enabled, which preserves the
+# logging-specific overrides (BRIK_LOG_FORCE_COLOR / BRIK_LOG_NO_COLOR).
+readonly _BRIK_C_RESET="$(BRIK_RENDER_FORCE_COLOR=1 render.color reset)"
+readonly _BRIK_C_DIM="$(BRIK_RENDER_FORCE_COLOR=1 render.color dim)"
+readonly _BRIK_C_RED="$(BRIK_RENDER_FORCE_COLOR=1 render.color red)"
+readonly _BRIK_C_GREEN="$(BRIK_RENDER_FORCE_COLOR=1 render.color green)"
+readonly _BRIK_C_YELLOW="$(BRIK_RENDER_FORCE_COLOR=1 render.color yellow)"
+readonly _BRIK_C_BLUE="$(BRIK_RENDER_FORCE_COLOR=1 render.color blue)"
 
 # Resolve the numeric threshold from BRIK_LOG_LEVEL.
 # `success` maps to INFO so it filters identically.
@@ -73,20 +84,37 @@ _log._color_enabled() {
     return 1
 }
 
-# Map a logical level to its display label and ANSI color (or empty).
+# Map a logical level to its display label and cached ANSI escape.
 # Sets two caller-visible variables: _LABEL and _COLOR.
+#
+# Delegates the level -> label+color-name mapping to render.sh's
+# _render._level_meta (single source of truth shared with render.status).
+# This module then resolves the color name to the cached escape constant
+# (so per-call cost stays minimal -- no repeated render.color subshells).
 _log._style_for() {
-    case "$1" in
-        debug)   _LABEL="DEBUG"; _COLOR="$_BRIK_C_DIM" ;;
-        info)    _LABEL="INFO";  _COLOR="" ;;
-        success) _LABEL="OK";    _COLOR="$_BRIK_C_GREEN" ;;
-        warn)    _LABEL="WARN";  _COLOR="$_BRIK_C_YELLOW" ;;
-        error)   _LABEL="ERROR"; _COLOR="$_BRIK_C_RED" ;;
-        *)       _LABEL="INFO";  _COLOR="" ;;
+    local _LEVEL_LABEL _LEVEL_COLOR
+    _render._level_meta "$1"
+    _LABEL="$_LEVEL_LABEL"
+    case "$_LEVEL_COLOR" in
+        green)  _COLOR="$_BRIK_C_GREEN"  ;;
+        red)    _COLOR="$_BRIK_C_RED"    ;;
+        yellow) _COLOR="$_BRIK_C_YELLOW" ;;
+        blue)   _COLOR="$_BRIK_C_BLUE"   ;;
+        dim)    _COLOR="$_BRIK_C_DIM"    ;;
+        *)      _COLOR=""                ;;
     esac
 }
 
 # Internal emitter - writes a formatted log line to stderr.
+#
+# Format:
+#   <ts>  <LABEL:5>  <scope>  <message>
+#
+# Whitespace-separated (no brackets), label padded to 5 chars so columns
+# align across all levels (longest labels are DEBUG/ERROR = 5). When
+# colors are enabled, the *entire* line is wrapped in the level color
+# so quick visual scanning distinguishes OK/WARN/ERROR/SKIP/INFO/DEBUG
+# without parsing the label text.
 _log._emit() {
     local level="$1"
     shift
@@ -96,10 +124,15 @@ _log._emit() {
     timestamp="$(date +"%Y-%m-%dT%H:%M:%S%z")"
     local _LABEL _COLOR
     _log._style_for "$level"
+    # Pad LABEL to 5 chars (length of DEBUG / ERROR).
+    local label_padded
+    printf -v label_padded '%-5s' "$_LABEL"
     if [[ -n "$_COLOR" ]] && _log._color_enabled; then
-        printf '%s [%s%s%s] [%s] %s\n' "$timestamp" "$_COLOR" "$_LABEL" "$_BRIK_C_RESET" "$scope" "$message" >&2
+        printf '%s%s  %s  %s  %s%s\n' \
+            "$_COLOR" "$timestamp" "$label_padded" "$scope" "$message" "$_BRIK_C_RESET" >&2
     else
-        printf '%s [%s] [%s] %s\n' "$timestamp" "$_LABEL" "$scope" "$message" >&2
+        printf '%s  %s  %s  %s\n' \
+            "$timestamp" "$label_padded" "$scope" "$message" >&2
     fi
 }
 

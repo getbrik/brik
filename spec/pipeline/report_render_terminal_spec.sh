@@ -5,6 +5,7 @@ Describe "report.render_terminal"
   # other report.* helpers (md/json/html) rather than in the local wrapper.
   Include "$BRIK_PIPELINE_LIB/logging.sh"
   Include "$BRIK_PIPELINE_LIB/error.sh"
+  Include "$BRIK_TRANSVERSE_LIB/render.sh"
   Include "$BRIK_PIPELINE_LIB/report.sh"
 
   setup_fixture() {
