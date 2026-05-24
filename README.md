@@ -3,8 +3,9 @@
 </p>
 
 <p align="center">
-  <b>A complete CI/CD pipeline, out of the box.</b><br>
-  <b>Describe your project. Brik does the rest.</b>
+  <b>CI/CD as configuration, not code.</b><br>
+  Write it once. Run it on GitLab, Jenkins, GitHub Actions, and your laptop.<br>
+  <i>Stop maintaining pipelines. Start shipping.</i>
 </p>
 
 <p align="center">
@@ -22,32 +23,30 @@
   <a href="https://github.com/getbrik/briklab">Briklab</a>
 </p>
 
-## The problem
+---
 
-CI/CD pipelines are:
+## The problem Brik solves
 
-- Rewritten in every project
-- Tied to specific platforms
-- Hard to maintain and evolve
+CI/CD logic is the same everywhere. Build the code. Run the tests. Scan for vulnerabilities. Push the image. Deploy. Notify.
 
-Even though... they all do the same thing.
+Yet every team rewrites it. Per project. Per platform. Per migration.
 
-## The solution: Brik
+- Move from GitLab to GitHub Actions? Rewrite the pipeline.
+- Add Jenkins for a customer? Rewrite again, in Groovy.
+- Onboard a new repo? Copy-paste the last one and pray.
+- Tighten a coverage threshold across 40 services? Forty pull requests.
 
-Brik provides a **ready-to-use CI/CD pipeline** that works out of the box.
-
-- No need to write pipeline logic
-- No need to learn platform-specific syntax
-
-You just describe your project in `brik.yml`.
+Brik treats CI/CD like the solved problem it is. The logic lives in one place. Platforms are thin adapters. You describe your project, not the pipeline.
 
 ## What you write
+
+A realistic `brik.yml` for a deployable Node service looks like this:
 
 ```yaml
 version: 1
 
 project:
-  name: my-node-app
+  name: orders-api
   stack: node
 
 test:
@@ -59,183 +58,188 @@ deploy:
   environments:
     staging:
       target: k8s
-      namespace: staging
+      namespace: orders-staging
     production:
       target: helm
-      chart: ./charts/my-app
+      chart: ./charts/orders-api
 ```
 
-That's it. Brik gives you build, test, lint, security scanning, and deployment,
-with sensible defaults you can override.
+That is the entire pipeline definition. No `.gitlab-ci.yml` with 400 lines of YAML. No `Jenkinsfile` with custom Groovy. No bash glue you maintain.
 
-## How it works
+Only `version` and `project.name` are required -- the stack is auto-detected, every other field has a per-stack default. The rest of `brik.yml` is where you override what actually matters for *your* project: coverage thresholds, deploy targets, notification channels, registries, secrets. You configure your project. You never write pipeline logic.
+
+From that single file, Brik produces:
+
+- a working GitLab pipeline via a one-line `include:`
+- a working Jenkins pipeline via the Brik shared library
+- a working local run via `brik run pipeline`
+- a release flow that triggers only on tags
+
+## Pipeline at a glance
+
+Every Brik pipeline runs the same 12 stages in the same order:
 
 ```mermaid
 flowchart LR
-    A["<b>1. brik.yml</b><br/>Your project"]
-    B["<b>2. brik init</b><br/>One-time setup"]
-    GL[".gitlab-ci.yml"]
-    JK["Jenkinsfile"]
-    LO["brik run"]
-    C["<b>3. Pipeline runs</b><br/>Build, test, lint,<br/>scan, deploy"]
-
-    A --> B
-    B --> GL
-    B --> JK
-    B --> LO
-    GL --> C
-    JK --> C
-    LO --> C
-```
-
-1. **Describe your project** -- stack, tools, thresholds in `brik.yml`.
-2. **Run `brik init` once** -- it generates a thin bootstrap file for your
-   platform (`.gitlab-ci.yml`, `Jenkinsfile`). You can also run locally with
-   `brik run`.
-3. **Your pipeline runs** -- build, test, lint, security scan, deploy. Same
-   behavior on every platform.
-
-## Pipeline flow
-
-Every Brik pipeline follows a fixed stage sequence:
-
-```mermaid
-flowchart LR
-    init["Init"]
-    release["Release"]
-    build["Build"]
-    lint["Lint"]
-    sast["SAST"]
-    scan["Dep Scan"]
-    test["Test"]
-    package["Package"]
-    cscan["Container<br/>Scan"]
-    promote["Promote"]
-    deploy["Deploy"]
-    notify["Notify"]
-
-    init --> release
-    release --> build
-    build --> lint
-    build --> sast
-    build --> scan
-    build --> test
-    lint -.->|quality gate| package
-    sast -.->|quality gate| package
-    scan -.->|quality gate| package
+    init["Init"] --> release["Release"]
+    release --> build["Build"]
+    build --> lint["Lint"]
+    build --> sast["SAST"]
+    build --> scan["Dep Scan"]
+    build --> test["Test"]
+    lint -. quality gate .-> package["Package"]
+    sast -. quality gate .-> package
+    scan -. quality gate .-> package
     test --> package
-    package --> cscan
-    cscan --> promote
-    promote --> deploy
+    package --> cscan["Container<br/>Scan"]
+    cscan --> promote["Promote"]
+    promote --> deploy["Deploy"]
     test --> deploy
-    deploy --> notify
+    deploy --> notify["Notify"]
 ```
 
-Lint, SAST, Scan, and Test all run **in parallel** after Build. The quality gate
-applies at **Package**: it waits for Test to pass and for Lint/SAST/Scan to
-succeed. See [the fixed flow](docs/concepts/fixed-flow.md) for the full stage
-table and behavior.
+Lint, SAST, dependency scan, and tests fan out in parallel after Build. The quality gate sits at Package: nothing gets packaged unless tests pass and the three security stages succeed. Nothing deploys without a green test.
 
-## Plan-aware execution
+That is not a convention. It is the structural shape of the pipeline. You cannot accidentally ship broken or unverified code by editing the pipeline, because there is no pipeline to edit.
 
-The stage *sequence* is fixed -- but Brik does not blindly run all of it on
-every commit. Before the pipeline starts, a planner computes a **plan**:
-which stages run, and why, for this commit.
+## What makes Brik different
 
-- A **docs-only commit** skips the build / lint / test grid -- no runner
-  container is spun up for a stage nothing changed.
-- A **tag push** runs the release path (Release, Package, Promote).
-- The plan is one provider-agnostic object (`plan.json`): GitLab, Jenkins,
-  and local `brik run` consume the same plan, so a commit behaves the same
-  everywhere.
+### 🗺️ A fixed flow, but a smart plan
 
-Selection is `safe` by default (commit context only). Set
-`pipeline.selection.mode: balanced` in `brik.yml` to also skip stages that
-no changed file impacts. Inspect the decision for the current commit with
-`brik plan --explain`. See [the plan](docs/concepts/plan.md).
+The 12 stages are non-negotiable. The decision of which stages actually *run* on this commit is computed up front:
 
-## Getting started
+- A **docs-only commit** skips the build, lint, and test grid. No runner container spins up for a stage nothing changed.
+- A **tag push** runs the release path: Release, Package, Promote.
+- A feature branch is **snapshot context**: the pipeline keeps going past failures so the operator sees the full picture.
+- A tagged release is **release context**: fail-fast, because a broken stage in a release pipeline is not a learning opportunity.
 
-| Platform | Start here |
-|----------|------------|
-| GitLab CI | [docs/getting-started/gitlab.md](docs/getting-started/gitlab.md) |
-| Jenkins | [docs/getting-started/jenkins.md](docs/getting-started/jenkins.md) |
-| Local (CLI) | [docs/getting-started/local.md](docs/getting-started/local.md) |
+The plan is one platform-agnostic JSON document. GitLab, Jenkins, and `brik run` consume the same plan. Same commit, same plan, same outcome, anywhere. Inspect any decision with `brik plan --explain`.
 
-Full documentation lives in **[docs/README.md](docs/README.md)**.
+### 🛡️ Security that knows the difference between "we can fix this" and "the vendor won't"
+
+Brik separates two axes for every stage result:
+
+- **Technical**: did the command exit zero?
+- **Business**: given the context, does that result block the release?
+
+The mapping is a pure function. Consequence: a CVE with an available upstream fix **blocks** a release pipeline. A CVE the vendor will not fix stays a **warning** even in release, because someone already accepted the risk and there is nothing to do but mitigate. A lint *warning* never blocks a release; a lint *error* does.
+
+The same model handles coverage drops, dependency audit results, container scan findings, and license violations. One decision matrix. Auditable. Centralised in [`lib/pipeline/business.sh`](lib/pipeline/business.sh).
+
+This is what makes Brik usable on a release pipeline that ships every day without either crying wolf or shipping a known-broken artifact.
+
+### 🐚 Bash, because Bash is the universal CI runtime
+
+Brik is written in Bash. Not as a stylistic choice. Because Bash is the only language guaranteed available on every CI runner, every container image, every VM, and every developer laptop.
+
+- No compilation step.
+- No runtime install.
+- No language-version drift between local and CI.
+- Same code path locally and on every platform.
+
+Bash has limits, and Brik treats them seriously: 3635 ShellSpec tests, 80% coverage gate enforced in CI, ShellCheck on every file, end-to-end runs against real GitLab and Jenkins instances in [briklab](https://github.com/getbrik/briklab) on every release.
+
+### 💻 Same pipeline on your laptop
+
+```bash
+brik run pipeline                # full pipeline locally
+brik run stage test              # one stage
+brik plan --explain              # show what will run on this commit, and why
+brik validate                    # validate brik.yml against the schema
+brik doctor                      # check prerequisites
+```
+
+The local runner uses the same Bash code path as the CI adapters. Reproducing a CI failure locally is `brik run stage <name>`, not "clone the repo, install a 600 MB runner image, and pray".
+
+## How the layers fit
+
+| Layer | Role | Replaced when you switch platform? |
+|-------|------|------------------------------------|
+| **brik.yml** | Project configuration. The only file you write. | No |
+| **brik-lib** | CI/CD business logic in Bash. Build, test, scan, deploy, package. | No |
+| **Shared Library** | Per-platform adapter. Reads `brik.yml`, runs the fixed flow via native CI constructs. | Yes (Brik ships them) |
+| **Bash Runtime** | `stage.run`: lifecycle, logging, hooks, structured reports. | No |
+
+Three of the four layers are platform-agnostic. The platform adapter is thin by design: read config, map the fixed flow to the platform, invoke `stage.run`. No business logic in adapters. Ever.
+
+See [docs/concepts/architecture.md](docs/concepts/architecture.md) for the full design.
 
 ## Supported stacks
 
-| Stack | Detection | Build | Test | Lint |
-|-------|-----------|-------|------|------|
-| **node** | `package.json` | npm/yarn/pnpm | jest/npm | eslint/biome |
-| **java** | `pom.xml` / `build.gradle(.kts)` | mvn/gradle | junit/gradle | checkstyle |
-| **python** | `pyproject.toml` / `setup.py` / `requirements.txt` | pip/poetry/uv/pipenv | pytest/unittest/tox | ruff |
-| **dotnet** | `*.csproj` / `*.sln` | dotnet build | dotnet test | dotnet-format |
-| **rust** | `Cargo.toml` | cargo build | cargo | clippy |
+| Stack | Auto-detected from | Build | Test | Lint |
+|-------|--------------------|-------|------|------|
+| **node** | `package.json` | npm / yarn / pnpm | jest / npm test | eslint / biome |
+| **java** | `pom.xml` / `build.gradle(.kts)` | maven / gradle | junit / gradle | checkstyle |
+| **python** | `pyproject.toml` / `requirements.txt` | pip / poetry / uv / pipenv | pytest / unittest / tox | ruff |
+| **dotnet** | `*.csproj` / `*.sln` | dotnet build | dotnet test | dotnet format |
+| **rust** | `Cargo.toml` | cargo build | cargo test | clippy |
 
-Stack is auto-detected from project files when not specified in `brik.yml`.
+The stack is detected from project files when not specified. Every stack ships with a runner image: [brik-images](https://github.com/getbrik/brik-images) (Alpine or slim bases, multi-arch, rebuilt weekly for CVE fixes).
 
 ## Platform support
 
-| Platform | Status | Integration |
-|----------|--------|-------------|
-| **GitLab CI** | Functional | Shared library with pipeline template |
-| **Jenkins** | Functional | Jenkins shared library (CasC + Gitea) |
-| **GitHub Actions** | `brik init --platform github` scaffolds a bootstrap; reusable workflows in progress | Reusable workflows |
+| Platform | Status | How it ships |
+|----------|--------|--------------|
+| **GitLab CI** | ✅ Functional | Shared library + pipeline template (`include:` one line) |
+| **Jenkins** | ✅ Functional | Jenkins Shared Library (works with Configuration-as-Code + Gitea) |
+| **GitHub Actions** | 🚧 Bootstrap shipped, reusable workflows in progress | `brik init --platform github` scaffolds today |
+| **Local CLI** | ✅ Functional | `brik run pipeline` |
+
+## Get started
+
+| You use | Start here |
+|---------|------------|
+| GitLab CI | [docs/getting-started/gitlab.md](docs/getting-started/gitlab.md) |
+| Jenkins | [docs/getting-started/jenkins.md](docs/getting-started/jenkins.md) |
+| Local CLI | [docs/getting-started/local.md](docs/getting-started/local.md) |
+
+Install Brik on macOS or Linux:
+
+```bash
+brew tap getbrik/tap
+brew install brik
+
+brik doctor    # check prerequisites
+brik init      # scaffold brik.yml + your platform bootstrap
+brik validate  # confirm the config is valid
+brik run pipeline
+```
+
+Full documentation: **[docs/README.md](docs/README.md)**.
 
 ## Configuration
 
-Brik follows a "declare what, not how" philosophy. Only `version` and
-`project.name` are required -- everything else has sensible per-stack defaults.
-
-```yaml
-version: 1
-project:
-  name: my-app
-  stack: node
-```
+Brik follows a "declare what, not how" rule. Only `version` and `project.name` are required. Every other field has a per-stack default you can override.
 
 - Configuration reference: [docs/configuration/overview.md](docs/configuration/overview.md)
 - JSON Schema (source of truth): [schemas/config/v1/brik.schema.json](schemas/config/v1/brik.schema.json)
-- Worked examples: [examples/](examples/) (minimal-node, java-maven, python-pytest, mono-dotnet)
+- Working examples: [examples/](examples/) (minimal-node, java-maven, python-pytest, mono-dotnet)
 
-## Architecture
+## Quality, in numbers
 
-| Layer | Role |
-|-------|------|
-| **brik.yml** | Project configuration |
-| **Shared Library** | Per platform (GitLab, Jenkins, GitHub Actions) |
-| **brik-lib** | Reusable CI/CD functions (Bash) |
-| **Bash Runtime** | Stage lifecycle, logging, hooks |
-
-For the design, the stage lifecycle, and how to extend Brik, see
-[docs/concepts/architecture.md](docs/concepts/architecture.md).
-
-## Code coverage
-
-Measured by [ShellSpec](https://shellspec.info) with
-[kcov](https://github.com/SimonKagstrom/kcov) on every push and pull request,
-then published to [Codecov](https://codecov.io/gh/getbrik/brik) with an 80%
-project and patch gate.
+- ✅ **3635** ShellSpec tests, 0 failures
+- ✅ **80%** Codecov gate on project and patch, enforced in CI
+- ✅ **~60** end-to-end scenarios on real GitLab + Jenkins instances per release
+- ✅ **ShellCheck** clean on every source file
+- ✅ **shellmetrics** tracks cyclomatic complexity, function count, and LLOC on every push to `main`
 
 ## Code metrics
 
-Tracked automatically via [shellmetrics](https://github.com/shellspec/shellmetrics)
-on every push to `main`: average cyclomatic complexity per function, total
-function count, and logical lines of code.
+Tracked automatically via [shellmetrics](https://github.com/shellspec/shellmetrics): average cyclomatic complexity per function, total function count, logical lines of code. The badges at the top of this README are live.
 
-## Related
+## Code coverage
 
-- [brik-images](https://github.com/getbrik/brik-images) - official Docker images for Brik CI/CD runners
-- [briklab](https://github.com/getbrik/briklab) - local Docker infrastructure for testing Brik pipelines
+Measured by [ShellSpec](https://shellspec.info) with [kcov](https://github.com/SimonKagstrom/kcov) on every push and pull request, published to [Codecov](https://codecov.io/gh/getbrik/brik). Project and patch gates are both set to 80%.
 
-## Transparency Notice
+## Related projects
 
-We use AI-assisted development ([Claude Code](https://claude.ai/code) + [Everything Claude Code](https://github.com/aspect-build/everything-claude-code)) to accelerate implementation:
+- [brik-images](https://github.com/getbrik/brik-images) - official Docker images for Brik runners (Node, Python, Java, Rust, .NET, base). Multi-arch, scanned, rebuilt weekly.
+- [briklab](https://github.com/getbrik/briklab) - local Docker infrastructure for testing Brik pipelines against real GitLab and Jenkins.
+- [homebrew-tap](https://github.com/getbrik/homebrew-tap) - the Homebrew tap for `brew install brik`.
 
-- Every contribution (human or AI-generated) follows the same quality gates: code review, test coverage, E2E testing, and CI checks.
-- AI-generated code is not perfect. Regular refactoring passes address its shortcomings, and the overall productivity gains are significant.
+## Transparency notice
+
+We use AI-assisted development ([Claude Code](https://claude.ai/code) and [Everything Claude Code](https://github.com/aspect-build/everything-claude-code)) to accelerate implementation. Every contribution, human or AI-generated, goes through the same gates: code review, ShellSpec coverage, ShellCheck, end-to-end runs on briklab, and CI.
 
 ## License
 
