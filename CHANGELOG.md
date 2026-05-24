@@ -9,14 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.6.0] - 2026-05-24
 
-93 commits since 0.5.0. The release of the architecture refonte: stacks
-and stages are now described by YAML manifests in a registry that is the
-single source of truth, a planner produces a provider-agnostic
-`plan.json`, and the local / Jenkins / GitLab adapters all execute from
-that plan. Adds the `promote` stage, the `brik plan` and `brik extension`
-commands, user-supplied extensions, and a GitLab `workflow:` filter.
-Adds glow rendering of the aggregate report on notify, and a substantial
-CI / supply-chain hardening pass across the project.
+93 commits since 0.5.0.
+
+This release lands the **architecture refonte**. Stacks and stages are
+now described by YAML manifests in a single-source-of-truth registry, a
+planner produces a provider-agnostic `plan.json`, and the local /
+Jenkins / GitLab adapters all execute from that plan.
+
+It also adds the **`promote`** stage, the **`brik plan`** and **`brik
+extension`** commands, support for **user-supplied extensions**, and a
+GitLab **`workflow:`** filter.
+
+Plus: **glow rendering** of the aggregate report on notify, and a
+substantial **CI / supply-chain hardening** pass across the project.
 
 ### Added
 
