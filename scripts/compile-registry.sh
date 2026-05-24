@@ -160,7 +160,7 @@ case "$mode" in
     mv "$tmp" "$output"
     trap - EXIT
     size=$(wc -c < "$output")
-    sha=$(shasum -a 256 "$output" | awk '{print $1}')
+    sha=$(sha256sum "$output" | awk '{print $1}')
     n_stacks=$(jq -r '.stacks | length' "$output")
     n_stages=$(jq -r '.stages | length' "$output")
     printf '[compile-registry] compiled %s\n' "$output"
