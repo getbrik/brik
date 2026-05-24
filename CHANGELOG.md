@@ -7,14 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.6.0] - 2026-05-20
+## [0.6.0] - 2026-05-24
 
-65 commits since 0.5.0. The release of the architecture refonte: stacks
+93 commits since 0.5.0. The release of the architecture refonte: stacks
 and stages are now described by YAML manifests in a registry that is the
 single source of truth, a planner produces a provider-agnostic
 `plan.json`, and the local / Jenkins / GitLab adapters all execute from
 that plan. Adds the `promote` stage, the `brik plan` and `brik extension`
 commands, user-supplied extensions, and a GitLab `workflow:` filter.
+Adds glow rendering of the aggregate report on notify, and a substantial
+CI / supply-chain hardening pass across the project.
 
 ### Added
 
@@ -63,6 +65,10 @@ commands, user-supplied extensions, and a GitLab `workflow:` filter.
 - Verification gates: a `bench-plan` perf gate, schema validation
   (`validate-schemas.sh`), registry-cache / schema-enum drift detection
   in the `lint` job, and a bash 5.0 / 5.2 / 5.3 compatibility matrix.
+- **Glow rendering of the aggregate report on notify** -- the notify
+  stage pipes the Markdown aggregate report through `glow` for
+  terminal-friendly output. The `pipeline/banner.sh` module is
+  simplified accordingly.
 
 ### Changed
 
@@ -100,6 +106,23 @@ commands, user-supplied extensions, and a GitLab `workflow:` filter.
   with `cli plan --out`, parent `yaml_variables` no longer forwarded to
   the child, registry cache pre-warmed during bootstrap, `notify`
   `needs:` handled when no run-stage siblings exist.
+
+### CI / Tooling
+
+- **README rewritten** with a marketing-focused presentation that
+  captures Brik's positioning, the structural quality gate, plan-aware
+  execution, and the tech / business outcome model. Mirrored across the
+  brik-images, briklab, and homebrew-tap repositories.
+- **Trufflehog secret-scan workflow** on every push and pull request.
+- **Dependabot** configured to auto-maintain GitHub Actions SHAs and
+  base images.
+- **CODEOWNERS** file for future-proofed review assignment.
+- **SECURITY.md** with the vulnerability reporting policy.
+- **Codecov upload switched to OIDC tokenless mode**, removing the need
+  for a long-lived token secret.
+- **All GitHub Actions pinned to full-length commit SHAs**, including
+  the new actions introduced by v0.6.0.
+- `actions/upload-artifact` bumped to v7.
 
 ## [0.5.0] - 2026-05-16
 
