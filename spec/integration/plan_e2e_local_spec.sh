@@ -110,9 +110,10 @@ JSON
       run_stages=$(jq -r '[.stages[] | select(.decision == "run") | .id] | sort | join(",")' "$REPO/.brik-logs/plan.json")
       # build (impact_build includes **/*.ts), lint+sast (use_stack_impact:
       # source includes **/*.ts) match; scan (lockfiles only) and test
-      # (.test/.spec only) correctly skip. This proves the planner
-      # filters precisely instead of running everything on every commit.
-      When call test "$run_stages" = "build,lint,sast"
+      # (.test/.spec only) correctly skip. notify is blocking (it always
+      # runs to render the pipeline report). This proves the planner
+      # filters precisely on impact while keeping always-on blockers in.
+      When call test "$run_stages" = "build,lint,notify,sast"
       The status should equal 0
     End
 

@@ -13,8 +13,7 @@ spec:
   runner:
     class: base
   gate:
-    mode: opt_in
-    opt_in_flag: --with-deploy
+    mode: blocking
     contexts: [snapshot, release]
   dry_run:
     destructive: true

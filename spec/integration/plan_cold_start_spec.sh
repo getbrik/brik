@@ -85,7 +85,7 @@ Describe "brik plan cold-start safety net"
         ' "$COLD_DIR/plan.json" | LC_ALL=C sort | tr '\n' ','
       }
       When call safe_blocking
-      The output should equal "build,init,lint,sast,scan,test,"
+      The output should equal "build,init,lint,notify,sast,scan,test,"
     End
 
     It "labels safe-mode runs as context-match (not no-diff)"
