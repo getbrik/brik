@@ -7,11 +7,13 @@
 # stdout).
 #
 # Public API (P1):
-#   render.repeat        - multi-byte-safe character repetition
-#   render.section       - section heading
-#   render.table         - read TSV from stdin, emit a Unicode
-#                          box-drawing table sized from the data
-#   render.color_enabled - auto-detect whether ANSI colors should be used
+#   render.repeat           - multi-byte-safe character repetition
+#   render.section          - section heading
+#   render.table            - read TSV from stdin, emit a Unicode
+#                             box-drawing table sized from the data
+#                             (supports per-row coloring via --color-by)
+#   render.color_enabled    - auto-detect whether ANSI colors should be used
+#   render.color_for_status - map a semantic status keyword to a color name
 #
 # Design notes
 #   - No external dependencies (jq, glow, awk are not required).
@@ -133,20 +135,23 @@ render.kv() {
 #     1. BRIK_RENDER_FORCE_COLOR=1  -> force on (tests, manual override)
 #     2. BRIK_RENDER_NO_COLOR=1     -> force off
 #     3. NO_COLOR set (no-color.org) -> force off
-#     4. TERM=dumb                  -> force off (UNIX convention: a "dumb"
+#     4. Known CI with ANSI rendering (GITLAB_CI, JENKINS_URL) -> on
+#                                       (trumps TERM=dumb: docker images
+#                                       default TERM to dumb, yet GitLab
+#                                       and Jenkins web logs render ANSI)
+#     5. TERM=dumb                  -> force off (UNIX convention: a "dumb"
 #                                       terminal has no ANSI support)
-#     5. fd is a TTY                -> on
-#     6. Known CI with ANSI rendering (GITLAB_CI, JENKINS_URL) -> on
+#     6. fd is a TTY                -> on
 #     7. Default                    -> off
 render.color_enabled() {
     local fd="${1:-1}"
     [[ "${BRIK_RENDER_FORCE_COLOR:-}" == "1" ]] && return 0
     [[ "${BRIK_RENDER_NO_COLOR:-}" == "1" ]] && return 1
     [[ -n "${NO_COLOR:-}" ]] && return 1
-    [[ "${TERM:-}" == "dumb" ]] && return 1
-    [[ -t "$fd" ]] && return 0
     [[ "${GITLAB_CI:-}" == "true" ]] && return 0
     [[ -n "${JENKINS_URL:-}" ]] && return 0
+    [[ "${TERM:-}" == "dumb" ]] && return 1
+    [[ -t "$fd" ]] && return 0
     return 1
 }
 
@@ -168,8 +173,11 @@ render.color() {
     if [[ "${BRIK_RENDER_FORCE_COLOR:-}" != "1" ]]; then
         [[ "${BRIK_RENDER_NO_COLOR:-}" == "1" ]] && return 0
         [[ -n "${NO_COLOR:-}" ]] && return 0
-        [[ "${TERM:-}" == "dumb" ]] && return 0
+        # Known CI environments render ANSI in their web log viewers even
+        # though TERM=dumb is the default inside the runner images. Trust
+        # the CI marker first; fall back to TERM/TTY for plain shells.
         if [[ "${GITLAB_CI:-}" != "true" && -z "${JENKINS_URL:-}" ]]; then
+            [[ "${TERM:-}" == "dumb" ]] && return 0
             [[ "${_BRIK_RENDER_TTY:-off}" == "off" ]] && return 0
         fi
     fi
@@ -186,6 +194,35 @@ render.color() {
         white)   printf '\033[37m' ;;
         gray)    printf '\033[90m' ;;
         *)       return 1 ;;
+    esac
+}
+
+# render.color_for_status <value>
+#   Map a semantic status keyword to the render.color name to use.
+#   Emits the color name on stdout (no ANSI), or nothing if no color
+#   applies. Matching is case-insensitive.
+#
+#   Used by render.table --color-by to color rows by a chosen column, by
+#   row-level highlighters in pipeline reports, and anywhere a semantic
+#   value (RUN/SKIP, SUCCESS/FAILED/SKIPPED, SUCCESS/WARNING/ERROR, N/A)
+#   needs a consistent palette.
+#
+#   Palette:
+#     success | ok | run | pass | passed      -> green
+#     failed  | fail | error                  -> red
+#     warn    | warning                       -> yellow
+#     skip    | skipped | n/a | na            -> gray
+#     running | in-progress                   -> blue
+#     <other>                                 -> "" (no color)
+render.color_for_status() {
+    local v="${1,,}"
+    case "$v" in
+        success|ok|run|pass|passed) printf 'green'  ;;
+        failed|fail|error)          printf 'red'    ;;
+        warn|warning)               printf 'yellow' ;;
+        skip|skipped|n/a|na)        printf 'gray'   ;;
+        running|in-progress)        printf 'blue'   ;;
+        *)                          return 0        ;;
     esac
 }
 
@@ -384,7 +421,7 @@ render.box() {
     printf '└%s┘\n' "$hr"
 }
 
-# render.table [--delim <char>]
+# render.table [--delim <char>] [--color-by <column-name>]
 #   Read delimiter-separated input from stdin (default delim TAB).
 #   The first non-empty line is the header; subsequent non-empty lines
 #   are body rows. Computes column widths from the data and emits a
@@ -393,15 +430,33 @@ render.box() {
 #   Cells are plain text without ANSI escapes. Multi-byte content in
 #   cells is preserved.
 #
+#   Options:
+#     --color-by NAME  Color each body row from the value at column NAME
+#                      (matched verbatim against the header row). The
+#                      color name is resolved through render.color_for_status,
+#                      so the column must carry a semantic keyword
+#                      (RUN/SKIP, SUCCESS/FAILED/SKIPPED, ERROR, N/A, ...).
+#                      Border characters stay uncolored; column-width math
+#                      is performed on raw cell text so alignment is
+#                      preserved. Unknown header name or color disabled
+#                      => no coloring (silent fallback).
+#
 #   Usage:
 #     { printf 'name\tage\n'; printf 'alice\t30\n'; } | render.table
 #     { printf 'a|b\n1|2\n'; } | render.table --delim '|'
+#     {
+#         printf 'ID\tDECISION\n'
+#         printf 'init\tRUN\n'
+#         printf 'lint\tSKIP\n'
+#     } | render.table --color-by DECISION
 render.table() {
     local delim=$'\t'
+    local color_by=""
     while [[ $# -gt 0 ]]; do
         case "$1" in
-            --delim) delim="$2"; shift 2 ;;
-            *)       shift ;;
+            --delim)    delim="$2"; shift 2 ;;
+            --color-by) color_by="$2"; shift 2 ;;
+            *)          shift ;;
         esac
     done
 
@@ -433,6 +488,21 @@ render.table() {
         done
     done
 
+    # Resolve --color-by to a column index. If the name is missing from
+    # the header, fall back to no coloring (silent: a header drift
+    # should not crash the renderer).
+    local color_col=-1
+    if [[ -n "$color_by" ]]; then
+        for ((c=0; c<cols; c++)); do
+            if [[ "${flat[c]}" == "$color_by" ]]; then
+                color_col=$c
+                break
+            fi
+        done
+    fi
+    local reset_seq=""
+    (( color_col >= 0 )) && reset_seq="$(render.color reset)"
+
     # Top rule
     printf '┌'
     for ((c=0; c<cols; c++)); do
@@ -441,13 +511,25 @@ render.table() {
     done
     printf '┐\n'
 
-    # Rows (header + mid rule + body)
+    # Rows (header + mid rule + body). Header row is never colored;
+    # body rows derive their color from the --color-by cell.
     for ((r=0; r<n; r++)); do
+        local row_color_seq=""
+        if (( r > 0 && color_col >= 0 )); then
+            local color_name
+            color_name="$(render.color_for_status "${flat[r * cols + color_col]}")"
+            [[ -n "$color_name" ]] && row_color_seq="$(render.color "$color_name")"
+        fi
+
         printf '│'
         for ((c=0; c<cols; c++)); do
             local cell="${flat[r * cols + c]}"
             local pad=$((widths[c] - ${#cell}))
-            printf ' %s%s │' "$cell" "$(render.repeat ' ' "$pad")"
+            if [[ -n "$row_color_seq" ]]; then
+                printf ' %s%s%s%s │' "$row_color_seq" "$cell" "$(render.repeat ' ' "$pad")" "$reset_seq"
+            else
+                printf ' %s%s │' "$cell" "$(render.repeat ' ' "$pad")"
+            fi
         done
         printf '\n'
         if (( r == 0 && n > 1 )); then

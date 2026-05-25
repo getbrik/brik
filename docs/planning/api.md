@@ -78,7 +78,7 @@ summary instead of writing a file. Useful in PR comments and dev
 loops:
 
 ```text
-Brik plan (v1, brik 0.6.0)
+Brik plan (schema v1, brik 0.6.0)
   context     : snapshot
   mode        : balanced
   workspace   : /repo

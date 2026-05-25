@@ -241,13 +241,32 @@ Describe "render.sh (transverse rendering primitives)"
       The status should be failure
     End
 
-    It "returns false when TERM=dumb (even in CI or with TTY)"
-      term_dumb() {
-        unset BRIK_RENDER_FORCE_COLOR BRIK_RENDER_NO_COLOR
-        TERM=dumb GITLAB_CI=true JENKINS_URL=foo render.color_enabled
+    It "returns false when TERM=dumb outside CI (no CI marker, no TTY)"
+      term_dumb_plain() {
+        unset BRIK_RENDER_FORCE_COLOR BRIK_RENDER_NO_COLOR \
+              GITLAB_CI JENKINS_URL NO_COLOR
+        TERM=dumb render.color_enabled 1 < /dev/null
       }
-      When call term_dumb
+      When call term_dumb_plain
       The status should be failure
+    End
+
+    It "honors GITLAB_CI over TERM=dumb (CI runner images set TERM=dumb)"
+      term_dumb_in_gitlab() {
+        unset BRIK_RENDER_FORCE_COLOR BRIK_RENDER_NO_COLOR NO_COLOR
+        TERM=dumb GITLAB_CI=true render.color_enabled 1 < /dev/null
+      }
+      When call term_dumb_in_gitlab
+      The status should be success
+    End
+
+    It "honors JENKINS_URL over TERM=dumb (CI runner images set TERM=dumb)"
+      term_dumb_in_jenkins() {
+        unset BRIK_RENDER_FORCE_COLOR BRIK_RENDER_NO_COLOR NO_COLOR GITLAB_CI
+        TERM=dumb JENKINS_URL=http://jenkins.example render.color_enabled 1 < /dev/null
+      }
+      When call term_dumb_in_jenkins
+      The status should be success
     End
 
     It "FORCE_COLOR still wins over TERM=dumb"

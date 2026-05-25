@@ -333,7 +333,7 @@ cli.plan._render_explain() {
 
     # Plain-text header: title line + aligned key/value block.
     printf '\n'
-    printf 'Brik plan (%s, brik %s)\n' "$schema" "$brik_v"
+    printf 'Brik plan (schema %s, brik %s)\n' "$schema" "$brik_v"
     render.kv "context"     "$context"   --key-width 11
     render.kv "mode"        "$mode"      --key-width 11
     render.kv "workspace"   "$workspace" --key-width 11
@@ -348,6 +348,8 @@ cli.plan._render_explain() {
     # Section heading + TSV table piped through render.table.
     # The REASON column is computed per-row via cli.plan._reason_text
     # so the same text appears here and in the per-stage gate message.
+    # DECISION is emitted in uppercase (RUN/SKIP) so render.table can
+    # color each row through --color-by DECISION via render.color_for_status.
     render.section "Stages"
     {
         printf 'ID\tDECISION\tGATE\tCODE\tREASON\n'
@@ -355,7 +357,7 @@ cli.plan._render_explain() {
         while IFS=$'\t' read -r id decision gate_mode reason matched_globs; do
             reason_text=$(cli.plan._reason_text "$id" "$reason" "$context" "$matched_globs")
             printf '%s\t%s\t%s\t%s\t%s\n' \
-                "$id" "$decision" "$gate_mode" "$reason" "$reason_text"
+                "$id" "${decision^^}" "$gate_mode" "$reason" "$reason_text"
         done < <(jq -r '.stages[] | [.id, .decision, .gate.mode, .reason, (.matched_globs // [] | join(","))] | @tsv' "$plan")
-    } | render.table
+    } | render.table --color-by DECISION
 }
