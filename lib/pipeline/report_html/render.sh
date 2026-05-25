@@ -54,6 +54,27 @@ _report._render_html() {
     # Embed JSON: escape </ to <\/ so a literal </script> in any payload
     # cannot terminate the data island. JSON parsers treat \/ as /.
     sed 's|</|<\\/|g' "$backend"
+    # Close the brik-report island here so the orchestrator owns every
+    # data-island boundary (tail.sh only emits the JS/closing tags).
+    printf '</script>\n'
+
+    # Optional second island: brik-plan. When plan.json is present next
+    # to the aggregate, embed it so app.js can:
+    #   - know the canonical execution order (independent of which
+    #     fragments were produced by the adapter, e.g. Jenkins skips
+    #     non-run stages entirely),
+    #   - render skipped stages with the plan's gate reason instead of
+    #     guessing from an empty fragment (e.g. container-scan showing
+    #     "0 findings" when it did not actually run).
+    # Defensive: the absence of plan.json or jq's failure to validate
+    # it leaves the report consumable -- app.js falls back to its
+    # prior data.stages-only rendering.
+    local plan_path="${backend%/*}/plan.json"
+    if [[ -f "$plan_path" ]] && jq -e 'type == "object"' "$plan_path" >/dev/null 2>&1; then
+        printf '<script type="application/json" id="brik-plan">\n'
+        sed 's|</|<\\/|g' "$plan_path"
+        printf '</script>\n'
+    fi
 
     _report._render_html_tail
 }

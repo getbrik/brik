@@ -1453,21 +1453,49 @@ report.render_aggregate_terminal() {
     render.kv "Pipeline ID" "$pipeline_id" --key-width 14
     render.kv "Project"     "$project"     --key-width 14
     render.kv "Platform"    "$platform"    --key-width 14
-    render.kv "Status"      "$(render.icon "$biz_status") $biz_status" --key-width 14
+    render.kv "Status"      "${biz_status^^}" --key-width 14
     render.kv "Started"     "$started"     --key-width 14
     render.kv "Finished"    "$finished"    --key-width 14
     render.kv "Duration"    "$duration_str" --key-width 14
     render.blank
 
     # Stages table -- Stage | Status | Business | Duration
-    # Status + Business columns carry the user-validated emoji set
-    # (✅ ❌ ⚠️ ⏭️ ℹ️ 🔍). Bash counts emoji code points inconsistently
-    # so render.table may have ≤1-cell column-edge drift; all icons share
-    # the same display width so rows stay visually consistent in practice.
+    # Status + Business cells carry plain uppercase keywords so
+    # render.table can compute clean column widths without emoji
+    # drift, and so --color-by Business can drive per-row coloring
+    # via render.color_for_status. Business follows tech.status:
+    # when a stage is skipped (no execution), the business outcome
+    # is N/A rather than "success", which would imply work was done.
+    #
+    # The stage list is driven by plan.json's canonical execution
+    # order when available (next to the aggregate report). This
+    # preserves the Init -> Release -> Build -> ... -> Notify flow
+    # in the table, and backfills any stage missing from fragments
+    # (e.g. adapters like Jenkins that don't emit skip-fragments)
+    # as SKIPPED / N/A so the view is consistent across adapters.
+    # Fallback (no plan.json): render whatever stages the aggregate
+    # already carries, in storage order.
+    local plan_path plan_json
+    plan_path="$(dirname "$report_path")/plan.json"
+    if [[ -f "$plan_path" ]] && jq -e 'type == "object"' "$plan_path" >/dev/null 2>&1; then
+        plan_json="$(cat "$plan_path")"
+    else
+        plan_json='null'
+    fi
+
+    # The stage currently rendering this view (typically notify itself
+    # when it aggregates). We classify a "missing fragment for the
+    # current stage" as RUNNING rather than SKIPPED so notify's own row
+    # reflects reality: at render time, notify hasn't yet written its
+    # fragment because it is the one printing this table.
+    local current_stage="${BRIK_STAGE_NAME:-}"
+
     render.section "Stages"
     {
         printf 'Stage\tStatus\tBusiness\tDuration\n'
-        jq -r '
+        jq -r --argjson plan "$plan_json" \
+              --arg current "$current_stage" \
+              --arg pipeline_biz "$biz_status" '
             def fmt_ms($s):
                 if $s == null or $s == "" then "-"
                 else (try ($s | tonumber) catch null) as $n
@@ -1475,40 +1503,81 @@ report.render_aggregate_terminal() {
                       elif $n < 1000 then "\($n)ms"
                       else "\(($n / 1000) | floor)s" end
                 end;
-            def tech_glyph($s):
-                if   $s == "success" then "✅ success"
-                elif $s == "failed"  then "❌ failed"
-                elif $s == "skipped" then "⏭️ skipped"
-                elif $s == "warning" then "⚠️ warning"
-                else "🔍 " + $s end;
-            def biz_glyph($b):
-                if   $b == "success" then "✅ success"
-                elif $b == "warning" then "⚠️ warning"
-                elif $b == "error"   then "❌ error"
-                elif $b == null      then "-"
-                else $b end;
-            .stages[] | [
-                (.stage // .name // .id // "?"),
-                tech_glyph((.tech.status // .status // "skipped")),
-                biz_glyph(.business.status),
-                fmt_ms(.tech.duration_ms // .duration_ms)
-            ] | @tsv
+            def tech_keyword($s):
+                if   $s == "success" then "SUCCESS"
+                elif $s == "failed"  then "FAILED"
+                elif $s == "skipped" then "SKIPPED"
+                elif $s == "warning" then "WARNING"
+                elif $s == "running" then "RUNNING"
+                else ($s | tostring | ascii_upcase) end;
+            # When a stage is the in-flight stage (typically notify
+            # aggregating its own pipeline), surface the pipeline-level
+            # business outcome in the Business cell so the row already
+            # reflects the verdict the operator is reading rather than
+            # a placeholder. That also drives the row color through
+            # --color-by Business: green for SUCCESS pipelines, yellow
+            # for WARNING, red for ERROR.
+            def biz_keyword($b; $tech):
+                if   $tech == "skipped" then "N/A"
+                elif $tech == "running" then ($pipeline_biz | ascii_upcase)
+                elif $b   == "success"  then "SUCCESS"
+                elif $b   == "warning"  then "WARNING"
+                elif $b   == "error"    then "ERROR"
+                elif $b   == null       then "-"
+                else ($b | tostring | ascii_upcase) end;
+
+            (.stages | map({ key: (.stage // .name // .id // "?"), value: . }) | from_entries) as $by_id
+            | ( if ($plan|type) == "object" and ($plan.stages|type) == "array"
+                then $plan.stages | map(.id)
+                else .stages | map(.stage // .name // .id // "?")
+                end ) as $order
+            | $order[] as $sid
+            | ($by_id[$sid] // {}) as $s
+            | (($s | length) == 0) as $missing
+            | (if $missing and $sid == $current then "running"
+               elif $missing then "skipped"
+               else ($s.tech.status // $s.status // "skipped")
+               end) as $tech
+            | [
+                $sid,
+                tech_keyword($tech),
+                biz_keyword((if $missing then null else $s.business.status end); $tech),
+                fmt_ms((if $missing then null else ($s.tech.duration_ms // $s.duration_ms) end))
+              ] | @tsv
         ' "$report_path"
-    } | render.table
+    } | render.table --color-by Business
     render.blank
 
-    # Counts: total, passed, failed, skipped
-    local total passed failed skipped
-    total="$(jq -r '.stages | length' "$report_path" 2>/dev/null)"
+    # Counts: total / passed / failed / running / skipped. Total tracks
+    # the same canonical list driving the table (so totals match what the
+    # operator just read above, including N/A backfills and the RUNNING
+    # marker for the in-flight stage). Running is at most 1 (the current
+    # stage). Skipped is the remainder, so total = passed + failed +
+    # running + skipped holds.
+    local total passed failed running skipped
+    total="$(jq -r --argjson plan "$plan_json" '
+        if ($plan|type) == "object" and ($plan.stages|type) == "array"
+        then $plan.stages | length
+        else .stages | length
+        end' "$report_path" 2>/dev/null)"
     passed="$(jq -r '[.stages[] | select((.tech.status // .status) == "success")] | length' "$report_path" 2>/dev/null)"
     failed="$(jq -r '[.stages[] | select((.tech.status // .status) == "failed")]  | length' "$report_path" 2>/dev/null)"
-    skipped="$(jq -r '[.stages[] | select(((.tech.status // .status // null) == "skipped") or ((.tech.status // .status // null) == null))] | length' "$report_path" 2>/dev/null)"
+    running=0
+    if [[ -n "$current_stage" ]] && jq -e --arg current "$current_stage" --argjson plan "$plan_json" '
+        ($plan|type) == "object" and ($plan.stages|type) == "array"
+        and ([$plan.stages[] | .id] | index($current)) != null
+        and ([.stages[] | (.stage // .name // .id // "?")] | index($current)) == null
+    ' "$report_path" >/dev/null 2>&1; then
+        running=1
+    fi
+    skipped=$(( total - passed - failed - running ))
 
     render.section "Summary"
     render.kv "Total stages" "$total"   --key-width 14
     render.kv "Passed"       "$passed"  --key-width 14
     render.kv "Failed"       "$failed"  --key-width 14
     render.kv "Skipped"      "$skipped" --key-width 14
+    (( running > 0 )) && render.kv "Running" "$running" --key-width 14
     render.blank
 
     # Business outcome with per-status counts
@@ -1518,7 +1587,7 @@ report.render_aggregate_terminal() {
     biz_error="$(jq -r '[.stages[] | select(.business.status == "error")]   | length' "$report_path" 2>/dev/null)"
 
     render.section "Business outcome"
-    render.kv "Status" "$(render.icon "$biz_status") $biz_status" --key-width 14
+    render.kv "Status" "${biz_status^^}" --key-width 14
     render.kv "Counts" "success=${biz_success}, warning=${biz_warning}, error=${biz_error}" --key-width 14
     render.blank
 

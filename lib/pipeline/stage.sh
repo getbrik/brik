@@ -256,6 +256,14 @@ stage.with_logging() {
 }
 
 # Execute the stage logic function with proper scope.
+#
+# BRIK_STAGE_NAME mirrors BRIK_LOG_SCOPE for the duration of the stage:
+# context.sh writes it to the context file (for stages that source the
+# context), but consumers that read live env vars (e.g.
+# report.render_aggregate_terminal showing the currently-running stage
+# as RUNNING in its own table) need it exported. Jenkins' brikStage
+# Groovy wrapper already injects this var; exporting here gives GitLab
+# and local adapters the same guarantee at zero cost.
 stage.execute() {
     local stage_name="$1"
     local logic_function="$2"
@@ -263,11 +271,14 @@ stage.execute() {
     shift 3
 
     local previous_scope="${BRIK_LOG_SCOPE:-}"
+    local previous_stage_name="${BRIK_STAGE_NAME:-}"
     export BRIK_LOG_SCOPE="$stage_name"
+    export BRIK_STAGE_NAME="$stage_name"
 
     if ! declare -f "$logic_function" >/dev/null 2>&1; then
         log.error "logic function not defined: $logic_function"
         export BRIK_LOG_SCOPE="$previous_scope"
+        export BRIK_STAGE_NAME="$previous_stage_name"
         return "$BRIK_EXIT_INVALID_INPUT"
     fi
 
@@ -275,6 +286,7 @@ stage.execute() {
     "$logic_function" "$context_file" "$@" || result=$?
 
     export BRIK_LOG_SCOPE="$previous_scope"
+    export BRIK_STAGE_NAME="$previous_stage_name"
     return "$result"
 }
 

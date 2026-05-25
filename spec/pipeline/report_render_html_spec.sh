@@ -1815,14 +1815,17 @@ JSON
         The output should include '"business_status":"error"'
       End
 
-      It "appends the synthetic notify panel at the end of renderBusiness"
+      It "renders the notify panel from data.pipeline.notify inside the canonical loop"
         write_notify_pass_aggregate
         run() { _report._render_html "$BACKEND"; }
         When call run
-        # Renderer reads data.pipeline.notify and wraps it in a business-stage div
-        # outside the STAGE_RENDERERS table.
-        The output should include 'renderNotifyPanel((data.pipeline || {}).notify)'
-        The output should include "<span class=\"stage-name\">notify</span>"
+        # The plan-driven renderBusiness branches to renderNotifyPanel
+        # when it encounters the notify stage and data.pipeline.notify
+        # is populated. Asserting on the local variable + the call wires
+        # this contract without coupling to the exact source layout.
+        The output should include "(data.pipeline || {}).notify"
+        The output should include "renderNotifyPanel(pipelineNotify)"
+        The output should include "<span class=\"stage-name\">"
       End
 
       It "renders nothing for the notify panel when pipeline.notify is absent (graceful)"
