@@ -164,7 +164,7 @@ report.has_status() {
 
     local status
     status="$(jq -r --arg s "$stage" \
-        '.stages[] | select(.name == $s) | .tech.status // empty' \
+        '.stages[] | select(.stage == $s) | .tech.status // empty' \
         "$backend" 2>/dev/null)" || return 1
 
     [[ -n "$status" ]]
@@ -203,7 +203,7 @@ report.read() {
 
     local value
     value="$(jq -r --arg s "$stage" --arg c "$category" --arg k "$key" \
-        '.stages[]? | select(.name == $s) | .[$c][$k] // empty' \
+        '.stages[]? | select(.stage == $s) | .[$c][$k] // empty' \
         "$backend" 2>/dev/null)" || value=""
 
     if [[ -n "$value" ]]; then
@@ -242,12 +242,12 @@ _report._append_json() {
             --arg value "$value" \
             '
             def ensure_stage(s):
-              if any(.stages[]; .name == s) then .
-              else .stages += [{ name: s, tech: {}, business: {}, env: {} }]
+              if any(.stages[]; .stage == s) then .
+              else .stages += [{ stage: s, tech: {}, business: {}, env: {} }]
               end;
             ensure_stage($stage)
             | .stages |= map(
-                if .name == $stage then
+                if .stage == $stage then
                   .[$category][$key] = $value
                 else .
                 end
@@ -291,12 +291,12 @@ _report._append_json_object() {
             --argjson value "$value" \
             '
             def ensure_stage(s):
-              if any(.stages[]; .name == s) then .
-              else .stages += [{ name: s, tech: {}, business: {}, env: {} }]
+              if any(.stages[]; .stage == s) then .
+              else .stages += [{ stage: s, tech: {}, business: {}, env: {} }]
               end;
             ensure_stage($stage)
             | .stages |= map(
-                if .name == $stage then
+                if .stage == $stage then
                   .[$category][$key] = $value
                 else .
                 end
@@ -390,7 +390,7 @@ report.write_fragment() {
         --arg image "$image" \
         --arg job_url "$job_url" \
         '
-        ( [ .stages[] | select(.name == $stage_name) ][0] // {} ) as $entry
+        ( [ .stages[] | select(.stage == $stage_name) ][0] // {} ) as $entry
         | ( $entry.tech     // {} ) as $tech
         | ( $entry.business // {} ) as $business
         | ( $entry.env      // {} ) as $env
@@ -631,6 +631,14 @@ report.aggregate_fragments() {
     else
         frags_json='[]'
     fi
+
+    # Note: the synthetic skip-fragments branch (Lot 2 of chantier
+    # 20260526) was removed in Lot 5 because every stage now produces a
+    # fragment on disk -- either via the plan-gate (run or skip) or via
+    # the stage body. GitLab's .brik-stage template sources the gate as
+    # the first script step; the Jenkins brikDriver loop calls
+    # `brik plan gate` for every stage in the registry list. So `$frags`
+    # is already complete; no synthesis needed.
 
     # KCOV_EXCL_START  -- jq script body is not bash code
     jq -n \
@@ -1622,14 +1630,14 @@ _report._render_md() {
         "",
         "| Stage | Status | Duration (ms) | Exit code |",
         "|---|---|---|---|",
-        (.stages[] | "| \(.name) | \(.tech.status // "-")\(if ((.tech.dry_run // false) | tostring) == "true" then " _(dry-run)_" else "" end) | \(.tech.duration_ms // "-") | \(.tech.exit_code // "-") |"),
+        (.stages[] | "| \(.stage) | \(.tech.status // "-")\(if ((.tech.dry_run // false) | tostring) == "true" then " _(dry-run)_" else "" end) | \(.tech.duration_ms // "-") | \(.tech.exit_code // "-") |"),
         "",
         "## Business",
         "",
         (
           .stages[]
           | select(.business != null and (.business | length) > 0)
-          | ("### \(.name)\(if ((.tech.dry_run // false) | tostring) == "true" then " _(dry-run)_" else "" end)",
+          | ("### \(.stage)\(if ((.tech.dry_run // false) | tostring) == "true" then " _(dry-run)_" else "" end)",
              "",
              (.business | to_entries[] | "- **\(.key):** \(.value)"),
              "")

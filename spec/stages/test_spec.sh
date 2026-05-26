@@ -31,12 +31,12 @@ Describe "stages.test"
   read_test_tech() {
     local key="$1"
     jq -r --arg k "$key" \
-      '.stages[] | select(.name == "test") | .tech[$k] // empty' \
+      '.stages[] | select(.stage == "test") | .tech[$k] // empty' \
       "$BRIK_LOG_DIR/aggregate-report.json" 2>/dev/null
   }
 
   read_test_coverage_pct() {
-    jq -r '.stages[] | select(.name == "test") | .business.coverage.line_pct // empty' \
+    jq -r '.stages[] | select(.stage == "test") | .business.coverage.line_pct // empty' \
       "$BRIK_LOG_DIR/aggregate-report.json" 2>/dev/null
   }
   Before 'setup_env'
@@ -332,7 +332,7 @@ XML
         local ctx
         ctx="$(context.create "test")" 2>/dev/null || ctx="$(mktemp)"
         stages.test "$ctx" >/dev/null 2>&1
-        jq -r '.stages[] | select(.name == "test") | .business.coverage.branch_pct // "<missing>"' \
+        jq -r '.stages[] | select(.stage == "test") | .business.coverage.branch_pct // "<missing>"' \
           "$BRIK_LOG_DIR/aggregate-report.json"
       }
       When call run_branch
@@ -347,7 +347,7 @@ XML
         local ctx
         ctx="$(context.create "test")" 2>/dev/null || ctx="$(mktemp)"
         stages.test "$ctx" >/dev/null 2>&1
-        jq -r '.stages[] | select(.name == "test") | .business.coverage.line_pct // "<missing>"' \
+        jq -r '.stages[] | select(.stage == "test") | .business.coverage.line_pct // "<missing>"' \
           "$BRIK_LOG_DIR/aggregate-report.json"
       }
       When call run_both
@@ -367,7 +367,7 @@ XML
         local ctx
         ctx="$(context.create "test")" 2>/dev/null || ctx="$(mktemp)"
         stages.test "$ctx" >/dev/null 2>&1
-        jq -r '.stages[] | select(.name == "test") | .business.coverage | has("branch_pct")' \
+        jq -r '.stages[] | select(.stage == "test") | .business.coverage | has("branch_pct")' \
           "$BRIK_LOG_DIR/aggregate-report.json"
       }
       When call run_no_branch
@@ -393,7 +393,7 @@ XML
         ctx="$(context.create "test")" 2>/dev/null || ctx="$(mktemp)"
         stages.test "$ctx" >/dev/null 2>&1
         unset BRIK_TEST_TOOL
-        jq -r '.stages[] | select(.name == "test") | .tech.tool // "<missing>"' \
+        jq -r '.stages[] | select(.stage == "test") | .tech.tool // "<missing>"' \
           "$BRIK_LOG_DIR/aggregate-report.json"
       }
       When call run_tool_explicit
@@ -409,7 +409,7 @@ XML
         ctx="$(context.create "test")" 2>/dev/null || ctx="$(mktemp)"
         stages.test "$ctx" >/dev/null 2>&1
         unset BRIK_TEST_FRAMEWORK
-        jq -r '.stages[] | select(.name == "test") | .tech.tool // "<missing>"' \
+        jq -r '.stages[] | select(.stage == "test") | .tech.tool // "<missing>"' \
           "$BRIK_LOG_DIR/aggregate-report.json"
       }
       When call run_tool_fallback_framework
@@ -425,7 +425,7 @@ XML
         ctx="$(context.create "test")" 2>/dev/null || ctx="$(mktemp)"
         stages.test "$ctx" >/dev/null 2>&1
         unset BRIK_TEST_TOOL BRIK_TEST_FRAMEWORK
-        jq -r '.stages[] | select(.name == "test") | .tech.tool // "<missing>"' \
+        jq -r '.stages[] | select(.stage == "test") | .tech.tool // "<missing>"' \
           "$BRIK_LOG_DIR/aggregate-report.json"
       }
       When call run_tool_priority
@@ -461,7 +461,7 @@ XML
         local ctx
         ctx="$(context.create "test")" 2>/dev/null || ctx="$(mktemp)"
         stages.test "$ctx" >/dev/null 2>&1
-        jq -r '.stages[] | select(.name == "test") | .business.tests.total // "<missing>"' \
+        jq -r '.stages[] | select(.stage == "test") | .business.tests.total // "<missing>"' \
           "$BRIK_LOG_DIR/aggregate-report.json"
       }
       When call run_total
@@ -475,7 +475,7 @@ XML
         local ctx
         ctx="$(context.create "test")" 2>/dev/null || ctx="$(mktemp)"
         stages.test "$ctx" >/dev/null 2>&1
-        jq -r '.stages[] | select(.name == "test") | .business.tests.passed // "<missing>"' \
+        jq -r '.stages[] | select(.stage == "test") | .business.tests.passed // "<missing>"' \
           "$BRIK_LOG_DIR/aggregate-report.json"
       }
       When call run_passed
@@ -489,7 +489,7 @@ XML
         local ctx
         ctx="$(context.create "test")" 2>/dev/null || ctx="$(mktemp)"
         stages.test "$ctx" >/dev/null 2>&1
-        jq -c '.stages[] | select(.name == "test") | {f: .business.tests.failed, s: .business.tests.skipped}' \
+        jq -c '.stages[] | select(.stage == "test") | {f: .business.tests.failed, s: .business.tests.skipped}' \
           "$BRIK_LOG_DIR/aggregate-report.json"
       }
       When call run_failed_skipped
@@ -503,7 +503,7 @@ XML
         local ctx
         ctx="$(context.create "test")" 2>/dev/null || ctx="$(mktemp)"
         stages.test "$ctx" >/dev/null 2>&1
-        jq -r '.stages[] | select(.name == "test") | .business.tests.duration_ms // "<missing>"' \
+        jq -r '.stages[] | select(.stage == "test") | .business.tests.duration_ms // "<missing>"' \
           "$BRIK_LOG_DIR/aggregate-report.json"
       }
       When call run_dur
@@ -517,7 +517,7 @@ XML
         local ctx
         ctx="$(context.create "test")" 2>/dev/null || ctx="$(mktemp)"
         stages.test "$ctx" >/dev/null 2>&1
-        jq -r '[.stages[] | select(.name == "test") | .business.tests // null | select(. != null)] | length' \
+        jq -r '[.stages[] | select(.stage == "test") | .business.tests // null | select(. != null)] | length' \
           "$BRIK_LOG_DIR/aggregate-report.json"
       }
       When call run_omit
@@ -536,7 +536,7 @@ XML
         local ctx
         ctx="$(context.create "test")" 2>/dev/null || ctx="$(mktemp)"
         stages.test "$ctx" >/dev/null 2>&1
-        jq -r '.stages[] | select(.name == "test") | .business.tests.total // "<missing>"' \
+        jq -r '.stages[] | select(.stage == "test") | .business.tests.total // "<missing>"' \
           "$BRIK_LOG_DIR/aggregate-report.json"
       }
       When call run_on_failure
@@ -733,7 +733,7 @@ XML
         local ctx
         ctx="$(context.create "test")" 2>/dev/null || ctx="$(mktemp)"
         stages.test "$ctx" >/dev/null 2>&1
-        jq -r '.stages[] | select(.name == "test") | .business.findings.failing.has_fix // 0' \
+        jq -r '.stages[] | select(.stage == "test") | .business.findings.failing.has_fix // 0' \
           "$BRIK_LOG_DIR/aggregate-report.json"
       }
       When call run_business

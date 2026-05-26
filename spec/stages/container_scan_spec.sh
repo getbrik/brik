@@ -10,7 +10,7 @@ Describe "stages/container_scan.sh"
   Include "$BRIK_HOME/spec/support/mock_helper.sh"
 
   read_container_scan_status() {
-    jq -r '.stages[] | select(.name == "container-scan") | .tech.status // empty' \
+    jq -r '.stages[] | select(.stage == "container-scan") | .tech.status // empty' \
       "$BRIK_LOG_DIR/aggregate-report.json" 2>/dev/null
   }
 
@@ -156,7 +156,7 @@ Describe "stages/container_scan.sh"
       read_cs_tech() {
         local key="$1"
         jq -r --arg k "$key" \
-          '.stages[] | select(.name == "container-scan") | .tech[$k] // empty' \
+          '.stages[] | select(.stage == "container-scan") | .tech[$k] // empty' \
           "$BRIK_LOG_DIR/aggregate-report.json" 2>/dev/null
       }
 
@@ -220,7 +220,7 @@ JSON
 }
 JSON
           stages.container_scan "$CTX_FILE" >/dev/null 2>&1
-          jq -r '.stages[] | select(.name == "container-scan") | .tech | has("target_digest")' \
+          jq -r '.stages[] | select(.stage == "container-scan") | .tech | has("target_digest")' \
             "$BRIK_LOG_DIR/aggregate-report.json"
         }
         When call invoke_no_digest

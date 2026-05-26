@@ -31,7 +31,7 @@ Describe "stages.build"
   read_build_tech() {
     local key="$1"
     jq -r --arg k "$key" \
-      '.stages[] | select(.name == "build") | .tech[$k] // empty' \
+      '.stages[] | select(.stage == "build") | .tech[$k] // empty' \
       "$BRIK_LOG_DIR/aggregate-report.json" 2>/dev/null
   }
   Before 'setup_env'
@@ -315,7 +315,7 @@ YAML
         local ctx
         ctx="$(context.create "build")" 2>/dev/null || ctx="$(mktemp)"
         stages.build "$ctx" >/dev/null 2>&1
-        jq -r '.stages[] | select(.name == "build") | .business.artifact.name // "<missing>"' \
+        jq -r '.stages[] | select(.stage == "build") | .business.artifact.name // "<missing>"' \
           "$BRIK_LOG_DIR/aggregate-report.json"
       }
       When call run_build_artifact_dist
@@ -331,7 +331,7 @@ YAML
         local ctx
         ctx="$(context.create "build")" 2>/dev/null || ctx="$(mktemp)"
         stages.build "$ctx" >/dev/null 2>&1
-        jq -r '.stages[] | select(.name == "build") | .business.artifact.type // "<missing>"' \
+        jq -r '.stages[] | select(.stage == "build") | .business.artifact.type // "<missing>"' \
           "$BRIK_LOG_DIR/aggregate-report.json"
       }
       When call run_build_artifact_type
@@ -347,7 +347,7 @@ YAML
         local ctx
         ctx="$(context.create "build")" 2>/dev/null || ctx="$(mktemp)"
         stages.build "$ctx" >/dev/null 2>&1
-        jq -r '.stages[] | select(.name == "build") | .business.artifact.sha256 // "<missing>"' \
+        jq -r '.stages[] | select(.stage == "build") | .business.artifact.sha256 // "<missing>"' \
           "$BRIK_LOG_DIR/aggregate-report.json"
       }
       When call run_build_artifact_sha
@@ -371,7 +371,7 @@ YAML
         local ctx
         ctx="$(context.create "build")" 2>/dev/null || ctx="$(mktemp)"
         stages.build "$ctx" >/dev/null 2>&1
-        jq -r '.stages[] | select(.name == "build") | .business.artifact.name // "<missing>"' \
+        jq -r '.stages[] | select(.stage == "build") | .business.artifact.name // "<missing>"' \
           "$BRIK_LOG_DIR/aggregate-report.json"
       }
       When call run_build_artifact_target
@@ -394,7 +394,7 @@ YAML
         local ctx
         ctx="$(context.create "build")" 2>/dev/null || ctx="$(mktemp)"
         stages.build "$ctx" >/dev/null 2>&1
-        jq -r '.stages[] | select(.name == "build") | .business.artifact.name // "<missing>"' \
+        jq -r '.stages[] | select(.stage == "build") | .business.artifact.name // "<missing>"' \
           "$BRIK_LOG_DIR/aggregate-report.json"
       }
       When call run_build_artifact_java_target_over_dist
@@ -418,7 +418,7 @@ YAML
         local ctx
         ctx="$(context.create "build")" 2>/dev/null || ctx="$(mktemp)"
         stages.build "$ctx" >/dev/null 2>&1
-        jq -r '.stages[] | select(.name == "build") | .business.artifact.name // "<missing>"' \
+        jq -r '.stages[] | select(.stage == "build") | .business.artifact.name // "<missing>"' \
           "$BRIK_LOG_DIR/aggregate-report.json"
       }
       When call run_build_artifact_python_dist_over_target
@@ -440,7 +440,7 @@ YAML
         local ctx
         ctx="$(context.create "build")" 2>/dev/null || ctx="$(mktemp)"
         stages.build "$ctx" >/dev/null 2>&1
-        jq -r '.stages[] | select(.name == "build") | .business.artifact.name // "<missing>"' \
+        jq -r '.stages[] | select(.stage == "build") | .business.artifact.name // "<missing>"' \
           "$BRIK_LOG_DIR/aggregate-report.json"
       }
       When call run_build_artifact_all_empty
@@ -463,7 +463,7 @@ YAML
         local ctx
         ctx="$(context.create "build")" 2>/dev/null || ctx="$(mktemp)"
         stages.build "$ctx" >/dev/null 2>&1
-        jq -r '[.stages[] | select(.name == "build") | .business.artifact // null | select(. != null)] | length' \
+        jq -r '[.stages[] | select(.stage == "build") | .business.artifact // null | select(. != null)] | length' \
           "$BRIK_LOG_DIR/aggregate-report.json"
       }
       When call run_build_artifact_docker_skip
@@ -477,7 +477,7 @@ YAML
         local ctx
         ctx="$(context.create "build")" 2>/dev/null || ctx="$(mktemp)"
         stages.build "$ctx" >/dev/null 2>&1
-        jq -r '[.stages[] | select(.name == "build") | .business.artifact // null | select(. != null)] | length' \
+        jq -r '[.stages[] | select(.stage == "build") | .business.artifact // null | select(. != null)] | length' \
           "$BRIK_LOG_DIR/aggregate-report.json"
       }
       When call run_build_artifact_omit
@@ -493,7 +493,7 @@ YAML
         local ctx
         ctx="$(context.create "build")" 2>/dev/null || ctx="$(mktemp)"
         stages.build "$ctx" >/dev/null 2>&1
-        jq -r '[.stages[] | select(.name == "build") | .business.artifact // null | select(. != null)] | length' \
+        jq -r '[.stages[] | select(.stage == "build") | .business.artifact // null | select(. != null)] | length' \
           "$BRIK_LOG_DIR/aggregate-report.json"
       }
       When call run_build_artifact_skip_on_fail
@@ -511,7 +511,7 @@ YAML
         ctx="$(context.create "build")" 2>/dev/null || ctx="$(mktemp)"
         stages.build "$ctx" >/dev/null 2>&1
         unset BRIK_BUILD_CACHE_HIT
-        jq -c '.stages[] | select(.name == "build") | .tech.cache_hit' \
+        jq -c '.stages[] | select(.stage == "build") | .tech.cache_hit' \
           "$BRIK_LOG_DIR/aggregate-report.json"
       }
       When call run_build_cache_hit_true
@@ -527,7 +527,7 @@ YAML
         ctx="$(context.create "build")" 2>/dev/null || ctx="$(mktemp)"
         stages.build "$ctx" >/dev/null 2>&1
         unset BRIK_BUILD_CACHE_HIT
-        jq -c '.stages[] | select(.name == "build") | .tech.cache_hit' \
+        jq -c '.stages[] | select(.stage == "build") | .tech.cache_hit' \
           "$BRIK_LOG_DIR/aggregate-report.json"
       }
       When call run_build_cache_hit_false
@@ -542,7 +542,7 @@ YAML
         local ctx
         ctx="$(context.create "build")" 2>/dev/null || ctx="$(mktemp)"
         stages.build "$ctx" >/dev/null 2>&1
-        jq -r '.stages[] | select(.name == "build") | .tech | has("cache_hit")' \
+        jq -r '.stages[] | select(.stage == "build") | .tech | has("cache_hit")' \
           "$BRIK_LOG_DIR/aggregate-report.json"
       }
       When call run_build_cache_hit_omit

@@ -27,21 +27,21 @@ Describe "stages.release"
   }
 
   read_release_new_version() {
-    jq -r '.stages[] | select(.name == "release") | .business.new_version // empty' \
+    jq -r '.stages[] | select(.stage == "release") | .business.new_version // empty' \
       "$BRIK_LOG_DIR/aggregate-report.json" 2>/dev/null
   }
 
   read_release_tech() {
     local key="$1"
     jq -r --arg k "$key" \
-      '.stages[] | select(.name == "release") | .tech[$k] // empty' \
+      '.stages[] | select(.stage == "release") | .tech[$k] // empty' \
       "$BRIK_LOG_DIR/aggregate-report.json" 2>/dev/null
   }
 
   read_release_business() {
     local key="$1"
     jq -r --arg k "$key" \
-      '.stages[] | select(.name == "release") | .business[$k] // empty' \
+      '.stages[] | select(.stage == "release") | .business[$k] // empty' \
       "$BRIK_LOG_DIR/aggregate-report.json" 2>/dev/null
   }
   Before 'setup_env'
@@ -103,7 +103,7 @@ Describe "stages.release"
       local ctx
       ctx="$(context.create "release")" 2>/dev/null || ctx="$(mktemp)"
       stages.release "$ctx" >/dev/null 2>&1
-      jq -c '.stages[] | select(.name == "release") | .tech.dry_run' \
+      jq -c '.stages[] | select(.stage == "release") | .tech.dry_run' \
         "$BRIK_LOG_DIR/aggregate-report.json"
     }
     When call run_release_dryrun_record
@@ -116,7 +116,7 @@ Describe "stages.release"
       local ctx
       ctx="$(context.create "release")" 2>/dev/null || ctx="$(mktemp)"
       stages.release "$ctx" >/dev/null 2>&1
-      jq -c '.stages[] | select(.name == "release") | .tech.dry_run' \
+      jq -c '.stages[] | select(.stage == "release") | .tech.dry_run' \
         "$BRIK_LOG_DIR/aggregate-report.json"
       unset BRIK_DRY_RUN
     }
@@ -180,7 +180,7 @@ Describe "stages.release"
       local ctx
       ctx="$(context.create "release")" 2>/dev/null || ctx="$(mktemp)"
       stages.release "$ctx" >/dev/null 2>&1 || return $?
-      jq -r '.stages[] | select(.name == "release") | .env.BRIK_APP_VERSION // empty' \
+      jq -r '.stages[] | select(.stage == "release") | .env.BRIK_APP_VERSION // empty' \
         "$BRIK_LOG_DIR/aggregate-report.json"
     }
     When call run_release_records_env_version
@@ -282,7 +282,7 @@ YAML
         local ctx
         ctx="$(context.create "release")" 2>/dev/null || ctx="$(mktemp)"
         stages.release "$ctx" >/dev/null 2>&1
-        jq -c '.stages[] | select(.name == "release") | .business.tag | {name, dry_run}' \
+        jq -c '.stages[] | select(.stage == "release") | .business.tag | {name, dry_run}' \
           "$BRIK_LOG_DIR/aggregate-report.json"
         unset BRIK_DRY_RUN
       }
@@ -488,7 +488,7 @@ YAML
         transverse.git.commit_all() { return 0; }
         pipeline.require_tool() { return 0; }
         _stages.release._prepare 2>/dev/null "1.0.0"
-        jq -r '.stages[] | select(.name == "release") | .business.changelog.path // "<missing>"' \
+        jq -r '.stages[] | select(.stage == "release") | .business.changelog.path // "<missing>"' \
           "$BRIK_LOG_DIR/aggregate-report.json"
       }
       When call run_prep_changelog_path
@@ -506,7 +506,7 @@ YAML
         transverse.git.commit_all() { return 0; }
         pipeline.require_tool() { return 0; }
         _stages.release._prepare 2>/dev/null "1.0.0"
-        jq -r '.stages[] | select(.name == "release") | .business.changelog.entries_count // "<missing>"' \
+        jq -r '.stages[] | select(.stage == "release") | .business.changelog.entries_count // "<missing>"' \
           "$BRIK_LOG_DIR/aggregate-report.json"
       }
       When call run_prep_changelog_count
@@ -524,7 +524,7 @@ YAML
         transverse.git.commit_all() { return 0; }
         pipeline.require_tool() { return 0; }
         _stages.release._prepare 2>/dev/null "1.0.0"
-        jq -r '.stages[] | select(.name == "release") | .business.changelog.generated_at // "<missing>"' \
+        jq -r '.stages[] | select(.stage == "release") | .business.changelog.generated_at // "<missing>"' \
           "$BRIK_LOG_DIR/aggregate-report.json"
       }
       When call run_prep_changelog_ts
@@ -540,7 +540,7 @@ YAML
         transverse.git.commit_all() { return 0; }
         pipeline.require_tool() { return 0; }
         _stages.release._prepare 2>/dev/null "1.0.0"
-        jq -r '[.stages[] | select(.name == "release") | .business.changelog // null | select(. != null)] | length' \
+        jq -r '[.stages[] | select(.stage == "release") | .business.changelog // null | select(. != null)] | length' \
           "$BRIK_LOG_DIR/aggregate-report.json"
       }
       When call run_prep_no_changelog_record

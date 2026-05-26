@@ -37,14 +37,14 @@ Describe "stages.scan"
   read_scan_tech() {
     local key="$1"
     jq -r --arg k "$key" \
-      '.stages[] | select(.name == "scan") | .tech[$k] // empty' \
+      '.stages[] | select(.stage == "scan") | .tech[$k] // empty' \
       "$BRIK_LOG_DIR/aggregate-report.json" 2>/dev/null
   }
 
   read_scan_tech_json() {
     local key="$1"
     jq -c --arg k "$key" \
-      '.stages[] | select(.name == "scan") | .tech[$k] // empty' \
+      '.stages[] | select(.stage == "scan") | .tech[$k] // empty' \
       "$BRIK_LOG_DIR/aggregate-report.json" 2>/dev/null
   }
   Before 'setup_env'
@@ -280,7 +280,7 @@ YAML
     read_scan_business_json() {
       local key="$1"
       jq -c --arg k "$key" \
-        '.stages[] | select(.name == "scan") | .business[$k] // empty' \
+        '.stages[] | select(.stage == "scan") | .business[$k] // empty' \
         "$BRIK_LOG_DIR/aggregate-report.json" 2>/dev/null
     }
 
@@ -421,7 +421,7 @@ YAML
         local ctx
         ctx="$(context.create "scan")" 2>/dev/null || ctx="$(mktemp)"
         stages.scan "$ctx" >/dev/null 2>&1
-        jq -c '.stages[] | select(.name == "scan") | .business // {}' \
+        jq -c '.stages[] | select(.stage == "scan") | .business // {}' \
           "$BRIK_LOG_DIR/aggregate-report.json" 2>/dev/null
       }
       When call run_no_artifacts

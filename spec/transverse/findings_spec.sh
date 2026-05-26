@@ -27,7 +27,7 @@ Describe "transverse/findings.sh"
   read_business() {
     local stage="$1" key="$2"
     jq -c --arg s "$stage" --arg k "$key" \
-      '.stages[] | select(.name == $s) | .business[$k] // empty' \
+      '.stages[] | select(.stage == $s) | .business[$k] // empty' \
       "$BRIK_LOG_DIR/aggregate-report.json" 2>/dev/null
   }
 
@@ -219,7 +219,7 @@ Describe "transverse/findings.sh"
       run_aggregate_twice() {
         findings.aggregate "sast" "$FIX/semgrep.sarif" >/dev/null 2>&1
         findings.aggregate "sast" "$FIX/semgrep.sarif" >/dev/null 2>&1
-        jq -r '[.stages[] | select(.name == "sast")] | length' \
+        jq -r '[.stages[] | select(.stage == "sast")] | length' \
           "$BRIK_LOG_DIR/aggregate-report.json"
       }
       When call run_aggregate_twice
@@ -791,7 +791,7 @@ Describe "transverse/findings.sh"
     After 'cleanup_l4v2'
 
     read_findings() {
-      jq -c '.stages[] | select(.name == "container-scan") | .business.findings' \
+      jq -c '.stages[] | select(.stage == "container-scan") | .business.findings' \
         "$BRIK_LOG_DIR/aggregate-report.json"
     }
 
@@ -1101,7 +1101,7 @@ Describe "transverse/findings.sh"
     read_business() {
       local stage="$1" key="$2"
       jq -c --arg s "$stage" --arg k "$key" \
-        '.stages[] | select(.name == $s) | .business[$k] // empty' \
+        '.stages[] | select(.stage == $s) | .business[$k] // empty' \
         "$BRIK_LOG_DIR/aggregate-report.json"
     }
 
@@ -1296,7 +1296,7 @@ Describe "transverse/findings.sh"
         local tmp; tmp="$(mktemp)"
         jq '
           .stages |= map(
-            if .name == "container-scan" then
+            if .stage == "container-scan" then
               .business.findings.failing = { total: 0, has_fix: 0, no_fix: 0 }
             else . end
           )

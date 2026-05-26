@@ -68,7 +68,7 @@ Describe "report.sh"
       record_and_read() {
         report.init || return 1
         report.record "build" "tech" "duration_ms" "1234" || return 1
-        jq -r '.stages[0].name' "$REPORT_LOG_DIR/aggregate-report.json"
+        jq -r '.stages[0].stage' "$REPORT_LOG_DIR/aggregate-report.json"
       }
       When call record_and_read
       The output should equal "build"
@@ -132,7 +132,7 @@ Describe "report.sh"
         report.init || return 1
         report.record "build" "tech" "exit_code" "0" || return 1
         report.record "test" "tech" "exit_code" "0" || return 1
-        jq -r '.stages | map(.name) | join(",")' "$REPORT_LOG_DIR/aggregate-report.json"
+        jq -r '.stages | map(.stage) | join(",")' "$REPORT_LOG_DIR/aggregate-report.json"
       }
       When call two_stages_order
       The output should equal "build,test"

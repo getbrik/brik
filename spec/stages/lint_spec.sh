@@ -40,14 +40,14 @@ Describe "stages.lint"
   # Read the recorded tech.status for the lint stage from the pipeline report.
   # Prints the status (or empty string if none) on stdout.
   read_lint_status() {
-    jq -r '.stages[] | select(.name == "lint") | .tech.status // empty' \
+    jq -r '.stages[] | select(.stage == "lint") | .tech.status // empty' \
       "$BRIK_LOG_DIR/aggregate-report.json" 2>/dev/null
   }
 
   read_lint_tech_json() {
     local key="$1"
     jq -c --arg k "$key" \
-      '.stages[] | select(.name == "lint") | .tech[$k] // empty' \
+      '.stages[] | select(.stage == "lint") | .tech[$k] // empty' \
       "$BRIK_LOG_DIR/aggregate-report.json" 2>/dev/null
   }
 
@@ -149,7 +149,7 @@ YAML
         local ctx
         ctx="$(context.create "lint")" 2>/dev/null || ctx="$(mktemp)"
         stages.lint "$ctx" >/dev/null 2>&1 || return $?
-        jq -r '.stages[] | select(.name=="lint") | .tech.kind // empty' \
+        jq -r '.stages[] | select(.stage=="lint") | .tech.kind // empty' \
           "$BRIK_LOG_DIR/aggregate-report.json"
       }
       When call run_lint_kind
@@ -264,7 +264,7 @@ YAML
         local ctx
         ctx="$(context.create "lint")" 2>/dev/null || ctx="$(mktemp)"
         stages.lint "$ctx" >/dev/null 2>&1 || true
-        jq -r '.stages[] | select(.name=="lint") | .tech.kind // empty' \
+        jq -r '.stages[] | select(.stage=="lint") | .tech.kind // empty' \
           "$BRIK_LOG_DIR/aggregate-report.json"
       }
       When call run_lint_legacy_kind
@@ -415,7 +415,7 @@ YAML
     read_lint_business_json() {
       local key="$1"
       jq -c --arg k "$key" \
-        '.stages[] | select(.name == "lint") | .business[$k] // empty' \
+        '.stages[] | select(.stage == "lint") | .business[$k] // empty' \
         "$BRIK_LOG_DIR/aggregate-report.json" 2>/dev/null
     }
 
@@ -505,7 +505,7 @@ YAML
         local ctx
         ctx="$(context.create "lint")" 2>/dev/null || ctx="$(mktemp)"
         stages.lint "$ctx" >/dev/null 2>&1
-        jq -r '.stages[] | select(.name == "lint") | (.business.fix_applied | tostring)' \
+        jq -r '.stages[] | select(.stage == "lint") | (.business.fix_applied | tostring)' \
           "$BRIK_LOG_DIR/aggregate-report.json" 2>/dev/null
       }
       When call run_fix_default
@@ -521,7 +521,7 @@ YAML
         local ctx
         ctx="$(context.create "lint")" 2>/dev/null || ctx="$(mktemp)"
         stages.lint "$ctx" >/dev/null 2>&1
-        jq -r '.stages[] | select(.name == "lint") | (.business.fix_applied | tostring)' \
+        jq -r '.stages[] | select(.stage == "lint") | (.business.fix_applied | tostring)' \
           "$BRIK_LOG_DIR/aggregate-report.json" 2>/dev/null
       }
       When call run_fix_set
@@ -535,7 +535,7 @@ YAML
         local ctx
         ctx="$(context.create "lint")" 2>/dev/null || ctx="$(mktemp)"
         stages.lint "$ctx" >/dev/null 2>&1
-        jq -c '.stages[] | select(.name == "lint") | .business // {}' \
+        jq -c '.stages[] | select(.stage == "lint") | .business // {}' \
           "$BRIK_LOG_DIR/aggregate-report.json" 2>/dev/null
       }
       When call run_no_sarif

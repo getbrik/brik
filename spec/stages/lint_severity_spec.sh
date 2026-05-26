@@ -52,7 +52,7 @@ Describe "lint severity passthrough (SC19)"
 
   read_failing() {
     jq -r --arg s "lint" \
-      '.stages[] | select(.name == $s) | "\(.business.findings.failing.total),\(.business.findings.failing.has_fix),\(.business.findings.failing.no_fix)"' \
+      '.stages[] | select(.stage == $s) | "\(.business.findings.failing.total),\(.business.findings.failing.has_fix),\(.business.findings.failing.no_fix)"' \
       "$BRIK_LOG_DIR/aggregate-report.json"
   }
 
@@ -71,7 +71,7 @@ Describe "lint severity passthrough (SC19)"
     It "yields business.status=warning in snapshot for eslint error"
       do_run() {
         process_fixture "eslint.sarif"
-        local has_fix; has_fix="$(jq -r '.stages[] | select(.name == "lint") | .business.findings.failing.has_fix' "$BRIK_LOG_DIR/aggregate-report.json")"
+        local has_fix; has_fix="$(jq -r '.stages[] | select(.stage == "lint") | .business.findings.failing.has_fix' "$BRIK_LOG_DIR/aggregate-report.json")"
         local payload; payload="$(business.evaluate \
             --tech-status failed \
             --context snapshot \
@@ -86,7 +86,7 @@ Describe "lint severity passthrough (SC19)"
     It "yields business.status=error in release for eslint error"
       do_run() {
         process_fixture "eslint.sarif"
-        local has_fix; has_fix="$(jq -r '.stages[] | select(.name == "lint") | .business.findings.failing.has_fix' "$BRIK_LOG_DIR/aggregate-report.json")"
+        local has_fix; has_fix="$(jq -r '.stages[] | select(.stage == "lint") | .business.findings.failing.has_fix' "$BRIK_LOG_DIR/aggregate-report.json")"
         local payload; payload="$(business.evaluate \
             --tech-status failed \
             --context release \

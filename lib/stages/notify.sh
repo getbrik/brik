@@ -419,6 +419,25 @@ stages.notify() {
     local _ci_fragments_dir="${BRIK_WORKSPACE:-}/brik-artifacts"
     if [[ -n "${BRIK_WORKSPACE:-}" ]] && \
        _notify._is_ci_aggregation_mode "$_ci_fragments_dir"; then
+        # Write notify's own fragment BEFORE aggregating (I10 of the
+        # chantier 20260526). Without this, the aggregator sees no notify
+        # fragment and the render falls back to "RUNNING" (because notify
+        # is the in-flight stage at render time) -- producing the orphan
+        # row observed on GitLab pipeline #3715 and the entirely-missing
+        # notify row on Jenkins. tech.kind=in-flight marks this as "stage
+        # is still running its own body but has reached a stable success
+        # contract"; the post-stage _finalize_fragment hook overwrites
+        # status with the real outcome.
+        #
+        # Located INSIDE the CI-aggregation branch so local mode
+        # (brik run pipeline) stays untouched: in local mode the framework
+        # builds the aggregate directly via report.record per stage, and
+        # the post-stage hook records notify itself.
+        report.record "notify" "tech" "status" "success"   || true
+        report.record "notify" "tech" "kind"   "in-flight" || true
+        report.write_fragment "notify" || \
+            log.warn "could not write notify pre-fragment (non-fatal)"
+
         report.aggregate_fragments "$_ci_fragments_dir" || \
             log.warn "fragment aggregation failed (non-fatal)"
     fi

@@ -38,7 +38,7 @@ Describe "stages.sast"
   read_sast_tech() {
     local key="$1"
     jq -r --arg k "$key" \
-      '.stages[] | select(.name == "sast") | .tech[$k] // empty' \
+      '.stages[] | select(.stage == "sast") | .tech[$k] // empty' \
       "$BRIK_LOG_DIR/aggregate-report.json" 2>/dev/null
   }
   Before 'setup_env'
@@ -287,7 +287,7 @@ YAML
     read_sast_business_json() {
       local key="$1"
       jq -c --arg k "$key" \
-        '.stages[] | select(.name == "sast") | .business[$k] // empty' \
+        '.stages[] | select(.stage == "sast") | .business[$k] // empty' \
         "$BRIK_LOG_DIR/aggregate-report.json" 2>/dev/null
     }
 
@@ -392,7 +392,7 @@ YAML
         local ctx
         ctx="$(context.create "sast")" 2>/dev/null || ctx="$(mktemp)"
         stages.sast "$ctx" >/dev/null 2>&1
-        jq -c '.stages[] | select(.name == "sast") | .business // {}' \
+        jq -c '.stages[] | select(.stage == "sast") | .business // {}' \
           "$BRIK_LOG_DIR/aggregate-report.json" 2>/dev/null
       }
       When call run_no_sarif

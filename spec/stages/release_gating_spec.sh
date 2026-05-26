@@ -58,11 +58,11 @@ Describe "stages.release SC20 trigger gating"
   }
 
   read_release_status() {
-    jq -r '.stages[] | select(.name == "release") | .tech.status // empty' \
+    jq -r '.stages[] | select(.stage == "release") | .tech.status // empty' \
       "$BRIK_LOG_DIR/aggregate-report.json"
   }
   read_release_kind() {
-    jq -r '.stages[] | select(.name == "release") | .tech.kind // empty' \
+    jq -r '.stages[] | select(.stage == "release") | .tech.kind // empty' \
       "$BRIK_LOG_DIR/aggregate-report.json"
   }
 

@@ -370,7 +370,7 @@ Describe "jenkins-wrapper.sh"
         brik.jenkins.run_stage "lint" >/dev/null 2>&1
         local report="${BRIK_LOG_DIR}/aggregate-report.json"
         if [[ -f "$report" ]]; then
-          jq -r '.stages[] | select(.name == "lint") | .tech.status // empty' "$report"
+          jq -r '.stages[] | select(.stage == "lint") | .tech.status // empty' "$report"
         else
           echo "no_report"
         fi

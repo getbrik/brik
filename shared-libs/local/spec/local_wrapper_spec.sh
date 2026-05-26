@@ -446,7 +446,7 @@ Describe "local-wrapper.sh"
         local report="${BRIK_LOG_DIR}/aggregate-report.json"
         if [[ -f "$report" ]]; then
           local version
-          version="$(jq -r '.stages[] | select(.name == "release") | .business.new_version // empty' "$report")"
+          version="$(jq -r '.stages[] | select(.stage == "release") | .business.new_version // empty' "$report")"
           if [[ -n "$version" ]]; then echo "has_version"; else echo "no_version"; fi
         else
           echo "no_report"
@@ -461,7 +461,7 @@ Describe "local-wrapper.sh"
         brik.local.run_stage "package" >/dev/null 2>&1
         local report="${BRIK_LOG_DIR}/aggregate-report.json"
         if [[ -f "$report" ]]; then
-          jq -r '.stages[] | select(.name == "package") | .tech.status // empty' "$report"
+          jq -r '.stages[] | select(.stage == "package") | .tech.status // empty' "$report"
         else
           echo "no_report"
         fi
@@ -475,7 +475,7 @@ Describe "local-wrapper.sh"
         brik.local.run_stage "deploy" >/dev/null 2>&1
         local report="${BRIK_LOG_DIR}/aggregate-report.json"
         if [[ -f "$report" ]]; then
-          jq -r '.stages[] | select(.name == "deploy") | .tech.status // empty' "$report"
+          jq -r '.stages[] | select(.stage == "deploy") | .tech.status // empty' "$report"
         else
           echo "no_report"
         fi

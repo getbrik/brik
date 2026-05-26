@@ -9,19 +9,19 @@ Describe "stages/promote.sh (Phase 9.B)"
   Include "$BRIK_HOME/spec/support/mock_helper.sh"
 
   read_status() {
-    jq -r '.stages[] | select(.name == "promote") | .tech.status // empty' \
+    jq -r '.stages[] | select(.stage == "promote") | .tech.status // empty' \
       "$BRIK_LOG_DIR/aggregate-report.json" 2>/dev/null
   }
   read_kind() {
-    jq -r '.stages[] | select(.name == "promote") | .tech.kind // empty' \
+    jq -r '.stages[] | select(.stage == "promote") | .tech.kind // empty' \
       "$BRIK_LOG_DIR/aggregate-report.json" 2>/dev/null
   }
   read_business_key() {
-    jq -r --arg k "$1" '.stages[] | select(.name == "promote") | .business[$k] // empty' \
+    jq -r --arg k "$1" '.stages[] | select(.stage == "promote") | .business[$k] // empty' \
       "$BRIK_LOG_DIR/aggregate-report.json" 2>/dev/null
   }
   read_env_key() {
-    jq -r --arg k "$1" '.stages[] | select(.name == "promote") | .env[$k] // empty' \
+    jq -r --arg k "$1" '.stages[] | select(.stage == "promote") | .env[$k] // empty' \
       "$BRIK_LOG_DIR/aggregate-report.json" 2>/dev/null
   }
 

@@ -61,7 +61,7 @@ Describe "pipeline.run + plan gate (D.5a)"
         export BRIK_PLAN_FILE
         write_plan "init"
         pipeline.run >/dev/null 2>&1
-        jq -r '.stages | map(select(.tech.kind == "not-applicable")) | map(.name) | join(",")' \
+        jq -r '.stages | map(select(.tech.kind == "not-applicable")) | map(.stage) | join(",")' \
           "$PIPELINE_LOG_DIR/aggregate-report.json"
       }
       When call run_with_plan
@@ -74,7 +74,7 @@ Describe "pipeline.run + plan gate (D.5a)"
         export BRIK_PLAN_FILE
         write_plan "init"
         pipeline.run >/dev/null 2>&1
-        jq -r '.stages | map(select(.name == "build")) | .[0].business.reason' \
+        jq -r '.stages | map(select(.stage == "build")) | .[0].business.reason' \
           "$PIPELINE_LOG_DIR/aggregate-report.json"
       }
       When call reason_recorded
@@ -87,7 +87,7 @@ Describe "pipeline.run + plan gate (D.5a)"
         export BRIK_PLAN_FILE
         write_plan "init"
         pipeline.run >/dev/null 2>&1
-        jq -r '.stages | map(select(.name == "init")) | .[0].tech.status' \
+        jq -r '.stages | map(select(.stage == "init")) | .[0].tech.status' \
           "$PIPELINE_LOG_DIR/aggregate-report.json"
       }
       When call init_ran
@@ -103,11 +103,16 @@ Describe "pipeline.run + plan gate (D.5a)"
       legacy_flow() {
         unset BRIK_PLAN_FILE
         pipeline.run >/dev/null 2>&1
-        jq -r '.stages | map(select(.tech.status == "success")) | map(.name) | join(",")' \
+        jq -r '.stages | map(select(.tech.status == "success")) | map(.stage) | join(",")' \
           "$PIPELINE_LOG_DIR/aggregate-report.json"
       }
       When call legacy_flow
-      The output should equal "init,build,lint,sast,scan,test"
+      # notify added by I10 (chantier 20260526): stages.notify pre-records
+      # its own success fragment in CI-aggregation mode. The mock workspace
+      # in setup_pipeline produces a brik-artifacts/ tree that satisfies
+      # _is_ci_aggregation_mode, so the I10 branch fires and notify lands
+      # in the success list alongside the always-run defaults.
+      The output should equal "init,build,lint,sast,scan,test,notify"
     End
   End
 End

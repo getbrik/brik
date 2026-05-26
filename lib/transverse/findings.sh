@@ -608,7 +608,7 @@ findings.scan_gate() {
         if [[ -f "$backend" ]] && command -v jq >/dev/null 2>&1; then
             local _has_entry
             _has_entry="$(jq -r --arg s "$stage" \
-                '.stages[] | select(.name == $s) | .business.findings | if . == null then "no" else "yes" end' \
+                '.stages[] | select(.stage == $s) | .business.findings | if . == null then "no" else "yes" end' \
                 "$backend" 2>/dev/null)"
             if [[ "$_has_entry" == "yes" ]]; then
                 if findings.gate "$stage" 2>/dev/null; then
@@ -658,13 +658,13 @@ findings.gate() {
             {
                 flock -s 9
                 jq -r --arg s "$stage" \
-                    '.stages[] | select(.name == $s) | ((.business.findings.failing | objects | .total) // (.business.findings.failing | numbers) // 0)' \
+                    '.stages[] | select(.stage == $s) | ((.business.findings.failing | objects | .total) // (.business.findings.failing | numbers) // 0)' \
                     "$backend"
             } 9>>"$lock_file" 2>/dev/null
         )"
     else
         failing="$(jq -r --arg s "$stage" \
-            '.stages[] | select(.name == $s) | ((.business.findings.failing | objects | .total) // (.business.findings.failing | numbers) // 0)' \
+            '.stages[] | select(.stage == $s) | ((.business.findings.failing | objects | .total) // (.business.findings.failing | numbers) // 0)' \
             "$backend" 2>/dev/null)"
     fi
     failing="${failing:-0}"

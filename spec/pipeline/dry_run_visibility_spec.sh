@@ -152,7 +152,7 @@ Describe "pipeline.sh - dry-run visibility"
     It "records tech.dry_run=true on deploy when BRIK_DRY_RUN=true"
       run_check_deploy() {
         BRIK_DRY_RUN=true pipeline.run --with-release --with-package --with-deploy >/dev/null 2>&1
-        jq -r '.stages[] | select(.name=="deploy") | .tech.dry_run' \
+        jq -r '.stages[] | select(.stage=="deploy") | .tech.dry_run' \
           "$PIPELINE_LOG_DIR/aggregate-report.json"
       }
       When call run_check_deploy
@@ -162,7 +162,7 @@ Describe "pipeline.sh - dry-run visibility"
     It "records tech.dry_run=true on package when BRIK_DRY_RUN=true"
       run_check_package() {
         BRIK_DRY_RUN=true pipeline.run --with-release --with-package --with-deploy >/dev/null 2>&1
-        jq -r '.stages[] | select(.name=="package") | .tech.dry_run' \
+        jq -r '.stages[] | select(.stage=="package") | .tech.dry_run' \
           "$PIPELINE_LOG_DIR/aggregate-report.json"
       }
       When call run_check_package
@@ -172,7 +172,7 @@ Describe "pipeline.sh - dry-run visibility"
     It "records tech.dry_run=true on notify when BRIK_DRY_RUN=true"
       run_check_notify() {
         BRIK_DRY_RUN=true pipeline.run --with-release --with-package --with-deploy >/dev/null 2>&1
-        jq -r '.stages[] | select(.name=="notify") | .tech.dry_run' \
+        jq -r '.stages[] | select(.stage=="notify") | .tech.dry_run' \
           "$PIPELINE_LOG_DIR/aggregate-report.json"
       }
       When call run_check_notify
@@ -182,7 +182,7 @@ Describe "pipeline.sh - dry-run visibility"
     It "leaves tech.dry_run absent on build (not an affected stage)"
       run_check_build() {
         BRIK_DRY_RUN=true pipeline.run --with-release --with-package --with-deploy >/dev/null 2>&1
-        jq -r '.stages[] | select(.name=="build") | .tech.dry_run // "absent"' \
+        jq -r '.stages[] | select(.stage=="build") | .tech.dry_run // "absent"' \
           "$PIPELINE_LOG_DIR/aggregate-report.json"
       }
       When call run_check_build
@@ -193,7 +193,7 @@ Describe "pipeline.sh - dry-run visibility"
       run_check_deploy_clean() {
         unset BRIK_DRY_RUN
         pipeline.run --with-release --with-package --with-deploy >/dev/null 2>&1
-        jq -r '.stages[] | select(.name=="deploy") | .tech.dry_run // "absent"' \
+        jq -r '.stages[] | select(.stage=="deploy") | .tech.dry_run // "absent"' \
           "$PIPELINE_LOG_DIR/aggregate-report.json"
       }
       When call run_check_deploy_clean

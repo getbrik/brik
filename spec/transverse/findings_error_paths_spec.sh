@@ -202,7 +202,7 @@ Describe "transverse/findings.sh error paths"
       proc_bad_preset_counts() {
         export BRIK_QUALITY_FINDINGS_POLICY="aggressive"
         findings.process "container-scan" "$PROC_SARIF" >/dev/null 2>&1
-        jq -r '.stages[] | select(.name == "container-scan") | .business.findings.total' \
+        jq -r '.stages[] | select(.stage == "container-scan") | .business.findings.total' \
           "$BRIK_LOG_DIR/aggregate-report.json"
       }
       When call proc_bad_preset_counts

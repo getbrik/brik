@@ -31,21 +31,21 @@ Describe "stages.package"
   After 'cleanup_env'
 
   read_package_status() {
-    jq -r '.stages[] | select(.name == "package") | .tech.status // empty' \
+    jq -r '.stages[] | select(.stage == "package") | .tech.status // empty' \
       "$BRIK_LOG_DIR/aggregate-report.json" 2>/dev/null
   }
 
   read_package_tech() {
     local key="$1"
     jq -r --arg k "$key" \
-      '.stages[] | select(.name == "package") | .tech[$k] // empty' \
+      '.stages[] | select(.stage == "package") | .tech[$k] // empty' \
       "$BRIK_LOG_DIR/aggregate-report.json" 2>/dev/null
   }
 
   read_package_business_json() {
     local key="$1"
     jq -c --arg k "$key" \
-      '.stages[] | select(.name == "package") | .business[$k] // empty' \
+      '.stages[] | select(.stage == "package") | .business[$k] // empty' \
       "$BRIK_LOG_DIR/aggregate-report.json" 2>/dev/null
   }
 
@@ -152,7 +152,7 @@ YAML
         ctx="$(context.create "package")" 2>/dev/null || ctx="$(mktemp)"
         stages.package "$ctx" >/dev/null 2>&1
         unset -f docker
-        jq -r '.stages[] | select(.name == "package") | .business.image.digest // "<missing>"' \
+        jq -r '.stages[] | select(.stage == "package") | .business.image.digest // "<missing>"' \
           "$BRIK_LOG_DIR/aggregate-report.json"
       }
       When call run_pkg_digest
@@ -174,7 +174,7 @@ YAML
         ctx="$(context.create "package")" 2>/dev/null || ctx="$(mktemp)"
         stages.package "$ctx" >/dev/null 2>&1
         unset -f docker
-        jq -r '.stages[] | select(.name == "package") | .business.image | has("digest")' \
+        jq -r '.stages[] | select(.stage == "package") | .business.image | has("digest")' \
           "$BRIK_LOG_DIR/aggregate-report.json"
       }
       When call run_pkg_no_digest

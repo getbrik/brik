@@ -35,7 +35,7 @@ Describe "pipeline.sh"
     It "runs the default subset: init build lint sast scan test"
       default_flow_ran_stages() {
         pipeline.run >/dev/null 2>&1
-        jq -r '.stages | map(select(.tech.status == "success")) | map(.name) | join(",")' \
+        jq -r '.stages | map(select(.tech.status == "success")) | map(.stage) | join(",")' \
           "$PIPELINE_LOG_DIR/aggregate-report.json"
       }
       When call default_flow_ran_stages
@@ -47,17 +47,25 @@ Describe "pipeline.sh"
       # spec mocks the function (see setup_pipeline) so the mock body
       # decides the recorded status. Production pipelines rely on the
       # plan-driven gate for context filtering (D.5a/D.5b/D.5c).
-      The output should equal "init,build,lint,sast,scan,test,promote"
+      # notify is now in the success list because of I10 (chantier 20260526):
+      # stages.notify writes its own fragment with tech.status=success
+      # before invoking report.aggregate_fragments so the aggregate carries
+      # a proper notify entry instead of the "RUNNING" placeholder it had
+      # before. The mock body in this spec (see setup_pipeline) thus lands
+      # the notify row with success status.
+      The output should equal "init,build,lint,sast,scan,test,promote,notify"
     End
 
-    It "marks release/package/container-scan/deploy/notify as skipped"
+    It "marks release/package/container-scan/deploy as skipped"
       default_flow_skipped_stages() {
         pipeline.run >/dev/null 2>&1
-        jq -r '.stages | map(select(.tech.status == "skipped")) | map(.name) | join(",")' \
+        jq -r '.stages | map(select(.tech.status == "skipped")) | map(.stage) | join(",")' \
           "$PIPELINE_LOG_DIR/aggregate-report.json"
       }
       When call default_flow_skipped_stages
-      The output should equal "release,package,container-scan,deploy,notify"
+      # notify removed from the skipped set: I10 (chantier 20260526) makes
+      # stages.notify pre-record its own success fragment before aggregation.
+      The output should equal "release,package,container-scan,deploy"
     End
 
     It "returns 0 when all ran stages pass"
@@ -94,7 +102,7 @@ Describe "pipeline.sh"
     It "runs every stage when all opt-in flags are set"
       all_stages_ran() {
         pipeline.run --with-release --with-package --with-deploy >/dev/null 2>&1
-        jq -r '.stages | map(.name) | join(",")' \
+        jq -r '.stages | map(.stage) | join(",")' \
           "$PIPELINE_LOG_DIR/aggregate-report.json"
       }
       When call all_stages_ran
@@ -123,7 +131,7 @@ Describe "pipeline.sh"
     It "enables package AND container-scan (coupled)"
       package_and_container_scan_ran() {
         pipeline.run --with-package >/dev/null 2>&1
-        jq -r '.stages | map(select(.name == "package" or .name == "container-scan")) | map(.tech.status) | join(",")' \
+        jq -r '.stages | map(select(.stage == "package" or .stage == "container-scan")) | map(.tech.status) | join(",")' \
           "$PIPELINE_LOG_DIR/aggregate-report.json"
       }
       When call package_and_container_scan_ran
@@ -138,7 +146,7 @@ Describe "pipeline.sh"
     It "enables deploy AND notify (coupled)"
       deploy_and_notify_ran() {
         pipeline.run --with-deploy >/dev/null 2>&1
-        jq -r '.stages | map(select(.name == "deploy" or .name == "notify")) | map(.tech.status) | join(",")' \
+        jq -r '.stages | map(select(.stage == "deploy" or .stage == "notify")) | map(.tech.status) | join(",")' \
           "$PIPELINE_LOG_DIR/aggregate-report.json"
       }
       When call deploy_and_notify_ran
@@ -155,7 +163,7 @@ Describe "pipeline.sh"
         unset BRIK_COMMIT_TAG
         stages.build() { return 1; }
         pipeline.run >/dev/null 2>&1
-        jq -r '.stages | map(select(.name == "lint" or .name == "sast" or .name == "scan" or .name == "test")) | map(.tech.status) | unique | join(",")' \
+        jq -r '.stages | map(select(.stage == "lint" or .stage == "sast" or .stage == "scan" or .stage == "test")) | map(.tech.status) | unique | join(",")' \
           "$PIPELINE_LOG_DIR/aggregate-report.json"
       }
       When call snapshot_continues_after_failure
@@ -168,7 +176,7 @@ Describe "pipeline.sh"
         stages.build() { return 1; }
         pipeline.run >/dev/null 2>&1
         unset BRIK_COMMIT_TAG
-        jq -r '.stages | map(select(.name == "lint" or .name == "sast" or .name == "scan" or .name == "test")) | map(.tech.status) | unique | join(",")' \
+        jq -r '.stages | map(select(.stage == "lint" or .stage == "sast" or .stage == "scan" or .stage == "test")) | map(.tech.status) | unique | join(",")' \
           "$PIPELINE_LOG_DIR/aggregate-report.json"
       }
       When call release_fail_fast
@@ -182,7 +190,7 @@ Describe "pipeline.sh"
         stages.build() { return 1; }
         pipeline.run >/dev/null 2>&1
         unset BRIK_CONTINUE_ON_ERROR
-        jq -r '.stages | map(select(.name == "lint" or .name == "sast" or .name == "scan" or .name == "test")) | map(.tech.status) | unique | join(",")' \
+        jq -r '.stages | map(select(.stage == "lint" or .stage == "sast" or .stage == "scan" or .stage == "test")) | map(.tech.status) | unique | join(",")' \
           "$PIPELINE_LOG_DIR/aggregate-report.json"
       }
       When call snapshot_env_override_fail_fast
@@ -196,7 +204,7 @@ Describe "pipeline.sh"
         stages.build() { return 1; }
         pipeline.run >/dev/null 2>&1
         unset BRIK_COMMIT_TAG BRIK_CONTINUE_ON_ERROR
-        jq -r '.stages | map(select(.name == "lint" or .name == "sast" or .name == "scan" or .name == "test")) | map(.tech.status) | unique | join(",")' \
+        jq -r '.stages | map(select(.stage == "lint" or .stage == "sast" or .stage == "scan" or .stage == "test")) | map(.tech.status) | unique | join(",")' \
           "$PIPELINE_LOG_DIR/aggregate-report.json"
       }
       When call release_env_override_continue
@@ -230,7 +238,7 @@ Describe "pipeline.sh"
       failed_stage_status() {
         stages.build() { return 1; }
         pipeline.run >/dev/null 2>&1
-        jq -r '.stages | map(select(.name == "build")) | map(.tech.status) | first' \
+        jq -r '.stages | map(select(.stage == "build")) | map(.tech.status) | first' \
           "$PIPELINE_LOG_DIR/aggregate-report.json"
       }
       When call failed_stage_status
@@ -241,7 +249,7 @@ Describe "pipeline.sh"
       continue_on_error_runs_rest() {
         stages.build() { return 1; }
         pipeline.run --continue-on-error >/dev/null 2>&1
-        jq -r '.stages | map(select(.name == "lint" or .name == "sast" or .name == "scan" or .name == "test")) | map(.tech.status) | unique | join(",")' \
+        jq -r '.stages | map(select(.stage == "lint" or .stage == "sast" or .stage == "scan" or .stage == "test")) | map(.tech.status) | unique | join(",")' \
           "$PIPELINE_LOG_DIR/aggregate-report.json"
       }
       When call continue_on_error_runs_rest
@@ -270,7 +278,7 @@ Describe "pipeline.sh"
           return 0
         }
         pipeline.run >/dev/null 2>&1
-        jq -r '.stages[] | select(.name == "lint") | .tech.status' \
+        jq -r '.stages[] | select(.stage == "lint") | .tech.status' \
           "$PIPELINE_LOG_DIR/aggregate-report.json"
       }
       When call lint_config_skip
@@ -359,7 +367,7 @@ Describe "pipeline.sh"
           printf 'init\n'
         }
         pipeline.run >/dev/null 2>&1
-        jq -r '.stages | map(select(.tech.status == "success")) | map(.name) | join(",")' \
+        jq -r '.stages | map(select(.tech.status == "success")) | map(.stage) | join(",")' \
           "$PIPELINE_LOG_DIR/aggregate-report.json"
       }
       When call registry_drives_order
