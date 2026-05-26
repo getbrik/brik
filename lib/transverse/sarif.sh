@@ -141,8 +141,12 @@ sarif.count_by_severity() {
 }
 
 # sarif.extract_cwe <file>
-# Print a JSON array of unique CWE identifiers (e.g. ["CWE-79","CWE-89"]),
-# parsed from rules[].properties.tags strings shaped "CWE-NN: ...".
+# Print a JSON array of unique CWE identifiers (e.g. ["CWE-79","CWE-89"])
+# for the rules that actually produced a result. Earlier revisions
+# listed every rule the scanner ships with -- so a clean run still
+# emitted ~60 CWE entries, which gave readers the impression that those
+# weaknesses were detected. We now join results[].ruleId against
+# tool.driver.rules[].id and pick CWE tags only from that subset.
 sarif.extract_cwe() {
     if [[ $# -lt 1 ]]; then
         printf 'sarif.extract_cwe: missing file argument\n' >&2
@@ -155,12 +159,15 @@ sarif.extract_cwe() {
     fi
     # KCOV_EXCL_START -- inline jq script body, not bash code
     jq -c '
-      [
-        (.runs[0].tool.driver.rules // [])[]
-        | (.properties.tags // [])[]
-        | select(type == "string" and (test("^CWE-[0-9]+")))
-        | capture("^(?<cwe>CWE-[0-9]+)").cwe
-      ]
+      . as $sarif
+      | ([(.runs[0].results // [])[].ruleId] | unique) as $hit_rule_ids
+      | [
+          ($sarif.runs[0].tool.driver.rules // [])[]
+          | select(.id as $rid | $hit_rule_ids | index($rid))
+          | (.properties.tags // [])[]
+          | select(type == "string" and (test("^CWE-[0-9]+")))
+          | capture("^(?<cwe>CWE-[0-9]+)").cwe
+        ]
       | unique
     ' "$_file"
     # KCOV_EXCL_STOP

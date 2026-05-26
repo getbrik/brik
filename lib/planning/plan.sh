@@ -190,6 +190,17 @@ plan.compute() {
     printf '# changes_source=%s\n' "$source"
     printf '# changes_from=%s\n' "$from"
     printf '# changes_to=%s\n' "$to"
+    # Emit one `# changes_file=<path>` per modified file so plan_writer
+    # can stamp changes.files into plan.json. The diff is NUL-separated
+    # for safety; we convert to line-oriented streaming here. Brik
+    # workspaces are source repositories where path newlines do not
+    # occur in practice, so tr '\0' '\n' is sufficient.
+    if [[ -s "$changes_file" ]]; then
+        while IFS= read -r _changes_file_path; do
+            [[ -z "$_changes_file_path" ]] && continue
+            printf '# changes_file=%s\n' "$_changes_file_path"
+        done < <(tr '\0' '\n' < "$changes_file")
+    fi
     printf '# release_profile=%s\n' "$_release_profile"
     printf '# release_version=%s\n' "$_release_version"
     printf '# is_candidate=%s\n' "$_is_candidate"

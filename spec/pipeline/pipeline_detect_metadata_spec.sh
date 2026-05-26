@@ -221,7 +221,10 @@ Describe "_pipeline.detect_metadata"
       The output should equal "alice@example.com"
     End
 
-    It "exports BRIK_COMMIT_TIMESTAMP from CI_COMMIT_TIMESTAMP"
+    It "exports BRIK_COMMIT_TIMESTAMP from CI_COMMIT_TIMESTAMP (normalised offset)"
+      # CI_COMMIT_TIMESTAMP arriving with ±HHMM (no colon) is normalised
+      # to ±HH:MM so the aggregate report stays byte-identical across
+      # platforms. See Normalisation block below for the matrix.
       check() {
         setup_gitlab
         export CI_COMMIT_TIMESTAMP="2026-05-03T18:38:10+0000"
@@ -229,7 +232,7 @@ Describe "_pipeline.detect_metadata"
         printf '%s' "$BRIK_COMMIT_TIMESTAMP"
       }
       When call check
-      The output should equal "2026-05-03T18:38:10+0000"
+      The output should equal "2026-05-03T18:38:10+00:00"
     End
 
     It "exports BRIK_COMMIT_MESSAGE_SUBJECT from CI_COMMIT_TITLE"
@@ -458,6 +461,73 @@ Describe "_pipeline.detect_metadata"
         export BRIK_WORKSPACE="$BRIK_WORKSPACE_FIXTURE"
         _pipeline.detect_metadata
         printf '%s' "${BRIK_COMMIT_AUTHOR:-<empty>}"
+      }
+      When call check
+      The output should equal "<empty>"
+    End
+  End
+
+  # ---------------------------------------------------------------------------
+  # BRIK_COMMIT_TIMESTAMP normalisation (cross-platform parity)
+  #
+  # Git's --format=%aI prints "Z" in UTC under some versions (and ±HHMM
+  # without colon under others); GitLab's CI_COMMIT_TIMESTAMP always uses
+  # ±HH:MM. _pipeline.detect_metadata standardises on the colonised
+  # numeric offset so the aggregate report is byte-identical on Jenkins,
+  # GitLab, and local.
+  # ---------------------------------------------------------------------------
+  Describe "BRIK_COMMIT_TIMESTAMP normalisation"
+    Before 'reset_env'
+    After 'reset_env'
+
+    It "rewrites a trailing Z to +00:00"
+      check() {
+        export BRIK_COMMIT_TIMESTAMP="2026-05-25T11:13:41Z"
+        _pipeline.detect_metadata
+        printf '%s' "$BRIK_COMMIT_TIMESTAMP"
+      }
+      When call check
+      The output should equal "2026-05-25T11:13:41+00:00"
+    End
+
+    It "inserts a colon into a ±HHMM offset"
+      check() {
+        export BRIK_COMMIT_TIMESTAMP="2026-05-25T11:13:41+0000"
+        _pipeline.detect_metadata
+        printf '%s' "$BRIK_COMMIT_TIMESTAMP"
+      }
+      When call check
+      The output should equal "2026-05-25T11:13:41+00:00"
+    End
+
+    It "inserts a colon into a negative ±HHMM offset"
+      check() {
+        export BRIK_COMMIT_TIMESTAMP="2026-05-25T11:13:41-0530"
+        _pipeline.detect_metadata
+        printf '%s' "$BRIK_COMMIT_TIMESTAMP"
+      }
+      When call check
+      The output should equal "2026-05-25T11:13:41-05:30"
+    End
+
+    It "leaves a value already in ±HH:MM form untouched"
+      check() {
+        export BRIK_COMMIT_TIMESTAMP="2026-05-25T13:13:41+02:00"
+        _pipeline.detect_metadata
+        printf '%s' "$BRIK_COMMIT_TIMESTAMP"
+      }
+      When call check
+      The output should equal "2026-05-25T13:13:41+02:00"
+    End
+
+    It "leaves an empty timestamp untouched"
+      check() {
+        unset BRIK_COMMIT_TIMESTAMP CI_COMMIT_TIMESTAMP
+        # Do not point BRIK_WORKSPACE at a repo, so the git log fallback
+        # produces nothing and the variable stays empty.
+        export BRIK_WORKSPACE="$(mktemp -d)"
+        _pipeline.detect_metadata
+        printf '%s' "${BRIK_COMMIT_TIMESTAMP:-<empty>}"
       }
       When call check
       The output should equal "<empty>"

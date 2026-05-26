@@ -165,6 +165,24 @@ _pipeline.detect_metadata() {
     _helpers.set_if_unset BRIK_COMMIT_TIMESTAMP       "${CI_COMMIT_TIMESTAMP:-}" "$_git_timestamp"
     _helpers.set_if_unset BRIK_COMMIT_MESSAGE_SUBJECT "${CI_COMMIT_TITLE:-}"     "$_git_subject"
 
+    # Normalise the commit timestamp to a single ISO-8601 form across
+    # platforms. Git's --format=%aI prints "Z" in UTC under some versions
+    # (and ±HHMM without colon under others); GitLab's CI_COMMIT_TIMESTAMP
+    # always uses ±HH:MM. Standardise on the colonised numeric offset so
+    # the aggregate report is byte-identical on Jenkins, GitLab, and local.
+    if [[ -n "${BRIK_COMMIT_TIMESTAMP:-}" ]]; then
+        case "$BRIK_COMMIT_TIMESTAMP" in
+            *Z)
+                BRIK_COMMIT_TIMESTAMP="${BRIK_COMMIT_TIMESTAMP%Z}+00:00"
+                ;;
+            *[+-][0-9][0-9][0-9][0-9])
+                # ±HHMM -> ±HH:MM (insert colon between hours and minutes)
+                BRIK_COMMIT_TIMESTAMP="${BRIK_COMMIT_TIMESTAMP:0:${#BRIK_COMMIT_TIMESTAMP}-2}:${BRIK_COMMIT_TIMESTAMP:${#BRIK_COMMIT_TIMESTAMP}-2}"
+                ;;
+        esac
+        export BRIK_COMMIT_TIMESTAMP
+    fi
+
     # Browseable repository URL. Resolution priority: CI_PROJECT_URL (GitLab),
     # GIT_URL (Jenkins Git plugin), then git config remote.origin.url. The raw
     # URL is normalized to HTTPS, credentials stripped, .git suffix dropped.
@@ -393,30 +411,30 @@ _stage._record_business() {
 
     local tech_status tech_kind findings_ignored
     tech_status="$(jq -r --arg s "$stage_name" \
-        '.stages[]? | select(.name == $s) | .tech.status // empty' \
+        '.stages[]? | select(.stage == $s) | .tech.status // empty' \
         "$backend" 2>/dev/null)" || tech_status=""
     [[ -n "$tech_status" ]] || return 0
 
     tech_kind="$(jq -r --arg s "$stage_name" \
-        '.stages[]? | select(.name == $s) | .tech.kind // empty' \
+        '.stages[]? | select(.stage == $s) | .tech.kind // empty' \
         "$backend" 2>/dev/null)" || tech_kind=""
 
     findings_ignored="$(jq -r --arg s "$stage_name" \
-        '.stages[]? | select(.name == $s) | .business.findings.ignored.total // 0' \
+        '.stages[]? | select(.stage == $s) | .business.findings.ignored.total // 0' \
         "$backend" 2>/dev/null)" || findings_ignored="0"
     [[ "$findings_ignored" =~ ^[0-9]+$ ]] || findings_ignored="0"
 
     local failing_has_fix failing_no_fix failing_total failing_unknown
     failing_has_fix="$(jq -r --arg s "$stage_name" \
-        '.stages[]? | select(.name == $s) | ((.business.findings.failing | objects | .has_fix) // 0)' \
+        '.stages[]? | select(.stage == $s) | ((.business.findings.failing | objects | .has_fix) // 0)' \
         "$backend" 2>/dev/null)" || failing_has_fix="0"
     [[ "$failing_has_fix" =~ ^[0-9]+$ ]] || failing_has_fix="0"
     failing_no_fix="$(jq -r --arg s "$stage_name" \
-        '.stages[]? | select(.name == $s) | ((.business.findings.failing | objects | .no_fix) // 0)' \
+        '.stages[]? | select(.stage == $s) | ((.business.findings.failing | objects | .no_fix) // 0)' \
         "$backend" 2>/dev/null)" || failing_no_fix="0"
     [[ "$failing_no_fix" =~ ^[0-9]+$ ]] || failing_no_fix="0"
     failing_total="$(jq -r --arg s "$stage_name" \
-        '.stages[]? | select(.name == $s) | ((.business.findings.failing | objects | .total) // (.business.findings.failing | numbers) // 0)' \
+        '.stages[]? | select(.stage == $s) | ((.business.findings.failing | objects | .total) // (.business.findings.failing | numbers) // 0)' \
         "$backend" 2>/dev/null)" || failing_total="0"
     [[ "$failing_total" =~ ^[0-9]+$ ]] || failing_total="0"
     # Conservative default: any failing finding not annotated has_fix or
@@ -476,7 +494,7 @@ _stage.run._project_env() {
         [[ -z "$key" ]] && continue
         _pipeline.env.append "$key" "$value" 2>/dev/null || true
     done < <(jq -j --arg s "$stage_name" \
-        '.stages[]? | select(.name == $s) | (.env // {}) | to_entries[]
+        '.stages[]? | select(.stage == $s) | (.env // {}) | to_entries[]
          | "\(.key)\u0000\(.value)\u0000"' \
         "$backend" 2>/dev/null)
 
@@ -543,7 +561,7 @@ stage.run() {
         _report_path="$(_brik.log_dir._resolve)/aggregate-report.json"
         if [[ -f "$_report_path" ]] && command -v jq >/dev/null 2>&1; then
             _stage_status="$(jq -r --arg s "$stage_name" \
-                '.stages[] | select(.name == $s) | .tech.status // empty' \
+                '.stages[] | select(.stage == $s) | .tech.status // empty' \
                 "$_report_path" 2>/dev/null)" || _stage_status=""
         fi
         case "$_stage_status" in

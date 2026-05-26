@@ -78,5 +78,70 @@ Describe "planning/plan_writer.sh"
       The status should equal "$BRIK_EXIT_INVALID_INPUT"
       The stderr should include "no stage records"
     End
+
+    # plan.compute now emits `# changes_file=<path>` directives between
+    # `# changes_to=` and the release block. plan_writer.from_stream
+    # accumulates them into changes.files instead of hard-coding [].
+    Describe "changes.files serialisation"
+      build_stream() {
+        # $1: changes source (none|local|git)
+        # $@: file paths (after the source argument)
+        local src="$1"; shift
+        printf '# workspace=/tmp\n'
+        printf '# mode=safe\n'
+        printf '# context=snapshot\n'
+        printf '# changes_source=%s\n' "$src"
+        printf '# changes_from=origin/main\n'
+        printf '# changes_to=HEAD\n'
+        local f
+        for f in "$@"; do
+          printf '# changes_file=%s\n' "$f"
+        done
+        printf '# release_profile=none\n'
+        printf '# release_version=0.0.0\n'
+        printf '# is_candidate=0\n'
+        printf 'init\trun\tcontext-match\tblocking\tbase\tstages.init\t\n'
+      }
+
+      It "stamps each # changes_file=<path> into changes.files"
+        run_check() {
+          local plan
+          plan="$(build_stream local src/index.js package.json src/lib/api.js | plan_writer.from_stream)"
+          jq -rc '.changes.files' <<<"$plan"
+        }
+        When call run_check
+        The output should equal '["src/index.js","package.json","src/lib/api.js"]'
+      End
+
+      It "produces an empty array when no # changes_file directive is present"
+        run_check() {
+          local plan
+          plan="$(build_stream local | plan_writer.from_stream)"
+          jq -rc '.changes.files' <<<"$plan"
+        }
+        When call run_check
+        The output should equal '[]'
+      End
+
+      It "preserves paths containing whitespace"
+        run_check() {
+          local plan
+          plan="$(build_stream local 'docs/Some File.md' 'src/index.js' | plan_writer.from_stream)"
+          jq -rc '.changes.files' <<<"$plan"
+        }
+        When call run_check
+        The output should equal '["docs/Some File.md","src/index.js"]'
+      End
+
+      It "remains compatible with source=none (empty files array)"
+        run_check() {
+          local plan
+          plan="$(build_stream none | plan_writer.from_stream)"
+          jq -rc '.changes' <<<"$plan"
+        }
+        When call run_check
+        The output should equal '{"files":[],"source":"none"}'
+      End
+    End
   End
 End

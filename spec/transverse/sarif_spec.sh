@@ -144,6 +144,78 @@ Describe "transverse/sarif.sh"
       When call sarif.extract_cwe "${FIX}/eslint-empty.sarif"
       The output should equal '[]'
     End
+
+    # Earlier revisions listed every CWE tag declared by the scanner's
+    # rules, even when no result referenced them. That produced a ~60-
+    # entry CWE list for a clean SAST run, which misled readers into
+    # thinking those weaknesses were detected. The function now only
+    # surfaces the CWE tags of rules that produced at least one result.
+    Describe "filters CWE list to rules actually hit by a result"
+      build_sarif() {
+        local results="$1" rules="$2"
+        local tmp; tmp="$(mktemp)"
+        jq -n --argjson results "$results" --argjson rules "$rules" '
+          {
+            version: "2.1.0",
+            runs: [{
+              tool: { driver: { name: "synthetic", rules: $rules } },
+              results: $results
+            }]
+          }
+        ' > "$tmp"
+        printf '%s' "$tmp"
+      }
+
+      It "returns [] when no results were produced even if rules declare CWE tags"
+        run_check() {
+          local sarif
+          sarif="$(build_sarif '[]' '[
+            {"id":"js.xss","properties":{"tags":["CWE-79: XSS"]}},
+            {"id":"sql.injection","properties":{"tags":["CWE-89: SQLi"]}}
+          ]')"
+          sarif.extract_cwe "$sarif"
+          rm -f "$sarif"
+        }
+        When call run_check
+        The output should equal '[]'
+      End
+
+      It "lists only the CWE tags of rules that produced a result"
+        run_check() {
+          local sarif
+          sarif="$(build_sarif '[
+            {"ruleId":"js.xss","level":"warning","message":{"text":"x"},"locations":[]}
+          ]' '[
+            {"id":"js.xss","properties":{"tags":["CWE-79: XSS"]}},
+            {"id":"sql.injection","properties":{"tags":["CWE-89: SQLi"]}},
+            {"id":"sec.leak","properties":{"tags":["CWE-200: Info exposure"]}}
+          ]')"
+          sarif.extract_cwe "$sarif"
+          rm -f "$sarif"
+        }
+        When call run_check
+        The output should equal '["CWE-79"]'
+      End
+
+      It "dedups the list when several results reference the same rule"
+        run_check() {
+          local sarif
+          sarif="$(build_sarif '[
+            {"ruleId":"js.xss","level":"warning","message":{"text":"a"},"locations":[]},
+            {"ruleId":"js.xss","level":"warning","message":{"text":"b"},"locations":[]},
+            {"ruleId":"sql.injection","level":"error","message":{"text":"c"},"locations":[]}
+          ]' '[
+            {"id":"js.xss","properties":{"tags":["CWE-79: XSS"]}},
+            {"id":"sql.injection","properties":{"tags":["CWE-89: SQLi"]}},
+            {"id":"sec.leak","properties":{"tags":["CWE-200: Info exposure"]}}
+          ]')"
+          sarif.extract_cwe "$sarif"
+          rm -f "$sarif"
+        }
+        When call run_check
+        The output should equal '["CWE-79","CWE-89"]'
+      End
+    End
   End
 
   Describe "sarif.is_valid"

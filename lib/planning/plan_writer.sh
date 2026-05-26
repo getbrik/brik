@@ -28,6 +28,7 @@ plan_writer.from_stream() {
     local source="none" from="" to=""
     local release_profile="none" release_version="0.0.0" is_candidate="0"
     local -a stage_rows=()
+    local -a changes_files_rows=()
 
     local line
     while IFS= read -r line; do
@@ -39,6 +40,7 @@ plan_writer.from_stream() {
             "# changes_source="*)    source="${line#\# changes_source=}" ;;
             "# changes_from="*)      from="${line#\# changes_from=}" ;;
             "# changes_to="*)        to="${line#\# changes_to=}" ;;
+            "# changes_file="*)      changes_files_rows+=("${line#\# changes_file=}") ;;
             "# release_profile="*)   release_profile="${line#\# release_profile=}" ;;
             "# release_version="*)   release_version="${line#\# release_version=}" ;;
             "# is_candidate="*)      is_candidate="${line#\# is_candidate=}" ;;
@@ -97,12 +99,21 @@ plan_writer.from_stream() {
         return "$BRIK_EXIT_INVALID_INPUT"
     fi
 
+    # changes.files: jq -R -s split correctly handles the empty array
+    # case (0 rows fed in). Path newlines are not supported (Brik
+    # workspaces are source repositories where this is effectively
+    # guaranteed; plan.compute strips NULs but keeps content as-is).
+    local files_array
+    files_array="$(printf '%s\n' "${changes_files_rows[@]:-}" \
+        | jq -R -s 'split("\n") | map(select(length > 0))')"
+
     local changes_obj
     if [[ "$source" == "none" ]]; then
-        changes_obj='{"source":"none","files":[]}'
+        changes_obj="$(jq -nc --argjson f "$files_array" \
+            '{source:"none", files:$f}')"
     else
-        changes_obj="$(jq -nc --arg s "$source" --arg f "$from" --arg t "$to" \
-            '{source:$s, from_ref:$f, to_ref:$t, files:[]}')"
+        changes_obj="$(jq -nc --arg s "$source" --arg fr "$from" --arg t "$to" --argjson f "$files_array" \
+            '{source:$s, from_ref:$fr, to_ref:$t, files:$f}')"
     fi
 
     # Phase 9.A release block. is_candidate is "0"/"1" in the stream so

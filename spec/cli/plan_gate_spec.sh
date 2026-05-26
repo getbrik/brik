@@ -47,6 +47,61 @@ JSON
     End
   End
 
+  # When an opt-in stage's flag points at a different stage
+  # (container-scan opts in via --with-package), spell out the
+  # dependency so users don't search for a --with-<stage_id> that
+  # doesn't exist. Self-referential flags (deploy/--with-deploy etc.)
+  # keep the legacy phrasing.
+  Describe "opt-in-flag-missing message text"
+    setup_optin_plan() {
+      OPTIN_DIR="$(mktemp -d)"
+      export BRIK_WORKSPACE="$OPTIN_DIR"
+      export BRIK_LOG_DIR="$OPTIN_DIR/.brik-logs"
+      mkdir -p "$BRIK_LOG_DIR"
+      local plan_file="$BRIK_LOG_DIR/plan.json"
+      cat > "$plan_file" <<'JSON'
+{"schemaVersion":"v1","brikVersion":"0.6.0","context":"snapshot","mode":"safe","workspace":"/tmp","changes":{"source":"none","files":[]},"stages":[
+  {"id":"deploy","decision":"skip","reason":"opt-in-flag-missing","gate":{"mode":"opt_in"},"runner_class":"deploy"},
+  {"id":"package","decision":"skip","reason":"opt-in-flag-missing","gate":{"mode":"opt_in"},"runner_class":"base"},
+  {"id":"container-scan","decision":"skip","reason":"opt-in-flag-missing","gate":{"mode":"opt_in"},"runner_class":"scanner"}
+],"dag":{"edges":[]},"fingerprint":"0000000000000000000000000000000000000000000000000000000000000000"}
+JSON
+      export BRIK_PLAN_FILE="$plan_file"
+    }
+    cleanup_optin_plan() {
+      rm -rf "$OPTIN_DIR"
+      unset BRIK_PLAN_FILE BRIK_LOG_DIR BRIK_WORKSPACE
+    }
+    Before 'setup_optin_plan'
+    After  'cleanup_optin_plan'
+
+    It "uses legacy phrasing when the flag matches the stage id (deploy)"
+      When run script "$BRIK_BIN" plan gate deploy
+      The status should equal 1
+      The output should include "[SKIP] deploy: the --with-deploy flag was not passed"
+    End
+
+    It "uses legacy phrasing when the flag matches the stage id (package)"
+      When run script "$BRIK_BIN" plan gate package
+      The status should equal 1
+      The output should include "[SKIP] package: the --with-package flag was not passed"
+    End
+
+    It "names the target stage when the flag points at a dependency (container-scan)"
+      When run script "$BRIK_BIN" plan gate container-scan
+      The status should equal 1
+      The output should include "depends on the package stage"
+      The output should include "--with-package was not passed"
+      The output should include "both stages activate together"
+    End
+
+    It "does NOT mislead container-scan users with a flag named after the stage"
+      When run script "$BRIK_BIN" plan gate container-scan
+      The status should equal 1
+      The output should not include "the --with-container-scan flag"
+    End
+  End
+
   Describe "no plan file"
     It "defaults to run when BRIK_PLAN_FILE is unset"
       unset BRIK_PLAN_FILE

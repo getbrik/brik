@@ -277,10 +277,21 @@ cli.plan._reason_text() {
                 "$context" "$current_explain" "$req_contexts"
             ;;
         opt-in-flag-missing)
-            local flag
+            local flag flag_target
             flag="$(registry.stage.gate_opt_in_flag "$stage_id" 2>/dev/null)"
             if [[ -n "$flag" ]]; then
-                printf 'the %s flag was not passed (this stage is opt-in)' "$flag"
+                # --with-<x> activates stage <x>. When that target differs
+                # from the current stage (e.g. container-scan opts in via
+                # --with-package because it consumes the package livrable),
+                # spell out the dependency so users don't search for a
+                # --with-<stage_id> that does not exist.
+                flag_target="${flag#--with-}"
+                if [[ -n "$flag_target" && "$flag_target" != "$stage_id" ]]; then
+                    printf 'depends on the %s stage (skipped: %s was not passed; both stages activate together)' \
+                        "$flag_target" "$flag"
+                else
+                    printf 'the %s flag was not passed (this stage is opt-in)' "$flag"
+                fi
             else
                 printf 'the required opt-in flag was not passed'
             fi

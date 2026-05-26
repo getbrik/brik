@@ -68,7 +68,7 @@ JSON
       plan_decision="$(jq -r --arg s "$stage" \
         '.stages[] | select(.id == $s) | .decision' "$plan")"
       report_kind="$(jq -r --arg s "$stage" \
-        '.stages[] | select(.name == $s) | .tech.kind // ""' "$report")"
+        '.stages[] | select(.stage == $s) | .tech.kind // ""' "$report")"
       if [[ "$plan_decision" == "skip" && "$report_kind" != "not-applicable" ]]; then
         printf 'MISMATCH %s: plan=skip report_kind=%s\n' "$stage" "${report_kind:-empty}"
       elif [[ "$plan_decision" == "run" && "$report_kind" == "not-applicable" ]]; then
