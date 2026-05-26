@@ -1,28 +1,17 @@
 # Brik Init Stage
-# Detects stack, validates brik.yml, sets up environment.
-#
-# Init is not plan-gated: it is a blocking stage in every context and runs
-# unconditionally. It still depends on brik-plan so it shares the same
-# dependency edge as the rest of the flow.
+# Detects stack, validates brik.yml, sets up environment, and exports the
+# BRIK_IMG_<CLASS> dotenv variables consumed by every downstream job's
+# image: directive. Init is always-on (gate.mode=blocking + both contexts);
+# the gate inherited from .brik-stage is a no-op for init.
 
 brik-init:
+  extends: .brik-stage
   stage: init
+  image: ${BRIK_IMG_BASE}
+  variables:
+    BRIK_STAGE_ID: init
   needs:
-    - job: brik-plan
-      artifacts: true
-  script:
-    - bash -c '. /tmp/brik-bootstrap.sh && brik.gitlab.run_stage init'
-  artifacts:
-    when: always
-    paths:
-      - .brik-logs/
-      - brik-artifacts/
-    exclude:
-      - .brik-logs/*.lock
-      - .brik-logs/context-*
-    reports:
-      dotenv: .brik-logs/pipeline.env
-    expire_in: 1 week
+    - { job: brik-plan, artifacts: true }
   after_script:
     # The env file is produced by the post-stage projection hook from the
     # report env section (see lib/pipeline/stage.sh _stage.run._project_env).

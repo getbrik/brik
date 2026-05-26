@@ -1,24 +1,26 @@
 # Brik Test Stage
 # Runs tests via brik-lib. Runs in parallel with lint/sast/scan in verify stage.
+#
+# Artifacts override (extends doesn't merge): test adds junit + coverage
+# reports to the standard dotenv export.
 
 brik-test:
+  extends: .brik-stage
   stage: verify
+  image: ${BRIK_IMG_STACK}
+  variables:
+    BRIK_STAGE_ID: test
   # Generic regex that picks up the "[brik] coverage: XX.XX%" line emitted
   # by stages.test post-test (via lib/transverse/coverage.sh). One regex
   # works for all stacks because brik standardizes the summary line; the
   # underlying coverage file may be cobertura or jacoco.
   coverage: '/\[brik\] coverage: ([\d\.]+)%/'
   needs:
-    - job: brik-plan
-      artifacts: true
-    - job: brik-init
-      artifacts: true
-    - job: brik-build
-      artifacts: true
+    - { job: brik-plan,  artifacts: true }
+    - { job: brik-init,  artifacts: true }
+    - { job: brik-build, artifacts: true }
   cache:
     key: "${BRIK_BUILD_STACK}-${CI_COMMIT_REF_SLUG}"
-    # Synced from lib/stacks/_deps.sh::stacks.cache_paths.
-    # Drift caught by spec/integration/cache_paths_parity_spec.sh.
     paths:
       - .npm/
       - .cache/pip
@@ -32,23 +34,12 @@ brik-test:
       - "${BRIK_BUILD_STACK}-${CI_DEFAULT_BRANCH}"
       - "${BRIK_BUILD_STACK}-default"
     policy: pull
-  script:
-    - . /tmp/brik-plan-gate.sh test
-    - bash -c '. /tmp/brik-bootstrap.sh && brik.gitlab.run_stage test'
   artifacts:
     when: always
+    expire_in: 1 week
     reports:
-      # dotenv propagates pipeline.env keys as CI variables to downstream
-      # jobs (cf. spec/integration/gitlab_dotenv_parity_spec.sh).
       dotenv: .brik-logs/pipeline.env
       junit: ${BRIK_TEST_JUNIT_PATH:-brik-artifacts/test/junit.xml}
-      # GitLab schema-validates coverage_format at YAML-parse time and
-      # only accepts "cobertura" or "jacoco" -- variables resolved from
-      # an upstream job's dotenv arrive too late. We hardcode the
-      # cobertura defaults so python and dotnet projects get a coverage
-      # badge out of the box. Java users (jacoco) and any project with
-      # a non-default path can override at the project level; see
-      # shared-libs/gitlab/README.md for the override recipe.
       coverage_report:
         coverage_format: cobertura
         path: brik-artifacts/test/coverage/coverage.xml
@@ -58,4 +49,3 @@ brik-test:
     exclude:
       - .brik-logs/*.lock
       - .brik-logs/context-*
-    expire_in: 1 week

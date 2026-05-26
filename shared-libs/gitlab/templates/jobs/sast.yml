@@ -3,19 +3,17 @@
 # Runs in the analysis image (Python/Ruby runtime).
 
 brik-sast:
+  extends: .brik-stage
   stage: verify
-  image: "${BRIK_ANALYSIS_IMAGE}"
+  image: ${BRIK_IMG_ANALYSIS}
+  variables:
+    BRIK_STAGE_ID: sast
   needs:
-    - job: brik-plan
-      artifacts: true
-    - job: brik-init
-      artifacts: true
-    - job: brik-build
-      artifacts: true
+    - { job: brik-plan,  artifacts: true }
+    - { job: brik-init,  artifacts: true }
+    - { job: brik-build, artifacts: true }
   cache:
     key: "${BRIK_BUILD_STACK}-${CI_COMMIT_REF_SLUG}"
-    # Synced from lib/stacks/_deps.sh::stacks.cache_paths.
-    # Drift caught by spec/integration/cache_paths_parity_spec.sh.
     paths:
       - .npm/
       - .cache/pip
@@ -29,23 +27,3 @@ brik-sast:
       - "${BRIK_BUILD_STACK}-${CI_DEFAULT_BRANCH}"
       - "${BRIK_BUILD_STACK}-default"
     policy: pull
-  script:
-    - . /tmp/brik-plan-gate.sh sast
-    - bash -c '. /tmp/brik-bootstrap.sh && brik.gitlab.run_stage sast'
-  artifacts:
-    when: always
-    expire_in: 1 week
-    # reports.dotenv propagates pipeline.env keys as CI variables to
-    # downstream jobs (cf. spec/integration/gitlab_dotenv_parity_spec.sh).
-    # The SARIF file at brik-artifacts/sast/sast.sarif ships via paths
-    # below. Surfacing it in the GitLab Security tab requires Ultimate;
-    # the conditional overlay jobs/sast-reports.yml adds reports.sarif
-    # when CI_GITLAB_FEATURES advertises sast support.
-    reports:
-      dotenv: .brik-logs/pipeline.env
-    paths:
-      - .brik-logs/
-      - brik-artifacts/
-    exclude:
-      - .brik-logs/*.lock
-      - .brik-logs/context-*

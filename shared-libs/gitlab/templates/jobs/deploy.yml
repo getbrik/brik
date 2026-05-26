@@ -7,45 +7,18 @@
 # gracefully.
 
 brik-deploy:
+  extends: .brik-stage
   stage: deploy
-  image: ${BRIK_DEPLOY_IMAGE}
+  image: ${BRIK_IMG_DEPLOY}
+  variables:
+    BRIK_STAGE_ID: deploy
   needs:
-    - job: brik-plan
-      artifacts: true
-    - job: brik-init
-      artifacts: true
-    - job: brik-release
-      artifacts: true
-      optional: true
-    - job: brik-test
-    - job: brik-package
-      artifacts: true
-      optional: true
-    - job: brik-lint
-      artifacts: false
-      optional: true
-    - job: brik-sast
-      artifacts: false
-      optional: true
-    - job: brik-scan
-      artifacts: false
-      optional: true
-    - job: brik-container-scan
-      artifacts: false
-      optional: true
-  script:
-    - . /tmp/brik-plan-gate.sh deploy
-    - bash -c '. /tmp/brik-bootstrap.sh && brik.gitlab.run_stage deploy'
-  artifacts:
-    # reports.dotenv propagates pipeline.env keys as CI variables to
-    # downstream jobs (cf. spec/integration/gitlab_dotenv_parity_spec.sh).
-    reports:
-      dotenv: .brik-logs/pipeline.env
-    paths:
-      - .brik-logs/
-      - brik-artifacts/
-    exclude:
-      - .brik-logs/*.lock
-      - .brik-logs/context-*
-    when: always
-    expire_in: 1 week
+    - { job: brik-plan,           artifacts: true }
+    - { job: brik-init,           artifacts: true }
+    - { job: brik-release,        artifacts: true,  optional: true }
+    - { job: brik-test }
+    - { job: brik-package,        artifacts: true,  optional: true }
+    - { job: brik-lint,           artifacts: false, optional: true }
+    - { job: brik-sast,           artifacts: false, optional: true }
+    - { job: brik-scan,           artifacts: false, optional: true }
+    - { job: brik-container-scan, artifacts: false, optional: true }

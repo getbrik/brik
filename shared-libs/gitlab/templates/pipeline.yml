@@ -58,15 +58,22 @@ variables:
   BRIK_HOME: "/opt/brik"
   BRIK_LOG_LEVEL: "info"
   BRIK_PLATFORM: "gitlab"
+  # BRIK_CI_IMAGE is the default image for brik-plan (the first job, before
+  # init runs and posts its dotenv). init.sh later overrides it via dotenv
+  # for every downstream job with the stack-specific runner image.
+  #
+  # BRIK_IMG_BASE is the top-level default for the base class so brik-init
+  # itself can reference ${BRIK_IMG_BASE} in its image: directive (init is
+  # what posts the dotenv version, so it can't depend on its own output).
+  # init.sh re-exports BRIK_IMG_BASE via dotenv (idempotent, same value)
+  # so the contract is uniform across all downstream jobs.
+  #
+  # The other image classes (analysis/scanner/deploy) are NOT declared
+  # here: they are posted by init as BRIK_IMG_ANALYSIS/SCANNER/DEPLOY,
+  # sourced from lib/registry/runner_classes.yml (single SoT, Lot 3 of
+  # chantier 20260526). Downstream jobs use ${BRIK_IMG_<CLASS>} directly.
   BRIK_CI_IMAGE: "ghcr.io/getbrik/brik-runner-base:latest"
-  # Pinned base runner image, intentionally NOT overridden by init's
-  # stack-specific resolution. Used by the notify stage so the report
-  # rendering toolchain (glow for terminal-friendly markdown) is always
-  # available, regardless of the project's language stack.
-  BRIK_BASE_IMAGE: "ghcr.io/getbrik/brik-runner-base:latest"
-  BRIK_ANALYSIS_IMAGE: "ghcr.io/getbrik/brik-runner-analysis:latest"
-  BRIK_SCANNER_IMAGE: "ghcr.io/getbrik/brik-runner-scanner:latest"
-  BRIK_DEPLOY_IMAGE: "ghcr.io/getbrik/brik-runner-deploy:latest"
+  BRIK_IMG_BASE: "ghcr.io/getbrik/brik-runner-base:latest"
   # User-overridable pipeline inputs. The long form (value/description/options)
   # surfaces these in the "Run pipeline" UI form -- short-form variables are
   # used at runtime but stay invisible. `options` requires GitLab >= 15.7;
@@ -216,6 +223,10 @@ default:
 # Include job templates
 # ---------------------------------------------------------------------------
 include:
+  # Hidden template .brik-stage factoring out the gate + run_stage script
+  # and the artifacts contract. Must come first so the per-stage job
+  # includes below can resolve `extends: .brik-stage`.
+  - local: '/templates/_brik-stage.yml'
   - local: '/templates/jobs/plan.yml'
   - local: '/templates/jobs/init.yml'
   - local: '/templates/jobs/release.yml'

@@ -2,34 +2,30 @@
 # Container build + publish. The plan gates this stage on the --with-package
 # opt-in (resolved by brik-plan from CI_COMMIT_TAG / BRIK_WITH_PACKAGE).
 # Waits for all verify jobs to complete.
+#
+# Script override (extends doesn't merge): package adds a Docker CLI
+# installer between the gate and the run_stage so the container build
+# below has docker available even on Alpine/Debian runners that ship
+# without it. The runner image (stack class) intentionally omits docker
+# to stay slim; the per-job install is the cheap way to keep it optional.
 
 brik-package:
+  extends: .brik-stage
   stage: package
+  image: ${BRIK_IMG_STACK}
+  variables:
+    BRIK_STAGE_ID: package
   needs:
-    - job: brik-plan
-      artifacts: true
-    - job: brik-init
-      artifacts: true
-    - job: brik-release
-      artifacts: true
-      optional: true
-    - job: brik-build
-      artifacts: true
-    - job: brik-test
-      artifacts: true
-    - job: brik-lint
-      artifacts: false
-      optional: true
-    - job: brik-sast
-      artifacts: false
-      optional: true
-    - job: brik-scan
-      artifacts: false
-      optional: true
+    - { job: brik-plan,    artifacts: true }
+    - { job: brik-init,    artifacts: true }
+    - { job: brik-release, artifacts: true, optional: true }
+    - { job: brik-build,   artifacts: true }
+    - { job: brik-test,    artifacts: true }
+    - { job: brik-lint,    artifacts: false, optional: true }
+    - { job: brik-sast,    artifacts: false, optional: true }
+    - { job: brik-scan,    artifacts: false, optional: true }
   cache:
     key: "${BRIK_BUILD_STACK}-${CI_COMMIT_REF_SLUG}"
-    # Synced from lib/stacks/_deps.sh::stacks.cache_paths.
-    # Drift caught by spec/integration/cache_paths_parity_spec.sh.
     paths:
       - .npm/
       - .cache/pip
@@ -44,8 +40,8 @@ brik-package:
       - "${BRIK_BUILD_STACK}-default"
     policy: pull
   script:
-    - . /tmp/brik-plan-gate.sh package
-    # Install Docker CLI if socket is available (needed for docker build/push)
+    - . /tmp/brik-plan-gate.sh "${BRIK_STAGE_ID}"
+    # Install Docker CLI if the host socket is mounted but the binary is missing.
     - |
       if [ -S /var/run/docker.sock ] && ! command -v docker >/dev/null 2>&1; then
         echo "[brik] Installing Docker CLI..."
@@ -55,17 +51,4 @@ brik-package:
           apt-get update -qq && apt-get install -y -qq docker.io
         fi
       fi
-    - bash -c '. /tmp/brik-bootstrap.sh && brik.gitlab.run_stage package'
-  artifacts:
-    # reports.dotenv propagates pipeline.env keys as CI variables to
-    # downstream jobs (cf. spec/integration/gitlab_dotenv_parity_spec.sh).
-    reports:
-      dotenv: .brik-logs/pipeline.env
-    paths:
-      - .brik-logs/
-      - brik-artifacts/
-    exclude:
-      - .brik-logs/*.lock
-      - .brik-logs/context-*
-    when: always
-    expire_in: 1 week
+    - bash -c '. /tmp/brik-bootstrap.sh && brik.gitlab.run_stage "${BRIK_STAGE_ID}"'

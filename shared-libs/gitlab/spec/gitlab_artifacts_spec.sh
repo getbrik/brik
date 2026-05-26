@@ -1,5 +1,6 @@
 Describe "shared-libs/gitlab templates - brik-artifacts paths"
   TEMPLATES_DIR="${BRIK_HOME}/shared-libs/gitlab/templates/jobs"
+  BRIK_STAGE_TEMPLATE="${BRIK_HOME}/shared-libs/gitlab/templates/_brik-stage.yml"
 
   yq_missing() { ! command -v yq >/dev/null 2>&1; }
 
@@ -19,37 +20,94 @@ Describe "shared-libs/gitlab templates - brik-artifacts paths"
     yq -r ".${job_key}.artifacts.expire_in" "$file"
   }
 
-  # Stage jobs: brik-artifacts/ in paths, when=always, expire_in 1 week.
-  Describe "stage jobs declare brik-artifacts/ as an artifact path"
+  job_extends_brik_stage() {
+    local file="$1" job_key="$2"
+    [[ "$(yq -r ".${job_key}.extends" "$file")" == ".brik-stage" ]]
+  }
+
+  # After Lot 3 of chantier 20260526, the artifacts contract
+  # (brik-artifacts/ paths, when=always, expire_in 1 week) lives in the
+  # hidden .brik-stage template. Each stage job either inherits it via
+  # extends: .brik-stage (no local artifacts: override) OR overrides it
+  # for a stage-specific reason (build, scan, test, package, notify).
+  # The asserts here cover both paths so the parity contract still holds.
+
+  Describe ".brik-stage hidden template carries the standard artifacts contract"
+    It "lists brik-artifacts/ under .brik-stage.artifacts.paths"
+      Skip if "yq not installed" yq_missing
+      paths_includes() { yq -e '.[".brik-stage"].artifacts.paths | contains(["brik-artifacts/"])' "$BRIK_STAGE_TEMPLATE" >/dev/null 2>&1; }
+      When call paths_includes
+      The status should be success
+    End
+
+    It "uses artifacts.when: always"
+      Skip if "yq not installed" yq_missing
+      paths_when() { yq -r '.[".brik-stage"].artifacts.when' "$BRIK_STAGE_TEMPLATE"; }
+      When call paths_when
+      The output should equal "always"
+    End
+
+    It "uses artifacts.expire_in: 1 week"
+      Skip if "yq not installed" yq_missing
+      paths_expire() { yq -r '.[".brik-stage"].artifacts.expire_in' "$BRIK_STAGE_TEMPLATE"; }
+      When call paths_expire
+      The output should equal "1 week"
+    End
+  End
+
+  # 7 jobs inherit the artifacts contract from .brik-stage (no override).
+  # Verified by checking they extend .brik-stage AND don't redeclare artifacts.
+  Describe "jobs that inherit artifacts from .brik-stage"
     Parameters
       "init"           "brik-init"
       "release"        "brik-release"
-      "build"          "brik-build"
       "lint"           "brik-lint"
       "sast"           "brik-sast"
-      "scan"           "brik-scan"
-      "test"           "brik-test"
       "package"        "brik-package"
       "container-scan" "brik-container-scan"
+      "promote"        "brik-promote"
       "deploy"         "brik-deploy"
     End
 
-    It "$1.yml lists brik-artifacts/ under .$2.artifacts.paths"
+    It "$1.yml extends .brik-stage"
+      Skip if "yq not installed" yq_missing
+      When call job_extends_brik_stage "${TEMPLATES_DIR}/$1.yml" "$2"
+      The status should be success
+    End
+
+    It "$1.yml does NOT redeclare artifacts (inheritance preserves contract)"
+      Skip if "yq not installed" yq_missing
+      artifacts_kind() { yq -r ".${2}.artifacts | type" "${TEMPLATES_DIR}/${1}.yml"; }
+      When call artifacts_kind "$1" "$2"
+      The output should equal "!!null"
+    End
+  End
+
+  # 3 jobs override artifacts but must still ship brik-artifacts/ and use
+  # when=always (parity-critical fields). expire_in may differ (notify).
+  Describe "jobs that override artifacts (build/scan/test)"
+    Parameters
+      "build"   "brik-build"
+      "scan"    "brik-scan"
+      "test"    "brik-test"
+    End
+
+    It "$1.yml extends .brik-stage even with override"
+      Skip if "yq not installed" yq_missing
+      When call job_extends_brik_stage "${TEMPLATES_DIR}/$1.yml" "$2"
+      The status should be success
+    End
+
+    It "$1.yml override still ships brik-artifacts/"
       Skip if "yq not installed" yq_missing
       When call artifact_has_brik_artifacts "${TEMPLATES_DIR}/$1.yml" "$2"
       The status should be success
     End
 
-    It "$1.yml uses artifacts.when: always"
+    It "$1.yml override still uses artifacts.when: always"
       Skip if "yq not installed" yq_missing
       When call artifact_when_always "${TEMPLATES_DIR}/$1.yml" "$2"
       The status should be success
-    End
-
-    It "$1.yml uses artifacts.expire_in: 1 week"
-      Skip if "yq not installed" yq_missing
-      When call artifact_expire_in "${TEMPLATES_DIR}/$1.yml" "$2"
-      The output should equal "1 week"
     End
   End
 

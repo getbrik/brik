@@ -2,57 +2,34 @@
 # Prints pipeline summary and aggregates the per-stage report fragments
 # (including the not-applicable fragments written by the plan gate of
 # skipped stages). Always runs regardless of previous stage results.
+#
+# Artifacts override (extends doesn't merge): notify adds a custom name
+# (downloadable as aggregate-report-<pipeline-id>), expire_in: 1 month
+# (longer retention than the per-stage 1 week), and the GitLab SAST
+# report (gl-sast-report.json) which surfaces findings in the MR widget
+# on non-Ultimate instances. The Ultimate per-stage SARIF overlay
+# (sast-reports.yml) is additive on top of this.
 
 brik-notify:
+  extends: .brik-stage
   stage: notify
-  # Force the base runner image so glow (markdown-to-terminal renderer) is
-  # available, regardless of the stack-specific image that init resolved for
-  # build/lint/test/etc. Matches the Jenkins runInBase('notify') convention.
-  image: "${BRIK_BASE_IMAGE}"
-  needs:
-    - job: brik-plan
-      artifacts: true
-    - job: brik-init
-      artifacts: true
-    - job: brik-release
-      artifacts: true
-      optional: true
-    - job: brik-build
-      artifacts: true
-      optional: true
-    - job: brik-lint
-      artifacts: true
-      optional: true
-    - job: brik-sast
-      artifacts: true
-      optional: true
-    - job: brik-scan
-      artifacts: true
-      optional: true
-    - job: brik-test
-      artifacts: true
-      optional: true
-    - job: brik-package
-      artifacts: true
-      optional: true
-    - job: brik-container-scan
-      artifacts: true
-      optional: true
-    - job: brik-promote
-      artifacts: true
-      optional: true
-    - job: brik-deploy
-      artifacts: true
-      optional: true
-  script:
-    - bash -c '. /tmp/brik-bootstrap.sh && brik.gitlab.run_stage notify'
+  image: ${BRIK_IMG_BASE}
+  variables:
+    BRIK_STAGE_ID: notify
   when: always
-  # Expose the pipeline report written by stages.notify so it is reachable
-  # via the GitLab job artifact URL (suitable for Slack/email links later).
-  # Publish the GitLab SAST report (gl-sast-report.json) alongside the
-  # aggregate SARIF so non-Ultimate instances surface findings in the MR
-  # widget. Ultimate instances keep their per-stage SARIF overlay via the
-  # sast-reports.yml job; the aggregate is additive.
+  needs:
+    - { job: brik-plan,           artifacts: true }
+    - { job: brik-init,           artifacts: true }
+    - { job: brik-release,        artifacts: true,  optional: true }
+    - { job: brik-build,          artifacts: true,  optional: true }
+    - { job: brik-lint,           artifacts: true,  optional: true }
+    - { job: brik-sast,           artifacts: true,  optional: true }
+    - { job: brik-scan,           artifacts: true,  optional: true }
+    - { job: brik-test,           artifacts: true,  optional: true }
+    - { job: brik-package,        artifacts: true,  optional: true }
+    - { job: brik-container-scan, artifacts: true,  optional: true }
+    - { job: brik-promote,        artifacts: true,  optional: true }
+    - { job: brik-deploy,         artifacts: true,  optional: true }
   artifacts:
     when: always
     expire_in: 1 month
@@ -64,10 +41,5 @@ brik-notify:
       - .brik-logs/*.lock
       - .brik-logs/context-*
     reports:
-      # dotenv propagates pipeline.env keys as CI variables to downstream
-      # jobs (cf. spec/integration/gitlab_dotenv_parity_spec.sh). Notify
-      # is the terminal stage of the fixed flow today, so no consumer
-      # downstream of brik-notify exists -- the declaration is kept for
-      # parity uniformity and future-proofing (retries).
       dotenv: .brik-logs/pipeline.env
       sast: brik-artifacts/gl-sast-report.json

@@ -1,30 +1,15 @@
 # Brik Release Stage
 # Computes semantic version. The plan gates this stage to the release
 # context (a tag push): on a snapshot pipeline `brik plan gate release`
-# records a not-applicable fragment and the job exits 0.
+# (inherited from .brik-stage) records a not-applicable fragment and
+# the job exits 0.
 
 brik-release:
+  extends: .brik-stage
   stage: release
+  image: ${BRIK_IMG_BASE}
+  variables:
+    BRIK_STAGE_ID: release
   needs:
-    - job: brik-plan
-      artifacts: true
-    - job: brik-init
-      artifacts: true
-  script:
-    - . /tmp/brik-plan-gate.sh release
-    - bash -c '. /tmp/brik-bootstrap.sh && brik.gitlab.run_stage release'
-  artifacts:
-    # reports.dotenv propagates pipeline.env keys (e.g. BRIK_APP_VERSION
-    # exported by release) as CI variables to downstream jobs. Required on
-    # every brik stage for GitLab to see the cumulative pipeline.env at
-    # YAML-parse time (cf. spec/integration/gitlab_dotenv_parity_spec.sh).
-    reports:
-      dotenv: .brik-logs/pipeline.env
-    paths:
-      - .brik-logs/
-      - brik-artifacts/
-    exclude:
-      - .brik-logs/*.lock
-      - .brik-logs/context-*
-    when: always
-    expire_in: 1 week
+    - { job: brik-plan, artifacts: true }
+    - { job: brik-init, artifacts: true }

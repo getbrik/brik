@@ -3,14 +3,15 @@
 # Runs in the CI (stack) image alongside SAST, Scan, and Test (all in verify stage).
 
 brik-lint:
+  extends: .brik-stage
   stage: verify
+  image: ${BRIK_IMG_STACK}
+  variables:
+    BRIK_STAGE_ID: lint
   needs:
-    - job: brik-plan
-      artifacts: true
-    - job: brik-init
-      artifacts: true
-    - job: brik-build
-      artifacts: true
+    - { job: brik-plan,  artifacts: true }
+    - { job: brik-init,  artifacts: true }
+    - { job: brik-build, artifacts: true }
   cache:
     key: "${BRIK_BUILD_STACK}-${CI_COMMIT_REF_SLUG}"
     # Synced from lib/stacks/_deps.sh::stacks.cache_paths.
@@ -28,19 +29,3 @@ brik-lint:
       - "${BRIK_BUILD_STACK}-${CI_DEFAULT_BRANCH}"
       - "${BRIK_BUILD_STACK}-default"
     policy: pull
-  script:
-    - . /tmp/brik-plan-gate.sh lint
-    - bash -c '. /tmp/brik-bootstrap.sh && brik.gitlab.run_stage lint'
-  artifacts:
-    when: always
-    expire_in: 1 week
-    # reports.dotenv propagates pipeline.env keys as CI variables to
-    # downstream jobs (cf. spec/integration/gitlab_dotenv_parity_spec.sh).
-    reports:
-      dotenv: .brik-logs/pipeline.env
-    paths:
-      - .brik-logs/
-      - brik-artifacts/
-    exclude:
-      - .brik-logs/*.lock
-      - .brik-logs/context-*

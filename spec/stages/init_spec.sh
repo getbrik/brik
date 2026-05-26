@@ -36,27 +36,27 @@ Describe "stages.init"
   jv_missing() { ! command -v jv >/dev/null 2>&1; }
 
   read_init_stack() {
-    jq -r '.stages[] | select(.name == "init") | .tech.stack // empty' \
+    jq -r '.stages[] | select(.stage == "init") | .tech.stack // empty' \
       "$BRIK_LOG_DIR/aggregate-report.json" 2>/dev/null
   }
 
   read_init_tech() {
     local key="$1"
     jq -r --arg k "$key" \
-      '.stages[] | select(.name == "init") | .tech[$k] // empty' \
+      '.stages[] | select(.stage == "init") | .tech[$k] // empty' \
       "$BRIK_LOG_DIR/aggregate-report.json" 2>/dev/null
   }
 
   read_init_business() {
     local key="$1"
     jq -r --arg k "$key" \
-      '.stages[] | select(.name == "init") | .business[$k] // empty' \
+      '.stages[] | select(.stage == "init") | .business[$k] // empty' \
       "$BRIK_LOG_DIR/aggregate-report.json" 2>/dev/null
   }
 
   read_init_business_path() {
     local path="$1"
-    jq -r ".stages[] | select(.name == \"init\") | .business${path} // empty" \
+    jq -r ".stages[] | select(.stage == \"init\") | .business${path} // empty" \
       "$BRIK_LOG_DIR/aggregate-report.json" 2>/dev/null
   }
   Before 'setup_env'
@@ -118,7 +118,7 @@ Describe "stages.init"
       local ctx
       ctx="$(context.create "init")" 2>/dev/null || ctx="$(mktemp)"
       stages.init "$ctx" >/dev/null 2>&1 || return $?
-      jq -c '.stages[] | select(.name == "init") | .tech.config_valid' \
+      jq -c '.stages[] | select(.stage == "init") | .tech.config_valid' \
         "$BRIK_LOG_DIR/aggregate-report.json"
     }
     When call run_init_config_valid
@@ -130,7 +130,7 @@ Describe "stages.init"
       local ctx
       ctx="$(context.create "init")" 2>/dev/null || ctx="$(mktemp)"
       stages.init "$ctx" >/dev/null 2>&1 || return $?
-      jq -c '.stages[] | select(.name == "init") | .tech.prereqs_present | {yq, jq}' \
+      jq -c '.stages[] | select(.stage == "init") | .tech.prereqs_present | {yq, jq}' \
         "$BRIK_LOG_DIR/aggregate-report.json"
     }
     When call run_init_prereqs
@@ -168,7 +168,7 @@ Describe "stages.init"
       local ctx
       ctx="$(context.create "init")" 2>/dev/null || ctx="$(mktemp)"
       stages.init "$ctx" >/dev/null 2>&1 || return $?
-      jq -c '.stages[] | select(.name == "init") | .business.commit' \
+      jq -c '.stages[] | select(.stage == "init") | .business.commit' \
         "$BRIK_LOG_DIR/aggregate-report.json"
     }
     When call run_init_commit
@@ -234,7 +234,7 @@ Describe "stages.init"
       local ctx
       ctx="$(context.create "init")" 2>/dev/null || ctx="$(mktemp)"
       stages.init "$ctx" >/dev/null 2>&1 || return $?
-      jq -c '.stages[] | select(.name == "init") | .business.commit | has("author")' \
+      jq -c '.stages[] | select(.stage == "init") | .business.commit | has("author")' \
         "$BRIK_LOG_DIR/aggregate-report.json"
     }
     When call run_init_commit_author_omitted
@@ -248,7 +248,7 @@ Describe "stages.init"
       local ctx
       ctx="$(context.create "init")" 2>/dev/null || ctx="$(mktemp)"
       stages.init "$ctx" >/dev/null 2>&1 || return $?
-      jq -c '.stages[] | select(.name == "init") | .business.pipeline' \
+      jq -c '.stages[] | select(.stage == "init") | .business.pipeline' \
         "$BRIK_LOG_DIR/aggregate-report.json"
     }
     When call run_init_pipeline_ref
@@ -424,7 +424,7 @@ Describe "stages.init"
     read_init_env() {
       local key="$1"
       jq -r --arg k "$key" \
-        '.stages[] | select(.name == "init") | .env[$k] // empty' \
+        '.stages[] | select(.stage == "init") | .env[$k] // empty' \
         "$BRIK_LOG_DIR/aggregate-report.json" 2>/dev/null
     }
 
@@ -446,11 +446,19 @@ Describe "stages.init"
         local ctx
         ctx="$(context.create "init")" 2>/dev/null || ctx="$(mktemp)"
         stages.init "$ctx" >/dev/null 2>&1 || return $?
-        jq -r '.stages[] | select(.name == "init") | .env | keys | sort | join(",")' \
+        jq -r '.stages[] | select(.stage == "init") | .env | keys | sort | join(",")' \
           "$BRIK_LOG_DIR/aggregate-report.json"
       }
       When call run_init_records_all_env_keys
-      The output should equal "BRIK_BUILD_STACK,BRIK_BUILD_STACK_VERSION,BRIK_CI_IMAGE,BRIK_DEPLOY_ENABLED,BRIK_GIT_USER_EMAIL,BRIK_GIT_USER_NAME,BRIK_IS_CANDIDATE,BRIK_PACKAGE_ENABLED,BRIK_PROJECT_NAME,BRIK_PROJECT_VERSION,BRIK_RELEASE_PROFILE,BRIK_TEST_COVERAGE_DIR,BRIK_TEST_COVERAGE_FORMAT,BRIK_TEST_JUNIT_PATH,BRIK_TEST_REPORTS_ENABLED"
+      # Lot 3 of chantier 20260526 added 5 runner-image keys (BRIK_IMG_*)
+      # to expose the runner_classes.yml mapping as CI variables for
+      # downstream GitLab jobs' image: directives. Pushes the per-job
+      # dotenv past GitLab's default 20-variable propagation limit;
+      # briklab raises the PlanLimit to 50 via
+      # briklab/scripts/lib/setup/gitlab.sh::configure_dotenv_limit.
+      # Adopters consuming Brik with a stock GitLab must apply the same
+      # bump (documented in chantier 20260526).
+      The output should equal "BRIK_BUILD_STACK,BRIK_BUILD_STACK_VERSION,BRIK_CI_IMAGE,BRIK_DEPLOY_ENABLED,BRIK_GIT_USER_EMAIL,BRIK_GIT_USER_NAME,BRIK_IMG_ANALYSIS,BRIK_IMG_BASE,BRIK_IMG_DEPLOY,BRIK_IMG_SCANNER,BRIK_IMG_STACK,BRIK_IS_CANDIDATE,BRIK_PACKAGE_ENABLED,BRIK_PROJECT_NAME,BRIK_PROJECT_VERSION,BRIK_RELEASE_PROFILE,BRIK_TEST_COVERAGE_DIR,BRIK_TEST_COVERAGE_FORMAT,BRIK_TEST_JUNIT_PATH,BRIK_TEST_REPORTS_ENABLED"
     End
 
     It "no longer creates brik-init.env"
@@ -477,7 +485,9 @@ Describe "stages.init"
         wc -l < "$BRIK_PIPELINE_ENV" | tr -d ' '
       }
       When call run_init_projects_all_keys
-      The output should equal "15"
+      # 15 legacy + 5 runner-image keys (BRIK_IMG_BASE/STACK/ANALYSIS/SCANNER/DEPLOY)
+      # added by Lot 3 of chantier 20260526.
+      The output should equal "20"
     End
   End
 

@@ -1,21 +1,23 @@
 # Brik Scan Stage
-# Security scanning: dependency vulnerabilities (osv-scanner/grype), secrets (gitleaks/trufflehog).
-# Runs in the scanner image (Go binaries).
+# Security scanning: dependency vulnerabilities (osv-scanner/grype),
+# secrets (gitleaks/trufflehog). Runs in the scanner image (Go binaries).
+#
+# Artifacts override (extends doesn't merge): scan adds the CycloneDX SBOM
+# report to the standard dotenv export. cyclonedx is free since GitLab
+# 15.6 and surfaces as a Dependency List entry in the project.
 
 brik-scan:
+  extends: .brik-stage
   stage: verify
-  image: "${BRIK_SCANNER_IMAGE}"
+  image: ${BRIK_IMG_SCANNER}
+  variables:
+    BRIK_STAGE_ID: scan
   needs:
-    - job: brik-plan
-      artifacts: true
-    - job: brik-init
-      artifacts: true
-    - job: brik-build
-      artifacts: true
+    - { job: brik-plan,  artifacts: true }
+    - { job: brik-init,  artifacts: true }
+    - { job: brik-build, artifacts: true }
   cache:
     key: "${BRIK_BUILD_STACK}-${CI_COMMIT_REF_SLUG}"
-    # Synced from lib/stacks/_deps.sh::stacks.cache_paths.
-    # Drift caught by spec/integration/cache_paths_parity_spec.sh.
     paths:
       - .npm/
       - .cache/pip
@@ -29,20 +31,11 @@ brik-scan:
       - "${BRIK_BUILD_STACK}-${CI_DEFAULT_BRANCH}"
       - "${BRIK_BUILD_STACK}-default"
     policy: pull
-  script:
-    - . /tmp/brik-plan-gate.sh scan
-    - bash -c '. /tmp/brik-bootstrap.sh && brik.gitlab.run_stage scan'
   artifacts:
     when: always
     expire_in: 1 week
     reports:
-      # dotenv propagates pipeline.env keys as CI variables to downstream
-      # jobs (cf. spec/integration/gitlab_dotenv_parity_spec.sh).
       dotenv: .brik-logs/pipeline.env
-      # cyclonedx is free since GitLab 15.6 and surfaces as a Dependency
-      # List entry in the project. SARIF reports for deps/secret require
-      # Ultimate; the conditional overlay jobs/scan-reports.yml adds
-      # reports.sarif when CI_GITLAB_FEATURES advertises support.
       cyclonedx:
         - brik-artifacts/scan/sbom.cdx.json
     paths:

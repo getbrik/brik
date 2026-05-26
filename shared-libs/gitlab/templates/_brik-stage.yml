@@ -1,0 +1,33 @@
+# Brik GitLab - hidden template factoring out the script + artifacts
+# contract shared by every standard stage job (Lot 3 of chantier
+# 20260526_pipeline-invariants-centralization.md).
+#
+# Each jobs/<id>.yml extends this template and only declares its own
+# image, stage, BRIK_STAGE_ID variable, and needs[]. The plan gate and
+# brik.gitlab.run_stage invocation are inherited from the script: block
+# below.
+#
+# Notes:
+#   - The gate sits at script[0] (not before_script) because the
+#     default.before_script block in pipeline.yml generates the
+#     /tmp/brik-plan-gate.sh helper; overriding before_script at the
+#     job level would discard that bootstrap.
+#   - artifacts.reports.dotenv is enforced everywhere so the pipeline.env
+#     propagation contract holds across all jobs (parity check at
+#     spec/integration/gitlab_dotenv_parity_spec.sh).
+
+.brik-stage:
+  script:
+    - . /tmp/brik-plan-gate.sh "${BRIK_STAGE_ID}"
+    - bash -c '. /tmp/brik-bootstrap.sh && brik.gitlab.run_stage "${BRIK_STAGE_ID}"'
+  artifacts:
+    when: always
+    expire_in: 1 week
+    paths:
+      - .brik-logs/
+      - brik-artifacts/
+    exclude:
+      - .brik-logs/*.lock
+      - .brik-logs/context-*
+    reports:
+      dotenv: .brik-logs/pipeline.env

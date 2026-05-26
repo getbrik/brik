@@ -2,20 +2,20 @@
 # Compiles/builds the project via brik-lib.
 #
 # Cache strategy: dependency download caches are saved here (pull-push).
-# Downstream stages (test, quality, security) use pull-only policy.
-# All cache paths are listed -- only those populated by the active stack are cached.
-# Node uses --cache .npm (no env var needed); other stacks use env vars from pipeline.yml.
+# Downstream stages (test, lint, security) use pull-only policy.
+# Artifacts override (extends doesn't merge): build adds dist/build/target/
+# alongside the standard .brik-logs/+brik-artifacts/ from .brik-stage.
 
 brik-build:
+  extends: .brik-stage
   stage: build
+  image: ${BRIK_IMG_STACK}
+  variables:
+    BRIK_STAGE_ID: build
   needs:
-    - job: brik-plan
-      artifacts: true
-    - job: brik-init
-      artifacts: true
-    - job: brik-release
-      artifacts: true
-      optional: true
+    - { job: brik-plan,    artifacts: true }
+    - { job: brik-init,    artifacts: true }
+    - { job: brik-release, artifacts: true, optional: true }
   cache:
     key: "${BRIK_BUILD_STACK}-${CI_COMMIT_REF_SLUG}"
     # Synced from lib/stacks/_deps.sh::stacks.cache_paths.
@@ -34,13 +34,12 @@ brik-build:
       - "${BRIK_BUILD_STACK}-default"
     policy: pull-push
     when: always
-  script:
-    - . /tmp/brik-plan-gate.sh build
-    - bash -c '. /tmp/brik-bootstrap.sh && brik.gitlab.run_stage build'
+  # Artifacts override .brik-stage's defaults so build outputs ship to
+  # downstream consumers (package, deploy). We re-declare the standard
+  # paths/exclude/dotenv plus the build-specific paths and exclusions.
   artifacts:
     when: always
-    # reports.dotenv propagates pipeline.env keys as CI variables to
-    # downstream jobs (cf. spec/integration/gitlab_dotenv_parity_spec.sh).
+    expire_in: 1 week
     reports:
       dotenv: .brik-logs/pipeline.env
     paths:
@@ -58,4 +57,3 @@ brik-build:
       - node_modules/
       - .venv/
       - __pycache__/
-    expire_in: 1 week

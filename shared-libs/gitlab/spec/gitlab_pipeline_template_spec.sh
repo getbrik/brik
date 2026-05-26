@@ -19,10 +19,20 @@ Describe "shared-libs/gitlab templates - classic plan-aware pipeline"
       The output should equal "plan"
     End
 
-    It "includes the brik-plan job template first"
+    It "includes _brik-stage.yml first so per-stage jobs can extend it"
       Skip if "yq not installed" yq_missing
       first_include() { yq -r '.include[0].local' "$PIPELINE"; }
       When call first_include
+      # Lot 3 of chantier 20260526: _brik-stage.yml carries the factored
+      # script + artifacts contract and must be loaded before any job
+      # that references it via extends:.
+      The output should equal "/templates/_brik-stage.yml"
+    End
+
+    It "includes the brik-plan job template second (after _brik-stage)"
+      Skip if "yq not installed" yq_missing
+      second_include() { yq -r '.include[1].local' "$PIPELINE"; }
+      When call second_include
       The output should equal "/templates/jobs/plan.yml"
     End
 
@@ -61,8 +71,25 @@ Describe "shared-libs/gitlab templates - classic plan-aware pipeline"
     End
   End
 
-  Describe "gateable stage jobs source the plan gate first"
+  # After Lot 3 of chantier 20260526 the gate is factored into the hidden
+  # template .brik-stage. Standard jobs inherit it; package overrides
+  # script (Docker install) but still calls the gate as its first step;
+  # init/notify also inherit the gate but it's a no-op for them (always-on
+  # contexts in their manifests).
+  Describe "the plan gate is factored in .brik-stage"
+    BRIK_STAGE_TEMPLATE="${TEMPLATES_DIR}/_brik-stage.yml"
+
+    It ".brik-stage script[0] sources /tmp/brik-plan-gate.sh"
+      Skip if "yq not installed" yq_missing
+      gate_step() { yq -r '.[".brik-stage"].script[0]' "$BRIK_STAGE_TEMPLATE"; }
+      When call gate_step
+      The output should include "brik-plan-gate.sh"
+    End
+  End
+
+  Describe "stage jobs depend on brik-plan via needs"
     Parameters
+      "init"
       "release"
       "build"
       "lint"
@@ -73,13 +100,7 @@ Describe "shared-libs/gitlab templates - classic plan-aware pipeline"
       "container-scan"
       "promote"
       "deploy"
-    End
-
-    It "job brik-$1 gates on the plan as its first script step"
-      Skip if "yq not installed" yq_missing
-      gate_step() { yq -r ".brik-$1.script[0]" "${JOBS_DIR}/$1.yml"; }
-      When call gate_step "$1"
-      The output should equal ". /tmp/brik-plan-gate.sh $1"
+      "notify"
     End
 
     It "job brik-$1 depends on brik-plan"
@@ -88,15 +109,12 @@ Describe "shared-libs/gitlab templates - classic plan-aware pipeline"
     End
   End
 
-  Describe "always-on jobs are not plan-gated"
-    Parameters
-      "init"
-      "notify"
-    End
-
-    It "job brik-$1 has no plan gate"
-      When run grep -qF ". /tmp/brik-plan-gate.sh" "${JOBS_DIR}/$1.yml"
-      The status should be failure
+  Describe "package overrides script but still sources the plan gate first"
+    It "package.yml first script step calls the gate"
+      Skip if "yq not installed" yq_missing
+      gate_step() { yq -r '.["brik-package"].script[0]' "${JOBS_DIR}/package.yml"; }
+      When call gate_step
+      The output should include "brik-plan-gate.sh"
     End
   End
 End

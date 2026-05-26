@@ -321,7 +321,32 @@ _stages.init._record_env_section() {
     _kv BRIK_PROJECT_NAME        "$(config.get '.project.name' 'unnamed')"
     _kv BRIK_BUILD_STACK         "${BRIK_BUILD_STACK:-auto}"
     _kv BRIK_BUILD_STACK_VERSION "$(config.get '.project.stack_version' '')"
-    _kv BRIK_CI_IMAGE            "$(_stages.init._resolve_runner_image)"
+    local _stack_image
+    _stack_image="$(_stages.init._resolve_runner_image)"
+    _kv BRIK_CI_IMAGE            "$_stack_image"
+
+    # Runner image map (Lot 3 of chantier 20260526). Each runner_class
+    # declared in lib/registry/runner_classes.yml is exposed as a CI
+    # variable so downstream GitLab jobs can substitute ${BRIK_IMG_<CLASS>}
+    # in their image: directive without hardcoding the OCI path. The
+    # Jenkins adapter (Lot 4) consumes the same SoT via
+    # brikDriver.resolveImage. BRIK_IMG_STACK aliases BRIK_CI_IMAGE for
+    # symmetric naming with the other classes.
+    #
+    # Note: 5 image vars + 15 base vars = 20 keys. GitLab's default
+    # dotenv_variables PlanLimit is 20, hit as soon as release adds
+    # BRIK_NEXT_VERSION. briklab raises this to 50 in
+    # scripts/lib/setup/gitlab.sh::configure_dotenv_limit. Adopters
+    # consuming Brik with a stock GitLab must apply the same bump
+    # (documented in chantier 20260526).
+    _kv BRIK_IMG_STACK           "$_stack_image"
+    brik.use registry.registry 2>/dev/null || true
+    if declare -f registry.runner_class.image >/dev/null 2>&1; then
+        _kv BRIK_IMG_BASE     "$(registry.runner_class.image base     2>/dev/null)"
+        _kv BRIK_IMG_ANALYSIS "$(registry.runner_class.image analysis 2>/dev/null)"
+        _kv BRIK_IMG_SCANNER  "$(registry.runner_class.image scanner  2>/dev/null)"
+        _kv BRIK_IMG_DEPLOY   "$(registry.runner_class.image deploy   2>/dev/null)"
+    fi
 
     # Legacy quality and security gating env vars (BRIK_LINT_ENABLED,
     # BRIK_SAST_ENABLED, ...) are no longer emitted: stages always run
