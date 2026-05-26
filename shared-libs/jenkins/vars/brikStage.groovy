@@ -14,10 +14,11 @@
  *            aggregate-report.json; warnings do not fail the job.
  */
 def call(String stageName, String brikHome) {
-    def validStages = ['init', 'release', 'build', 'lint', 'sast', 'scan', 'test', 'package', 'container-scan', 'deploy', 'notify']
-    if (!validStages.contains(stageName)) {
-        error("brikStage: unknown stage '${stageName}'. Valid: ${validStages.join(', ')}")
-    }
+    // Stage name validation removed in Lot 4 of chantier 20260526: the
+    // registry is the single source of truth for stage ids, and
+    // brik.jenkins.run_stage validates against it natively. A duplicated
+    // hardcoded list here was the exact drift pattern the chantier
+    // closes (it had omitted promote, surfacing as the trigger bug).
 
     def rc
     withEnv(["BRIK_HOME=${brikHome}", "BRIK_STAGE_NAME=${stageName}"]) {

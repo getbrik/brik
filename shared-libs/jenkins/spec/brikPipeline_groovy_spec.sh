@@ -48,5 +48,102 @@ Describe "shared-libs/jenkins brikPipeline.groovy - artifact layout"
       The status should be success
       The output should be present
     End
+
+    # When recordIssues was invoked in Verify with aggregate.sarif as a
+    # pattern, the Warnings NG plugin logged `[-ERROR-] No files found
+    # for pattern 'brik-artifacts/aggregate.sarif'` on every build (the
+    # aggregate is produced later, by notify). The fix splits the calls:
+    # per-stage SARIFs stay in Verify, the aggregate moves to the Notify
+    # try-block where the file already exists.
+    It "records the aggregate.sarif AFTER the notify invocation, not before"
+      # Anchor on line numbers: every sarif(pattern: '..aggregate.sarif')
+      # line must be located strictly below the runInBase('notify') call.
+      # If aggregate.sarif still appeared in the Verify-side recordIssues
+      # (which is before notify), this check would fail.
+      check_aggregate_below_notify() {
+        local notify_line aggregate_pattern_line
+        notify_line=$(grep -n "runInBase('notify')" "$GROOVY" | head -1 | cut -d: -f1)
+        aggregate_pattern_line=$(grep -n "pattern: 'brik-artifacts/aggregate.sarif'" "$GROOVY" | head -1 | cut -d: -f1)
+        [[ -n "$notify_line" && -n "$aggregate_pattern_line" \
+           && "$aggregate_pattern_line" -gt "$notify_line" ]]
+      }
+      When call check_aggregate_below_notify
+      The status should be success
+    End
+
+    It "wraps the aggregate recordIssues in try/catch with a dedicated skip message"
+      When call grep -F "recordIssues aggregate skipped" "$GROOVY"
+      The status should be success
+      The output should be present
+    End
+  End
+
+  Describe "deterministic Notify unstash messages"
+    It "no longer emits the speculative 'likely skipped' phrasing"
+      When call grep -F "(likely skipped)" "$GROOVY"
+      The status should not equal 0
+    End
+
+    It "reads plan.json via env.BRIK_PLAN_FILE in the Notify unstash catch block"
+      When call grep -F "env.BRIK_PLAN_FILE" "$GROOVY"
+      The status should be success
+      The output should be present
+    End
+
+    It "emits a 'skipped per plan (reason=...)' message when the plan decided skip"
+      When call grep -F "skipped per plan (reason=" "$GROOVY"
+      The status should be success
+      The output should be present
+    End
+
+    It "distinguishes 'plan=run but no artifact' from 'skipped per plan'"
+      When call grep -F "no stash found despite plan=run" "$GROOVY"
+      The status should be success
+      The output should be present
+    End
+
+    It "still degrades gracefully when plan.json is unreadable"
+      When call grep -F "plan decision unknown" "$GROOVY"
+      The status should be success
+      The output should be present
+    End
+  End
+
+  # When notify fails (business.status = error), wfapi must report the
+  # Notify stage as FAILED -- not SUCCESS -- so consumers reading the
+  # stage statuses are consistent with the build result. catchError is
+  # the idiomatic Pipeline construct that achieves this without aborting
+  # the surrounding archiveArtifacts call.
+  Describe "Notify stage marks itself FAILURE on notify failure"
+    It "uses catchError around runInBase('notify') instead of a swallowing try/catch"
+      When call grep -F "catchError(message: '[brik] notify stage signalled failure'" "$GROOVY"
+      The status should be success
+      The output should be present
+    End
+
+    It "propagates the failure to both stageResult and buildResult"
+      When call grep -F "stageResult: 'FAILURE', buildResult: 'FAILURE'" "$GROOVY"
+      The status should be success
+      The output should be present
+    End
+
+    It "no longer mutates currentBuild.result manually around notify"
+      # The legacy block set currentBuild.result = 'FAILURE' inside a
+      # try/catch around runInBase('notify'). catchError handles both
+      # results now, so the manual mutation should be gone.
+      check_no_manual_mutation() {
+        # Allow currentBuild.result elsewhere in the file but not on the
+        # line immediately following 'notify stage signalled failure'.
+        awk '
+          /notify stage signalled failure/ { found=NR; window=NR+6 }
+          found && NR > found && NR <= window && /currentBuild\.result *= *.FAILURE/ {
+            print "leak at line " NR; bad=1
+          }
+          END { exit (bad ? 1 : 0) }
+        ' "$GROOVY"
+      }
+      When call check_no_manual_mutation
+      The status should equal 0
+    End
   End
 End

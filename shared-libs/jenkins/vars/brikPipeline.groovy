@@ -268,8 +268,13 @@ def call(Map params = [:]) {
                 if (!env.BRIK_PLAN_FILE?.trim()) {
                     return true
                 }
+                // BRIK_WORKSPACE must be exported so the gate's SKIP
+                // fragment lands in the job workspace (see same fix in
+                // vars/brikDriver.groovy::planSaysRun for the loop path).
                 def rc = sh(
-                    script: "${brikHome}/bin/brik plan gate '${stageId}'",
+                    script: "BRIK_WORKSPACE='${env.WORKSPACE}' " +
+                            "BRIK_LOG_DIR='${env.WORKSPACE}/.brik-logs' " +
+                            "${brikHome}/bin/brik plan gate '${stageId}'",
                     returnStatus: true
                 )
                 return rc == 0
@@ -305,43 +310,37 @@ def call(Map params = [:]) {
 
                 def initEnv = brikReadDotenv("${env.WORKSPACE}/.brik-logs/pipeline.env")
                 resolvedImage = initEnv['BRIK_CI_IMAGE'] ?: ''
-                if (resolvedImage) {
-                    docker.image(resolvedImage).pull()
+                // No explicit docker.image().pull(): the briklab Docker
+                // daemon is seeded by scripts/lib/setup/sync-brik-images.sh
+                // and the subsequent docker.image().inside() reuses the
+                // local cache. The previous unconditional pull failed
+                // every offline build on a transient ghcr.io issue even
+                // though the image was cached locally.
+
+                // Propagate init's dotenv into Jenkins env so brikDriver
+                // helpers (resolveImage) can substitute ${BRIK_IMG_<CLASS>}
+                // without re-reading the file. GitLab gets this for free
+                // via artifacts.reports.dotenv; Jenkins needs the explicit
+                // bridge because dotenv is not a Jenkins-native concept.
+                ['BRIK_CI_IMAGE',
+                 'BRIK_IMG_STACK',
+                 'BRIK_IMG_BASE',
+                 'BRIK_IMG_ANALYSIS',
+                 'BRIK_IMG_SCANNER',
+                 'BRIK_IMG_DEPLOY'].each { k ->
+                    if (initEnv[k]) {
+                        env[k] = initEnv[k]
+                    }
                 }
 
                 // Plan stage (D.5b). Produces .brik-logs/plan.json and
-                // points the gate helpers at it via BRIK_PLAN_FILE. Runs
-                // on the master without Docker because the planner only
-                // needs jq/yq/git (already on the Jenkins agent). A
-                // planner failure is non-fatal: we echo and fall back to
-                // the legacy unconditional flow.
+                // points the gate helpers at it via BRIK_PLAN_FILE.
                 runStageWithReporting('Plan') {
-                    // Mirror gitlab/_plan.yml's flag resolution. The planner
-                    // defaults gate release/package/deploy off; the wrapper
-                    // is responsible for translating CI context into the
-                    // matching --with-* flags:
-                    //   - tag context (BRIK_TAG or TAG_NAME set) -> release+package
-                    //   - BRIK_WITH_DEPLOY=true                  -> deploy
-                    //   - BRIK_WITH_RELEASE/PACKAGE override for finer control.
                     def tagSet = (env.BRIK_TAG?.trim() || env.TAG_NAME?.trim()) as boolean
                     def planOpts = []
-                    if (tagSet || env.BRIK_WITH_RELEASE == 'true') {
-                        planOpts << '--with-release'
-                    }
-                    if (tagSet || env.BRIK_WITH_PACKAGE == 'true') {
-                        planOpts << '--with-package'
-                    }
-                    if (env.BRIK_WITH_DEPLOY == 'true') {
-                        planOpts << '--with-deploy'
-                    }
-                    // The planner derives context (release vs snapshot) from
-                    // BRIK_COMMIT_TAG, with BRIK_TAG as a final fallback (see
-                    // _pipeline.detect_metadata). On a Multibranch tag scan
-                    // Jenkins sets TAG_NAME but not BRIK_TAG, so the planner
-                    // would otherwise classify a tag build as snapshot and
-                    // reject release with context-mismatch even when the
-                    // opt-in flag matches. Bridge the two so the planner
-                    // sees the same context the wrapper does.
+                    if (tagSet || env.BRIK_WITH_RELEASE == 'true') { planOpts << '--with-release' }
+                    if (tagSet || env.BRIK_WITH_PACKAGE == 'true') { planOpts << '--with-package' }
+                    if (env.BRIK_WITH_DEPLOY  == 'true')           { planOpts << '--with-deploy' }
                     if (env.TAG_NAME?.trim() && !env.BRIK_TAG?.trim()) {
                         env.BRIK_TAG = env.TAG_NAME
                     }
@@ -357,71 +356,85 @@ def call(Map params = [:]) {
                     }
                 }
 
-                // release: gate-at-platform on tag presence. Two routes:
-                //   - Multibranch tag-scan: Jenkins sets env.TAG_NAME on
-                //     the build automatically.
-                //   - pipelineJob (briklab fixtures): the harness passes
-                //     BRIK_TAG via buildWithParameters; Jenkins exposes
-                //     parameters as env vars to subsequent steps but the
-                //     `params` map is only populated after this build's
-                //     `properties([parameters(...)])` block completes, so
-                //     params.BRIK_TAG reads null on the first stage even
-                //     when env.BRIK_TAG is already "v0.1.0". Check env
-                //     directly to cover both routes.
-                if (env.TAG_NAME?.trim() || env.BRIK_TAG?.trim()) {
-                    runStageWithPlan('Release', 'release') { runStage('release') }
-                }
-                runStageWithPlan('Build', 'build')          { runStage('build') }
-                runStageWithReporting('Verify') {
-                    // Verify groups four checks; the gate applies per child
-                    // so a docs-only commit can skip individual scanners
-                    // without dropping the whole Verify stage.
-                    parallel(
-                        'Lint': { if (planSaysRun('lint')) { runStage('lint') }      else { echo "[brik] [SKIP] lint: per plan";  stashBrikArtifacts('lint') } },
-                        'SAST': { if (planSaysRun('sast')) { runInAnalysis('sast') } else { echo "[brik] [SKIP] sast: per plan";  stashBrikArtifacts('sast') } },
-                        'Scan': { if (planSaysRun('scan')) { runInScanner('scan') }  else { echo "[brik] [SKIP] scan: per plan";  stashBrikArtifacts('scan') } },
-                        'Test': { if (planSaysRun('test')) { runStage('test') }      else { echo "[brik] [SKIP] test: per plan";  stashBrikArtifacts('test') } }
-                    )
-                    // brik-artifacts/test/junit/**/*.xml covers the Java surefire/gradle layout;
-                    // brik-artifacts/test/junit.xml covers node/python/dotnet.
-                    junit testResults: 'brik-artifacts/test/junit.xml,brik-artifacts/test/junit/**/*.xml',
-                          allowEmptyResults: true
-                    // Surface SARIF findings in the Warnings NG dashboard
-                    // (Jenkins free / community plugin). Wrapped in try/catch
-                    // so instances without Warnings NG installed log a notice
-                    // and continue; the SARIF files still ship as build
-                    // artifacts via archiveArtifacts below.
-                    //
-                    // The aggregate.sarif (chantier 20260508 P6) merges every
-                    // stage's findings.sarif into one document and is the
-                    // preferred Warnings NG source. Per-stage entries stay as
-                    // a fallback so the dashboard still surfaces findings on
-                    // pipelines that ran before the notify stage produced the
-                    // aggregate (e.g. early-fail builds).
-                    try {
-                        recordIssues(
-                            enabledForFailure: true,
-                            aggregatingResults: true,
-                            tools: [
-                                sarif(pattern: 'brik-artifacts/aggregate.sarif',
-                                      id: 'brik-aggregate', name: 'Brik findings (aggregate)'),
-                                sarif(pattern: 'brik-artifacts/sast/sast.sarif',
-                                      id: 'brik-sast',   name: 'SAST (semgrep)'),
-                                sarif(pattern: 'brik-artifacts/scan/deps.sarif',
-                                      id: 'brik-deps',   name: 'Dependencies (osv-scanner)'),
-                                sarif(pattern: 'brik-artifacts/scan/secret.sarif',
-                                      id: 'brik-secret', name: 'Secrets (gitleaks)')
-                            ]
-                        )
-                    } catch (Exception e) {
-                        echo "[brik] recordIssues skipped (Warnings NG plugin unavailable): ${e.message}"
+                // Generic stage iteration driven by `brik registry stages`
+                // (Lot 4 of chantier 20260526). The driver returns the
+                // 12 stages of the fixed flow in topological order with
+                // their runner_class, parallel_group, and needs. We
+                // iterate, batching consecutive stages of the same
+                // parallel_group (currently only 'verify': lint/sast/scan/test)
+                // into a single parallel{} block. init, plan, and notify
+                // are handled out-of-band (init/plan already ran above;
+                // notify is in the finally block below). Stage-specific
+                // pre-work that does NOT fit the generic loop -- the
+                // verify post-block (junit + recordIssues), the deploy
+                // kubeconfig prep -- is dispatched inline by id.
+                def stages = brikDriver.stagesList(brikHome)
+                def stashCallback = { sid -> stashBrikArtifacts(sid) }
+                def i = 0
+                while (i < stages.size()) {
+                    def s = stages[i]
+                    def sid = s.id
+
+                    if (sid in ['init', 'notify']) { i++; continue }
+
+                    // release runs only when a tag triggered the build.
+                    if (sid == 'release' && !(env.TAG_NAME?.trim() || env.BRIK_TAG?.trim())) {
+                        i++; continue
                     }
-                }
-                runStageWithPlan('Package', 'package')              { runStage('package') }
-                runStageWithPlan('Container Scan', 'container-scan') { runInScanner('container-scan') }
-                runStageWithPlan('Deploy', 'deploy') {
-                    sh 'mkdir -p "${WORKSPACE}/.kube" && cp /opt/brik/kubeconfig "${WORKSPACE}/.kube/config" 2>/dev/null || true'
-                    runInDeploy('deploy')
+
+                    // Parallel group: collect all consecutive stages of the
+                    // same group and run them in a parallel{} block, with a
+                    // single Jenkins stage() wrapper named after the group.
+                    if (s.parallel_group && i + 1 < stages.size() && stages[i + 1].parallel_group == s.parallel_group) {
+                        def groupName = s.parallel_group
+                        def group = []
+                        while (i < stages.size() && stages[i].parallel_group == groupName) {
+                            group << stages[i]
+                            i++
+                        }
+                        runStageWithReporting(groupName.capitalize()) {
+                            parallel(brikDriver.parallelStages(group, brikHome, dockerArgs, stashCallback))
+                            // verify post-block: junit + Warnings NG SARIF surfacing.
+                            // These hang off the verify group only; other parallel
+                            // groups (if any are added later) won't have this.
+                            if (groupName == 'verify') {
+                                junit testResults: 'brik-artifacts/test/junit.xml,brik-artifacts/test/junit/**/*.xml',
+                                      allowEmptyResults: true
+                                try {
+                                    recordIssues(
+                                        enabledForFailure: true,
+                                        aggregatingResults: true,
+                                        tools: [
+                                            sarif(pattern: 'brik-artifacts/sast/sast.sarif',
+                                                  id: 'brik-sast',   name: 'SAST (semgrep)'),
+                                            sarif(pattern: 'brik-artifacts/scan/deps.sarif',
+                                                  id: 'brik-deps',   name: 'Dependencies (osv-scanner)'),
+                                            sarif(pattern: 'brik-artifacts/scan/secret.sarif',
+                                                  id: 'brik-secret', name: 'Secrets (gitleaks)')
+                                        ]
+                                    )
+                                } catch (Exception e) {
+                                    echo "[brik] recordIssues skipped (Warnings NG plugin unavailable): ${e.message}"
+                                }
+                            }
+                        }
+                        continue
+                    }
+
+                    // Single sequential stage.
+                    runStageWithPlan(s.display_name, sid) {
+                        if (sid == 'deploy') {
+                            // Deploy needs the kubeconfig in the workspace
+                            // (mounted into the deploy runner image at /root/.kube).
+                            sh 'mkdir -p "${WORKSPACE}/.kube" && cp /opt/brik/kubeconfig "${WORKSPACE}/.kube/config" 2>/dev/null || true'
+                            runInDeploy(sid)
+                        } else {
+                            def image = brikDriver.resolveImage(s.runner_class, resolvedImage)
+                            brikRunStage(image: image, stageName: sid, brikHome: brikHome, dockerArgs: dockerArgs)
+                        }
+                        stashBrikArtifacts(sid)
+                    }
+                    i++
                 }
             } finally {
                 // Notify always runs, even on upstream failure. Inner
@@ -429,30 +442,83 @@ def call(Map params = [:]) {
                 // SUCCESS into a FAILURE.
                 stage('Notify') {
                     try {
-                        ['init', 'release', 'build', 'lint', 'sast', 'scan',
-                         'test', 'package', 'container-scan', 'deploy'].each { s ->
+                        // Consult plan.json to turn an unstash miss into a
+                        // deterministic message: the planner has already
+                        // decided run-vs-skip for each stage at the Plan
+                        // step, so "likely" speculation is unwarranted.
+                        // Returns [decision: run|skip|unknown, reason: ...].
+                        def planDecisionForStage = { sid ->
+                            if (!env.BRIK_PLAN_FILE || !fileExists(env.BRIK_PLAN_FILE)) {
+                                return [decision: 'unknown', reason: 'no-plan-file']
+                            }
+                            def out = sh(
+                                script: """jq -r --arg id '${sid}' '(.stages[]? | select(.id == \$id)) | "\\(.decision // "unknown")|\\(.reason // "")"' '${env.BRIK_PLAN_FILE}' 2>/dev/null || echo 'unknown|read-error'""",
+                                returnStdout: true
+                            ).trim()
+                            if (!out) { return [decision: 'unknown', reason: 'not-in-plan'] }
+                            def parts = out.split('\\|', 2)
+                            return [decision: parts[0] ?: 'unknown',
+                                    reason:   parts.length > 1 ? parts[1] : '']
+                        }
+                        // Unstash list derived from the registry (Lot 4 of
+                        // chantier 20260526). Adding a stage to the
+                        // registry now propagates here automatically; no
+                        // more hardcoded list to forget like the original
+                        // omission of promote that triggered the chantier.
+                        // notify is excluded: it is THIS stage so no stash
+                        // exists yet.
+                        brikDriver.stagesList(brikHome).collect { it.id }
+                            .findAll { it != 'notify' }
+                            .each { s ->
                             try {
                                 unstash "brik-artifacts-${s}"
                             } catch (Exception ue) {
-                                echo "[brik] no stash for ${s} (likely skipped)"
+                                def d = planDecisionForStage(s)
+                                if (d.decision == 'skip') {
+                                    echo "[brik] ${s}: skipped per plan (reason=${d.reason ?: 'unspecified'})"
+                                } else if (d.decision == 'run') {
+                                    echo "[brik] ${s}: no stash found despite plan=run (stage likely failed before producing artifacts)"
+                                } else {
+                                    echo "[brik] ${s}: no stash, plan decision unknown (${d.reason ?: 'unspecified'})"
+                                }
                             }
                         }
-                        try {
+                        // catchError lets the surrounding stage report
+                        // FAILURE in wfapi (instead of swallowing the
+                        // exception and showing SUCCESS for a stage that
+                        // actually failed), while still letting the
+                        // archiveArtifacts call below run. The notify
+                        // stage doubles as the pipeline gatekeeper: it
+                        // exits non-zero whenever the aggregate-report's
+                        // business.status is "error" (a real product
+                        // failure). Publishing the proof
+                        // (aggregate-report.json) must survive that exit
+                        // so CI parity diffs against GitLab (which
+                        // always uploads artifacts regardless of job
+                        // exit code) remain possible.
+                        catchError(message: '[brik] notify stage signalled failure',
+                                   stageResult: 'FAILURE', buildResult: 'FAILURE') {
                             runInBase('notify')
-                        } catch (Exception ne) {
-                            // The notify stage doubles as the pipeline
-                            // gatekeeper: it exits non-zero whenever the
-                            // aggregate-report's business.status is
-                            // "error" (a real product failure). Catch
-                            // that here so the archiveArtifacts call
-                            // below still runs -- without it, the
-                            // brik-artifacts/aggregate-report.json that
-                            // proves the failure is never published,
-                            // which makes CI parity diffs against GitLab
-                            // (where artifacts upload regardless of job
-                            // exit code) impossible.
-                            echo "[brik] notify stage signalled failure: ${ne.message}"
-                            currentBuild.result = 'FAILURE'
+                        }
+                        // aggregate.sarif now exists (notify writes it).
+                        // Recording it here, rather than in Verify, avoids
+                        // the misleading "[-ERROR-] No files found for
+                        // pattern 'brik-artifacts/aggregate.sarif'" line
+                        // that polluted every build before this split.
+                        // On early-fail builds (notify never reached), the
+                        // per-stage SARIFs already registered in Verify
+                        // remain visible in the Warnings NG dashboard.
+                        try {
+                            recordIssues(
+                                enabledForFailure: true,
+                                aggregatingResults: false,
+                                tools: [
+                                    sarif(pattern: 'brik-artifacts/aggregate.sarif',
+                                          id: 'brik-aggregate', name: 'Brik findings (aggregate)')
+                                ]
+                            )
+                        } catch (Exception are) {
+                            echo "[brik] recordIssues aggregate skipped (Warnings NG plugin unavailable): ${are.message}"
                         }
                         archiveArtifacts artifacts: 'brik-artifacts/**/*,.brik-logs/**/*',
                             excludes: '.brik-logs/*.lock,.brik-logs/context-*',
