@@ -490,7 +490,7 @@ Describe "local-wrapper.sh"
     It "runs notify stage and prints summary"
       When call brik.local.run_stage "notify"
       The status should be success
-      The output should include "Pipeline Summary"
+      The output should include "Pipeline Report"
       The error should be present
     End
   End
@@ -569,19 +569,17 @@ MOCKEOF
       The error should be present
     End
 
-    It "skips release/package/deploy/notify by default"
+    It "skips release/package/deploy by default (notify always runs)"
       check_skipped() {
         local output
         output="$(brik.local.run_pipeline 2>/dev/null)"
-        local release_line package_line deploy_line notify_line
+        local release_line package_line deploy_line
         release_line="$(echo "$output" | grep -F "release")"
         package_line="$(echo "$output" | grep -F "package")"
         deploy_line="$(echo "$output" | grep -F "deploy")"
-        notify_line="$(echo "$output" | grep -F "notify")"
         if echo "$release_line" | grep -qF "SKIP" && \
            echo "$package_line" | grep -qF "SKIP" && \
-           echo "$deploy_line" | grep -qF "SKIP" && \
-           echo "$notify_line" | grep -qF "SKIP"; then
+           echo "$deploy_line" | grep -qF "SKIP"; then
           echo "all_skipped"
         else
           echo "not_all_skipped"

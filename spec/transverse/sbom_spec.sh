@@ -121,7 +121,7 @@ Describe "transverse/sbom.sh"
     It "unions distinct components (osv uuid + lodash)"
       run_merge_components() {
         sbom.merge "${MERGE_DIR}/out.cdx.json" "${MERGE_DIR}/a.cdx.json" "${MERGE_DIR}/b.cdx.json"
-        jq -c '.components | map(.stage) | sort' "${MERGE_DIR}/out.cdx.json"
+        jq -c '.components | map(.name) | sort' "${MERGE_DIR}/out.cdx.json"
       }
       When call run_merge_components
       The output should equal '["lodash","uuid"]'

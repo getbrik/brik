@@ -15,9 +15,9 @@ Describe "report.render_terminal"
       started_at: "2026-01-01T00:00:00+0000",
       finished_at: "2026-01-01T00:00:05+0000",
       stages: [
-        { name: "init",  tech: { status: "success", duration_ms: "1000" }, business: {} },
-        { name: "build", tech: { status: "success", duration_ms: "2000" }, business: {} },
-        { name: "lint",  tech: { status: "skipped" },                       business: {} }
+        { stage: "init",  tech: { status: "success", duration_ms: "1000" }, business: {} },
+        { stage: "build", tech: { status: "success", duration_ms: "2000" }, business: {} },
+        { stage: "lint",  tech: { status: "skipped" },                       business: {} }
       ]
     }' > "$REPORT_FILE"
   }
@@ -54,8 +54,8 @@ Describe "report.render_terminal"
         started_at: "2026-01-01T00:00:00+0000",
         finished_at: "2026-01-01T00:00:02+0000",
         stages: [
-          { name: "init",  tech: { status: "success", duration_ms: "1000" }, business: {} },
-          { name: "build", tech: { status: "failed",  duration_ms: "2000" }, business: {} }
+          { stage: "init",  tech: { status: "success", duration_ms: "1000" }, business: {} },
+          { stage: "build", tech: { status: "failed",  duration_ms: "2000" }, business: {} }
         ]
       }' > "$report"
       local output
@@ -80,10 +80,10 @@ Describe "report.render_terminal"
         started_at: "2026-01-01T00:00:00+0000",
         finished_at: "2026-01-01T00:00:04+0000",
         stages: [
-          { name: "init",  tech: { status: "success", duration_ms: "1000" }, business: {} },
-          { name: "build", tech: { status: "failed",  duration_ms: "2000" }, business: {} },
-          { name: "lint",  tech: { status: "success", duration_ms: "1000" }, business: {} },
-          { name: "scan",  tech: { status: "skipped" },                       business: {} }
+          { stage: "init",  tech: { status: "success", duration_ms: "1000" }, business: {} },
+          { stage: "build", tech: { status: "failed",  duration_ms: "2000" }, business: {} },
+          { stage: "lint",  tech: { status: "success", duration_ms: "1000" }, business: {} },
+          { stage: "scan",  tech: { status: "skipped" },                       business: {} }
         ]
       }' > "$report"
       local output

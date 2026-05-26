@@ -43,6 +43,9 @@ _report._require_jq() {
 
 # Create (or overwrite) the aggregate-report.json skeleton.
 # Uses BRIK_RUN_ID as pipeline_id (falls back to epoch-pid if unset).
+# Stamps pipeline.{id,project,platform,commit_ref,started_at} from the
+# environment so the local backend carries the same identity surface as the
+# CI aggregate (single-stage paths via stage.dispatch lazy-init also benefit).
 report.init() {
     _report._require_jq || return "$?"
 
@@ -58,11 +61,29 @@ report.init() {
     local pipeline_id="${BRIK_RUN_ID:-$(date +%s)-$$}"
     local started_at
     started_at="$(date +"%Y-%m-%dT%H:%M:%S%z")"
+    local platform="${BRIK_PLATFORM:-local}"
+    local project="${BRIK_PROJECT_NAME:-unnamed}"
+    local commit_ref="${BRIK_COMMIT_REF:-}"
 
     jq -n \
         --arg pid "$pipeline_id" \
         --arg started "$started_at" \
-        '{ pipeline_id: $pid, started_at: $started, finished_at: null, stages: [] }' \
+        --arg project "$project" \
+        --arg platform "$platform" \
+        --arg commit_ref "$commit_ref" \
+        '{
+            pipeline_id: $pid,
+            started_at: $started,
+            finished_at: null,
+            pipeline: {
+                id: $pid,
+                project: $project,
+                platform: $platform,
+                started_at: $started,
+                commit_ref: (if $commit_ref == "" then null else $commit_ref end)
+            },
+            stages: []
+        }' \
         > "$backend" || {
         log.error "cannot initialize report: $backend"
         return "$BRIK_EXIT_IO_FAILURE"
@@ -1336,7 +1357,7 @@ report.render_terminal() {
 
     # Extract per-stage rows as TAB-separated: name<TAB>status<TAB>duration_ms
     local rows
-    rows="$(jq -r '.stages[] | [.name, (.tech.status // "skipped"), (.tech.duration_ms // "0")] | @tsv' "$report_path")" || {
+    rows="$(jq -r '.stages[] | [.stage, (.tech.status // "skipped"), (.tech.duration_ms // "0")] | @tsv' "$report_path")" || {
         log.warn "failed to parse pipeline report: $report_path"
         return "$BRIK_EXIT_FAILURE"
     }

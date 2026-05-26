@@ -417,7 +417,7 @@ Describe "jenkins-wrapper.sh"
     It "runs notify stage and prints project name in summary"
       When call brik.jenkins.run_stage "notify"
       The status should be success
-      The output should include "Pipeline Summary"
+      The output should include "Pipeline Report"
       The output should include "test-project"
       The error should be present
     End

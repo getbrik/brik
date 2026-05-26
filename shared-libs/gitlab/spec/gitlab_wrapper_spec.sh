@@ -518,15 +518,18 @@ Describe "gitlab-wrapper.sh"
     It "runs notify stage and prints project name in summary"
       When call brik.gitlab.run_stage "notify"
       The status should be success
-      The output should include "Pipeline Summary"
+      The output should include "Pipeline Report"
       The output should include "test-project"
       The error should be present
     End
 
     It "runs notify stage and uses BRIK_COMMIT_REF"
-      When call brik.gitlab.run_stage "notify"
-      The output should include "main"
-      The error should be present
+      check_commit_ref() {
+        brik.gitlab.run_stage "notify" >/dev/null 2>&1
+        jq -r '.pipeline.commit_ref // empty' "${BRIK_LOG_DIR}/aggregate-report.json"
+      }
+      When call check_commit_ref
+      The output should equal "main"
     End
 
     # --- Release stage ---

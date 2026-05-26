@@ -202,7 +202,7 @@ YAML
       local ctx
       ctx="$(context.create "deploy")" 2>/dev/null || ctx="$(mktemp)"
       stages.deploy "$ctx" >/dev/null 2>&1
-      jq -c '.stages[] | select(.stage == "deploy") | .business.environments | map(.stage)' \
+      jq -c '.stages[] | select(.stage == "deploy") | .business.environments | map(.name)' \
         "$BRIK_LOG_DIR/aggregate-report.json"
     }
     When call run_deploy_skipped_excluded

@@ -42,12 +42,13 @@ readonly _BRIK_LOG_LEVEL_ERROR=3
 # source of truth (render.sh); the per-call decision to *emit* them is
 # kept inside this module via _log._color_enabled, which preserves the
 # logging-specific overrides (BRIK_LOG_FORCE_COLOR / BRIK_LOG_NO_COLOR).
-readonly _BRIK_C_RESET="$(BRIK_RENDER_FORCE_COLOR=1 render.color reset)"
-readonly _BRIK_C_DIM="$(BRIK_RENDER_FORCE_COLOR=1 render.color dim)"
-readonly _BRIK_C_RED="$(BRIK_RENDER_FORCE_COLOR=1 render.color red)"
-readonly _BRIK_C_GREEN="$(BRIK_RENDER_FORCE_COLOR=1 render.color green)"
-readonly _BRIK_C_YELLOW="$(BRIK_RENDER_FORCE_COLOR=1 render.color yellow)"
-readonly _BRIK_C_BLUE="$(BRIK_RENDER_FORCE_COLOR=1 render.color blue)"
+_BRIK_C_RESET="$(BRIK_RENDER_FORCE_COLOR=1 render.color reset)"
+_BRIK_C_DIM="$(BRIK_RENDER_FORCE_COLOR=1 render.color dim)"
+_BRIK_C_RED="$(BRIK_RENDER_FORCE_COLOR=1 render.color red)"
+_BRIK_C_GREEN="$(BRIK_RENDER_FORCE_COLOR=1 render.color green)"
+_BRIK_C_YELLOW="$(BRIK_RENDER_FORCE_COLOR=1 render.color yellow)"
+_BRIK_C_BLUE="$(BRIK_RENDER_FORCE_COLOR=1 render.color blue)"
+readonly _BRIK_C_RESET _BRIK_C_DIM _BRIK_C_RED _BRIK_C_GREEN _BRIK_C_YELLOW _BRIK_C_BLUE
 
 # Resolve the numeric threshold from BRIK_LOG_LEVEL.
 # `success` maps to INFO so it filters identically.
