@@ -341,6 +341,103 @@ registry.stage.impact_use_stack_impact() {
   printf '%s\n' "${_REGISTRY_STAGE_IMPACT_USE_STACK_IMPACT[$id]:-}"
 }
 
+# --- Runner class accessors ---
+#
+# Read lib/registry/runner_classes.yml to resolve the OCI image attached to
+# each runner.class declared on a stage manifest (spec.runner.class). Single
+# source of truth consumed identically by the GitLab adapter (via dotenv
+# exported by init: BRIK_IMG_<CLASS>) and the Jenkins adapter (via
+# brikDriver.resolveImage). Avoids the previous duplication where image
+# paths were hardcoded in both pipeline.yml and brikPipeline.groovy.
+#
+# The 'stack' class is dynamic: its image is computed by init from the
+# project's stack (node/python/...) and exposed via the env var declared
+# under classes.stack.image_env (BRIK_CI_IMAGE).
+
+_BRIK_RUNNER_CLASSES_YML="${BASH_SOURCE[0]%/*}/runner_classes.yml"
+
+# Resolve a runner_class id to its full OCI image reference.
+#
+# For a static class, prints "<image>:<tag>" using the values declared in
+# runner_classes.yml.
+# For a dynamic class (declares image_env instead of image), prints the
+# current value of the environment variable named by image_env; fails when
+# that variable is unset or empty.
+#
+# Returns:
+#   0 on successful resolution
+#   BRIK_EXIT_INVALID_INPUT  unknown class, missing argument, or required
+#                            env var unset for a dynamic class
+#   BRIK_EXIT_IO_FAILURE     runner_classes.yml not found
+#   BRIK_EXIT_MISSING_DEP    yq not on PATH
+#
+# Usage: registry.runner_class.image <class>
+registry.runner_class.image() {
+  local class="${1:-}"
+  if [[ -z "$class" ]]; then
+    printf '[registry] runner_class.image: class id required\n' >&2
+    return "$BRIK_EXIT_INVALID_INPUT"
+  fi
+  if [[ ! -f "$_BRIK_RUNNER_CLASSES_YML" ]]; then
+    printf '[registry] runner_classes.yml not found: %s\n' \
+      "$_BRIK_RUNNER_CLASSES_YML" >&2
+    return "$BRIK_EXIT_IO_FAILURE"
+  fi
+  command -v yq >/dev/null 2>&1 || {
+    printf '[registry] yq required for runner_class.image\n' >&2
+    return "$BRIK_EXIT_MISSING_DEP"
+  }
+
+  # Dynamic case: classes.<class>.image_env declares an env var name.
+  local image_env
+  image_env="$(yq -r ".classes.\"$class\".image_env // \"\"" \
+                "$_BRIK_RUNNER_CLASSES_YML" 2>/dev/null)"
+  if [[ -n "$image_env" ]]; then
+    local resolved="${!image_env:-}"
+    if [[ -z "$resolved" ]]; then
+      printf '[registry] runner_class.image: class %s requires %s (unset)\n' \
+        "$class" "$image_env" >&2
+      return "$BRIK_EXIT_INVALID_INPUT"
+    fi
+    printf '%s\n' "$resolved"
+    return 0
+  fi
+
+  # Static case: <image>:<tag>.
+  local image tag
+  image="$(yq -r ".classes.\"$class\".image // \"\"" \
+            "$_BRIK_RUNNER_CLASSES_YML" 2>/dev/null)"
+  if [[ -z "$image" ]]; then
+    printf '[registry] runner_class.image: unknown class: %s\n' "$class" >&2
+    return "$BRIK_EXIT_INVALID_INPUT"
+  fi
+  tag="$(yq -r ".classes.\"$class\".tag // \"latest\"" \
+          "$_BRIK_RUNNER_CLASSES_YML" 2>/dev/null)"
+  printf '%s:%s\n' "$image" "$tag"
+}
+
+# Print the declared runner_class ids, one per line, in YAML insertion
+# order (matches the source file's structure).
+#
+# Returns:
+#   0 on success
+#   BRIK_EXIT_IO_FAILURE     runner_classes.yml not found
+#   BRIK_EXIT_MISSING_DEP    yq not on PATH
+#
+# Usage: registry.runner_class.list
+registry.runner_class.list() {
+  if [[ ! -f "$_BRIK_RUNNER_CLASSES_YML" ]]; then
+    printf '[registry] runner_classes.yml not found: %s\n' \
+      "$_BRIK_RUNNER_CLASSES_YML" >&2
+    return "$BRIK_EXIT_IO_FAILURE"
+  fi
+  command -v yq >/dev/null 2>&1 || {
+    printf '[registry] yq required for runner_class.list\n' >&2
+    return "$BRIK_EXIT_MISSING_DEP"
+  }
+  yq -r '.classes | keys | .[]' "$_BRIK_RUNNER_CLASSES_YML"
+}
+
 registry.explain() {
   _registry._load || return $?
   printf 'apiVersion: brik.dev/registry/v1\n'

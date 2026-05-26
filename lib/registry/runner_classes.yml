@@ -1,0 +1,26 @@
+apiVersion: brik.dev/v1
+kind: RunnerClassRegistry
+metadata:
+  description: |
+    Mapping from runner.class (declared in stage manifests under
+    spec.runner.class) to the OCI image used by orchestrators to run the
+    stage. Single source of truth consumed by both GitLab and Jenkins
+    adapters via registry.runner_class.image.
+classes:
+  base:
+    image: ghcr.io/getbrik/brik-runner-base
+    tag: latest
+  stack:
+    # Dynamic: image is computed by the init stage from the project's stack
+    # (node/python/java/...) and posted via .brik-logs/pipeline.env. The
+    # registry.runner_class.image helper reads $BRIK_CI_IMAGE for this class.
+    image_env: BRIK_CI_IMAGE
+  analysis:
+    image: ghcr.io/getbrik/brik-runner-analysis
+    tag: latest
+  scanner:
+    image: ghcr.io/getbrik/brik-runner-scanner
+    tag: latest
+  deploy:
+    image: ghcr.io/getbrik/brik-runner-deploy
+    tag: latest
