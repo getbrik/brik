@@ -129,11 +129,22 @@ Describe "git.sh"
       GIT_DIR="$(mktemp -d)"
       cd "$GIT_DIR" || return 1
       git init -q
-      # Use a sandbox HOME so we never touch the host ~/.gitconfig
+      # Use a sandbox HOME so we never touch the host ~/.gitconfig.
+      # spec_helper.sh sets GIT_CONFIG_GLOBAL=/dev/null globally to isolate
+      # tests from the developer's gpgsign config, but this test exercises
+      # 'git config --global' which must write to a real file -- restore
+      # HOME-based discovery by unsetting the override.
+      unset GIT_CONFIG_GLOBAL
       export HOME="$GIT_DIR"
       unset BRIK_GIT_USER_EMAIL BRIK_GIT_USER_NAME
     }
-    cleanup_identity_repo() { rm -rf "$GIT_DIR"; cd /tmp || true; unset HOME; }
+    cleanup_identity_repo() {
+      rm -rf "$GIT_DIR"
+      cd /tmp || true
+      unset HOME
+      # Restore the spec_helper isolation default.
+      export GIT_CONFIG_GLOBAL=/dev/null
+    }
     Before 'setup_identity_repo'
     After 'cleanup_identity_repo'
 
@@ -350,15 +361,15 @@ Describe "git.sh"
 
     It "returns the most recent tag matching --pattern"
       run_latest_pattern() {
-        git tag v1.0.0
+        git -c tag.gpgsign=false -c tag.forceSignAnnotated=false tag v1.0.0
         printf 'a\n' >> file.txt
         git add file.txt
         git commit -q -m "b"
-        git tag rc-5
+        git -c tag.gpgsign=false -c tag.forceSignAnnotated=false tag rc-5
         printf 'b\n' >> file.txt
         git add file.txt
         git commit -q -m "c"
-        git tag v1.1.0
+        git -c tag.gpgsign=false -c tag.forceSignAnnotated=false tag v1.1.0
         transverse.git.latest_tag --pattern "v*"
       }
       When call run_latest_pattern

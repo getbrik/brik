@@ -238,7 +238,7 @@ YAML
       git config user.name "Test"
       printf 'init\n' > README.md
       git add README.md && git commit -q -m "chore: init"
-      git tag v1.2.3
+      git -c tag.gpgsign=false -c tag.forceSignAnnotated=false tag v1.2.3
       export BRIK_WORKSPACE="$TEST_GIT"
       export BRIK_PROJECT_DIR="$TEST_GIT"
     }

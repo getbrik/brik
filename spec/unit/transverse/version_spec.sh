@@ -90,7 +90,7 @@ Describe "version.sh"
         printf 'hello\n' > file.txt
         git add file.txt
         git commit -q -m "initial"
-        git tag "v2.5.0"
+        git -c tag.gpgsign=false -c tag.forceSignAnnotated=false tag "v2.5.0"
       }
       cleanup_git() { rm -rf "$GIT_DIR"; cd /tmp || true; }
       Before 'setup_git'
@@ -112,7 +112,7 @@ Describe "version.sh"
         printf 'hello\n' > file.txt
         git add file.txt
         git commit -q -m "initial"
-        git tag "1.0.0"
+        git -c tag.gpgsign=false -c tag.forceSignAnnotated=false tag "1.0.0"
       }
       cleanup_git_nov() { rm -rf "$GIT_DIR"; cd /tmp || true; }
       Before 'setup_git_nov'
@@ -134,7 +134,7 @@ Describe "version.sh"
         printf 'hello\n' > file.txt
         git add file.txt
         git commit -q -m "initial"
-        git tag "release-2.0.0"
+        git -c tag.gpgsign=false -c tag.forceSignAnnotated=false tag "release-2.0.0"
       }
       cleanup_git_prefix() { rm -rf "$GIT_DIR"; cd /tmp || true; }
       Before 'setup_git_prefix'
@@ -156,7 +156,7 @@ Describe "version.sh"
         printf 'hello\n' > file.txt
         git add file.txt
         git commit -q -m "initial"
-        git tag "v3.1.0"
+        git -c tag.gpgsign=false -c tag.forceSignAnnotated=false tag "v3.1.0"
       }
       cleanup_git_vprefix() { rm -rf "$GIT_DIR"; cd /tmp || true; }
       Before 'setup_git_vprefix'
@@ -194,7 +194,7 @@ Describe "version.sh"
         printf 'hello\n' > file.txt
         git add file.txt
         git commit -q -m "initial"
-        git tag "v3.0.0"
+        git -c tag.gpgsign=false -c tag.forceSignAnnotated=false tag "v3.0.0"
       }
       cleanup_auto_git() { rm -rf "$AUTO_DIR"; cd /tmp || true; }
       Before 'setup_auto_git'
