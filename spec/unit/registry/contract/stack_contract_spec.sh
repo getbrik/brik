@@ -10,7 +10,7 @@
 #   - builtin+extension: builtins plus a synthetic contract-stack
 
 Describe "registry.stack.* contract"
-  Include "$BRIK_HOME/spec/_legacy/registry/contract/helpers.sh"
+  Include "$BRIK_HOME/spec/unit/registry/contract/helpers.sh"
   Include "$BRIK_HOME/lib/registry/_loader.sh"
   Include "$BRIK_HOME/lib/registry/registry.sh"
 
