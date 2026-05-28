@@ -32,7 +32,7 @@ JSON
 
   walk_fixture() {
     # shellcheck source=/dev/null
-    . "${BRIK_HOME}/spec/_legacy/transverse/_drift_helpers.sh"
+    . "${BRIK_HOME}/spec/unit/transverse/_drift_helpers.sh"
     drift.walk_leaves "$FIXTURE_SCHEMA"
   }
 
@@ -53,7 +53,7 @@ JSON
 
   It "emits exactly three leaves for the fixture schema"
     count_leaves() {
-      . "${BRIK_HOME}/spec/_legacy/transverse/_drift_helpers.sh"
+      . "${BRIK_HOME}/spec/unit/transverse/_drift_helpers.sh"
       drift.walk_leaves "$FIXTURE_SCHEMA" | wc -l | tr -d ' '
     }
     When call count_leaves
@@ -64,7 +64,7 @@ End
 Describe "drift.derive_envvar"
   setup_helpers() {
     # shellcheck source=/dev/null
-    . "${BRIK_HOME}/spec/_legacy/transverse/_drift_helpers.sh"
+    . "${BRIK_HOME}/spec/unit/transverse/_drift_helpers.sh"
   }
   Before 'setup_helpers'
 
@@ -104,7 +104,7 @@ Describe "drift.has_consumer"
 
   It "finds a path-based consumer (config.get literal)"
     test_path_consumer() {
-      . "${BRIK_HOME}/spec/_legacy/transverse/_drift_helpers.sh"
+      . "${BRIK_HOME}/spec/unit/transverse/_drift_helpers.sh"
       printf "val=\"\$(config.get '.x.y' '')\"\n" > "${SANDBOX_LIB}/test.sh"
       drift.has_consumer ".x.y" "$SANDBOX_LIB"
     }
@@ -114,7 +114,7 @@ Describe "drift.has_consumer"
 
   It "finds an env-var consumer (BRIK_ export)"
     test_envvar_consumer() {
-      . "${BRIK_HOME}/spec/_legacy/transverse/_drift_helpers.sh"
+      . "${BRIK_HOME}/spec/unit/transverse/_drift_helpers.sh"
       printf 'export BRIK_X_Y="value"\n' > "${SANDBOX_LIB}/test.sh"
       drift.has_consumer ".x.y" "$SANDBOX_LIB"
     }
@@ -124,7 +124,7 @@ Describe "drift.has_consumer"
 
   It "reports drift when lib dir is empty"
     test_no_consumer() {
-      . "${BRIK_HOME}/spec/_legacy/transverse/_drift_helpers.sh"
+      . "${BRIK_HOME}/spec/unit/transverse/_drift_helpers.sh"
       drift.has_consumer ".x.y" "$SANDBOX_LIB"
     }
     When call test_no_consumer
@@ -135,8 +135,8 @@ End
 Describe "schema-runtime drift detector"
   It "every schema leaf has a runtime consumer in lib/ or is allowlisted"
     check_all_leaves() {
-      . "${BRIK_HOME}/spec/_legacy/transverse/_drift_helpers.sh"
-      local allowlist="${BRIK_HOME}/spec/_legacy/transverse/_drift_allowlist.txt"
+      . "${BRIK_HOME}/spec/unit/transverse/_drift_helpers.sh"
+      local allowlist="${BRIK_HOME}/spec/unit/transverse/_drift_allowlist.txt"
       local lib_dir="${BRIK_HOME}/lib"
       local missing=0
       local missing_list=""
@@ -178,7 +178,7 @@ Describe "schema-runtime drift detector"
 
   It "allowlist stays small (at most 10 entries)"
     check_allowlist_size() {
-      local allowlist="${BRIK_HOME}/spec/_legacy/transverse/_drift_allowlist.txt"
+      local allowlist="${BRIK_HOME}/spec/unit/transverse/_drift_allowlist.txt"
       local count
       count="$(grep -cv '^[[:space:]]*#\|^[[:space:]]*$' "$allowlist" 2>/dev/null || printf '0')"
       if [[ "$count" -gt 10 ]]; then
