@@ -22,6 +22,56 @@ Describe "pipeline.sh"
     stages.promote()         { printf 'ran:promote\n';        return 0; }
     stages.deploy()          { printf 'ran:deploy\n'; return 0; }
     stages.notify()          { printf 'ran:notify\n'; return 0; }
+    # L1 isolation stubs: skip expensive per-stage I/O that pipeline_spec
+    # tests do not assert on. Each stub reduces wall-clock per pipeline.run
+    # call without affecting the aggregate-report.json fields under test.
+
+    # Skip HTML rendering (CSS+JS assets are not asserted by any test here).
+    _report._render_html()   { :; }
+
+    # Skip the stage banner (logo output is not asserted here).
+    banner.stage()           { :; }
+
+    # Skip the per-stage summary.json artifact (not asserted by any test).
+    summary.build()          { :; }
+
+    # Skip pipeline.env projection (no cross-stage env assertions here).
+    _stage.run._project_env() { :; }
+
+    # Replace the 6-jq-call _stage._record_business with a 1-read version
+    # that maps tech.status -> business.status. This preserves the
+    # pipeline.run return code when a stage fails in release context
+    # (_pipeline._compute_business_summary reads business.status).
+    _stage._record_business() {
+      local _sn="$1" _be="$2"
+      local _ts _ctx _bs
+      _ts="$(jq -r --arg s "$_sn" \
+        '.stages[]? | select(.stage == $s) | .tech.status // empty' \
+        "$_be" 2>/dev/null)" || return 0
+      [[ -n "$_ts" ]] || return 0
+      _ctx="snapshot"; [[ -n "${BRIK_COMMIT_TAG:-}" ]] && _ctx="release"
+      case "$_ts" in
+        failed)  [[ "$_ctx" == "release" ]] && _bs="error" || _bs="warning" ;;
+        skipped) _bs="success" ;;
+        *)       _bs="success" ;;
+      esac
+      report.record "$_sn" "business" "status" "$_bs" 2>/dev/null || true
+    }
+
+    # Replace the full stage.run lifecycle (context, log, tee, hooks,
+    # skip-status jq check, summary, project_env, cleanup) with a minimal
+    # wrapper that calls the logic function and runs _stage._finalize_fragment
+    # to record tech.status/exit_code/duration. All pipeline_spec assertions
+    # about aggregate-report.json fields are satisfied by this path.
+    stage.run() {
+      local _stage_name="$1" _fn="$2"; shift 2
+      local _start_ms
+      _start_ms="$(_helpers.epoch_ms)"
+      "$_fn" "$@"
+      local _rc=$?
+      _stage._finalize_fragment "$_stage_name" "$_rc" "$_start_ms" || true
+      return "$_rc"
+    }
   }
   cleanup_pipeline() {
     rm -rf "$PIPELINE_LOG_DIR"
