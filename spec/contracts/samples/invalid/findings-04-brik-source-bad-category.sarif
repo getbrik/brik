@@ -1,0 +1,440 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "grype",
+          "version": "0.112.0",
+          "informationUri": "https://github.com/anchore/grype",
+          "rules": [
+            {
+              "id": "GHSA-3xgq-45jj-v275-cross-spawn",
+              "name": "JavascriptMatcherExactDirectMatch",
+              "shortDescription": {
+                "text": "GHSA-3xgq-45jj-v275 high vulnerability for cross-spawn package"
+              },
+              "fullDescription": {
+                "text": "Regular Expression Denial of Service (ReDoS) in cross-spawn"
+              },
+              "helpUri": "https://github.com/advisories/GHSA-3xgq-45jj-v275",
+              "help": {
+                "text": "Vulnerability GHSA-3xgq-45jj-v275\nSeverity: high\nPackage: cross-spawn\nVersion: 7.0.3\nFix Version: 7.0.5\nType: npm\nLocation: /usr/local/lib/node_modules/npm/node_modules/cross-spawn/package.json\nData Namespace: github:language:javascript\nLink: [GHSA-3xgq-45jj-v275](https://github.com/advisories/GHSA-3xgq-45jj-v275)",
+                "markdown": "**Vulnerability GHSA-3xgq-45jj-v275**\n| Severity | Package | Version | Fix Version | Type | Location | Data Namespace | Link |\n| --- | --- | --- | --- | --- | --- | --- | --- |\n| high  | cross-spawn  | 7.0.3  | 7.0.5  | npm  | /usr/local/lib/node_modules/npm/node_modules/cross-spawn/package.json  | github:language:javascript  | [GHSA-3xgq-45jj-v275](https://github.com/advisories/GHSA-3xgq-45jj-v275)  |\n"
+              },
+              "properties": {
+                "purls": [
+                  "pkg:npm/cross-spawn@7.0.3"
+                ],
+                "security-severity": "7.7"
+              }
+            },
+            {
+              "id": "CVE-2025-60876-busybox",
+              "name": "ApkMatcherCpeMatch",
+              "shortDescription": {
+                "text": "CVE-2025-60876 medium vulnerability for busybox package"
+              },
+              "fullDescription": {
+                "text": "BusyBox wget thru 1.3.7 accepted raw CR (0x0D)/LF (0x0A) and other C0 control bytes in the HTTP request-target (path/query), allowing the request line to be split and attacker-controlled headers to be injected. To preserve the HTTP/1.1 request-line shape METHOD SP request-target SP HTTP/1.1, a raw space (0x20) in the request-target must also be rejected (clients should use %20)."
+              },
+              "helpUri": "https://nvd.nist.gov/vuln/detail/CVE-2025-60876",
+              "help": {
+                "text": "Vulnerability CVE-2025-60876\nSeverity: medium\nPackage: busybox\nVersion: 1.37.0-r30\nFix Version: \nType: apk\nLocation: /lib/apk/db/installed\nData Namespace: nvd:cpe\nLink: [CVE-2025-60876](https://nvd.nist.gov/vuln/detail/CVE-2025-60876)",
+                "markdown": "**Vulnerability CVE-2025-60876**\n| Severity | Package | Version | Fix Version | Type | Location | Data Namespace | Link |\n| --- | --- | --- | --- | --- | --- | --- | --- |\n| medium  | busybox  | 1.37.0-r30  |   | apk  | /lib/apk/db/installed  | nvd:cpe  | [CVE-2025-60876](https://nvd.nist.gov/vuln/detail/CVE-2025-60876)  |\n"
+              },
+              "properties": {
+                "purls": [
+                  "pkg:apk/alpine/busybox@1.37.0-r30?arch=aarch64&distro=alpine-3.23.4"
+                ],
+                "security-severity": "6.5"
+              }
+            },
+            {
+              "id": "CVE-2025-60876-busybox-binsh",
+              "name": "ApkMatcherCpeMatch",
+              "shortDescription": {
+                "text": "CVE-2025-60876 medium vulnerability for busybox-binsh package"
+              },
+              "fullDescription": {
+                "text": "BusyBox wget thru 1.3.7 accepted raw CR (0x0D)/LF (0x0A) and other C0 control bytes in the HTTP request-target (path/query), allowing the request line to be split and attacker-controlled headers to be injected. To preserve the HTTP/1.1 request-line shape METHOD SP request-target SP HTTP/1.1, a raw space (0x20) in the request-target must also be rejected (clients should use %20)."
+              },
+              "helpUri": "https://nvd.nist.gov/vuln/detail/CVE-2025-60876",
+              "help": {
+                "text": "Vulnerability CVE-2025-60876\nSeverity: medium\nPackage: busybox-binsh\nVersion: 1.37.0-r30\nFix Version: \nType: apk\nLocation: /lib/apk/db/installed\nData Namespace: nvd:cpe\nLink: [CVE-2025-60876](https://nvd.nist.gov/vuln/detail/CVE-2025-60876)",
+                "markdown": "**Vulnerability CVE-2025-60876**\n| Severity | Package | Version | Fix Version | Type | Location | Data Namespace | Link |\n| --- | --- | --- | --- | --- | --- | --- | --- |\n| medium  | busybox-binsh  | 1.37.0-r30  |   | apk  | /lib/apk/db/installed  | nvd:cpe  | [CVE-2025-60876](https://nvd.nist.gov/vuln/detail/CVE-2025-60876)  |\n"
+              },
+              "properties": {
+                "purls": [
+                  "pkg:apk/alpine/busybox-binsh@1.37.0-r30?arch=aarch64&distro=alpine-3.23.4&upstream=busybox"
+                ],
+                "security-severity": "6.5"
+              }
+            },
+            {
+              "id": "CVE-2025-60876-ssl_client",
+              "name": "ApkMatcherCpeMatch",
+              "shortDescription": {
+                "text": "CVE-2025-60876 medium vulnerability for ssl_client package"
+              },
+              "fullDescription": {
+                "text": "BusyBox wget thru 1.3.7 accepted raw CR (0x0D)/LF (0x0A) and other C0 control bytes in the HTTP request-target (path/query), allowing the request line to be split and attacker-controlled headers to be injected. To preserve the HTTP/1.1 request-line shape METHOD SP request-target SP HTTP/1.1, a raw space (0x20) in the request-target must also be rejected (clients should use %20)."
+              },
+              "helpUri": "https://nvd.nist.gov/vuln/detail/CVE-2025-60876",
+              "help": {
+                "text": "Vulnerability CVE-2025-60876\nSeverity: medium\nPackage: ssl_client\nVersion: 1.37.0-r30\nFix Version: \nType: apk\nLocation: /lib/apk/db/installed\nData Namespace: nvd:cpe\nLink: [CVE-2025-60876](https://nvd.nist.gov/vuln/detail/CVE-2025-60876)",
+                "markdown": "**Vulnerability CVE-2025-60876**\n| Severity | Package | Version | Fix Version | Type | Location | Data Namespace | Link |\n| --- | --- | --- | --- | --- | --- | --- | --- |\n| medium  | ssl_client  | 1.37.0-r30  |   | apk  | /lib/apk/db/installed  | nvd:cpe  | [CVE-2025-60876](https://nvd.nist.gov/vuln/detail/CVE-2025-60876)  |\n"
+              },
+              "properties": {
+                "purls": [
+                  "pkg:apk/alpine/ssl_client@1.37.0-r30?arch=aarch64&distro=alpine-3.23.4&upstream=busybox"
+                ],
+                "security-severity": "6.5"
+              }
+            },
+            {
+              "id": "GHSA-7r86-cg39-jmmj-minimatch",
+              "name": "JavascriptMatcherExactDirectMatch",
+              "shortDescription": {
+                "text": "GHSA-7r86-cg39-jmmj high vulnerability for minimatch package"
+              },
+              "fullDescription": {
+                "text": "minimatch has ReDoS: matchOne() combinatorial backtracking via multiple non-adjacent GLOBSTAR segments"
+              },
+              "helpUri": "https://github.com/advisories/GHSA-7r86-cg39-jmmj",
+              "help": {
+                "text": "Vulnerability GHSA-7r86-cg39-jmmj\nSeverity: high\nPackage: minimatch\nVersion: 9.0.5\nFix Version: 9.0.7\nType: npm\nLocation: /usr/local/lib/node_modules/npm/node_modules/minimatch/package.json\nData Namespace: github:language:javascript\nLink: [GHSA-7r86-cg39-jmmj](https://github.com/advisories/GHSA-7r86-cg39-jmmj)",
+                "markdown": "**Vulnerability GHSA-7r86-cg39-jmmj**\n| Severity | Package | Version | Fix Version | Type | Location | Data Namespace | Link |\n| --- | --- | --- | --- | --- | --- | --- | --- |\n| high  | minimatch  | 9.0.5  | 9.0.7  | npm  | /usr/local/lib/node_modules/npm/node_modules/minimatch/package.json  | github:language:javascript  | [GHSA-7r86-cg39-jmmj](https://github.com/advisories/GHSA-7r86-cg39-jmmj)  |\n"
+              },
+              "properties": {
+                "purls": [
+                  "pkg:npm/minimatch@9.0.5"
+                ],
+                "security-severity": "7.5"
+              }
+            },
+            {
+              "id": "GHSA-v6h2-p8h4-qcjw-brace-expansion",
+              "name": "JavascriptMatcherExactDirectMatch",
+              "shortDescription": {
+                "text": "GHSA-v6h2-p8h4-qcjw low vulnerability for brace-expansion package"
+              },
+              "fullDescription": {
+                "text": "brace-expansion Regular Expression Denial of Service vulnerability"
+              },
+              "helpUri": "https://github.com/advisories/GHSA-v6h2-p8h4-qcjw",
+              "help": {
+                "text": "Vulnerability GHSA-v6h2-p8h4-qcjw\nSeverity: low\nPackage: brace-expansion\nVersion: 2.0.1\nFix Version: 2.0.2\nType: npm\nLocation: /usr/local/lib/node_modules/npm/node_modules/brace-expansion/package.json\nData Namespace: github:language:javascript\nLink: [GHSA-v6h2-p8h4-qcjw](https://github.com/advisories/GHSA-v6h2-p8h4-qcjw)",
+                "markdown": "**Vulnerability GHSA-v6h2-p8h4-qcjw**\n| Severity | Package | Version | Fix Version | Type | Location | Data Namespace | Link |\n| --- | --- | --- | --- | --- | --- | --- | --- |\n| low  | brace-expansion  | 2.0.1  | 2.0.2  | npm  | /usr/local/lib/node_modules/npm/node_modules/brace-expansion/package.json  | github:language:javascript  | [GHSA-v6h2-p8h4-qcjw](https://github.com/advisories/GHSA-v6h2-p8h4-qcjw)  |\n"
+              },
+              "properties": {
+                "purls": [
+                  "pkg:npm/brace-expansion@2.0.1"
+                ],
+                "security-severity": "3.1"
+              }
+            },
+            {
+              "id": "GHSA-3ppc-4f35-3m26-minimatch",
+              "name": "JavascriptMatcherExactDirectMatch",
+              "shortDescription": {
+                "text": "GHSA-3ppc-4f35-3m26 high vulnerability for minimatch package"
+              },
+              "fullDescription": {
+                "text": "minimatch has a ReDoS via repeated wildcards with non-matching literal in pattern"
+              },
+              "helpUri": "https://github.com/advisories/GHSA-3ppc-4f35-3m26",
+              "help": {
+                "text": "Vulnerability GHSA-3ppc-4f35-3m26\nSeverity: high\nPackage: minimatch\nVersion: 9.0.5\nFix Version: 9.0.6\nType: npm\nLocation: /usr/local/lib/node_modules/npm/node_modules/minimatch/package.json\nData Namespace: github:language:javascript\nLink: [GHSA-3ppc-4f35-3m26](https://github.com/advisories/GHSA-3ppc-4f35-3m26)",
+                "markdown": "**Vulnerability GHSA-3ppc-4f35-3m26**\n| Severity | Package | Version | Fix Version | Type | Location | Data Namespace | Link |\n| --- | --- | --- | --- | --- | --- | --- | --- |\n| high  | minimatch  | 9.0.5  | 9.0.6  | npm  | /usr/local/lib/node_modules/npm/node_modules/minimatch/package.json  | github:language:javascript  | [GHSA-3ppc-4f35-3m26](https://github.com/advisories/GHSA-3ppc-4f35-3m26)  |\n"
+              },
+              "properties": {
+                "purls": [
+                  "pkg:npm/minimatch@9.0.5"
+                ],
+                "security-severity": "8.7"
+              }
+            },
+            {
+              "id": "GHSA-23c5-xmqv-rm74-minimatch",
+              "name": "JavascriptMatcherExactDirectMatch",
+              "shortDescription": {
+                "text": "GHSA-23c5-xmqv-rm74 high vulnerability for minimatch package"
+              },
+              "fullDescription": {
+                "text": "minimatch ReDoS: nested *() extglobs generate catastrophically backtracking regular expressions"
+              },
+              "helpUri": "https://github.com/advisories/GHSA-23c5-xmqv-rm74",
+              "help": {
+                "text": "Vulnerability GHSA-23c5-xmqv-rm74\nSeverity: high\nPackage: minimatch\nVersion: 9.0.5\nFix Version: 9.0.7\nType: npm\nLocation: /usr/local/lib/node_modules/npm/node_modules/minimatch/package.json\nData Namespace: github:language:javascript\nLink: [GHSA-23c5-xmqv-rm74](https://github.com/advisories/GHSA-23c5-xmqv-rm74)",
+                "markdown": "**Vulnerability GHSA-23c5-xmqv-rm74**\n| Severity | Package | Version | Fix Version | Type | Location | Data Namespace | Link |\n| --- | --- | --- | --- | --- | --- | --- | --- |\n| high  | minimatch  | 9.0.5  | 9.0.7  | npm  | /usr/local/lib/node_modules/npm/node_modules/minimatch/package.json  | github:language:javascript  | [GHSA-23c5-xmqv-rm74](https://github.com/advisories/GHSA-23c5-xmqv-rm74)  |\n"
+              },
+              "properties": {
+                "purls": [
+                  "pkg:npm/minimatch@9.0.5"
+                ],
+                "security-severity": "7.5"
+              }
+            },
+            {
+              "id": "GHSA-5j98-mcp5-4vw2-glob",
+              "name": "JavascriptMatcherExactDirectMatch",
+              "shortDescription": {
+                "text": "GHSA-5j98-mcp5-4vw2 high vulnerability for glob package"
+              },
+              "fullDescription": {
+                "text": "glob CLI: Command injection via -c/--cmd executes matches with shell:true"
+              },
+              "helpUri": "https://github.com/advisories/GHSA-5j98-mcp5-4vw2",
+              "help": {
+                "text": "Vulnerability GHSA-5j98-mcp5-4vw2\nSeverity: high\nPackage: glob\nVersion: 10.4.2\nFix Version: 10.5.0\nType: npm\nLocation: /usr/local/lib/node_modules/npm/node_modules/glob/package.json\nData Namespace: github:language:javascript\nLink: [GHSA-5j98-mcp5-4vw2](https://github.com/advisories/GHSA-5j98-mcp5-4vw2)",
+                "markdown": "**Vulnerability GHSA-5j98-mcp5-4vw2**\n| Severity | Package | Version | Fix Version | Type | Location | Data Namespace | Link |\n| --- | --- | --- | --- | --- | --- | --- | --- |\n| high  | glob  | 10.4.2  | 10.5.0  | npm  | /usr/local/lib/node_modules/npm/node_modules/glob/package.json  | github:language:javascript  | [GHSA-5j98-mcp5-4vw2](https://github.com/advisories/GHSA-5j98-mcp5-4vw2)  |\n"
+              },
+              "properties": {
+                "purls": [
+                  "pkg:npm/glob@10.4.2"
+                ],
+                "security-severity": "7.5"
+              }
+            },
+            {
+              "id": "GHSA-34x7-hfp2-rc4v-tar",
+              "name": "JavascriptMatcherExactDirectMatch",
+              "shortDescription": {
+                "text": "GHSA-34x7-hfp2-rc4v high vulnerability for tar package"
+              },
+              "fullDescription": {
+                "text": "node-tar Vulnerable to Arbitrary File Creation/Overwrite via Hardlink Path Traversal"
+              },
+              "helpUri": "https://github.com/advisories/GHSA-34x7-hfp2-rc4v",
+              "help": {
+                "text": "Vulnerability GHSA-34x7-hfp2-rc4v\nSeverity: high\nPackage: tar\nVersion: 6.2.1\nFix Version: 7.5.7\nType: npm\nLocation: /usr/local/lib/node_modules/npm/node_modules/tar/package.json\nData Namespace: github:language:javascript\nLink: [GHSA-34x7-hfp2-rc4v](https://github.com/advisories/GHSA-34x7-hfp2-rc4v)",
+                "markdown": "**Vulnerability GHSA-34x7-hfp2-rc4v**\n| Severity | Package | Version | Fix Version | Type | Location | Data Namespace | Link |\n| --- | --- | --- | --- | --- | --- | --- | --- |\n| high  | tar  | 6.2.1  | 7.5.7  | npm  | /usr/local/lib/node_modules/npm/node_modules/tar/package.json  | github:language:javascript  | [GHSA-34x7-hfp2-rc4v](https://github.com/advisories/GHSA-34x7-hfp2-rc4v)  |\n"
+              },
+              "properties": {
+                "purls": [
+                  "pkg:npm/tar@6.2.1"
+                ],
+                "security-severity": "8.2"
+              }
+            },
+            {
+              "id": "GHSA-f886-m6hf-6m8v-brace-expansion",
+              "name": "JavascriptMatcherExactDirectMatch",
+              "shortDescription": {
+                "text": "GHSA-f886-m6hf-6m8v medium vulnerability for brace-expansion package"
+              },
+              "fullDescription": {
+                "text": "brace-expansion: Zero-step sequence causes process hang and memory exhaustion"
+              },
+              "helpUri": "https://github.com/advisories/GHSA-f886-m6hf-6m8v",
+              "help": {
+                "text": "Vulnerability GHSA-f886-m6hf-6m8v\nSeverity: medium\nPackage: brace-expansion\nVersion: 2.0.1\nFix Version: 2.0.3\nType: npm\nLocation: /usr/local/lib/node_modules/npm/node_modules/brace-expansion/package.json\nData Namespace: github:language:javascript\nLink: [GHSA-f886-m6hf-6m8v](https://github.com/advisories/GHSA-f886-m6hf-6m8v)",
+                "markdown": "**Vulnerability GHSA-f886-m6hf-6m8v**\n| Severity | Package | Version | Fix Version | Type | Location | Data Namespace | Link |\n| --- | --- | --- | --- | --- | --- | --- | --- |\n| medium  | brace-expansion  | 2.0.1  | 2.0.3  | npm  | /usr/local/lib/node_modules/npm/node_modules/brace-expansion/package.json  | github:language:javascript  | [GHSA-f886-m6hf-6m8v](https://github.com/advisories/GHSA-f886-m6hf-6m8v)  |\n"
+              },
+              "properties": {
+                "purls": [
+                  "pkg:npm/brace-expansion@2.0.1"
+                ],
+                "security-severity": "6.5"
+              }
+            },
+            {
+              "id": "GHSA-8qq5-rm4j-mr97-tar",
+              "name": "JavascriptMatcherExactDirectMatch",
+              "shortDescription": {
+                "text": "GHSA-8qq5-rm4j-mr97 high vulnerability for tar package"
+              },
+              "fullDescription": {
+                "text": "node-tar is Vulnerable to Arbitrary File Overwrite and Symlink Poisoning via Insufficient Path Sanitization"
+              },
+              "helpUri": "https://github.com/advisories/GHSA-8qq5-rm4j-mr97",
+              "help": {
+                "text": "Vulnerability GHSA-8qq5-rm4j-mr97\nSeverity: high\nPackage: tar\nVersion: 6.2.1\nFix Version: 7.5.3\nType: npm\nLocation: /usr/local/lib/node_modules/npm/node_modules/tar/package.json\nData Namespace: github:language:javascript\nLink: [GHSA-8qq5-rm4j-mr97](https://github.com/advisories/GHSA-8qq5-rm4j-mr97)",
+                "markdown": "**Vulnerability GHSA-8qq5-rm4j-mr97**\n| Severity | Package | Version | Fix Version | Type | Location | Data Namespace | Link |\n| --- | --- | --- | --- | --- | --- | --- | --- |\n| high  | tar  | 6.2.1  | 7.5.3  | npm  | /usr/local/lib/node_modules/npm/node_modules/tar/package.json  | github:language:javascript  | [GHSA-8qq5-rm4j-mr97](https://github.com/advisories/GHSA-8qq5-rm4j-mr97)  |\n"
+              },
+              "properties": {
+                "purls": [
+                  "pkg:npm/tar@6.2.1"
+                ],
+                "security-severity": "8.2"
+              }
+            },
+            {
+              "id": "GHSA-r6q2-hw4h-h46w-tar",
+              "name": "JavascriptMatcherExactDirectMatch",
+              "shortDescription": {
+                "text": "GHSA-r6q2-hw4h-h46w high vulnerability for tar package"
+              },
+              "fullDescription": {
+                "text": "Race Condition in node-tar Path Reservations via Unicode Ligature Collisions on macOS APFS"
+              },
+              "helpUri": "https://github.com/advisories/GHSA-r6q2-hw4h-h46w",
+              "help": {
+                "text": "Vulnerability GHSA-r6q2-hw4h-h46w\nSeverity: high\nPackage: tar\nVersion: 6.2.1\nFix Version: 7.5.4\nType: npm\nLocation: /usr/local/lib/node_modules/npm/node_modules/tar/package.json\nData Namespace: github:language:javascript\nLink: [GHSA-r6q2-hw4h-h46w](https://github.com/advisories/GHSA-r6q2-hw4h-h46w)",
+                "markdown": "**Vulnerability GHSA-r6q2-hw4h-h46w**\n| Severity | Package | Version | Fix Version | Type | Location | Data Namespace | Link |\n| --- | --- | --- | --- | --- | --- | --- | --- |\n| high  | tar  | 6.2.1  | 7.5.4  | npm  | /usr/local/lib/node_modules/npm/node_modules/tar/package.json  | github:language:javascript  | [GHSA-r6q2-hw4h-h46w](https://github.com/advisories/GHSA-r6q2-hw4h-h46w)  |\n"
+              },
+              "properties": {
+                "purls": [
+                  "pkg:npm/tar@6.2.1"
+                ],
+                "security-severity": "8.8"
+              }
+            },
+            {
+              "id": "GHSA-9ppj-qmqm-q256-tar",
+              "name": "JavascriptMatcherExactDirectMatch",
+              "shortDescription": {
+                "text": "GHSA-9ppj-qmqm-q256 high vulnerability for tar package"
+              },
+              "fullDescription": {
+                "text": "node-tar Symlink Path Traversal via Drive-Relative Linkpath"
+              },
+              "helpUri": "https://github.com/advisories/GHSA-9ppj-qmqm-q256",
+              "help": {
+                "text": "Vulnerability GHSA-9ppj-qmqm-q256\nSeverity: high\nPackage: tar\nVersion: 6.2.1\nFix Version: 7.5.11\nType: npm\nLocation: /usr/local/lib/node_modules/npm/node_modules/tar/package.json\nData Namespace: github:language:javascript\nLink: [GHSA-9ppj-qmqm-q256](https://github.com/advisories/GHSA-9ppj-qmqm-q256)",
+                "markdown": "**Vulnerability GHSA-9ppj-qmqm-q256**\n| Severity | Package | Version | Fix Version | Type | Location | Data Namespace | Link |\n| --- | --- | --- | --- | --- | --- | --- | --- |\n| high  | tar  | 6.2.1  | 7.5.11  | npm  | /usr/local/lib/node_modules/npm/node_modules/tar/package.json  | github:language:javascript  | [GHSA-9ppj-qmqm-q256](https://github.com/advisories/GHSA-9ppj-qmqm-q256)  |\n"
+              },
+              "properties": {
+                "purls": [
+                  "pkg:npm/tar@6.2.1"
+                ],
+                "security-severity": "8.2"
+              }
+            },
+            {
+              "id": "GHSA-qffp-2rhf-9h96-tar",
+              "name": "JavascriptMatcherExactDirectMatch",
+              "shortDescription": {
+                "text": "GHSA-qffp-2rhf-9h96 high vulnerability for tar package"
+              },
+              "fullDescription": {
+                "text": "tar has Hardlink Path Traversal via Drive-Relative Linkpath"
+              },
+              "helpUri": "https://github.com/advisories/GHSA-qffp-2rhf-9h96",
+              "help": {
+                "text": "Vulnerability GHSA-qffp-2rhf-9h96\nSeverity: high\nPackage: tar\nVersion: 6.2.1\nFix Version: 7.5.10\nType: npm\nLocation: /usr/local/lib/node_modules/npm/node_modules/tar/package.json\nData Namespace: github:language:javascript\nLink: [GHSA-qffp-2rhf-9h96](https://github.com/advisories/GHSA-qffp-2rhf-9h96)",
+                "markdown": "**Vulnerability GHSA-qffp-2rhf-9h96**\n| Severity | Package | Version | Fix Version | Type | Location | Data Namespace | Link |\n| --- | --- | --- | --- | --- | --- | --- | --- |\n| high  | tar  | 6.2.1  | 7.5.10  | npm  | /usr/local/lib/node_modules/npm/node_modules/tar/package.json  | github:language:javascript  | [GHSA-qffp-2rhf-9h96](https://github.com/advisories/GHSA-qffp-2rhf-9h96)  |\n"
+              },
+              "properties": {
+                "purls": [
+                  "pkg:npm/tar@6.2.1"
+                ],
+                "security-severity": "8.2"
+              }
+            },
+            {
+              "id": "GHSA-73rr-hh4g-fpgx-diff",
+              "name": "JavascriptMatcherExactDirectMatch",
+              "shortDescription": {
+                "text": "GHSA-73rr-hh4g-fpgx low vulnerability for diff package"
+              },
+              "fullDescription": {
+                "text": "jsdiff has a Denial of Service vulnerability in parsePatch and applyPatch"
+              },
+              "helpUri": "https://github.com/advisories/GHSA-73rr-hh4g-fpgx",
+              "help": {
+                "text": "Vulnerability GHSA-73rr-hh4g-fpgx\nSeverity: low\nPackage: diff\nVersion: 5.2.0\nFix Version: 5.2.2\nType: npm\nLocation: /usr/local/lib/node_modules/npm/node_modules/diff/package.json\nData Namespace: github:language:javascript\nLink: [GHSA-73rr-hh4g-fpgx](https://github.com/advisories/GHSA-73rr-hh4g-fpgx)",
+                "markdown": "**Vulnerability GHSA-73rr-hh4g-fpgx**\n| Severity | Package | Version | Fix Version | Type | Location | Data Namespace | Link |\n| --- | --- | --- | --- | --- | --- | --- | --- |\n| low  | diff  | 5.2.0  | 5.2.2  | npm  | /usr/local/lib/node_modules/npm/node_modules/diff/package.json  | github:language:javascript  | [GHSA-73rr-hh4g-fpgx](https://github.com/advisories/GHSA-73rr-hh4g-fpgx)  |\n"
+              },
+              "properties": {
+                "purls": [
+                  "pkg:npm/diff@5.2.0"
+                ],
+                "security-severity": "2.7"
+              }
+            },
+            {
+              "id": "GHSA-v2v4-37r5-5v8g-ip-address",
+              "name": "JavascriptMatcherExactDirectMatch",
+              "shortDescription": {
+                "text": "GHSA-v2v4-37r5-5v8g medium vulnerability for ip-address package"
+              },
+              "fullDescription": {
+                "text": "ip-address has XSS in Address6 HTML-emitting methods"
+              },
+              "helpUri": "https://github.com/advisories/GHSA-v2v4-37r5-5v8g",
+              "help": {
+                "text": "Vulnerability GHSA-v2v4-37r5-5v8g\nSeverity: medium\nPackage: ip-address\nVersion: 9.0.5\nFix Version: 10.1.1\nType: npm\nLocation: /usr/local/lib/node_modules/npm/node_modules/ip-address/package.json\nData Namespace: github:language:javascript\nLink: [GHSA-v2v4-37r5-5v8g](https://github.com/advisories/GHSA-v2v4-37r5-5v8g)",
+                "markdown": "**Vulnerability GHSA-v2v4-37r5-5v8g**\n| Severity | Package | Version | Fix Version | Type | Location | Data Namespace | Link |\n| --- | --- | --- | --- | --- | --- | --- | --- |\n| medium  | ip-address  | 9.0.5  | 10.1.1  | npm  | /usr/local/lib/node_modules/npm/node_modules/ip-address/package.json  | github:language:javascript  | [GHSA-v2v4-37r5-5v8g](https://github.com/advisories/GHSA-v2v4-37r5-5v8g)  |\n"
+              },
+              "properties": {
+                "purls": [
+                  "pkg:npm/ip-address@9.0.5"
+                ],
+                "security-severity": "5.3"
+              }
+            },
+            {
+              "id": "GHSA-83g3-92jg-28cx-tar",
+              "name": "JavascriptMatcherExactDirectMatch",
+              "shortDescription": {
+                "text": "GHSA-83g3-92jg-28cx high vulnerability for tar package"
+              },
+              "fullDescription": {
+                "text": "Arbitrary File Read/Write via Hardlink Target Escape Through Symlink Chain in node-tar Extraction"
+              },
+              "helpUri": "https://github.com/advisories/GHSA-83g3-92jg-28cx",
+              "help": {
+                "text": "Vulnerability GHSA-83g3-92jg-28cx\nSeverity: high\nPackage: tar\nVersion: 6.2.1\nFix Version: 7.5.8\nType: npm\nLocation: /usr/local/lib/node_modules/npm/node_modules/tar/package.json\nData Namespace: github:language:javascript\nLink: [GHSA-83g3-92jg-28cx](https://github.com/advisories/GHSA-83g3-92jg-28cx)",
+                "markdown": "**Vulnerability GHSA-83g3-92jg-28cx**\n| Severity | Package | Version | Fix Version | Type | Location | Data Namespace | Link |\n| --- | --- | --- | --- | --- | --- | --- | --- |\n| high  | tar  | 6.2.1  | 7.5.8  | npm  | /usr/local/lib/node_modules/npm/node_modules/tar/package.json  | github:language:javascript  | [GHSA-83g3-92jg-28cx](https://github.com/advisories/GHSA-83g3-92jg-28cx)  |\n"
+              },
+              "properties": {
+                "purls": [
+                  "pkg:npm/tar@6.2.1"
+                ],
+                "security-severity": "7.1"
+              }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "GHSA-3xgq-45jj-v275-cross-spawn",
+          "level": "error",
+          "message": {
+            "text": "A high vulnerability in npm package: cross-spawn, version 7.0.3 was found in image nexus.briklab.test:8082/brik/node-deploy-k8s:0.1.0 at: /usr/local/lib/node_modules/npm/node_modules/cross-spawn/package.json"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "node-deploy-k8s//usr/local/lib/node_modules/npm/node_modules/cross-spawn/package.json"
+                },
+                "region": {
+                  "startLine": 1,
+                  "startColumn": 1,
+                  "endLine": 1,
+                  "endColumn": 1
+                }
+              },
+              "logicalLocations": [
+                {
+                  "name": "/usr/local/lib/node_modules/npm/node_modules/cross-spawn/package.json",
+                  "fullyQualifiedName": "nexus.briklab.test:8082/brik/node-deploy-k8s:0.1.0@sha256:21e4f00ae03f714ca184b962b542ebb67dc73b5c2f7200659becdef9bdfe320e:/usr/local/lib/node_modules/npm/node_modules/cross-spawn/package.json"
+                }
+              ]
+            }
+          ],
+          "partialFingerprints": {
+            "primaryLocationLineHash": "b388f8cba79f4380e348dda64980b16291fabff51bb4b100127516a79623171b:1"
+          },
+          "properties": {
+            "brikFixClassification": "unknown"
+          },
+          "suppressions": [
+            {
+              "kind": "external",
+              "justification": "Brik policy: path-allowlist",
+              "properties": {
+                "brikSource": "policy.weird.unknown"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

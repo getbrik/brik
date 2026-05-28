@@ -1,0 +1,16 @@
+{
+  "BRIK_HOME": "/opt/brik",
+  "BRIK_WORKSPACE": "/builds/brik/node-minimal",
+  "BRIK_CONFIG_FILE": "/builds/brik/node-minimal/brik.yml",
+  "BRIK_LIB_EXTENSIONS": "/opt/brik/lib/pipeline:/opt/brik/lib/transverse:/opt/brik/lib/stacks:/opt/brik/lib/rollout:/opt/brik/lib/deployments:/opt/brik/lib/package-managers:/opt/brik/lib/stages:/opt/brik/lib/cli:/opt/brik/lib",
+  "BRIK_LOG_DIR": "/builds/brik/node-minimal/.brik-logs",
+  "BRIK_PROJECT_DIR": "/builds/brik/node-minimal",
+  "BRIK_PLATFORM": "circleci",
+  "BRIK_BRANCH": "main",
+  "BRIK_TAG": "",
+  "BRIK_COMMIT_SHA": "1b897e0c65d9abc3e04ba5fd51870e92b2b968c1",
+  "BRIK_COMMIT_SHORT_SHA": "1b897e0",
+  "BRIK_COMMIT_REF": "main",
+  "BRIK_PIPELINE_SOURCE": "push",
+  "BRIK_MERGE_REQUEST_ID": ""
+}

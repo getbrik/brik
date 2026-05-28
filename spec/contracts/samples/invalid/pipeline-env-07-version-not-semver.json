@@ -1,0 +1,22 @@
+{
+  "BRIK_GIT_USER_EMAIL": "gitlab_admin_3e886a@example.com",
+  "BRIK_GIT_USER_NAME": "Administrator",
+  "BRIK_PROJECT_NAME": "node-deploy-k8s",
+  "BRIK_BUILD_STACK": "node",
+  "BRIK_BUILD_STACK_VERSION": "22",
+  "BRIK_CI_IMAGE": "ghcr.io/getbrik/brik-runner-node:22",
+  "BRIK_IMG_STACK": "ghcr.io/getbrik/brik-runner-node:22",
+  "BRIK_IMG_BASE": "ghcr.io/getbrik/brik-runner-base:latest",
+  "BRIK_IMG_ANALYSIS": "ghcr.io/getbrik/brik-runner-analysis:latest",
+  "BRIK_IMG_SCANNER": "ghcr.io/getbrik/brik-runner-scanner:latest",
+  "BRIK_IMG_DEPLOY": "ghcr.io/getbrik/brik-runner-deploy:latest",
+  "BRIK_RELEASE_PROFILE": "none",
+  "BRIK_PROJECT_VERSION": "v0.1",
+  "BRIK_IS_CANDIDATE": "1",
+  "BRIK_PACKAGE_ENABLED": "true",
+  "BRIK_DEPLOY_ENABLED": "true",
+  "BRIK_TEST_REPORTS_ENABLED": "false",
+  "BRIK_TEST_COVERAGE_FORMAT": "auto",
+  "BRIK_TEST_COVERAGE_DIR": "brik-artifacts/test/coverage",
+  "BRIK_TEST_JUNIT_PATH": "brik-artifacts/test/junit.xml"
+}

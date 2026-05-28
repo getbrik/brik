@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://brik.dev/schemas/rollout/v1/deploy-profile.schema.json",
+  "title": "Brik Deploy Profile v1",
+  "description": "Contract for the deploy profiles bundled under lib/rollout/data/deploy-profiles/ and merged into a user's brik.yml by rollout.profile.merge (lib/rollout/profile.sh). v1 captures the 3 builtin profiles shipped (trunk-based, github-flow, git-flow) plus the 'none' profile (no deploy block). A profile declares a deploy.environments map: each environment carries a `when` expression, a `target` enum aligned with lib/deployments/, and a Kubernetes-like `namespace`. The target enum mirrors brik.yml schema (schemas/config/v1/brik.schema.json) -- argocd is reached via target=gitops, not as a standalone target.",
+  "type": "object",
+  "required": ["deploy"],
+  "additionalProperties": false,
+  "properties": {
+    "deploy": {
+      "type": "object",
+      "required": ["environments"],
+      "additionalProperties": false,
+      "properties": {
+        "environments": {
+          "type": "object",
+          "description": "Map of environment-name -> environment-spec. Builtin profile environment names currently observed: dev, staging, production, preview. The key is a free-form lowercase identifier; the value is a typed environment block.",
+          "minProperties": 1,
+          "additionalProperties": {
+            "type": "object",
+            "required": ["when", "target", "namespace"],
+            "additionalProperties": false,
+            "properties": {
+              "when": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Condition expression that activates this environment. v0.6.0 uses simple branch/tag matchers like \"branch == 'main'\", \"branch =~ 'feature/*'\", \"tag =~ 'v*'\". The expression is consumed verbatim by the rollout.profile resolver -- the schema does not pin its grammar in v1."
+              },
+              "target": {
+                "type": "string",
+                "enum": ["k8s", "helm", "compose", "ssh", "gitops"],
+                "description": "Deploy target module under lib/deployments/. Mirrors brik.yml schema (schemas/config/v1/brik.schema.json). 'argocd' is reached via target=gitops -- not exposed as a standalone v1 target."
+              },
+              "namespace": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Namespace into which the target deploys. Semantics depend on target: Kubernetes namespace for k8s/helm/gitops, compose project name for compose, identifier for ssh."
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

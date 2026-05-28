@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://brik.dev/schemas/findings/v1/brik-extensions.schema.json",
+  "title": "Brik SARIF Extensions v1",
+  "description": "Overlay schema that constrains the brik-specific extensions injected into SARIF 2.1.0 documents by lib/transverse/findings/. This schema does NOT replace SARIF 2.1.0 validation (use schemas/external/sarif-2.1.0.json for that); it adds typed constraints on brik-only fields and is permissive (additionalProperties allowed) on every block of the SARIF tree it walks through. A consumer that validates a finding pipeline output should run BOTH schemas: first sarif-2.1.0 for structural conformance, then this overlay for brik extension conformance. v1 captures the extensions currently observed (lib/transverse/findings.sh) and codified in the master  fix-classification model.",
+  "type": "object",
+  "properties": {
+    "runs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "properties": {
+                  "type": "object",
+                  "description": "result.properties open block. Brik may inject brikFixClassification (fix-classifier output) and brikToolBlocking (tool-level blocking flag, lint/format specific).",
+                  "properties": {
+                    "brikFixClassification": {
+                      "type": "string",
+                      "enum": ["has_fix", "no_fix", "unknown"],
+                      "description": "Fix-classifier verdict for this finding. has_fix = upstream fix available (CVE patched, lint auto-fixable). no_fix = won't-fix or no upstream fix. unknown = not yet classified. Drives the business.findings.failing.{has_fix, no_fix} counters consumed by the business gate model (cf.  SC1)."
+                    },
+                    "brikToolBlocking": {
+                      "type": "boolean",
+                      "description": "True when the tool itself blocks the build on this finding (e.g. lint/format errors). Absent for stages where every failing finding is tool-blocking by default."
+                    }
+                  }
+                },
+                "suppressions": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "properties": {
+                        "type": "object",
+                        "description": "suppression.properties open block. Brik annotates each suppression it adds with brikSource so the policy origin is auditable.",
+                        "properties": {
+                          "brikSource": {
+                            "description": "Origin tag of the suppression. 'tool_native' when the upstream scanner emitted the suppression itself. 'policy.org.<allowlist>' when an org policy (brik-policy.yml) matched. 'policy.built-in.<reason>' when a brik built-in policy (e.g. below-severity) suppressed the finding.",
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "const": "tool_native"
+                              },
+                              {
+                                "type": "string",
+                                "pattern": "^policy\\.(org|built-in)\\.[a-z][a-z0-9-]*$"
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

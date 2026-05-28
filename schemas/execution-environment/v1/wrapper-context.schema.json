@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://brik.dev/schemas/execution-environment/v1/wrapper-context.schema.json",
+  "title": "Brik Wrapper Context v1",
+  "description": "Contract for the BRIK_* environment that any wrapper (shared-libs/gitlab, shared-libs/jenkins, shared-libs/local, shared-libs/common base) MUST export before delegating to lib/pipeline/. v1 captures the cross-platform contract currently observed (shared-libs/common/scripts/base-wrapper.sh + shared-libs/{gitlab,jenkins}/scripts/*-wrapper.sh). The wrapper translates CI-native variables (CI_COMMIT_SHA, GIT_COMMIT, WORKSPACE, ...) into the canonical BRIK_* contract, decoupling lib/pipeline/ from the orchestrator. Validation target: a JSON snapshot of the BRIK_* environment captured right after wrapper init.",
+  "type": "object",
+  "required": [
+    "BRIK_HOME",
+    "BRIK_WORKSPACE",
+    "BRIK_CONFIG_FILE",
+    "BRIK_LIB_EXTENSIONS",
+    "BRIK_LOG_DIR",
+    "BRIK_PROJECT_DIR",
+    "BRIK_PLATFORM",
+    "BRIK_BRANCH",
+    "BRIK_TAG",
+    "BRIK_COMMIT_SHA",
+    "BRIK_COMMIT_SHORT_SHA",
+    "BRIK_COMMIT_REF",
+    "BRIK_PIPELINE_SOURCE",
+    "BRIK_MERGE_REQUEST_ID"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "BRIK_HOME": {
+      "description": "Absolute path to the brik runtime root (base-wrapper.sh line 61).",
+      "type": "string",
+      "minLength": 1
+    },
+    "BRIK_WORKSPACE": {
+      "description": "Absolute path to the project workspace, defaults to BRIK_PROJECT_DIR (base-wrapper.sh line 85).",
+      "type": "string",
+      "minLength": 1
+    },
+    "BRIK_CONFIG_FILE": {
+      "description": "Absolute path to brik.yml, defaults to ${BRIK_PROJECT_DIR}/brik.yml (base-wrapper.sh line 86).",
+      "type": "string",
+      "minLength": 1
+    },
+    "BRIK_LIB_EXTENSIONS": {
+      "description": "Colon-separated list of absolute paths searched for brik lib modules (base-wrapper.sh line 93).",
+      "type": "string",
+      "pattern": "^/[^:]+(:/[^:]+)*$"
+    },
+    "BRIK_LOG_DIR": {
+      "description": "Absolute path to the per-run logs directory. Mapped to ${CI_PROJECT_DIR}/.brik-logs on GitLab, ${WORKSPACE}/.brik-logs on Jenkins.",
+      "type": "string",
+      "minLength": 1
+    },
+    "BRIK_PROJECT_DIR": {
+      "description": "Absolute path to the project root checkout. Mapped from CI_PROJECT_DIR (GitLab) or WORKSPACE (Jenkins).",
+      "type": "string",
+      "minLength": 1
+    },
+    "BRIK_PLATFORM": {
+      "description": "Orchestrator hosting this run. Set by each wrapper as a const literal.",
+      "type": "string",
+      "enum": ["gitlab", "jenkins", "local", "github"]
+    },
+    "BRIK_BRANCH": {
+      "description": "Branch name. Empty string on tag-push pipelines. Mapped from CI_COMMIT_BRANCH (GitLab) or BRANCH_NAME (Jenkins).",
+      "type": "string"
+    },
+    "BRIK_TAG": {
+      "description": "Tag name. Empty string on branch-push pipelines. Mapped from CI_COMMIT_TAG (GitLab) or TAG_NAME (Jenkins).",
+      "type": "string"
+    },
+    "BRIK_COMMIT_SHA": {
+      "description": "Full 40-character git commit SHA. Mapped from CI_COMMIT_SHA (GitLab) or GIT_COMMIT (Jenkins).",
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "BRIK_COMMIT_SHORT_SHA": {
+      "description": "First 7 characters of BRIK_COMMIT_SHA.",
+      "type": "string",
+      "pattern": "^[a-f0-9]{7}$"
+    },
+    "BRIK_COMMIT_REF": {
+      "description": "Human-readable ref name (branch or tag). Mapped from CI_COMMIT_REF_NAME (GitLab) or derived from BRIK_BRANCH/BRIK_TAG (Jenkins).",
+      "type": "string",
+      "minLength": 1
+    },
+    "BRIK_PIPELINE_SOURCE": {
+      "description": "Trigger source. v1 enum mirrors observed v0.6.0 values: 'push' (default on Jenkins + GitLab branch/tag pushes), 'merge_request_event' (GitLab MR pipelines), 'schedule' (cron), 'web' (manual UI trigger), 'api' (programmatic trigger).",
+      "type": "string",
+      "enum": ["push", "merge_request_event", "schedule", "web", "api"]
+    },
+    "BRIK_MERGE_REQUEST_ID": {
+      "description": "Merge request / pull request id when applicable, empty string otherwise. Mapped from CI_MERGE_REQUEST_IID (GitLab) or CHANGE_ID (Jenkins).",
+      "type": "string"
+    }
+  }
+}

@@ -1,0 +1,7 @@
+deploy:
+  environments:
+    production:
+      when: "branch == 'main'"
+      target: k8s
+      namespace: prod
+      replicas: 3

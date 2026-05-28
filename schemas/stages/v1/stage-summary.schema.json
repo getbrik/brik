@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://brik.dev/schemas/stages/v1/stage-summary.schema.json",
+  "title": "Brik Stage Summary v1",
+  "description": "Minimal per-stage summary written by each pipeline stage to .brik-logs/<stage>-summary.json. v1 captures the format currently observed (10 mandatory fields, no business/tech enrichment). Future v2 will absorb the master #1 enrichment (tech.kind, business.status, etc.) currently described in schemas/report/v1.1/fragment.schema.json.",
+  "type": "object",
+  "required": [
+    "stage_name",
+    "status",
+    "exit_code",
+    "started_at",
+    "finished_at",
+    "duration_ms",
+    "log_file",
+    "artifacts",
+    "warnings",
+    "errors"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "stage_name": {
+      "description": "Canonical brik stage name. Stages that publish a <stage>-summary.json are the 12 non-meta stages of the fixed flow. 'plan' is excluded (it produces plan.json instead, owned by the planning notion).",
+      "type": "string",
+      "enum": [
+        "init",
+        "release",
+        "build",
+        "lint",
+        "sast",
+        "scan",
+        "test",
+        "package",
+        "container-scan",
+        "promote",
+        "deploy",
+        "notify"
+      ]
+    },
+    "status": {
+      "description": "Technical stage status. v1 observes two values; v2 may add SKIPPED once the planner-driven skip is reflected in summaries.",
+      "type": "string",
+      "enum": ["SUCCESS", "FAILED"]
+    },
+    "exit_code": {
+      "description": "Stage exit code as returned by the stage logic. 0 = success, non-zero = failure. Specific codes follow the BRIK_EXIT_* table (cf. lib/pipeline/error.sh).",
+      "type": "integer",
+      "minimum": 0
+    },
+    "started_at": {
+      "description": "Timestamp when the stage entered. ISO 8601 with timezone offset (example format: 'YYYY-MM-DDTHH:MM:SS+HHMM').",
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}[+-][0-9]{4}$"
+    },
+    "finished_at": {
+      "description": "Timestamp when the stage exited. Same format as started_at.",
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}[+-][0-9]{4}$"
+    },
+    "duration_ms": {
+      "description": "Stage wall-clock duration in milliseconds. May be 0 for sub-second stages (v0.6.0 rounds to seconds in some paths; v2 will guarantee millisecond precision).",
+      "type": "integer",
+      "minimum": 0
+    },
+    "log_file": {
+      "description": "Absolute path of the per-stage log file inside the runner workspace. Pattern: '<workspace>/.brik-logs/<stage>-<hash>.log'. The hash is the same fingerprint used by stage.run for filename uniqueness.",
+      "type": "string"
+    },
+    "artifacts": {
+      "description": "Array of artifact descriptors produced by the stage. v1 observes only empty arrays in the campaign sample, but the field remains an array (not null) for forward compatibility. v2 will likely type each element as an object {path, kind, size}.",
+      "type": "array"
+    },
+    "warnings": {
+      "description": "Human-readable warning messages collected during the stage. v1 elements are strings.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "errors": {
+      "description": "Human-readable error messages collected during the stage. v1 elements are strings. Non-empty when status == FAILED.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

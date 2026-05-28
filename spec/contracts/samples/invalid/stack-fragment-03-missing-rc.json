@@ -1,0 +1,32 @@
+{
+  "schema_version": "1.1",
+  "stage": "build",
+  "timestamp": "2026-05-28T08:54:52+0000",
+  "status": "success",
+  "runner": {
+    "platform": "gitlab",
+    "image": "ghcr.io/getbrik/brik-runner-node:22",
+    "job_url": "http://gitlab.briklab.test:8929/brik/node-deploy-k8s/-/jobs/36087"
+  },
+  "tech": {
+    "stack": "node",
+    "tool": "auto",
+    "command": "<stack-default>",
+    "duration_ms": "588",
+    "exit_code": "0",
+    "status": "success"
+  },
+  "business": {
+    "artifact": {
+      "type": "directory",
+      "name": "dist",
+      "size_bytes": 459,
+      "sha256": "2a585ca0aad26d8b0c8cc9eb30b5a92c4802eedfdca609d56d1a53119633a349",
+      "path": "/builds/brik/node-deploy-k8s/dist",
+      "main_file": "index.js"
+    },
+    "status": "success",
+    "reason": ""
+  },
+  "duration_ms": 588
+}

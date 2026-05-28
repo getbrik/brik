@@ -1,0 +1,16 @@
+{
+  "BRIK_HOME": "/var/jenkins_home/workspace/node-deploy-k8s@libs/abc123",
+  "BRIK_WORKSPACE": "/var/jenkins_home/workspace/node-deploy-k8s",
+  "BRIK_CONFIG_FILE": "/var/jenkins_home/workspace/node-deploy-k8s/brik.yml",
+  "BRIK_LIB_EXTENSIONS": "/var/jenkins_home/workspace/node-deploy-k8s@libs/abc123/lib/pipeline:/var/jenkins_home/workspace/node-deploy-k8s@libs/abc123/lib",
+  "BRIK_LOG_DIR": "/var/jenkins_home/workspace/node-deploy-k8s/.brik-logs",
+  "BRIK_PROJECT_DIR": "/var/jenkins_home/workspace/node-deploy-k8s",
+  "BRIK_PLATFORM": "jenkins",
+  "BRIK_BRANCH": "",
+  "BRIK_TAG": "v0.1.0",
+  "BRIK_COMMIT_SHA": "aabbccddeeff00112233445566778899aabbccdd",
+  "BRIK_COMMIT_SHORT_SHA": "aabbccd",
+  "BRIK_COMMIT_REF": "v0.1.0",
+  "BRIK_PIPELINE_SOURCE": "push",
+  "BRIK_MERGE_REQUEST_ID": ""
+}
