@@ -74,7 +74,8 @@ Describe "planning/plan_writer.sh"
 
   Describe "plan_writer.from_stream"
     It "fails when no stage records are present"
-      When call plan_writer.from_stream
+      no_input() { plan_writer.from_stream </dev/null; }
+      When call no_input
       The status should equal "$BRIK_EXIT_INVALID_INPUT"
       The stderr should include "no stage records"
     End
