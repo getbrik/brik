@@ -1,0 +1,28 @@
+{
+  "schema_version": "1.1",
+  "pipeline": {
+    "id": "3822",
+    "platform": "gitlab",
+    "project": "node-minimal",
+    "started_at": "2026-05-28T08:50:37+0000",
+    "finished_at": "2026-05-28T08:52:11+0000",
+    "status": "success",
+    "context": "snapshot",
+    "business": {
+      "status": "success"
+    }
+  },
+  "summary": {
+    "stages": {
+      "total": 12,
+      "passed": 7,
+      "failed": 0,
+      "skipped": 5
+    },
+    "business": {
+      "success_count": 12,
+      "warning_count": 0,
+      "error_count": 0
+    }
+  }
+}

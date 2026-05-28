@@ -1,0 +1,34 @@
+apiVersion: brik.dev/v1
+kind: Stage
+metadata:
+  id: deploy
+  displayName: Deploy
+spec:
+  module: stages.deploy
+  function: stages.deploy
+  placement:
+    slot: deploy
+    after: [container-scan]
+    before: [notify]
+  runner:
+    class: deploy
+  gate:
+    mode: opt_in
+    opt_in_flag: --with-deploy
+    contexts: [snapshot, release]
+  dry_run:
+    destructive: true
+  impact:
+    changes:
+      - "**/k8s/**"
+      - "**/helm/**"
+      - "**/docker-compose*.yml"
+      - "**/ansible/**"
+  consumes: [package.artifact, package.registry_url]
+  provides: [deploy.url, deploy.environment]
+  artifacts:
+    paths:
+      - brik-artifacts/deploy/
+    dotenv: true
+  api:
+    required: [stages.deploy]

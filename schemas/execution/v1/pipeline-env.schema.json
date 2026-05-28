@@ -1,0 +1,132 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://brik.dev/schemas/execution/v1/pipeline-env.schema.json",
+  "title": "Brik Pipeline Env v1",
+  "description": "Contract for the .brik-logs/pipeline.env file written by the init stage of the execution notion (lib/pipeline/pipeline-env.sh) and consumed by every downstream stage through dotenv propagation (GitLab artifacts.reports.dotenv, Jenkins stash, local sourcing). v1 captures the 20 mandatory keys currently observed on the the test campaign campaign (7/7 samples, identical structure). To validate a pipeline.env file against this schema, convert KEY=VALUE lines to a JSON object first (the file format is dotenv, not JSON).",
+  "type": "object",
+  "required": [
+    "BRIK_GIT_USER_EMAIL",
+    "BRIK_GIT_USER_NAME",
+    "BRIK_PROJECT_NAME",
+    "BRIK_BUILD_STACK",
+    "BRIK_BUILD_STACK_VERSION",
+    "BRIK_CI_IMAGE",
+    "BRIK_IMG_STACK",
+    "BRIK_IMG_BASE",
+    "BRIK_IMG_ANALYSIS",
+    "BRIK_IMG_SCANNER",
+    "BRIK_IMG_DEPLOY",
+    "BRIK_RELEASE_PROFILE",
+    "BRIK_PROJECT_VERSION",
+    "BRIK_IS_CANDIDATE",
+    "BRIK_PACKAGE_ENABLED",
+    "BRIK_DEPLOY_ENABLED",
+    "BRIK_TEST_REPORTS_ENABLED",
+    "BRIK_TEST_COVERAGE_FORMAT",
+    "BRIK_TEST_COVERAGE_DIR",
+    "BRIK_TEST_JUNIT_PATH"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "BRIK_GIT_USER_EMAIL": {
+      "description": "Email of the git user that triggered the pipeline. Used by the release stage for tag annotations.",
+      "type": "string",
+      "pattern": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$"
+    },
+    "BRIK_GIT_USER_NAME": {
+      "description": "Display name of the git user. Used by the release stage for tag annotations.",
+      "type": "string",
+      "minLength": 1
+    },
+    "BRIK_PROJECT_NAME": {
+      "description": "Project name resolved from brik.yml project.name. Used as default tag/image name when no other source is set.",
+      "type": "string",
+      "minLength": 1
+    },
+    "BRIK_BUILD_STACK": {
+      "description": "Stack id resolved by stacks.<id>.detect or stated in brik.yml project.stack.",
+      "type": "string",
+      "enum": ["node", "python", "java", "rust", "dotnet", "docker"]
+    },
+    "BRIK_BUILD_STACK_VERSION": {
+      "description": "Stack version (e.g. '22' for Node 22, '3.13' for Python). Drives runner image selection.",
+      "type": "string",
+      "minLength": 1
+    },
+    "BRIK_CI_IMAGE": {
+      "description": "Resolved CI image for the build stage. Pattern: registry/name:tag.",
+      "type": "string",
+      "pattern": "^[a-z0-9.\\-]+(/[a-z0-9.\\-]+)+:[a-zA-Z0-9._\\-]+$"
+    },
+    "BRIK_IMG_STACK": {
+      "description": "Runner image for stack-class stages (build, lint, test).",
+      "type": "string",
+      "pattern": "^[a-z0-9.\\-]+(/[a-z0-9.\\-]+)+:[a-zA-Z0-9._\\-]+$"
+    },
+    "BRIK_IMG_BASE": {
+      "description": "Runner image for base-class stages (init, release, notify).",
+      "type": "string",
+      "pattern": "^[a-z0-9.\\-]+(/[a-z0-9.\\-]+)+:[a-zA-Z0-9._\\-]+$"
+    },
+    "BRIK_IMG_ANALYSIS": {
+      "description": "Runner image for analysis-class stages (sast).",
+      "type": "string",
+      "pattern": "^[a-z0-9.\\-]+(/[a-z0-9.\\-]+)+:[a-zA-Z0-9._\\-]+$"
+    },
+    "BRIK_IMG_SCANNER": {
+      "description": "Runner image for scanner-class stages (scan, container-scan).",
+      "type": "string",
+      "pattern": "^[a-z0-9.\\-]+(/[a-z0-9.\\-]+)+:[a-zA-Z0-9._\\-]+$"
+    },
+    "BRIK_IMG_DEPLOY": {
+      "description": "Runner image for deploy-class stages (deploy, promote).",
+      "type": "string",
+      "pattern": "^[a-z0-9.\\-]+(/[a-z0-9.\\-]+)+:[a-zA-Z0-9._\\-]+$"
+    },
+    "BRIK_RELEASE_PROFILE": {
+      "description": "Git workflow profile resolved from brik.yml .release.profile. Mirrors planning's release.profile enum.",
+      "type": "string",
+      "enum": ["trunk-based", "git-flow", "github-flow", "none"]
+    },
+    "BRIK_PROJECT_VERSION": {
+      "description": "Project version derived from the latest git tag (stripped of .release.tag_prefix). Falls back to 0.0.0 when no tag exists.",
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(-[0-9A-Za-z.\\-]+)?(\\+[0-9A-Za-z.\\-]+)?$"
+    },
+    "BRIK_IS_CANDIDATE": {
+      "description": "Dotenv-encoded boolean. '1' when the current commit is a release candidate, '0' otherwise. Mirrors planning's release.is_candidate.",
+      "type": "string",
+      "enum": ["0", "1"]
+    },
+    "BRIK_PACKAGE_ENABLED": {
+      "description": "Dotenv-encoded boolean. 'true' when the package stage is enabled by planner gate, 'false' otherwise.",
+      "type": "string",
+      "enum": ["true", "false"]
+    },
+    "BRIK_DEPLOY_ENABLED": {
+      "description": "Dotenv-encoded boolean. 'true' when the deploy stage is enabled (BRIK_WITH_DEPLOY opt-in), 'false' otherwise.",
+      "type": "string",
+      "enum": ["true", "false"]
+    },
+    "BRIK_TEST_REPORTS_ENABLED": {
+      "description": "Dotenv-encoded boolean. 'true' when test reports collection is enabled.",
+      "type": "string",
+      "enum": ["true", "false"]
+    },
+    "BRIK_TEST_COVERAGE_FORMAT": {
+      "description": "Coverage report format expected by the test stage. 'auto' lets the stack-specific test runner pick a default.",
+      "type": "string",
+      "minLength": 1
+    },
+    "BRIK_TEST_COVERAGE_DIR": {
+      "description": "Relative path where the test stage writes the coverage report.",
+      "type": "string",
+      "minLength": 1
+    },
+    "BRIK_TEST_JUNIT_PATH": {
+      "description": "Relative path where the test stage writes the JUnit XML report.",
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

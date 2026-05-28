@@ -1,0 +1,30 @@
+apiVersion: brik.dev/v1
+kind: Stage
+metadata:
+  id: init
+  displayName: Init
+spec:
+  module: stages.init
+  function: stages.init
+  placement:
+    slot: init
+    after: []
+    before: [release, build]
+  runner:
+    class: base
+  gate:
+    mode: blocking
+    contexts: [snapshot, release]
+  impact:
+    changes:
+      - brik.yml
+      - brik.lock
+      - .gitlab-ci.yml
+      - Jenkinsfile
+  consumes: []
+  provides: [pipeline.context, brik.config]
+  artifacts:
+    paths: [.brik-logs/aggregate-report.json]
+    dotenv: true
+  api:
+    required: [stages.init]

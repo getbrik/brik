@@ -1,0 +1,51 @@
+{
+  "schema_version": "1.1",
+  "stages": [
+    {
+      "schema_version": "1.1",
+      "stage": "build",
+      "timestamp": "2026-05-28T08:50:58+0000",
+      "rc": 0,
+      "status": "success",
+      "runner": {
+        "platform": "gitlab",
+        "image": "ghcr.io/getbrik/brik-runner-node:22",
+        "job_url": "http://gitlab.briklab.test:8929/brik/node-minimal/-/jobs/36035"
+      },
+      "tech": {
+        "stack": "node",
+        "tool": "auto",
+        "command": "<stack-default>",
+        "duration_ms": "586",
+        "exit_code": "0",
+        "status": "success"
+      },
+      "business": {
+        "artifact": {
+          "type": "directory",
+          "name": "dist",
+          "size_bytes": 135,
+          "sha256": "75bf3ca9cfd979cca3ab07c871d8803b475a5b8379fc1f7ebb099578eb6653c6",
+          "path": "/builds/brik/node-minimal/dist",
+          "main_file": "index.js"
+        },
+        "status": "success",
+        "reason": ""
+      },
+      "duration_ms": 586
+    }
+  ],
+  "summary": {
+    "stages": {
+      "total": 12,
+      "passed": 7,
+      "failed": 0,
+      "skipped": 5
+    },
+    "business": {
+      "success_count": 12,
+      "warning_count": 0,
+      "error_count": 0
+    }
+  }
+}

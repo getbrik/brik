@@ -1,0 +1,11 @@
+apiVersion: brik.dev/v1
+kind: Stack
+metadata:
+  id: node
+  displayName: Node.js
+spec:
+  runner:
+    image: ghcr.io/getbrik/brik-runner-node
+    defaultVersion: "22"
+    versions: ["22"]
+  api: {required: [stacks.node.build]}

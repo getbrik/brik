@@ -1,0 +1,39 @@
+{
+  "schema_version": "1.1",
+  "stage": "package",
+  "timestamp": "2026-05-28T08:58:28+0000",
+  "rc": -1,
+  "status": "success",
+  "runner": {
+    "platform": "gitlab",
+    "image": "ghcr.io/getbrik/brik-runner-node:22",
+    "job_url": "http://gitlab.briklab.test:8929/brik/node-deploy-gitops/-/jobs/36118"
+  },
+  "tech": {
+    "packager": "docker",
+    "dockerfile": "Dockerfile",
+    "build_duration_ms": "1105",
+    "image_built": "true",
+    "image_ref": "nexus.briklab.test:8082/brik/node-deploy-gitops:0.1.0",
+    "duration_ms": "1464",
+    "exit_code": "0",
+    "status": "success"
+  },
+  "business": {
+    "image": {
+      "name": "nexus.briklab.test:8082/brik/node-deploy-gitops",
+      "tag": "0.1.0",
+      "full_name": "nexus.briklab.test:8082/brik/node-deploy-gitops:0.1.0",
+      "digest": "sha256:767d1f63e3d18ba95b4b851a63394bc3a9566810d01301bc64e058019937174e"
+    },
+    "registry": {
+      "host": "nexus.briklab.test:8082",
+      "namespace": "brik",
+      "repository": "node-deploy-gitops",
+      "ui_url": "http://nexus.briklab.test:8081"
+    },
+    "status": "success",
+    "reason": ""
+  },
+  "duration_ms": 1464
+}

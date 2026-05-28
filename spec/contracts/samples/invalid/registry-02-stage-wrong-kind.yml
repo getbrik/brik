@@ -1,0 +1,12 @@
+apiVersion: brik.dev/v1
+kind: Workflow
+metadata:
+  id: init
+  displayName: Init
+spec:
+  module: stages.init
+  function: stages.init
+  placement: {slot: init, after: [], before: [build]}
+  runner: {class: base}
+  gate: {mode: blocking, contexts: [snapshot, release]}
+  api: {required: [stages.init]}

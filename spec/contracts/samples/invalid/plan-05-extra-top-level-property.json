@@ -1,0 +1,222 @@
+{
+  "brikVersion": "0.6.0",
+  "changes": {
+    "files": [],
+    "from_ref": "origin/main",
+    "source": "local",
+    "to_ref": "HEAD"
+  },
+  "context": "snapshot",
+  "dag": {
+    "edges": [
+      {
+        "from": "build",
+        "to": "lint"
+      },
+      {
+        "from": "build",
+        "to": "sast"
+      },
+      {
+        "from": "build",
+        "to": "scan"
+      },
+      {
+        "from": "build",
+        "to": "test"
+      },
+      {
+        "from": "container-scan",
+        "to": "deploy"
+      },
+      {
+        "from": "container-scan",
+        "to": "promote"
+      },
+      {
+        "from": "deploy",
+        "to": "notify"
+      },
+      {
+        "from": "init",
+        "to": "build"
+      },
+      {
+        "from": "init",
+        "to": "release"
+      },
+      {
+        "from": "lint",
+        "to": "package"
+      },
+      {
+        "from": "package",
+        "to": "container-scan"
+      },
+      {
+        "from": "promote",
+        "to": "deploy"
+      },
+      {
+        "from": "release",
+        "to": "build"
+      },
+      {
+        "from": "sast",
+        "to": "package"
+      },
+      {
+        "from": "scan",
+        "to": "package"
+      },
+      {
+        "from": "test",
+        "to": "package"
+      }
+    ]
+  },
+  "fingerprint": "da17c758d6d566152ca66ceb96ad0c270b46be74cd828fe508174858ac9fca47",
+  "mode": "safe",
+  "release": {
+    "is_candidate": false,
+    "profile": "none",
+    "version": "0.1.0"
+  },
+  "schemaVersion": "v1",
+  "stages": [
+    {
+      "decision": "run",
+      "function": "stages.init",
+      "gate": {
+        "mode": "blocking"
+      },
+      "id": "init",
+      "matched_globs": [],
+      "reason": "context-match",
+      "runner_class": "base"
+    },
+    {
+      "decision": "skip",
+      "function": "stages.release",
+      "gate": {
+        "mode": "opt_in"
+      },
+      "id": "release",
+      "matched_globs": [],
+      "reason": "context-mismatch",
+      "runner_class": "base"
+    },
+    {
+      "decision": "run",
+      "function": "stages.build",
+      "gate": {
+        "mode": "blocking"
+      },
+      "id": "build",
+      "matched_globs": [],
+      "reason": "context-match",
+      "runner_class": "stack"
+    },
+    {
+      "decision": "run",
+      "function": "stages.lint",
+      "gate": {
+        "mode": "blocking"
+      },
+      "id": "lint",
+      "matched_globs": [],
+      "reason": "context-match",
+      "runner_class": "stack"
+    },
+    {
+      "decision": "run",
+      "function": "stages.sast",
+      "gate": {
+        "mode": "blocking"
+      },
+      "id": "sast",
+      "matched_globs": [],
+      "reason": "context-match",
+      "runner_class": "analysis"
+    },
+    {
+      "decision": "run",
+      "function": "stages.scan",
+      "gate": {
+        "mode": "blocking"
+      },
+      "id": "scan",
+      "matched_globs": [],
+      "reason": "context-match",
+      "runner_class": "scanner"
+    },
+    {
+      "decision": "run",
+      "function": "stages.test",
+      "gate": {
+        "mode": "blocking"
+      },
+      "id": "test",
+      "matched_globs": [],
+      "reason": "context-match",
+      "runner_class": "stack"
+    },
+    {
+      "decision": "skip",
+      "function": "stages.package",
+      "gate": {
+        "mode": "opt_in"
+      },
+      "id": "package",
+      "matched_globs": [],
+      "reason": "opt-in-flag-missing",
+      "runner_class": "stack"
+    },
+    {
+      "decision": "skip",
+      "function": "stages.container_scan",
+      "gate": {
+        "mode": "opt_in"
+      },
+      "id": "container-scan",
+      "matched_globs": [],
+      "reason": "opt-in-flag-missing",
+      "runner_class": "scanner"
+    },
+    {
+      "decision": "skip",
+      "function": "stages.promote",
+      "gate": {
+        "mode": "blocking"
+      },
+      "id": "promote",
+      "matched_globs": [],
+      "reason": "context-mismatch",
+      "runner_class": "deploy"
+    },
+    {
+      "decision": "skip",
+      "function": "stages.deploy",
+      "gate": {
+        "mode": "opt_in"
+      },
+      "id": "deploy",
+      "matched_globs": [],
+      "reason": "opt-in-flag-missing",
+      "runner_class": "deploy"
+    },
+    {
+      "decision": "run",
+      "function": "stages.notify",
+      "gate": {
+        "mode": "blocking"
+      },
+      "id": "notify",
+      "matched_globs": [],
+      "reason": "context-match",
+      "runner_class": "base"
+    }
+  ],
+  "workspace": "/builds/brik/node-minimal",
+  "extra_field": "not allowed"
+}

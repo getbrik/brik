@@ -1,0 +1,25 @@
+{
+  "schema_version": "1.1",
+  "stage": "test",
+  "timestamp": "2026-05-28T08:51:15+0000",
+  "rc": 0,
+  "status": "success",
+  "runner": {
+    "platform": "gitlab",
+    "image": "ghcr.io/getbrik/brik-runner-node:22",
+    "job_url": "http://gitlab.briklab.test:8929/brik/node-minimal/-/jobs/36039"
+  },
+  "tech": {
+    "framework": "npm",
+    "tool": "npm",
+    "coverage_tool": "auto",
+    "duration_ms": "854",
+    "exit_code": "0",
+    "status": "success"
+  },
+  "business": {
+    "status": "success",
+    "reason": ""
+  },
+  "duration_ms": 854
+}

@@ -1,0 +1,5 @@
+deploy:
+  environments:
+    production:
+      target: k8s
+      namespace: prod

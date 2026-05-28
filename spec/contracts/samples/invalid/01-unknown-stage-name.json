@@ -1,0 +1,12 @@
+{
+  "stage_name": "bogus-stage",
+  "status": "SUCCESS",
+  "exit_code": 0,
+  "started_at": "2026-05-28T08:50:57+0000",
+  "finished_at": "2026-05-28T08:50:58+0000",
+  "duration_ms": 100,
+  "log_file": "/tmp/x.log",
+  "artifacts": [],
+  "warnings": [],
+  "errors": []
+}
