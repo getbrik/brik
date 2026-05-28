@@ -21,6 +21,15 @@ spec_helper_loaded() {
   export BRIK_HOME
   BRIK_HOME="$(pwd)"
 
+  # Isolate every spec from the developer's global / system git config.
+  # Global keys like tag.gpgsign=true or commit.gpgsign=true would
+  # otherwise leak into specs that exercise git operations (lightweight
+  # tag, commit) and break them with "fatal: no tag message?" etc. By
+  # routing GIT_CONFIG_GLOBAL to /dev/null and disabling system config,
+  # every test sees a pristine git baseline regardless of the host setup.
+  export GIT_CONFIG_GLOBAL=/dev/null
+  export GIT_CONFIG_NOSYSTEM=1
+
   export BRIK_BIN="${BRIK_HOME}/bin/brik"
   export BRIK_SCHEMA="${BRIK_HOME}/schemas/config/v1/brik.schema.json"
   export FIXTURES="${BRIK_HOME}/testdata/fixtures"

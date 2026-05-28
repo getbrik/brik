@@ -25,7 +25,7 @@ Describe "changelog.sh"
         git config user.name "Test"
         printf 'init\n' > README.md
         git add README.md && git commit -q -m "chore: initial commit"
-        git tag v0.1.0
+        git -c tag.gpgsign=false -c tag.forceSignAnnotated=false tag v0.1.0
         printf 'feature\n' >> README.md
         git add README.md && git commit -q -m "feat: add login page"
         printf 'fix\n' >> README.md
@@ -81,7 +81,7 @@ Describe "changelog.sh"
         git config user.name "Test"
         printf 'init\n' > README.md
         git add README.md && git commit -q -m "initial commit"
-        git tag v0.0.1
+        git -c tag.gpgsign=false -c tag.forceSignAnnotated=false tag v0.0.1
         printf 'x\n' >> README.md
         git add README.md && git commit -q -m "update readme"
         printf 'y\n' >> README.md
@@ -117,7 +117,7 @@ Describe "changelog.sh"
         git config user.name "Test"
         printf 'init\n' > README.md
         git add README.md && git commit -q -m "chore: init"
-        git tag v1.0.0
+        git -c tag.gpgsign=false -c tag.forceSignAnnotated=false tag v1.0.0
         printf 'x\n' >> README.md
         git add README.md && git commit -q -m "feat!: change API format"
       }
@@ -145,7 +145,7 @@ Describe "changelog.sh"
         git config user.name "Test"
         printf 'init\n' > README.md
         git add README.md && git commit -q -m "chore: init"
-        git tag v1.0.0
+        git -c tag.gpgsign=false -c tag.forceSignAnnotated=false tag v1.0.0
       }
       cleanup_empty() {
         cd "$ORIG_DIR" || true
@@ -202,7 +202,7 @@ Describe "changelog.sh"
         git config user.name "Test"
         printf 'init\n' > README.md
         git add README.md && git commit -q -m "chore: init"
-        git tag v0.0.1
+        git -c tag.gpgsign=false -c tag.forceSignAnnotated=false tag v0.0.1
         for type in perf ci style build revert docs test chore; do
           printf '%s\n' "$type" >> README.md
           git add README.md && git commit -q -m "${type}: ${type} change"
@@ -266,10 +266,10 @@ Describe "changelog.sh"
         git config user.name "Test"
         printf 'init\n' > README.md
         git add README.md && git commit -q -m "chore: init"
-        git tag v1.0.0
+        git -c tag.gpgsign=false -c tag.forceSignAnnotated=false tag v1.0.0
         printf 'a\n' >> README.md
         git add README.md && git commit -q -m "feat: feature a"
-        git tag v1.1.0
+        git -c tag.gpgsign=false -c tag.forceSignAnnotated=false tag v1.1.0
         printf 'b\n' >> README.md
         git add README.md && git commit -q -m "feat: feature b"
       }
