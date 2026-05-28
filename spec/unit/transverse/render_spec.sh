@@ -496,7 +496,8 @@ Describe "render.sh (transverse rendering primitives)"
 
   Describe "render.table"
     It "writes nothing when stdin is empty"
-      When call render.table
+      no_input() { render.table </dev/null; }
+      When call no_input
       The status should be success
       The stdout should equal ""
       The stderr should equal ""
