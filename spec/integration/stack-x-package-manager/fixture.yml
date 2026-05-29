@@ -1,0 +1,14 @@
+# L2 fixture manifest -- chantier 20260528_e2e-tests-par-notion (S3, wave 3.3)
+edge: stack -> package manager
+graph_edge_id: 9
+case: >-
+  Each stack drives its language package-manager CLI: node -> npm ci (lockfile
+  present), rust -> cargo build (+ --release with --profile release).
+synthesized_workspace:
+  stacks: [node, rust]
+  files: [package.json, package-lock.json, Cargo.toml]
+  mocked_binaries: [npm, cargo]
+deps_expected: [jq, yq]
+version_pin:
+  registry: built-in node + rust stack manifests
+covers_divergence: "-"

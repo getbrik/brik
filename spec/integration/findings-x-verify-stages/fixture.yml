@@ -1,0 +1,14 @@
+# L2 fixture manifest -- chantier 20260528_e2e-tests-par-notion (S3, wave 3.3)
+edge: findings (x) verify stages
+graph_edge_id: 11
+case: >-
+  Severity normalization is one shared scale across the verify stages' tools
+  (grype/osv-scanner/semgrep); fix-classification dispatches per consuming
+  stage on the same native finding (grype fixState -> has_fix for
+  container-scan, not for the deps scan which keys off fixes[]).
+fixtures:
+  sarif: spec/fixtures/sarif/grype-fixstate.sarif
+deps_expected: [jq]
+version_pin:
+  findings_pivot: severity.sh + fix_classifier.sh
+covers_divergence: "-"
