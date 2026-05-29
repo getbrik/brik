@@ -3,18 +3,78 @@ coverage:
     project:
       default:
         target: 80%
+      # Per-notion non-regression gates. registry/planning keep an absolute
+      # 90% bar (new code, central to the architecture); every other notion
+      # uses target:auto so its coverage cannot drop versus the base commit
+      # (1% threshold absorbs measurement noise). A PR that lowers a notion's
+      # coverage fails that notion's status check.
       registry:
-        # V.1 of the architecture refactor chantier targets 90% on the
-        # registry surface (new code, central to the OCP claim).
         target: 90%
         paths:
           - lib/registry/
       planning:
-        # Same 90% bar on the planner (D.4): the gate hook in pipeline.run
-        # and the per-stage `brik plan gate` all hang off these modules.
         target: 90%
         paths:
           - lib/planning/
+      stack:
+        target: auto
+        threshold: 1%
+        paths:
+          - lib/stacks/
+      stages:
+        target: auto
+        threshold: 1%
+        paths:
+          - lib/stages/
+      deployments:
+        target: auto
+        threshold: 1%
+        paths:
+          - lib/deployments/
+      transverse:
+        target: auto
+        threshold: 1%
+        paths:
+          - lib/transverse/
+      execution:
+        target: auto
+        threshold: 1%
+        paths:
+          - lib/pipeline/
+      package-managers:
+        target: auto
+        threshold: 1%
+        paths:
+          - lib/package-managers/
+      rollout:
+        target: auto
+        threshold: 1%
+        paths:
+          - lib/rollout/
+      findings:
+        target: auto
+        threshold: 1%
+        paths:
+          - lib/transverse/findings*
+          - lib/transverse/sarif.sh
+          - lib/transverse/severity.sh
+          - lib/transverse/fix_classifier.sh
+          - lib/transverse/junit.sh
+          - lib/transverse/sbom.sh
+          - lib/transverse/coverage.sh
+      cli:
+        target: auto
+        threshold: 1%
+        paths:
+          - lib/cli/
+      execution-environment:
+        target: auto
+        threshold: 1%
+        paths:
+          - shared-libs/common/scripts/
+          - shared-libs/gitlab/scripts/
+          - shared-libs/jenkins/scripts/
+          - shared-libs/local/scripts/
     patch:
       default:
         target: 80%
