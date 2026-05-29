@@ -1,0 +1,12 @@
+# L2 fixture manifest -- chantier 20260528_e2e-tests-par-notion (S3, wave 3.3)
+edge: deployments -> rollout
+graph_edge_id: 10
+case: >-
+  rollout.health.wait gates on endpoint health (curl mocked) and times out
+  with BRIK_EXIT_TIMEOUT (8) when never healthy; rollout.strategy.run delegates
+  to the deploy function (the path a strategy-driven deployment takes).
+synthesized_workspace: none (mocked curl + a marker-writing deploy fn)
+deps_expected: [jq]
+version_pin:
+  exit_codes: BRIK_EXIT_TIMEOUT=8
+covers_divergence: "-"
