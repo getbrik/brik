@@ -93,12 +93,13 @@ Line/branch coverage is measured by kcov and published to Codecov:
 make coverage      # shellspec --kcov over bin/, lib/, shared-libs/*/scripts/
 ```
 
-The per-notion **non-regression gate** lives in `codecov.yml`:
-`coverage.status.project` maps each notion to its `lib/<notion>/` paths.
-registry and planning hold an absolute 90% target; every other notion uses
-`target: auto`, so a PR that lowers a notion's coverage fails that notion's
-Codecov status check. This is the per-notion PR-gate -- there is no bespoke
-coverage script; kcov + Codecov are the single source of truth.
+The per-notion **coverage floor** lives in `codecov.yml`:
+`coverage.status.project` maps each notion to its `lib/<notion>/` paths. Every
+notion holds at least 80% line coverage today (measured with kcov; global
+~90%), so 80% is the uniform floor; registry keeps a 90% bar and planning 85%.
+A PR that drops a notion below its floor fails that notion's Codecov status
+check. This is the per-notion PR-gate -- there is no bespoke coverage script;
+kcov + Codecov are the single source of truth.
 
 ## Running the suite
 

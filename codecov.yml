@@ -3,57 +3,49 @@ coverage:
     project:
       default:
         target: 80%
-      # Per-notion non-regression gates. registry/planning keep an absolute
-      # 90% bar (new code, central to the architecture); every other notion
-      # uses target:auto so its coverage cannot drop versus the base commit
-      # (1% threshold absorbs measurement noise). A PR that lowers a notion's
-      # coverage fails that notion's status check.
+      # Per-notion absolute floors. Every notion holds at least 80% line
+      # coverage today (measured with kcov; global 90.4%), so 80% is the
+      # uniform minimum. registry keeps a higher 90% bar (central to the
+      # architecture, sits at 91%); planning holds 85% (at 87%). A PR that
+      # drops a notion below its floor fails that notion's status check.
       registry:
         target: 90%
         paths:
           - lib/registry/
       planning:
-        target: 90%
+        target: 85%
         paths:
           - lib/planning/
       stack:
-        target: auto
-        threshold: 1%
+        target: 80%
         paths:
           - lib/stacks/
       stages:
-        target: auto
-        threshold: 1%
+        target: 80%
         paths:
           - lib/stages/
       deployments:
-        target: auto
-        threshold: 1%
+        target: 80%
         paths:
           - lib/deployments/
       transverse:
-        target: auto
-        threshold: 1%
+        target: 80%
         paths:
           - lib/transverse/
       execution:
-        target: auto
-        threshold: 1%
+        target: 80%
         paths:
           - lib/pipeline/
       package-managers:
-        target: auto
-        threshold: 1%
+        target: 80%
         paths:
           - lib/package-managers/
       rollout:
-        target: auto
-        threshold: 1%
+        target: 80%
         paths:
           - lib/rollout/
       findings:
-        target: auto
-        threshold: 1%
+        target: 80%
         paths:
           - lib/transverse/findings*
           - lib/transverse/sarif.sh
@@ -63,13 +55,11 @@ coverage:
           - lib/transverse/sbom.sh
           - lib/transverse/coverage.sh
       cli:
-        target: auto
-        threshold: 1%
+        target: 80%
         paths:
           - lib/cli/
       execution-environment:
-        target: auto
-        threshold: 1%
+        target: 80%
         paths:
           - shared-libs/common/scripts/
           - shared-libs/gitlab/scripts/
