@@ -1,0 +1,14 @@
+# L2 fixture manifest -- chantier 20260528_e2e-tests-par-notion (S3, wave 3.2)
+edge: stages -> stack
+graph_edge_id: 2
+case: >-
+  The build stage dispatches through stage.run to the real stacks.node.build
+  (npm mocked); failure propagates. Relocated from spec/_legacy/integration/.
+synthesized_workspace:
+  stack: node
+  files: [package.json, node_modules/]
+  mocked_binaries: [npm]
+deps_expected: [jq, yq]
+version_pin:
+  registry: built-in node stack manifest
+covers_divergence: "-"

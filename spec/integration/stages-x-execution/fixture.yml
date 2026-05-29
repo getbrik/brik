@@ -1,0 +1,12 @@
+# L2 fixture manifest -- chantier 20260528_e2e-tests-par-notion (S3, wave 3.2)
+edge: stages -> execution
+graph_edge_id: 6
+case: >-
+  stage.run instruments a real stage: a passing logic fn yields a SUCCESS
+  summary and tech.status=success in the aggregate report; a failing fn
+  propagates the exit code, yields FAILED, and records tech.status=failed.
+synthesized_workspace: none (trivial logic functions + report.init)
+deps_expected: [jq]
+version_pin:
+  brik_schema: report/v1.1 (aggregate + fragment)
+covers_divergence: "-"

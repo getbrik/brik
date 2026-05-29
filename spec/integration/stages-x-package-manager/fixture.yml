@@ -1,0 +1,15 @@
+# L2 fixture manifest -- chantier 20260528_e2e-tests-par-notion (S3, wave 3.2)
+edge: stages -> package manager
+graph_edge_id: 3
+case: >-
+  The package stage builds the container then dispatches to pkg.<reg>.publish
+  for each configured publish target (binaries mocked), fail-fast on first
+  publisher error. Relocated from spec/_legacy/stages/package_spec.sh.
+synthesized_workspace:
+  stack: node
+  files: [package.json, brik.yml]
+  mocked_binaries: [docker, npm, mvn, cargo]
+deps_expected: [jq, yq]
+version_pin:
+  registry: built-in stage + package-manager modules
+covers_divergence: "-"

@@ -1,0 +1,14 @@
+# L2 fixture manifest -- chantier 20260528_e2e-tests-par-notion (S3, wave 3.2)
+edge: stages -> transverse
+graph_edge_id: 5
+case: >-
+  The transverse contract stages rely on: config.read/config.get (read
+  brik.yml), env.resolve_indirect (deploy resolves BRIK_DEPLOY_<ENV>_TARGET),
+  wait.until (rollout/deploy poll readiness, returns immediately on first pass).
+synthesized_workspace:
+  files: [brik.yml]
+  env: BRIK_DEPLOY_STAGING_TARGET
+deps_expected: [jq, yq]
+version_pin:
+  brik_schema: config/v1
+covers_divergence: "-"
