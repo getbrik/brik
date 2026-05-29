@@ -1,0 +1,16 @@
+# L2 fixture manifest -- chantier 20260528_e2e-tests-par-notion (S3, wave 3.1)
+edge: planning -> stages
+graph_edge_id: 10
+case: >-
+  plan.json drives the per-stage gate: brik plan gate <stage> returns 0 for a
+  run decision and 1 for a skip decision; an unimplemented planner mode is
+  rejected.
+synthesized_workspace:
+  stack: node
+  files: [package.json, brik.yml]
+  git: init + single baseline commit
+deps_expected: [git, jq, yq]
+version_pin:
+  brik_schema: plan/v1
+  registry: built-in manifests
+covers_divergence: "-"
