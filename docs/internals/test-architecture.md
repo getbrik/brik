@@ -101,6 +101,12 @@ A PR that drops a notion below its floor fails that notion's Codecov status
 check. This is the per-notion PR-gate -- there is no bespoke coverage script;
 kcov + Codecov are the single source of truth.
 
+> Caveat: kcov instruments the in-process ShellSpec bash, not child processes.
+> CLI commands tested end to end via `When run script "$BRIK_BIN" <cmd>` run in
+> a subprocess, so their lines read as uncovered even when well tested -- e.g.
+> `lib/cli/registry.sh` shows 0% although `registry_stages_spec.sh` exercises
+> it. Do not "fix" such files with redundant tests; check the spec first.
+
 ## Running the suite
 
 ```bash
