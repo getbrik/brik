@@ -4,15 +4,17 @@
 
 The test suite is organised along the **11 domain notions** declared in
 [`layout.md`](layout.md) and the inter-notion **dependency graph** documented
-there. The architecture is layered:
+there. It is layered into four typed layers, all under
+`brik/spec/{contracts,unit,integration,pipeline-e2e}/`:
 
-- Pre-existing tests live under `brik/spec/_legacy/` and continue to run
-  during the transition.
-- The new four-layer architecture (L0 Contracts / L1 Unit / L2 Notion-pair
-  / L3 Pipeline-E2E) is built **alongside** under
-  `brik/spec/{contracts,unit,integration,pipeline-e2e}/`.
-- `_legacy/` shrinks as specs migrate into the typed layers and is
-  scheduled for removal once coverage parity is reached.
+- **L0 Contracts** -- a notion's static I/O contract against its JSON Schema.
+- **L1 Unit** -- a notion's logic in isolation, every external binary mocked.
+- **L2 Notion-pair** -- one edge of the dependency graph, the target notion real.
+- **L3 Pipeline-E2E** -- the whole graph on a real orchestrator (briklab).
+
+The former transition holding pen `spec/_legacy/` has been fully migrated and
+removed: every spec now lives in its typed layer, and `spec/unit/` is purely
+single-notion L1.
 
 ## Layout
 
@@ -21,23 +23,12 @@ brik/spec/
   spec_helper.sh           # SHARED: exports BRIK_HOME, BRIK_BIN, BRIK_SCHEMA, FIXTURES, EXAMPLES
   support/                 # SHARED: mock_helper.sh + its spec (referenced by 84+ specs)
   fixtures/                # SHARED: SARIF/JUnit/SBOM samples
-  _legacy/                 # TRANSITION: ~206 pre-existing specs, organised by notion
-    cli/
-    deployments/
-    integration/
-    package-managers/
-    pipeline/
-    planning/
-    registry/
-    rollout/
-    schemas/
-    stacks/
-    stages/
-    transverse/
+  coverage/                # coverage-matrix.sh -- per-notion coverage generator
   contracts/               # L0: per-notion static I/O contracts
-  unit/                    # L1: per-notion pure logic (in progress)
-  integration/             # L2: per-edge tests (S3 -- all 11 graph edges landed)
-    execution-env-x-stages/    # edge #1  -- D1 --with-deploy propagation
+  unit/                    # L1: per-notion pure logic (every external binary mocked)
+    <notion>/              #     one directory per notion (stacks, stages, ...)
+  integration/             # L2: one directory per dependency-graph edge
+    execution-env-x-stages/    # edge #1  -- --with-deploy propagation
     planning-x-stages/         # edge #10 -- plan.json drives the stage gate
     registry-x-planning/       # edge #11 -- gate.opt_in_flag consumed by planner
     stages-x-stack/            # edge #2  -- build stage -> stacks.<stack>.build
@@ -55,17 +46,11 @@ brik/spec/
 
 Each `integration/<edge>/` directory carries a `fixture.yml` documenting the
 fixture the family relies on (see `spec/integration/README.md`). All 11
-dependency-graph edges have an L2 family. `adapter-parity/` holds the
-cross-cutting parity specs that mirror the registry/stacks across adapters
-(not a single edge; see its README). The cross-notion specs that used to sit
-under `spec/unit/integration/` have been relocated into their edge directories,
-`adapter-parity/`, or `pipeline-e2e/`, so `spec/unit/` is now purely
-single-notion L1.
+dependency-graph edges have an L2 family. `adapter-parity/` holds cross-cutting
+parity specs that are not a single edge (see its README).
 
-`support/` and `fixtures/` stay at the root of `brik/spec/` because they
-are referenced by absolute path (`$BRIK_HOME/spec/support/...`) from
-84+ specs. They remain shared between `_legacy/` and the four typed
-layers.
+`support/` and `fixtures/` stay at the root of `brik/spec/` because they are
+referenced by absolute path (`$BRIK_HOME/spec/support/...`) from 84+ specs.
 
 ## Target layers
 
@@ -78,50 +63,53 @@ layers.
 
 ### L1 purity criterion
 
-An L1 spec must run inside a minimal Alpine container: bash + jq + yq +
-ShellSpec. If the spec needs `docker`, `kubectl`, `grype`, `npm`, a real
-filesystem outside `/tmp`, or a real external service, **it belongs to
-L2**.
+An L1 spec **mocks every external binary** (`docker`, `kubectl`, `helm`,
+`npm`, `cargo`, `mvn`, `grype`, `gitleaks`, ...) and runs with only the brik
+prerequisites on PATH: bash + jq + yq + jv + git + ShellSpec. It must pass in
+CI (ubuntu) with no stack or deploy tool installed. If a spec needs a **real**
+external binary, a real external service, or a real filesystem outside `/tmp`,
+it is not L1 -- it belongs to L2 or L3.
 
-## Writing a new test during the transition
+> Note: the operative reference environment is the CI runner (ubuntu + the
+> prerequisites above), not a bare busybox image. A few L1 specs rely on
+> GNU-coreutils behaviour (e.g. `date`) and would not pass on pure busybox;
+> that is a portability detail, not an L1 violation.
 
-- **Test of a pure function** of a notion → write the spec under
-  `brik/spec/_legacy/<notion>/<submodule>_spec.sh` (current convention).
-  It will migrate to `unit/<notion>/` when L1 is reorganised.
-- **Test of an I/O contract** of a notion → write the spec under
-  `brik/spec/contracts/<notion>_contract_spec.sh` and create / extend
-  the schema under `brik/schemas/<notion>/v1/<output>.schema.json`.
-- **Test of a graph edge** (e.g. "stage build dispatches correctly to
-  the node stack") → write the spec under
-  `brik/spec/integration/<edge>/` (create the directory if it is the
-  first member of the family).
+## Writing a new test
+
+- **Pure function of a notion** -> `brik/spec/unit/<notion>/<submodule>_spec.sh`,
+  mocking every external binary.
+- **I/O contract of a notion** -> `brik/spec/contracts/<notion>_contract_spec.sh`
+  plus the schema under `brik/schemas/<notion>/v1/<output>.schema.json`.
+- **Graph edge** (e.g. "the build stage dispatches to the node stack") ->
+  `brik/spec/integration/<edge>/` (create the directory if it is the first
+  member of the family, with a `fixture.yml`).
+
+## Coverage
+
+Line/branch coverage is measured by kcov and published to Codecov:
+
+```bash
+make coverage      # shellspec --kcov over bin/, lib/, shared-libs/*/scripts/
+```
+
+The per-notion **non-regression gate** lives in `codecov.yml`:
+`coverage.status.project` maps each notion to its `lib/<notion>/` paths.
+registry and planning hold an absolute 90% target; every other notion uses
+`target: auto`, so a PR that lowers a notion's coverage fails that notion's
+Codecov status check. This is the per-notion PR-gate -- there is no bespoke
+coverage script; kcov + Codecov are the single source of truth.
 
 ## Running the suite
 
 ```bash
-# Everything (legacy + new layers)
-cd brik && shellspec
+cd brik && shellspec            # everything
 
-# Per layer
-shellspec spec/_legacy/         # transition
 shellspec spec/contracts/       # L0
-shellspec spec/unit/            # L1 (in progress)
-shellspec spec/integration/     # L2 (in progress)
-shellspec spec/pipeline-e2e/    # L3 (in progress)
-
-# A specific notion (legacy)
-shellspec spec/_legacy/stages/
+shellspec spec/unit/            # L1
+shellspec spec/integration/     # L2
+shellspec spec/pipeline-e2e/    # L3
 ```
-
-## Known pre-existing failures
-
-`shellspec spec/_legacy/` reports a stable count of failures located in
-specs that manipulate `git tag` / `git init` inside temp directories
-(`release_spec.sh`, `version_spec.sh`, `self_update_internals_spec.sh`,
-`stages/release_spec.sh`). These tests are sensitive to the local git
-environment (global config, git version, sandbox) and not caused by the
-layered reorganisation. They are slated for cleanup as the affected
-specs migrate to L1.
 
 ## References
 
