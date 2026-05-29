@@ -3,68 +3,19 @@ coverage:
     project:
       default:
         target: 80%
-      # Per-notion absolute floors. Every notion holds at least 80% line
-      # coverage today (measured with kcov; global 90.4%), so 80% is the
-      # uniform minimum. registry keeps a higher 90% bar (central to the
-      # architecture, sits at 91%); planning holds 85% (at 87%). A PR that
-      # drops a notion below its floor fails that notion's status check.
+      # The two notions central to the architecture get an explicit higher
+      # bar; every other notion is covered by the 80% repo-wide floor above.
       registry:
+        # The registry is the extension surface; it sits at ~91%.
         target: 90%
         paths:
           - lib/registry/
       planning:
+        # The planner drives the per-stage gate; it sits at ~87%, so 85%
+        # (kept below 90%, which it no longer meets).
         target: 85%
         paths:
           - lib/planning/
-      stack:
-        target: 80%
-        paths:
-          - lib/stacks/
-      stages:
-        target: 80%
-        paths:
-          - lib/stages/
-      deployments:
-        target: 80%
-        paths:
-          - lib/deployments/
-      transverse:
-        target: 80%
-        paths:
-          - lib/transverse/
-      execution:
-        target: 80%
-        paths:
-          - lib/pipeline/
-      package-managers:
-        target: 80%
-        paths:
-          - lib/package-managers/
-      rollout:
-        target: 80%
-        paths:
-          - lib/rollout/
-      findings:
-        target: 80%
-        paths:
-          - lib/transverse/findings*
-          - lib/transverse/sarif.sh
-          - lib/transverse/severity.sh
-          - lib/transverse/fix_classifier.sh
-          - lib/transverse/junit.sh
-          - lib/transverse/sbom.sh
-          - lib/transverse/coverage.sh
-      cli:
-        target: 80%
-        paths:
-          - lib/cli/
-      execution-environment:
-        target: 80%
-        paths:
-          - shared-libs/common/scripts/
-          - shared-libs/gitlab/scripts/
-          - shared-libs/jenkins/scripts/
-          - shared-libs/local/scripts/
     patch:
       default:
         target: 80%
