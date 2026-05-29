@@ -102,10 +102,12 @@ check. This is the per-notion PR-gate -- there is no bespoke coverage script;
 kcov + Codecov are the single source of truth.
 
 > Caveat: kcov instruments the in-process ShellSpec bash, not child processes.
-> CLI commands tested end to end via `When run script "$BRIK_BIN" <cmd>` run in
-> a subprocess, so their lines read as uncovered even when well tested -- e.g.
-> `lib/cli/registry.sh` shows 0% although `registry_stages_spec.sh` exercises
-> it. Do not "fix" such files with redundant tests; check the spec first.
+> A CLI command exercised only via `When run script "$BRIK_BIN" <cmd>` runs in
+> a subprocess, so its lines read as uncovered even when the end-to-end spec
+> passes. To make that coverage visible, add in-process `When call cli.<cmd>.*`
+> tests -- the `*_internals_spec.sh` pattern -- alongside the end-to-end spec
+> (see `registry_internals_spec.sh`). Before treating a 0% file as untested,
+> check whether it is only covered by a subprocess spec.
 
 ## Running the suite
 
