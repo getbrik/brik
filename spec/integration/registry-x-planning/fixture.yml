@@ -1,0 +1,12 @@
+# L2 fixture manifest -- chantier 20260528_e2e-tests-par-notion (S3, wave 3.1)
+edge: registry -> planning
+graph_edge_id: 11
+case: >-
+  Each opt-in stage manifest's spec.gate.opt_in_flag, loaded by the registry,
+  is the exact flag the planner gates on (deploy/--with-deploy,
+  package/--with-package, release/--with-release).
+synthesized_workspace: none (uses built-in registry cache + planner functions)
+deps_expected: [jq, yq]
+version_pin:
+  registry: built-in manifests (lib/registry/manifests/stages/*.yml)
+covers_divergence: "-"
