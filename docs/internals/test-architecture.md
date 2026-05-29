@@ -36,9 +36,27 @@ brik/spec/
     transverse/
   contracts/               # L0: per-notion static I/O contracts
   unit/                    # L1: per-notion pure logic (in progress)
-  integration/             # L2: per-edge tests (in progress)
+  integration/             # L2: per-edge tests (S3 -- all 11 graph edges landed)
+    execution-env-x-stages/    # edge #1  -- D1 --with-deploy propagation
+    planning-x-stages/         # edge #10 -- plan.json drives the stage gate
+    registry-x-planning/       # edge #11 -- gate.opt_in_flag consumed by planner
+    stages-x-stack/            # edge #2  -- build stage -> stacks.<stack>.build
+    stages-x-package-manager/  # edge #3  -- package stage -> pkg.<reg>.publish
+    stages-x-deployments/      # edge #4  -- deploy stage -> deploy.<target>.run
+    stages-x-transverse/       # edge #5  -- stages -> config/env/wait contract
+    stages-x-execution/        # edge #6  -- stage.run instrumentation
+    stack-x-package-manager/   # edge #9  -- stacks drive npm/cargo/... CLI
+    deployments-x-rollout/     # edge #8  -- health gate + strategy delegation
+    findings-x-verify-stages/  # edge #7  -- shared severity + fix-classification
   pipeline-e2e/            # L3: 3-5 orchestrator scenarios (in progress)
 ```
+
+Each `integration/<edge>/` directory carries a `fixture.yml` documenting the
+fixture the family relies on (see `spec/integration/README.md`). All 11
+dependency-graph edges now have an L2 family (waves 3.1 parity-critical, 3.2
+business flow, 3.3 secondary). The remaining S3 work is the consolidation of
+the cross-notion specs still parked under `spec/unit/integration/` into their
+edge directories.
 
 `support/` and `fixtures/` stay at the root of `brik/spec/` because they
 are referenced by absolute path (`$BRIK_HOME/spec/support/...`) from
