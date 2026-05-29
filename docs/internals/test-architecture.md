@@ -48,15 +48,19 @@ brik/spec/
     stack-x-package-manager/   # edge #9  -- stacks drive npm/cargo/... CLI
     deployments-x-rollout/     # edge #8  -- health gate + strategy delegation
     findings-x-verify-stages/  # edge #7  -- shared severity + fix-classification
-  pipeline-e2e/            # L3: 3-5 orchestrator scenarios (in progress)
+    adapter-parity/            # cross-cutting: adapters mirror the registry/stacks
+  pipeline-e2e/            # L3: full plan-driven pipeline + orchestrator scenarios
+    plan_l3_local_spec.sh
 ```
 
 Each `integration/<edge>/` directory carries a `fixture.yml` documenting the
 fixture the family relies on (see `spec/integration/README.md`). All 11
-dependency-graph edges now have an L2 family (waves 3.1 parity-critical, 3.2
-business flow, 3.3 secondary). The remaining S3 work is the consolidation of
-the cross-notion specs still parked under `spec/unit/integration/` into their
-edge directories.
+dependency-graph edges have an L2 family. `adapter-parity/` holds the
+cross-cutting parity specs that mirror the registry/stacks across adapters
+(not a single edge; see its README). The cross-notion specs that used to sit
+under `spec/unit/integration/` have been relocated into their edge directories,
+`adapter-parity/`, or `pipeline-e2e/`, so `spec/unit/` is now purely
+single-notion L1.
 
 `support/` and `fixtures/` stay at the root of `brik/spec/` because they
 are referenced by absolute path (`$BRIK_HOME/spec/support/...`) from

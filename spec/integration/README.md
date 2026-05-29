@@ -65,6 +65,10 @@ and the secondary edges (3.3).
 | #8 Deployments -> Rollout | `deployments-x-rollout/` | health gate timeout (exit 8) + strategy delegation |
 | #7 Findings x verify stages | `findings-x-verify-stages/` | shared severity scale + per-stage fix-classification |
 
-All 11 dependency-graph edges now have an L2 family. The remaining S3 work is
-the consolidation of the cross-notion specs currently parked under
-`spec/unit/integration/` into their edge directories.
+All 11 dependency-graph edges now have an L2 family. The `adapter-parity/`
+directory holds cross-cutting parity specs (adapters mirroring the
+registry/stacks) that are not a single edge -- see its own README. The
+cross-notion specs that used to live under `spec/unit/integration/` have been
+relocated here (into edge directories or `adapter-parity/`) or into
+`spec/pipeline-e2e/` for the full plan-driven pipeline run, so `spec/unit/` is
+now purely single-notion L1.
