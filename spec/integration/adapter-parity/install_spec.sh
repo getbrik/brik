@@ -7,8 +7,12 @@ Describe "shim integration"
     TMPDIR_INSTALL="$(mktemp -d)"
     TMPDIR_BIN="$(mktemp -d)"
 
-    # Simulate an installation: copy the whole brik tree into a fake BRIK_HOME
-    cp -R "${BRIK_HOME}/." "${TMPDIR_INSTALL}/"
+    # Simulate an installation by copying only the runtime the shim needs
+    # (bin, lib, schemas). Copying the whole tree pulled in .git, coverage/
+    # (large after a kcov run) and testdata/, which was slow and raced with
+    # concurrent specs under --jobs -- the source of the install flake.
+    mkdir -p "${TMPDIR_INSTALL}"
+    cp -R "${BRIK_HOME}/bin" "${BRIK_HOME}/lib" "${BRIK_HOME}/schemas" "${TMPDIR_INSTALL}/"
 
     # Resolve to canonical path (handles macOS /var -> /private/var)
     TMPDIR_INSTALL="$(cd -P "${TMPDIR_INSTALL}" && pwd)"
