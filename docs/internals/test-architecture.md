@@ -23,7 +23,6 @@ brik/spec/
   spec_helper.sh           # SHARED: exports BRIK_HOME, BRIK_BIN, BRIK_SCHEMA, FIXTURES, EXAMPLES
   support/                 # SHARED: mock_helper.sh + its spec (referenced by 84+ specs)
   fixtures/                # SHARED: SARIF/JUnit/SBOM samples
-  coverage/                # coverage-matrix.sh -- per-notion coverage generator
   contracts/               # L0: per-notion static I/O contracts
   unit/                    # L1: per-notion pure logic (every external binary mocked)
     <notion>/              #     one directory per notion (stacks, stages, ...)
