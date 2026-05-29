@@ -1,0 +1,15 @@
+# L2 fixture manifest -- chantier 20260528_e2e-tests-par-notion (S3, wave 3.2)
+edge: stages -> deployments
+graph_edge_id: 4
+case: >-
+  The deploy stage reads deploy.environments[].target and dispatches to
+  deploy.<target>.run with the right args; an unknown target whose module
+  cannot be loaded makes the stage fail with "unsupported deploy target".
+synthesized_workspace:
+  stack: node
+  files: [brik.yml]
+  config: deploy.environments.staging.target
+deps_expected: [jq, yq]
+version_pin:
+  registry: built-in deploy stage + deployments modules
+covers_divergence: "-"
