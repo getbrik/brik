@@ -53,6 +53,50 @@ Describe "lib/registry/registry.sh - runner_class helpers"
       End
     End
 
+    Context "the BRIK_RUNNER_CLASSES_FILE override"
+      # A single configuration seam points the runner-class registry at an
+      # alternate file (e.g. a stub image fleet for e2e, a mirror, or an
+      # air-gapped registry) without editing the bundled default. The stage
+      # that reads the file still runs on its default bootstrap image.
+      write_override() {
+        override_file="$(mktemp)"
+        cat > "$override_file" <<'YAML'
+apiVersion: brik.dev/v1
+kind: RunnerClassRegistry
+classes:
+  base:
+    image: registry.local/stub/brik-runner-base
+    tag: spike
+  stack:
+    image_env: BRIK_CI_IMAGE
+  analysis:
+    image: registry.local/stub/brik-runner-analysis
+    tag: spike
+  scanner:
+    image: registry.local/stub/brik-runner-scanner
+    tag: spike
+  deploy:
+    image: registry.local/stub/brik-runner-deploy
+    tag: spike
+YAML
+      }
+
+      It "resolves a class from the override file when the variable is set"
+        write_override
+        BRIK_RUNNER_CLASSES_FILE="$override_file"
+        When call registry.runner_class.image scanner
+        The status should be success
+        The output should equal "registry.local/stub/brik-runner-scanner:spike"
+      End
+
+      It "falls back to the bundled registry when the variable is unset"
+        unset BRIK_RUNNER_CLASSES_FILE
+        When call registry.runner_class.image scanner
+        The status should be success
+        The output should equal "ghcr.io/getbrik/brik-runner-scanner:latest"
+      End
+    End
+
     It "fails for an unknown class with a diagnostic message"
       When call registry.runner_class.image bogus-class
       The status should be failure
@@ -63,39 +107,6 @@ Describe "lib/registry/registry.sh - runner_class helpers"
       When call registry.runner_class.image
       The status should be failure
       The stderr should include "required"
-    End
-  End
-
-  Describe "registry.runner_class.list"
-    It "returns the 5 declared classes"
-      When call registry.runner_class.list
-      The status should be success
-      The lines of output should equal 5
-    End
-
-    It "includes 'base'"
-      When call registry.runner_class.list
-      The output should include "base"
-    End
-
-    It "includes 'stack'"
-      When call registry.runner_class.list
-      The output should include "stack"
-    End
-
-    It "includes 'analysis'"
-      When call registry.runner_class.list
-      The output should include "analysis"
-    End
-
-    It "includes 'scanner'"
-      When call registry.runner_class.list
-      The output should include "scanner"
-    End
-
-    It "includes 'deploy'"
-      When call registry.runner_class.list
-      The output should include "deploy"
     End
   End
 

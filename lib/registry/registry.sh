@@ -354,7 +354,11 @@ registry.stage.impact_use_stack_impact() {
 # project's stack (node/python/...) and exposed via the env var declared
 # under classes.stack.image_env (BRIK_CI_IMAGE).
 
-_BRIK_RUNNER_CLASSES_YML="${BASH_SOURCE[0]%/*}/runner_classes.yml"
+# Default runner-class registry (bundled). BRIK_RUNNER_CLASSES_FILE overrides
+# it at call time, letting e2e / mirror / air-gapped setups point at an
+# alternate file (e.g. a stub image fleet) without editing the default. The
+# stage that reads this file still runs on its own default bootstrap image.
+_BRIK_RUNNER_CLASSES_DEFAULT="${BASH_SOURCE[0]%/*}/runner_classes.yml"
 
 # Resolve a runner_class id to its full OCI image reference.
 #
@@ -378,6 +382,7 @@ registry.runner_class.image() {
     printf '[registry] runner_class.image: class id required\n' >&2
     return "$BRIK_EXIT_INVALID_INPUT"
   fi
+  local _BRIK_RUNNER_CLASSES_YML="${BRIK_RUNNER_CLASSES_FILE:-$_BRIK_RUNNER_CLASSES_DEFAULT}"
   if [[ ! -f "$_BRIK_RUNNER_CLASSES_YML" ]]; then
     printf '[registry] runner_classes.yml not found: %s\n' \
       "$_BRIK_RUNNER_CLASSES_YML" >&2
@@ -416,27 +421,6 @@ registry.runner_class.image() {
   printf '%s:%s\n' "$image" "$tag"
 }
 
-# Print the declared runner_class ids, one per line, in YAML insertion
-# order (matches the source file's structure).
-#
-# Returns:
-#   0 on success
-#   BRIK_EXIT_IO_FAILURE     runner_classes.yml not found
-#   BRIK_EXIT_MISSING_DEP    yq not on PATH
-#
-# Usage: registry.runner_class.list
-registry.runner_class.list() {
-  if [[ ! -f "$_BRIK_RUNNER_CLASSES_YML" ]]; then
-    printf '[registry] runner_classes.yml not found: %s\n' \
-      "$_BRIK_RUNNER_CLASSES_YML" >&2
-    return "$BRIK_EXIT_IO_FAILURE"
-  fi
-  command -v yq >/dev/null 2>&1 || {
-    printf '[registry] yq required for runner_class.list\n' >&2
-    return "$BRIK_EXIT_MISSING_DEP"
-  }
-  yq -r '.classes | keys | .[]' "$_BRIK_RUNNER_CLASSES_YML"
-}
 
 registry.explain() {
   _registry._load || return $?
