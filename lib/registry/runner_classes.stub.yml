@@ -1,0 +1,35 @@
+apiVersion: brik.dev/v1
+kind: RunnerClassRegistry
+metadata:
+  description: |
+    E2E stub override for runner_classes.yml. NOT a production registry.
+
+    Point BRIK_RUNNER_CLASSES_FILE at this file to make every pipeline stage
+    run on the single brik-runner-stub image (all stack/scan/deploy/sign
+    tools no-op to exit 0). This exercises the FULL shared-library workflow
+    (context detection, planner, per-stage gates, needs/sequence, image
+    parity) on the real orchestrator WITHOUT pulling the heavy stack images
+    or doing real work.
+
+    All five classes -- including the dynamic 'stack' -- are pinned to the
+    same stub image. The 'brik-runner-stub:spike' ref is built locally
+    (brik-images/images/stub/Dockerfile) and present in the runner's Docker
+    daemon, so pull_policy if-not-present reuses it.
+classes:
+  base:
+    image: brik-runner-stub
+    tag: spike
+  stack:
+    # Static here (overrides the dynamic image_env in the bundled default)
+    # so build/test/lint/package also land on the stub image.
+    image: brik-runner-stub
+    tag: spike
+  analysis:
+    image: brik-runner-stub
+    tag: spike
+  scanner:
+    image: brik-runner-stub
+    tag: spike
+  deploy:
+    image: brik-runner-stub
+    tag: spike

@@ -177,7 +177,10 @@ _stages.init._warn_legacy_enabled_keys() {
 }
 
 # Resolve the runner image to use for downstream jobs based on the active
-# stack and version. Falls back to the base runner if no specific match.
+# stack and version. Thin wrapper over runner.resolve_stack_or_base (the
+# single shared stack-or-base resolver): reads the project stack_version,
+# then delegates so the resolution policy and the base fallback literal live
+# in one place (lib/pipeline/runner-images.sh).
 _stages.init._resolve_runner_image() {
     local stack="${BRIK_BUILD_STACK:-auto}"
     local version
@@ -187,13 +190,14 @@ _stages.init._resolve_runner_image() {
     if [[ -f "${home}/lib/pipeline/runner-images.sh" ]]; then
         # shellcheck source=/dev/null
         . "${home}/lib/pipeline/runner-images.sh" 2>/dev/null || true
-        local image
-        image="$(runner.resolve_image "$stack" "$version" 2>/dev/null)" && {
-            printf '%s' "$image"
-            return 0
-        }
     fi
-    printf 'ghcr.io/getbrik/brik-runner-base:latest'
+    if declare -f runner.resolve_stack_or_base >/dev/null 2>&1; then
+        runner.resolve_stack_or_base "$stack" "$version"
+        return 0
+    fi
+    # runner-images.sh unavailable (degraded environment): emit the base ref
+    # directly. Kept in sync with runner.base_image's default tag.
+    printf '%s/brik-runner-base:latest' "${BRIK_RUNNER_REGISTRY:-ghcr.io/getbrik}"
 }
 
 # Emit a JSON object listing prerequisite tools and their availability.
@@ -321,9 +325,13 @@ _stages.init._record_env_section() {
     _kv BRIK_PROJECT_NAME        "$(config.get '.project.name' 'unnamed')"
     _kv BRIK_BUILD_STACK         "${BRIK_BUILD_STACK:-auto}"
     _kv BRIK_BUILD_STACK_VERSION "$(config.get '.project.stack_version' '')"
-    local _stack_image
-    _stack_image="$(_stages.init._resolve_runner_image)"
-    _kv BRIK_CI_IMAGE            "$_stack_image"
+    # Resolve the project's stack image dynamically (node:22, python:3.13,
+    # ...) and export it as BRIK_CI_IMAGE *before* consulting the registry:
+    # the 'stack' runner_class declares image_env: BRIK_CI_IMAGE, so this is
+    # the value it reads back by default.
+    local _stack_default
+    _stack_default="$(_stages.init._resolve_runner_image)"
+    export BRIK_CI_IMAGE="$_stack_default"
 
     # Runner image map (Lot 3 of chantier 20260526). Each runner_class
     # declared in lib/registry/runner_classes.yml is exposed as a CI
@@ -333,20 +341,56 @@ _stages.init._record_env_section() {
     # brikDriver.resolveImage. BRIK_IMG_STACK aliases BRIK_CI_IMAGE for
     # symmetric naming with the other classes.
     #
+    # All five classes -- including the dynamic 'stack' -- are resolved
+    # through registry.runner_class.image so that a single override file
+    # (BRIK_RUNNER_CLASSES_FILE: an e2e stub fleet, a mirror, an air-gapped
+    # registry) supersedes every image without editing the bundled default.
+    # For 'stack' the default registry returns image_env BRIK_CI_IMAGE (the
+    # dynamic image exported above), so default behaviour is unchanged; an
+    # override that declares 'stack' as a static image wins.
+    #
     # Note: 5 image vars + 15 base vars = 20 keys. GitLab's default
     # dotenv_variables PlanLimit is 20, hit as soon as release adds
     # BRIK_NEXT_VERSION. briklab raises this to 50 in
     # scripts/lib/setup/gitlab.sh::configure_dotenv_limit. Adopters
     # consuming Brik with a stock GitLab must apply the same bump
     # (documented in chantier 20260526).
-    _kv BRIK_IMG_STACK           "$_stack_image"
-    brik.use registry.registry 2>/dev/null || true
-    if declare -f registry.runner_class.image >/dev/null 2>&1; then
-        _kv BRIK_IMG_BASE     "$(registry.runner_class.image base     2>/dev/null)"
-        _kv BRIK_IMG_ANALYSIS "$(registry.runner_class.image analysis 2>/dev/null)"
-        _kv BRIK_IMG_SCANNER  "$(registry.runner_class.image scanner  2>/dev/null)"
-        _kv BRIK_IMG_DEPLOY   "$(registry.runner_class.image deploy   2>/dev/null)"
+    # Load the registry module that maps runner_class -> image. A silent
+    # load failure here defeats the whole BRIK_RUNNER_CLASSES_FILE override
+    # (every BRIK_IMG_* ends up empty and stages fall back to the default
+    # image) with no operator signal, so surface it instead of discarding.
+    if ! brik.use registry.registry; then
+        log.warn "[init] registry module failed to load -- runner-class image overrides will not apply"
     fi
+
+    # Resolve one runner_class image, capturing stderr+rc so a resolution
+    # failure (missing/unreadable override file, unset image_env for a
+    # dynamic class, yq absent, unknown class) is logged instead of silently
+    # recording an empty value. log.warn writes to stderr, so it does not
+    # pollute the value captured by the command substitution at the call
+    # site. Prints the resolved image on stdout, or nothing on failure.
+    _resolve_class() {
+        local _class="$1" _out _rc
+        _out="$(registry.runner_class.image "$_class" 2>&1)"; _rc=$?
+        if [[ "$_rc" -ne 0 ]]; then
+            log.warn "[init] runner_class.image ${_class} failed (rc=${_rc}): ${_out} [BRIK_RUNNER_CLASSES_FILE=${BRIK_RUNNER_CLASSES_FILE:-<unset>}]"
+            return "$_rc"
+        fi
+        printf '%s' "$_out"
+    }
+
+    local _stack_image="$_stack_default"
+    if declare -f registry.runner_class.image >/dev/null 2>&1; then
+        local _resolved_stack
+        _resolved_stack="$(_resolve_class stack)"
+        [[ -n "$_resolved_stack" ]] && _stack_image="$_resolved_stack"
+        _kv BRIK_IMG_BASE     "$(_resolve_class base)"
+        _kv BRIK_IMG_ANALYSIS "$(_resolve_class analysis)"
+        _kv BRIK_IMG_SCANNER  "$(_resolve_class scanner)"
+        _kv BRIK_IMG_DEPLOY   "$(_resolve_class deploy)"
+    fi
+    _kv BRIK_CI_IMAGE            "$_stack_image"
+    _kv BRIK_IMG_STACK           "$_stack_image"
 
     # Legacy quality and security gating env vars (BRIK_LINT_ENABLED,
     # BRIK_SAST_ENABLED, ...) are no longer emitted: stages always run

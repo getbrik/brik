@@ -50,18 +50,30 @@ def stagesList(brikHome) {
 }
 
 def resolveImage(runnerClass, fallbackStackImage = '') {
+    // A value is usable only if it is non-blank AND not a leftover quoted
+    // empty ('' or ""). init emits KEY='' when a class fails to resolve;
+    // brikReadDotenv now unwraps those quotes, but a value sourced directly
+    // from env (set before that unwrap, or by another producer) can still
+    // carry them. Treating them as blank keeps a malformed dotenv from
+    // reaching docker.image("''"), which aborts with "Name must follow the
+    // pattern ...".
+    def usable = { v ->
+        if (!v?.trim()) { return false }
+        def t = v.trim()
+        return !(t == "''" || t == '""')
+    }
     // The 'stack' class is dynamic per project: init's _resolve_runner_image
     // computes it and exports BRIK_IMG_STACK (and the legacy BRIK_CI_IMAGE).
     // The fallback parameter is the value resolved at pipeline init time
     // (brikReadDotenv extracts it from .brik-logs/pipeline.env) for callers
     // that prefer not to round-trip through env on every call.
     if (runnerClass == 'stack') {
-        if (fallbackStackImage?.trim()) {
-            return fallbackStackImage
+        if (usable(fallbackStackImage)) {
+            return fallbackStackImage.trim()
         }
-        def stackEnv = env.BRIK_IMG_STACK ?: env.BRIK_CI_IMAGE
-        if (stackEnv?.trim()) {
-            return stackEnv
+        def stackEnv = usable(env.BRIK_IMG_STACK) ? env.BRIK_IMG_STACK : env.BRIK_CI_IMAGE
+        if (usable(stackEnv)) {
+            return stackEnv.trim()
         }
         return 'ghcr.io/getbrik/brik-runner-base:latest'
     }
@@ -69,8 +81,8 @@ def resolveImage(runnerClass, fallbackStackImage = '') {
     // posted by init's dotenv contract (Lot 3 of the same chantier).
     def envVar = "BRIK_IMG_${runnerClass.toUpperCase()}"
     def value = env[envVar]
-    if (value?.trim()) {
-        return value
+    if (usable(value)) {
+        return value.trim()
     }
     // Safe fallback so pipelines on legacy fixtures (no init dotenv) still
     // resolve to something runnable instead of an empty string.

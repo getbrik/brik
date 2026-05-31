@@ -55,6 +55,11 @@ def call(Map params = [:]) {
                     name: 'BRIK_WITH_DEPLOY',
                     defaultValue: false,
                     description: 'Opt into the deploy stage. The planner skips deploy by default even on tag pushes; set to true to actually run it.'
+                ),
+                string(
+                    name: 'BRIK_RUNNER_CLASSES_FILE',
+                    defaultValue: '',
+                    description: 'Override the runner-class image registry (lib/registry/runner_classes.yml). Absolute path, or a path relative to the brik library root (resolved per stage container). Used for mirrors, air-gapped registries, or an e2e stub image fleet. Empty = bundled default.'
                 )
             ])
         ])
@@ -162,12 +167,29 @@ def call(Map params = [:]) {
 
             def brikHome = params.brikHome ?: brikResolveHome()
 
-            // Stage runner images. resolvedImage is filled after Init reads
-            // .brik-logs/pipeline.env and exposes BRIK_CI_IMAGE.
-            def baseImage     = 'ghcr.io/getbrik/brik-runner-base:latest'
-            def analysisImage = 'ghcr.io/getbrik/brik-runner-analysis:latest'
-            def scannerImage  = 'ghcr.io/getbrik/brik-runner-scanner:latest'
-            def deployImage   = 'ghcr.io/getbrik/brik-runner-deploy:latest'
+            // Normalize BRIK_RUNNER_CLASSES_FILE to an absolute path in the
+            // Jenkins env itself. The build parameter is supplied relative to
+            // the brik library root (callers cannot hardcode the
+            // ${WORKSPACE}@libs/<hash> path), but Jenkins promotes the raw
+            // parameter into env, and docker.image().inside() injects that env
+            // into EVERY stage container. Inside a container the CWD is the
+            // workspace, not the @libs checkout, so a relative value fails to
+            // resolve (registry.runner_class.image returns IO_FAILURE and the
+            // override silently degrades to the default image). Resolving it
+            // here against brikHome makes the absolute path the single value
+            // every container inherits, independent of brikRunStage's per-call
+            // -e forwarding. An absolute value (or empty) passes through.
+            if (env.BRIK_RUNNER_CLASSES_FILE?.trim() &&
+                !env.BRIK_RUNNER_CLASSES_FILE.startsWith('/')) {
+                env.BRIK_RUNNER_CLASSES_FILE = "${brikHome}/${env.BRIK_RUNNER_CLASSES_FILE}"
+            }
+
+            // Stage runner images are resolved uniformly from
+            // runner_classes.yml via brikDriver.resolveImage (BRIK_IMG_<CLASS>,
+            // posted by Init's dotenv); brikPipeline holds no image literal of
+            // its own. resolvedImage carries the stack image once Init reads
+            // .brik-logs/pipeline.env and exposes BRIK_CI_IMAGE, and is passed
+            // to resolveImage as the stack fallback.
             def resolvedImage = ''
 
             // Wrap each stage in try/catch so the stage view records the
@@ -204,27 +226,14 @@ def call(Map params = [:]) {
                       allowEmpty: true
             }
 
-            // Per-image stage helpers. Every stage runs in its dedicated
-            // brik-runner image; the only variation is the image (and
-            // deploy's root override + chown). runInBase covers init and
-            // notify, both targeted at the same minimal Alpine image.
+            // Per-image stage helpers. runInBase covers the bootstrap stages
+            // init and notify (the 'base' class): resolveImage('base') returns
+            // BRIK_IMG_BASE once Init's dotenv exists, and falls back to the
+            // base bootstrap literal for Init itself (which runs first, before
+            // any dotenv). Every other stage resolves its image inline via
+            // brikDriver.resolveImage in the generic loop below.
             def runInBase = { name ->
-                brikRunStage(image: baseImage, stageName: name,
-                             brikHome: brikHome, dockerArgs: dockerArgs)
-                stashBrikArtifacts(name)
-            }
-            def runStage = { name ->
-                brikRunStage(image: resolvedImage, stageName: name,
-                             brikHome: brikHome, dockerArgs: dockerArgs)
-                stashBrikArtifacts(name)
-            }
-            def runInAnalysis = { name ->
-                brikRunStage(image: analysisImage, stageName: name,
-                             brikHome: brikHome, dockerArgs: dockerArgs)
-                stashBrikArtifacts(name)
-            }
-            def runInScanner = { name ->
-                brikRunStage(image: scannerImage, stageName: name,
+                brikRunStage(image: brikDriver.resolveImage('base', ''), stageName: name,
                              brikHome: brikHome, dockerArgs: dockerArgs)
                 stashBrikArtifacts(name)
             }
@@ -234,7 +243,7 @@ def call(Map params = [:]) {
             // build.
             def runInDeploy = { name ->
                 try {
-                    brikRunStage(image: deployImage, stageName: name,
+                    brikRunStage(image: brikDriver.resolveImage('deploy', ''), stageName: name,
                                  brikHome: brikHome, dockerArgs: deployDockerArgs)
                 } finally {
                     def jenkinsUid = sh(script: 'id -u', returnStdout: true).trim()

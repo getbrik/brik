@@ -2,10 +2,11 @@
  * brikRunStage - Run a Brik stage inside a Docker container.
  *
  * Wraps `docker.image(image).inside(args) { brikStage(name, brikHome) }`
- * for the per-image helpers in brikPipeline (runInBase, runStage,
- * runInAnalysis, runInScanner, runInDeploy). BRIK_RUNNER_IMAGE is
- * injected so report.write_fragment records the actual execution image
- * rather than the stack default computed by config.export_runner_vars.
+ * for the bootstrap helpers in brikPipeline (runInBase, runInDeploy) and
+ * the generic stage loop, which all resolve their image via
+ * brikDriver.resolveImage. BRIK_RUNNER_IMAGE is injected so
+ * report.write_fragment records the actual execution image rather than the
+ * stack default computed by config.export_runner_vars.
  *
  * Usage:
  *   brikRunStage(image: 'ghcr.io/getbrik/brik-runner-base:latest',
@@ -22,6 +23,17 @@ def call(Map config) {
     // through the wrapper, the in-container brik picks up the plan and
     // honours the same skip semantics as the orchestrated path.
     def planEnv = env.BRIK_PLAN_FILE ? "-e BRIK_PLAN_FILE=${env.BRIK_PLAN_FILE} " : ''
-    def args = "-e BRIK_RUNNER_IMAGE=${image} ${planEnv}${config.dockerArgs ?: ''}"
+    // Forward the runner-class registry override (mirror / air-gapped / e2e
+    // stub fleet). A relative value is resolved against the brik library root
+    // (home) -- the Jenkins shared lib is checked out at ${WORKSPACE}@libs/<hash>/,
+    // so callers cannot hardcode an absolute path; absolute values pass through
+    // unchanged. Empty param = bundled default registry.
+    def rcFile = env.BRIK_RUNNER_CLASSES_FILE?.trim()
+    def rcEnv = ''
+    if (rcFile) {
+        def resolved = rcFile.startsWith('/') ? rcFile : "${home}/${rcFile}"
+        rcEnv = "-e BRIK_RUNNER_CLASSES_FILE=${resolved} "
+    }
+    def args = "-e BRIK_RUNNER_IMAGE=${image} ${planEnv}${rcEnv}${config.dockerArgs ?: ''}"
     docker.image(image).inside(args) { brikStage(name, home) }
 }

@@ -146,4 +146,43 @@ Describe "shared-libs/jenkins brikPipeline.groovy - artifact layout"
       The status should equal 0
     End
   End
+
+  # Image selection is uniform: every stage resolves its runner image from
+  # runner_classes.yml via brikDriver.resolveImage (BRIK_IMG_<CLASS>, posted
+  # by init's dotenv). brikPipeline declares no image literal of its own --
+  # the single accepted bootstrap literal lives in brikDriver.resolveImage's
+  # fallback, used before init's dotenv exists.
+  Describe "uniform image selection via the runner_classes registry"
+    It "declares no hardcoded brik-runner image literal"
+      When call grep -F "ghcr.io/getbrik/brik-runner" "$GROOVY"
+      The status should not equal 0
+    End
+
+    It "resolves the base image via brikDriver.resolveImage"
+      When call grep -F "brikDriver.resolveImage('base'" "$GROOVY"
+      The status should be success
+      The output should be present
+    End
+
+    It "resolves the deploy image via brikDriver.resolveImage"
+      When call grep -F "brikDriver.resolveImage('deploy'" "$GROOVY"
+      The status should be success
+      The output should be present
+    End
+
+    It "no longer defines the unused runStage closure"
+      When call grep -F "def runStage =" "$GROOVY"
+      The status should not equal 0
+    End
+
+    It "no longer defines the unused runInAnalysis closure"
+      When call grep -F "def runInAnalysis =" "$GROOVY"
+      The status should not equal 0
+    End
+
+    It "no longer defines the unused runInScanner closure"
+      When call grep -F "def runInScanner =" "$GROOVY"
+      The status should not equal 0
+    End
+  End
 End

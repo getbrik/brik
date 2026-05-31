@@ -6,6 +6,11 @@ metadata:
     spec.runner.class) to the OCI image used by orchestrators to run the
     stage. Single source of truth consumed by both GitLab and Jenkins
     adapters via registry.runner_class.image.
+
+    Override: set BRIK_RUNNER_CLASSES_FILE to point at an alternate copy of
+    this file (e.g. a stub image fleet for e2e, a mirror, or an air-gapped
+    registry) without editing the bundled default. The stage that reads the
+    file still runs on its own default bootstrap image.
 classes:
   base:
     image: ghcr.io/getbrik/brik-runner-base
