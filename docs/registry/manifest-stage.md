@@ -106,16 +106,20 @@ runner:
 
 | Class | Image | Used by |
 |---|---|---|
-| `stack` | `brik-runner-<stack>` chosen at runtime | build, test, package |
+| `stack` | `brik-runner-<stack>` chosen at runtime (dynamic) | build, test, package |
 | `base` | `brik-runner-base` | init, release, notify |
 | `scanner` | `brik-runner-scanner` | scan, container-scan, lint (when in scanner mode) |
 | `analysis` | `brik-runner-analysis` | sast |
 | `deploy` | `brik-runner-deploy` | deploy |
 
-The wrapper resolves the actual image via
-`pipeline.runner_image_for <runner_class> [<stack_id>]`. Extensions
-that need a custom image declare a new class via `compatibility`
-(below) or ship their own value and document it.
+The class-to-image mapping is centralized in
+[`lib/registry/runner_classes.yml`](runner-classes.md) (the single
+source of truth) and resolved via `registry.runner_class.image <class>`.
+The four static classes (`base`/`analysis`/`scanner`/`deploy`) declare an
+`image` + `tag`; the `stack` class is dynamic (`image_env: BRIK_CI_IMAGE`,
+computed by the init stage from the project stack). Extensions that need a
+custom image add a class to that file or override every class at once via
+`BRIK_RUNNER_CLASSES_FILE`. See [runner-classes.md](runner-classes.md).
 
 ## spec.gate
 

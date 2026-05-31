@@ -77,13 +77,17 @@ By default `brikPipeline` auto-detects the network from the Jenkins container.
 ## Private registry / cannot pull `ghcr.io`
 
 If runners cannot pull from `ghcr.io`, mirror
-[brik-images](https://github.com/getbrik/brik-images) to your private registry.
+[brik-images](https://github.com/getbrik/brik-images) to your private registry,
+then point Brik at a copy of the runner-class registry that names the mirror.
 
-- **GitLab**: override `BRIK_CI_IMAGE`, `BRIK_ANALYSIS_IMAGE`,
-  `BRIK_SCANNER_IMAGE`, and `BRIK_DEPLOY_IMAGE` in your `.gitlab-ci.yml`.
-- **Jenkins**: the stack image is resolved from `brik.yml`; for the specialized
-  images, configure Jenkins environment variables or update the image names in
-  a fork.
+- Copy [`lib/registry/runner_classes.yml`](../registry/runner-classes.md),
+  rewrite each `image:` to your mirror, and set `BRIK_RUNNER_CLASSES_FILE`
+  to that file. This redirects every runner image (base, stack, analysis,
+  scanner, deploy) in one place, on both GitLab and Jenkins.
+- **GitLab**: set `BRIK_RUNNER_CLASSES_FILE` as a CI/CD variable (a FILE-type
+  variable, or a path resolvable inside the runner).
+- **Jenkins**: pass `BRIK_RUNNER_CLASSES_FILE` as a build parameter; a path
+  relative to the brik library root is resolved to absolute automatically.
 
 ## A stage fails but the pipeline still exits 0
 

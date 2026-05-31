@@ -72,6 +72,17 @@ accessors operate on in-memory arrays.
 | `registry.stage.impact_changes <id>` | one glob per line | `spec.impact.changes`. |
 | `registry.stage.impact_use_stack_impact <id>` | `source` / `test` / `build` | `spec.impact.use_stack_impact`. |
 
+## Runner-class accessors
+
+Map a stage's `spec.runner.class` to the OCI image that runs it. The
+mapping lives in `lib/registry/runner_classes.yml` (the single source of
+truth), overridable wholesale via `BRIK_RUNNER_CLASSES_FILE`. See
+[runner-classes.md](runner-classes.md) for the model.
+
+| Function | Returns | Notes |
+|---|---|---|
+| `registry.runner_class.image <class>` | `image:tag` on stdout | For a static class (`base`/`analysis`/`scanner`/`deploy`) returns the declared `image:tag`. For the dynamic `stack` class returns the value of the env var named by `image_env` (`BRIK_CI_IMAGE`), failing rc=1 when it is unset. rc=`IO_FAILURE` when the classes file is missing, `MISSING_DEP` when `yq` is absent, `INVALID_INPUT` for an unknown class. |
+
 ## Introspection
 
 | Function | Returns |
