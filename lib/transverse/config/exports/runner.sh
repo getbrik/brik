@@ -20,11 +20,13 @@ config.export_runner_vars() {
         return 0
     fi
 
-    local stack="${BRIK_BUILD_STACK:-auto}"
-    local version="${BRIK_BUILD_STACK_VERSION:-}"
-
-    if [[ "$stack" == "auto" || -z "$stack" ]]; then
-        export BRIK_RUNNER_IMAGE="${BRIK_RUNNER_REGISTRY:-ghcr.io/getbrik}/brik-runner-base:latest"
+    # GitLab exposes the resolved job image as CI_JOB_IMAGE. Prefer it so the
+    # banner and report record the image the stage ACTUALLY runs in (e.g. the
+    # stub image under a BRIK_RUNNER_CLASSES_FILE override), not the project's
+    # stack default. Jenkins gets the same parity by injecting BRIK_RUNNER_IMAGE
+    # explicitly via brikRunStage. Empty on platforms that do not set it.
+    if [[ -n "${CI_JOB_IMAGE:-}" ]]; then
+        export BRIK_RUNNER_IMAGE="$CI_JOB_IMAGE"
         return 0
     fi
 
@@ -37,13 +39,20 @@ config.export_runner_vars() {
         . "$runner_file"
     fi
 
-    local image
-    if image="$(runner.resolve_image "$stack" "$version")"; then
+    local stack="${BRIK_BUILD_STACK:-auto}"
+    local version="${BRIK_BUILD_STACK_VERSION:-}"
+
+    # Delegate to the single shared stack-or-base resolver: stack image when
+    # known, base image (with the warning) otherwise. The base fallback literal
+    # lives only in runner.base_image.
+    if declare -f runner.resolve_stack_or_base >/dev/null 2>&1; then
+        local image
+        image="$(runner.resolve_stack_or_base "$stack" "$version")"
         export BRIK_RUNNER_IMAGE="$image"
-    else
-        log.warn "no runner image found for stack '$stack' version '${version:-default}', using base"
-        export BRIK_RUNNER_IMAGE="${BRIK_RUNNER_REGISTRY:-ghcr.io/getbrik}/brik-runner-base:latest"
+        return 0
     fi
 
+    # runner-images.sh unavailable (degraded environment): emit the base ref.
+    export BRIK_RUNNER_IMAGE="${BRIK_RUNNER_REGISTRY:-ghcr.io/getbrik}/brik-runner-base:latest"
     return 0
 }

@@ -57,8 +57,18 @@ def call(Map config = [:]) {
     ).trim()
     def policyArg = policyHost ? "-v ${policyHost}:/etc/brik/policy:ro" : ''
 
+    // BRIK_RUNNER_CLASSES_FILE is excluded from the env-file: brikRunStage
+    // forwards it explicitly as `-e BRIK_RUNNER_CLASSES_FILE=<absolute>`
+    // (a relative param value resolved against brikHome). The env-file is
+    // appended AFTER that -e on the docker run line, and Docker lets the
+    // rightmost source win -- so leaving the raw (relative) param value in
+    // the env-file would clobber the resolved absolute path. Inside the
+    // stage container the CWD is the workspace, not the @libs/<hash>
+    // checkout, so the relative path would not resolve and the registry
+    // override would silently fall back to the bundled default. Drop it
+    // here and let the explicit -e be the single source.
     def envFile = "/tmp/brik-env-${env.BUILD_TAG}"
-    sh """env | grep -E '^(NEXUS_|BRIK_|REGISTRY_|ARGOCD_|CARGO_|SSH_)' > '${envFile}' 2>/dev/null || true"""
+    sh """env | grep -E '^(NEXUS_|BRIK_|REGISTRY_|ARGOCD_|CARGO_|SSH_)' | grep -v '^BRIK_RUNNER_CLASSES_FILE=' > '${envFile}' 2>/dev/null || true"""
     def envFileArg = fileExists(envFile) && readFile(envFile).trim() ? "--env-file ${envFile}" : ''
 
     def javaEnvArgs = "-e MAVEN_OPTS=\"-Dmaven.repo.local=${env.WORKSPACE}/.m2/repository\" -e GRADLE_USER_HOME=${env.WORKSPACE}/.gradle"

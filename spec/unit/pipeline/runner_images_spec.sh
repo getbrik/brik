@@ -56,10 +56,64 @@ Describe "runner-images.sh"
       The status should be success
     End
 
-    It "resolves base 3.23 to the correct image"
+    It "returns failure for 'base' (not a language stack -- use runner.base_image)"
       When call runner.resolve_image base 3.23
-      The output should equal "ghcr.io/getbrik/brik-runner-base:3.23"
+      The status should be failure
+      The output should equal ""
+    End
+  End
+
+  Describe "runner.base_image"
+    It "returns the base runner image at the default tag"
+      When call runner.base_image
+      The output should equal "ghcr.io/getbrik/brik-runner-base:latest"
       The status should be success
+    End
+
+    It "honours BRIK_RUNNER_REGISTRY for the base image"
+      BRIK_RUNNER_REGISTRY="registry.example.com/custom"
+      When call runner.base_image
+      The output should equal "registry.example.com/custom/brik-runner-base:latest"
+    End
+
+    # Parity guard: the fallback base tag must mirror the 'base' runner_class
+    # tag in lib/registry/runner_classes.yml (the canonical map on the normal
+    # path). Without this, the fallback and the registry could drift (the bug
+    # this consolidation closed: fallback was '3.23' while the registry said
+    # 'latest').
+    It "matches the 'base' runner_class tag in runner_classes.yml"
+      registry_base_tag() {
+        yq -r '.classes.base.tag' "$BRIK_HOME/lib/registry/runner_classes.yml"
+      }
+      When call registry_base_tag
+      The output should equal "$BRIK_RUNNER_BASE_DEFAULT_TAG"
+    End
+  End
+
+  Describe "runner.resolve_stack_or_base"
+    It "resolves a known stack to its image"
+      When call runner.resolve_stack_or_base node 22
+      The output should equal "ghcr.io/getbrik/brik-runner-node:22"
+      The status should be success
+    End
+
+    It "falls back to the base image for stack 'auto'"
+      When call runner.resolve_stack_or_base auto
+      The output should equal "ghcr.io/getbrik/brik-runner-base:latest"
+      The status should be success
+    End
+
+    It "falls back to the base image for an empty stack"
+      When call runner.resolve_stack_or_base ""
+      The output should equal "ghcr.io/getbrik/brik-runner-base:latest"
+      The status should be success
+    End
+
+    It "falls back to the base image for an unknown stack (with a warning)"
+      When call runner.resolve_stack_or_base golang 1.22
+      The output should equal "ghcr.io/getbrik/brik-runner-base:latest"
+      The status should be success
+      The stderr should be present
     End
   End
 
