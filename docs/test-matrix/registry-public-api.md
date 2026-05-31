@@ -62,9 +62,8 @@ Format: `<notion>.<submodule>.<verb>` (convention layout.md).
 | `registry.stage.impact_changes` | `registry/registry.sh:329` |
 | `registry.stage.impact_use_stack_impact` | `registry/registry.sh:338` |
 | `registry.runner_class.image` | `registry/registry.sh:375` |
-| `registry.runner_class.list` | `registry/registry.sh:428` |
-| `registry.explain` | `registry/registry.sh:441` |
+| `registry.explain` | `registry/registry.sh:428` |
 
 ## Total
 
-**56 unique public functions** in notion `registry`.
+**55 unique public functions** in notion `registry`.

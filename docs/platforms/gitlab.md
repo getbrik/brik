@@ -184,10 +184,13 @@ Each GitLab CI job:
 | `BRIK_HOME` | `/opt/brik` | Path where the runtime is cloned |
 | `BRIK_LOG_LEVEL` | `info` | Log verbosity (`debug`, `info`, `warn`, `error`) |
 | `BRIK_PLATFORM` | `gitlab` | Platform identifier |
-| `BRIK_CI_IMAGE` | `ghcr.io/getbrik/brik-runner-base:latest` | Default runner image (auto-resolved by Init) |
-| `BRIK_ANALYSIS_IMAGE` | `ghcr.io/getbrik/brik-runner-analysis:latest` | SAST stage image |
-| `BRIK_SCANNER_IMAGE` | `ghcr.io/getbrik/brik-runner-scanner:latest` | Scan / Container Scan image |
-| `BRIK_DEPLOY_IMAGE` | `ghcr.io/getbrik/brik-runner-deploy:latest` | Deploy stage image |
+| `BRIK_IMG_BASE` | `ghcr.io/getbrik/brik-runner-base:latest` | Bootstrap image for Init/Release/Notify (posted to dotenv by Init) |
+| `BRIK_CI_IMAGE` | `ghcr.io/getbrik/brik-runner-base:latest` | Stack runner image (auto-resolved by Init) |
+| `BRIK_RUNNER_CLASSES_FILE` | _(unset)_ | Path to an alternate `runner_classes.yml` to override every runner image at once |
+
+`BRIK_IMG_ANALYSIS` / `BRIK_IMG_SCANNER` / `BRIK_IMG_DEPLOY` are not
+declared as pipeline variables: Init posts them into the dotenv from the
+runner-class registry, and the job templates consume them from there.
 
 ## User-overridable inputs (Run pipeline form)
 

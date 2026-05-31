@@ -110,6 +110,35 @@ a sentinel depth and sorted last rather than aborting the load. Neither
 the loader nor `compile-registry.sh` performs an explicit cycle-detection
 abort, so author your `after`/`before` edges carefully.
 
+## Runner-class registry (image mapping)
+
+Alongside stacks and stages, the registry carries a third map: which
+container image runs each stage. It lives in
+`lib/registry/runner_classes.yml` and is the single source of truth for
+the runner-class -> OCI image mapping, consumed identically by every
+adapter. Full model in [runner-classes.md](runner-classes.md).
+
+- Five classes: `base`, `stack`, `analysis`, `scanner`, `deploy`.
+- `base`/`analysis`/`scanner`/`deploy` are static (`image` + `tag`);
+  `stack` is dynamic (`image_env: BRIK_CI_IMAGE`, computed by the init
+  stage from the project's language stack).
+- `registry.runner_class.image <class>` resolves a class to its image.
+  The init stage calls it for all five classes and posts the results into
+  `.brik-logs/pipeline.env` as `BRIK_IMG_BASE/ANALYSIS/SCANNER/DEPLOY` +
+  `BRIK_CI_IMAGE`/`BRIK_IMG_STACK` (the dotenv contract). GitLab job
+  templates reference `${BRIK_IMG_<CLASS>}`; the Jenkins
+  `brikDriver.resolveImage` helper reads the same variables.
+- `BRIK_RUNNER_CLASSES_FILE` points the resolver at an alternate copy of
+  the file (mirror, air-gapped registry, e2e stub fleet) to supersede
+  every image without editing the bundled default.
+
+This is orthogonal to language-stack image *versions*, which live in the
+stack manifests (`spec.runner.{image,defaultVersion,versions}`, see
+[manifest-stack.md](manifest-stack.md)). `lib/pipeline/runner-images.sh`
+owns only the last-resort base-image fallback (`runner.base_image`,
+`runner.resolve_stack_or_base`); the registry is canonical on the normal
+path.
+
 ## What lives outside the registry
 
 The registry deliberately does **not** carry:

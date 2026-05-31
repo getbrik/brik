@@ -53,13 +53,19 @@ container. The Init stage reads `project.stack` and `project.stack_version` from
 | rust | `ghcr.io/getbrik/brik-runner-rust:1` |
 | dotnet | `ghcr.io/getbrik/brik-runner-dotnet:9.0` (or `:10.0`) |
 
-Specialized images, same as on GitLab:
+Specialized images, same as on GitLab (resolved from the runner-class
+registry and read by `brikDriver.resolveImage`):
 
 | Image | Used by |
 |-------|---------|
 | `ghcr.io/getbrik/brik-runner-analysis:latest` | SAST |
 | `ghcr.io/getbrik/brik-runner-scanner:latest` | Scan, Container Scan |
 | `ghcr.io/getbrik/brik-runner-deploy:latest` | Deploy |
+
+To override every image at once (mirror / private registry), pass
+`BRIK_RUNNER_CLASSES_FILE` as a build parameter; a path relative to the
+brik library root is resolved to absolute before it reaches the stage
+containers. See [runner-classes.md](../registry/runner-classes.md).
 
 If `stack` is unset or unrecognized, no image is resolved and stages run
 directly on the Jenkins agent (same as `useDockerAgent: false`).

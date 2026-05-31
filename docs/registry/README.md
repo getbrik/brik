@@ -16,6 +16,7 @@ first and come back here when you need the field-by-field details.
 | [`manifest-stack.md`](manifest-stack.md) | Stack author | Field reference for `lib/registry/manifests/stacks/<id>.yml`. |
 | [`manifest-stage.md`](manifest-stage.md) | Stage author | Field reference for `lib/registry/manifests/stages/<id>.yml`. |
 | [`api.md`](api.md) | Runtime contributor | The `registry.stack.*` / `registry.stage.*` Bash API consumers call. |
+| [`runner-classes.md`](runner-classes.md) | Platform / extension author | The runner-class -> image registry (`runner_classes.yml`), the dotenv contract, and the `BRIK_RUNNER_CLASSES_FILE` override. |
 
 ## At a glance
 
