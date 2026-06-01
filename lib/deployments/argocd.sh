@@ -54,10 +54,15 @@ _deploy.argocd._add_server_auth() {
 
 # Sync an ArgoCD application.
 # Usage: deploy.argocd.sync --app <name> [--server <url>] [--auth-token-var <VAR>]
-#        [--prune] [--async] [--dry-run]
+#        [--prune] [--async] [--timeout <s>] [--dry-run]
+# A synchronous sync (the default) BLOCKS until the operation completes. Without
+# a timeout the CLI hangs forever when ArgoCD cannot make progress (e.g. the
+# application-controller is down), so a bounded --timeout (default 300s) is
+# applied unless --async is requested.
 deploy.argocd.sync() {
     local app_name="" server="" auth_token_var=""
     local prune="false" async="false"
+    local timeout=300
     local dry_run="${BRIK_DRY_RUN:-}"
 
     while [[ $# -gt 0 ]]; do
@@ -67,6 +72,7 @@ deploy.argocd.sync() {
             --auth-token-var) auth_token_var="$2"; shift 2 ;;
             --prune)          prune="true";        shift ;;
             --async)          async="true";        shift ;;
+            --timeout)        timeout="$2";        shift 2 ;;
             --dry-run)        dry_run="true";      shift ;;
             *) log.error "unknown option: $1"; return "$BRIK_EXIT_INVALID_INPUT" ;;
         esac
@@ -74,12 +80,23 @@ deploy.argocd.sync() {
 
     _deploy.argocd._validate_app_name "$app_name" || return $?
 
+    if ! [[ "$timeout" =~ ^[0-9]+$ ]]; then
+        log.error "timeout must be a positive integer, got: $timeout"
+        return "$BRIK_EXIT_INVALID_INPUT"
+    fi
+
     pipeline.require_tool argocd || return "$BRIK_EXIT_MISSING_DEP"
 
     local -a cmd=(argocd app sync "$app_name")
     _deploy.argocd._add_server_auth cmd "$server" "$auth_token_var" || return $?
     [[ "$prune" == "true" ]] && cmd+=(--prune)
-    [[ "$async" == "true" ]] && cmd+=(--async)
+    # --async returns immediately (no operation wait), so --timeout would be
+    # meaningless; otherwise bound the blocking sync so it cannot hang forever.
+    if [[ "$async" == "true" ]]; then
+        cmd+=(--async)
+    else
+        cmd+=(--timeout "$timeout")
+    fi
 
     if [[ "$dry_run" == "true" ]]; then
         log.info "[dry-run] would run: ${cmd[*]}"
