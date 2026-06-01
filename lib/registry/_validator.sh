@@ -2,8 +2,9 @@
 # shellcheck source-path=SCRIPTDIR
 # @module registry/_validator
 # @description Validate stack/stage manifests against JSON Schema (jv).
-# Used by scripts/compile-registry.sh and by `brik registry validate-manifest
-# <path>` (D.4+). Per ADR-002: first layer of the contract test harness.
+# Sourced by scripts/compile-registry.sh, which gates compilation on
+# registry.validate_all_manifests so a malformed manifest never reaches the
+# compiled cache. Per ADR-002: first layer of the contract test harness.
 
 [[ -n "${_BRIK_REGISTRY_VALIDATOR_LOADED:-}" ]] && return 0
 _BRIK_REGISTRY_VALIDATOR_LOADED=1

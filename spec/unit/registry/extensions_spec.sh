@@ -134,4 +134,26 @@ YAML
       The stderr should include "extension dir not found"
     End
   End
+
+  Describe "manifest schema validation gate"
+    It "rejects an extension manifest that violates the registry schema"
+      # spec.required is [detect, runner, api]; omitting runner+api is invalid.
+      cat > "$EXT_DIR/stacks/broken.yml" <<'YAML'
+apiVersion: brik.dev/v1
+kind: Stack
+metadata:
+  id: broken
+  displayName: Broken
+spec:
+  detect: {markers: {any: [broken.toml]}}
+YAML
+      compile_invalid() {
+        BRIK_REGISTRY_EXTENSIONS_DIRS="$EXT_DIR" \
+          "$BRIK_HOME/scripts/compile-registry.sh" --output "$OUT_CACHE"
+      }
+      When call compile_invalid
+      The status should equal "$BRIK_EXIT_INVALID_INPUT"
+      The stderr should include "manifest invalid"
+    End
+  End
 End
