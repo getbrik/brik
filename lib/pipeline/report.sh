@@ -863,6 +863,23 @@ _report._enrich_findings_items() {
     return 0
 }
 
+# Emit the canonical stage execution order as a single space-separated line.
+# The registry (registry.stage.list) is the single source of truth and is
+# preferred whenever the module is loaded; otherwise the documented fixed
+# flow is used as a fallback so report rendering stays self-contained when
+# invoked without the registry (e.g. standalone unit tests, CI stage jobs
+# that did not source the registry).
+_report._stage_order() {
+    if declare -f registry.stage.list >/dev/null 2>&1; then
+        local _ids
+        if _ids="$(registry.stage.list 2>/dev/null)" && [[ -n "$_ids" ]]; then
+            printf '%s' "$_ids" | tr '\n' ' ' | sed 's/ *$//'
+            return 0
+        fi
+    fi
+    printf '%s' "init release build lint sast scan test package container-scan promote deploy notify"
+}
+
 # Render the v1 aggregate JSON as Markdown on stdout. Distinct from
 # _report._render_md, which targets the local backend shape (pipeline_id,
 # stages[].name, tech.status). The aggregate produced by
@@ -870,17 +887,18 @@ _report._enrich_findings_items() {
 # status/rc -- selectors here mirror schemas/report/v1/aggregate.schema.json.
 _report._render_aggregate_md() {
     local backend="$1"
+    local _stage_order
+    _stage_order="$(_report._stage_order)"
     # KCOV_EXCL_START  -- jq script body is not bash code
-    jq -r '
+    jq -r --arg stage_order "$_stage_order" '
         # ----- Phase 2 helpers --------------------------------------------
-        # Stage execution order: matches the documented fixed flow. Stages
-        # not on the list sort to the end (rank 99) but keep their input
-        # order via a stable secondary key.
+        # Stage execution order: sourced from registry.stage.list when the
+        # registry is loaded (single source of truth), else the documented
+        # fixed-flow fallback (see _report._stage_order). Stages not on the
+        # list sort to the end (rank 99) but keep their input order via a
+        # stable secondary key.
         def stage_rank($name):
-          ["init","release","build",
-           "lint","sast","scan","test",
-           "package","container-scan","deploy","notify"]
-          | index($name) // 99;
+          ($stage_order | split(" ")) | index($name) // 99;
 
         def severity_rank($s):
           if   $s == "critical" then 4
