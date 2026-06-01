@@ -108,7 +108,7 @@ Examples:
   brik extension test ./my-extension
   brik self-update
   brik self-update --channel edge
-  brik self-update --version v0.6.0
+  brik self-update --version v${BRIK_VERSION}
   brik version
   brik version --verbose
 EOF
