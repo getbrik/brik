@@ -211,7 +211,7 @@ report.aggregate_fragments() {
     }
 
     shopt -s nullglob
-    local f base
+    local f base sv
     for f in "$fragment_dir"/*/*.json; do
         base="$(basename "$f")"
         # Ignore the aggregate output if it lives in the same directory.
@@ -222,7 +222,6 @@ report.aggregate_fragments() {
             continue
         fi
         # Schema version gate: warn-and-skip on mismatch.
-        local sv
         sv="$(jq -r '.schema_version' "$f" 2>/dev/null)"
         case "$sv" in
             1.0|1.1) ;;
@@ -560,7 +559,7 @@ _report._stage_order() {
     if declare -f registry.stage.list >/dev/null 2>&1; then
         local _ids
         if _ids="$(registry.stage.list 2>/dev/null)" && [[ -n "$_ids" ]]; then
-            printf '%s' "$_ids" | tr '\n' ' ' | sed 's/ *$//'
+            printf '%s' "$_ids" | tr '\n' ' '
             return 0
         fi
     fi
