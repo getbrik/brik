@@ -23,6 +23,7 @@ tmp/
 # ShellSpec
 report/
 !schemas/report/
+!lib/pipeline/report/
 .brik-logs/
 
 # Claude Code workspace (local state, plans, checkpoints)
