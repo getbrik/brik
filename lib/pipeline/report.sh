@@ -26,6 +26,39 @@ _BRIK_REPORT_LOADED=1
 # shellcheck source=report_html/render.sh
 [[ -z "${_BRIK_REPORT_HTML_RENDER_LOADED:-}" ]] && . "${BASH_SOURCE[0]%/*}/report_html/render.sh"
 
+# Canonical jq helpers for rendering durations. Defined once so the terminal
+# Duration KV, the terminal Stages table, and the Markdown report format
+# milliseconds identically. Previously three divergent implementations existed:
+# a bash branch (capped at minutes), a jq fmt_ms (capped at seconds), and the
+# full human_duration_ms (hours + zero-padding) -- the same 2m view could show
+# "2m15s" in one place and "135s" in another. Accepts a number or a numeric
+# string; null/non-numeric renders as "-".
+# KCOV_EXCL_START -- jq function library, not bash code
+_BRIK_JQ_DURATION_DEFS=$(cat <<'JQ'
+def pad2($n):
+  ($n | tostring) | if length == 1 then "0" + . else . end;
+# 80 -> "80ms", 1142 -> "1s", 33339 -> "33s", 141000 -> "2m21s", 3661000 -> "1h01m".
+def human_duration_ms($ms):
+  ( if $ms == null then null
+    elif ($ms | type) == "number" then $ms
+    else ($ms | tonumber?) end ) as $n
+  | if $n == null then "-"
+    elif $n < 1000 then "\($n)ms"
+    else
+      ($n / 1000 | floor) as $s
+      | if $s < 60 then "\($s)s"
+        elif $s < 3600 then
+          ($s / 60 | floor) as $m | ($s % 60) as $sec
+          | "\($m)m\(pad2($sec))s"
+        else
+          ($s / 3600 | floor) as $h | (($s % 3600) / 60 | floor) as $m
+          | "\($h)h\(pad2($m))m"
+        end
+    end;
+JQ
+)
+# KCOV_EXCL_STOP
+
 # Resolve the backend JSON path from BRIK_LOG_DIR.
 _report._backend_path() {
     local log_dir
@@ -890,7 +923,7 @@ _report._render_aggregate_md() {
     local _stage_order
     _stage_order="$(_report._stage_order)"
     # KCOV_EXCL_START  -- jq script body is not bash code
-    jq -r --arg stage_order "$_stage_order" '
+    jq -r --arg stage_order "$_stage_order" "${_BRIK_JQ_DURATION_DEFS}"'
         # ----- Phase 2 helpers --------------------------------------------
         # Stage execution order: sourced from registry.stage.list when the
         # registry is loaded (single source of truth), else the documented
@@ -914,24 +947,8 @@ _report._render_aggregate_md() {
           elif $s == "warning" then "[WARN]"
           else "[?]" end;
 
-        def pad2($n):
-          ($n | tostring) | if length == 1 then "0" + . else . end;
-
-        # 80 -> "80ms", 1142 -> "1s", 33339 -> "33s", 141000 -> "2m21s".
-        def human_duration_ms($ms):
-          if $ms == null or (($ms | type) != "number") then "-"
-          elif $ms < 1000 then "\($ms)ms"
-          else
-            ($ms / 1000 | floor) as $s
-            | if $s < 60 then "\($s)s"
-              elif $s < 3600 then
-                ($s / 60 | floor) as $m | ($s % 60) as $sec
-                | "\($m)m\(pad2($sec))s"
-              else
-                ($s / 3600 | floor) as $h | (($s % 3600) / 60 | floor) as $m
-                | "\($h)h\(pad2($m))m"
-              end
-          end;
+        # pad2 / human_duration_ms come from ${_BRIK_JQ_DURATION_DEFS}
+        # (top of report.sh), prepended to this program above.
 
         # 0 -> "0B", 1142 -> "1.1KB", 1500000 -> "1.4MB". Used to render
         # artifact sizes in the stages table Metrics column.
@@ -1487,14 +1504,13 @@ report.render_aggregate_terminal() {
           end
     ' "$report_path" 2>/dev/null || printf '0')"
     [[ "$duration_ms" =~ ^[0-9]+$ ]] || duration_ms=0
+    # 0 means "unknown" (missing/unparseable timestamps) -> "-". Otherwise
+    # format through the canonical human_duration_ms so this KV matches the
+    # Stages table and the Markdown report exactly (one source of truth).
     if (( duration_ms == 0 )); then
         duration_str="-"
-    elif (( duration_ms < 1000 )); then
-        duration_str="${duration_ms}ms"
-    elif (( duration_ms < 60000 )); then
-        duration_str="$((duration_ms / 1000))s"
     else
-        duration_str="$((duration_ms / 60000))m$(( (duration_ms / 1000) % 60 ))s"
+        duration_str="$(jq -rn --argjson ms "$duration_ms" "${_BRIK_JQ_DURATION_DEFS}"' human_duration_ms($ms)')"
     fi
 
     render.blank
@@ -1544,14 +1560,12 @@ report.render_aggregate_terminal() {
         printf 'Stage\tStatus\tBusiness\tDuration\n'
         jq -r --argjson plan "$plan_json" \
               --arg current "$current_stage" \
-              --arg pipeline_biz "$biz_status" '
-            def fmt_ms($s):
-                if $s == null or $s == "" then "-"
-                else (try ($s | tonumber) catch null) as $n
-                    | if $n == null then "-"
-                      elif $n < 1000 then "\($n)ms"
-                      else "\(($n / 1000) | floor)s" end
-                end;
+              --arg pipeline_biz "$biz_status" "${_BRIK_JQ_DURATION_DEFS}"'
+            # human_duration_ms comes from ${_BRIK_JQ_DURATION_DEFS}
+            # (top of report.sh), prepended to this program above. It
+            # supersedes the former fmt_ms, which capped output at seconds
+            # (a 2m stage rendered "120s" here while the Duration KV above
+            # rendered "2m00s") and accepts the same string/null inputs.
             def tech_keyword($s):
                 if   $s == "success" then "SUCCESS"
                 elif $s == "failed"  then "FAILED"
@@ -1591,7 +1605,7 @@ report.render_aggregate_terminal() {
                 $sid,
                 tech_keyword($tech),
                 biz_keyword((if $missing then null else $s.business.status end); $tech),
-                fmt_ms((if $missing then null else ($s.tech.duration_ms // $s.duration_ms) end))
+                human_duration_ms((if $missing then null else ($s.tech.duration_ms // $s.duration_ms) end))
               ] | @tsv
         ' "$report_path"
     } | render.table --color-by Business

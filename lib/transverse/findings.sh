@@ -42,6 +42,34 @@ if [[ -z "${_BRIK_FIX_CLASSIFIER_LOADED:-}" ]]; then
     fi
 fi
 
+# Canonical jq helpers for SARIF result -> severity resolution, shared by the
+# apply_policy and v2-stats jq programs below (previously copy-pasted into
+# both). Depends on cvss_bucket / level_bucket from ${_BRIK_JQ_SEVERITY_DEFS}
+# (transverse/sarif.sh), so prepend both, severity defs first:
+#   jq ... "${_BRIK_JQ_SEVERITY_DEFS}${_FINDINGS_JQ_RESULT_DEFS}"' ...rest... '
+# KCOV_EXCL_START -- jq function library, not bash code
+_FINDINGS_JQ_RESULT_DEFS=$(cat <<'JQ'
+def rule_for($r; $sarif):
+  ($r.ruleId // null) as $rid
+  | if $rid == null then null
+    else
+      (($sarif.runs[0].tool.driver.rules // [])[]?
+       | select(.id == $rid))
+      // null
+    end;
+def severity_of_result($r; $sarif):
+  rule_for($r; $sarif) as $rule
+  | ($r.properties["security-severity"]
+     // ($rule.properties["security-severity"] // null)) as $cvss
+  | if   $cvss != null            then cvss_bucket($cvss)
+    elif ($r.level // null) != null then level_bucket($r.level)
+    elif ($rule.defaultConfiguration.level // null) != null
+                                    then level_bucket($rule.defaultConfiguration.level)
+    else "info" end;
+JQ
+)
+# KCOV_EXCL_STOP
+
 # Validate a tool's SARIF report. Entry point of the ingest stage of the
 # pipeline; downstream callers (apply_policy, aggregate) assume the file
 # has already been vetted.
@@ -198,7 +226,7 @@ findings.apply_policy() {
     jq --arg     preset        "$preset" \
        --argjson floor_rank    "$floor_rank" \
        --argjson cve_allowlist "$cve_allowlist" \
-       --argjson path_globs    "$path_globs" '
+       --argjson path_globs    "$path_globs" "${_BRIK_JQ_SEVERITY_DEFS}${_FINDINGS_JQ_RESULT_DEFS}"'
         def severity_rank(s):
           if   s == "critical" then 4
           elif s == "high"     then 3
@@ -206,46 +234,15 @@ findings.apply_policy() {
           elif s == "low"      then 1
           else 0 end;
 
-        def cvss_bucket(s):
-          # tonumber? swallows non-numeric CVSS strings (truncated, garbage)
-          # so an upstream-malformed properties.security-severity downgrades
-          # to info instead of crashing the entire jq filter.
-          ((s | tonumber?) // -1) as $v
-          | if   $v >= 9.0 then "critical"
-            elif $v >= 7.0 then "high"
-            elif $v >= 4.0 then "medium"
-            elif $v > 0    then "low"
-            else "info" end;
+        # cvss_bucket / level_bucket come from ${_BRIK_JQ_SEVERITY_DEFS}
+        # (transverse/sarif.sh), prepended to this program above.
 
-        def level_bucket(lvl):
-          if   lvl == "error"   then "high"
-          elif lvl == "warning" then "medium"
-          elif lvl == "note"    then "low"
-          else "info" end;
-
-        # Rule lookup for severity/fix metadata. Grype encodes CVSS at
-        # rule.properties.security-severity and fix availability in
-        # rule.help.text ("Fix Version: <value>", empty = no upstream fix).
-        # The rule table is built from the input document at call time so
-        # this stays a pure function (no extra binding needed).
-        def rule_for($r; $sarif):
-          ($r.ruleId // null) as $rid
-          | if $rid == null then null
-            else
-              (($sarif.runs[0].tool.driver.rules // [])[]?
-               | select(.id == $rid))
-              // null
-            end;
-
-        def severity_of_result($r; $sarif):
-          rule_for($r; $sarif) as $rule
-          | ($r.properties["security-severity"]
-             // ($rule.properties["security-severity"] // null)) as $cvss
-          | if   $cvss != null            then cvss_bucket($cvss)
-            elif ($r.level // null) != null then level_bucket($r.level)
-            elif ($rule.defaultConfiguration.level // null) != null
-                                            then level_bucket($rule.defaultConfiguration.level)
-            else "info" end;
+        # rule_for / severity_of_result come from
+        # ${_FINDINGS_JQ_RESULT_DEFS} (top of findings.sh), prepended to this
+        # program above. rule_for looks up severity/fix metadata: Grype
+        # encodes CVSS at rule.properties.security-severity and fix
+        # availability in rule.help.text ("Fix Version: <value>", empty = no
+        # upstream fix).
 
         # Resolve fix availability. Order: explicit result property, SARIF
         # standard result.fixes[], grype-style "Fix Version:" in rule
@@ -410,43 +407,10 @@ findings.aggregate() {
     # results that lack our properties.brikSource annotation).
     local v2_stats
     # KCOV_EXCL_START -- jq script body is not bash code
-    v2_stats="$(jq -c '
-        def cvss_bucket(s):
-          # tonumber? swallows non-numeric CVSS strings (truncated, garbage)
-          # so an upstream-malformed properties.security-severity downgrades
-          # to info instead of crashing the entire jq filter.
-          ((s | tonumber?) // -1) as $v
-          | if   $v >= 9.0 then "critical"
-            elif $v >= 7.0 then "high"
-            elif $v >= 4.0 then "medium"
-            elif $v > 0    then "low"
-            else "info" end;
-
-        def level_bucket(lvl):
-          if   lvl == "error"   then "high"
-          elif lvl == "warning" then "medium"
-          elif lvl == "note"    then "low"
-          else "info" end;
-
-        def rule_for($r; $sarif):
-          ($r.ruleId // null) as $rid
-          | if $rid == null then null
-            else
-              (($sarif.runs[0].tool.driver.rules // [])[]?
-               | select(.id == $rid))
-              // null
-            end;
-
-        def severity_of_result($r; $sarif):
-          rule_for($r; $sarif) as $rule
-          | ($r.properties["security-severity"]
-             // ($rule.properties["security-severity"] // null)) as $cvss
-          | if   $cvss != null            then cvss_bucket($cvss)
-            elif ($r.level // null) != null then level_bucket($r.level)
-            elif ($rule.defaultConfiguration.level // null) != null
-                                            then level_bucket($rule.defaultConfiguration.level)
-            else "info" end;
-
+    v2_stats="$(jq -c "${_BRIK_JQ_SEVERITY_DEFS}${_FINDINGS_JQ_RESULT_DEFS}"'
+        # cvss_bucket / level_bucket come from ${_BRIK_JQ_SEVERITY_DEFS} and
+        # rule_for / severity_of_result from ${_FINDINGS_JQ_RESULT_DEFS}
+        # (both at the top of findings.sh), prepended to this program above.
         . as $sarif
         | (.runs[0].results // []) as $results
         | ($results | map(select(((.suppressions // []) | length) == 0))) as $fail

@@ -11,6 +11,35 @@
 [[ -n "${_BRIK_TRANSVERSE_SARIF_LOADED:-}" ]] && return 0
 _BRIK_TRANSVERSE_SARIF_LOADED=1
 
+# Canonical jq function library shared by every severity-resolving filter in
+# this module and in transverse/findings.sh (which sources this file). Defined
+# once here so the CVSS-band thresholds and SARIF level mapping have a single
+# source of truth instead of being copy-pasted into each jq invocation.
+# Prepend ${_BRIK_JQ_SEVERITY_DEFS} to a jq program to make cvss_bucket/
+# level_bucket available to it.
+# KCOV_EXCL_START -- jq function library, not bash code
+_BRIK_JQ_SEVERITY_DEFS=$(cat <<'JQ'
+def cvss_bucket(s):
+  # tonumber? swallows non-numeric CVSS strings (truncated, garbage) so an
+  # upstream-malformed properties.security-severity downgrades to info
+  # instead of crashing the entire jq filter.
+  ((s | tonumber?) // -1) as $v
+  | if   $v >= 9.0 then "critical"
+    elif $v >= 7.0 then "high"
+    elif $v >= 4.0 then "medium"
+    elif $v >  0   then "low"
+    else "info"
+    end;
+def level_bucket(lvl):
+  if   lvl == "error"   then "high"
+  elif lvl == "warning" then "medium"
+  elif lvl == "note"    then "low"
+  else "info"
+  end;
+JQ
+)
+# KCOV_EXCL_STOP
+
 # Shared jq pipeline that resolves a result's effective severity bucket.
 # Reads from the result object plus the rules table; emits one of
 # {critical, high, medium, low, info}.
@@ -25,23 +54,8 @@ _BRIK_TRANSVERSE_SARIF_LOADED=1
 #   5. info as the fallback.
 #
 # KCOV_EXCL_START
-_SARIF_SEVERITY_PIPE=$(cat <<'JQ'
-def cvss_bucket(s):
-  (s | tonumber) as $v
-  | if $v >= 9.0 then "critical"
-    elif $v >= 7.0 then "high"
-    elif $v >= 4.0 then "medium"
-    elif $v > 0    then "low"
-    else "info"
-    end;
-
-def level_bucket(lvl):
-  if   lvl == "error"   then "high"
-  elif lvl == "warning" then "medium"
-  elif lvl == "note"    then "low"
-  else "info"
-  end;
-
+_SARIF_SEVERITY_PIPE="${_BRIK_JQ_SEVERITY_DEFS}
+$(cat <<'JQ'
 . as $sarif
 | ($sarif.runs[0].tool.driver.rules // []) as $rules
 | ($sarif.runs[0].results // [])
@@ -83,7 +97,7 @@ def level_bucket(lvl):
       end
   )
 JQ
-)
+)"
 # KCOV_EXCL_STOP
 
 # sarif.tool_name <file>
@@ -196,21 +210,7 @@ sarif.extract_items() {
         return 1
     fi
     # KCOV_EXCL_START -- inline jq script body, not bash code
-    jq -c '
-        def cvss_bucket(s):
-          (s | tonumber) as $v
-          | if   $v >= 9.0 then "critical"
-            elif $v >= 7.0 then "high"
-            elif $v >= 4.0 then "medium"
-            elif $v >  0   then "low"
-            else "info"
-            end;
-        def level_bucket(lvl):
-          if   lvl == "error"   then "high"
-          elif lvl == "warning" then "medium"
-          elif lvl == "note"    then "low"
-          else "info"
-          end;
+    jq -c "${_BRIK_JQ_SEVERITY_DEFS}"'
         def parse_purl(p):
           if (p // "") == "" or ((p // "") | test("^pkg:") | not) then null
           else
