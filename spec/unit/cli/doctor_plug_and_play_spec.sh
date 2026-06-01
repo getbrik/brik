@@ -28,6 +28,7 @@ spec:
   doctor:
     tools: [foo-bin-that-does-not-exist]
   api:
+    module: stacks.foo
     required: [stacks.foo.build]
 YAML
     : > "${PNP_DIR}/ws/foo.config"

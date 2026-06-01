@@ -79,6 +79,16 @@ fi
 command -v yq >/dev/null 2>&1 || { printf '[compile-registry] yq required\n' >&2; exit 69; }
 command -v jq >/dev/null 2>&1 || { printf '[compile-registry] jq required\n' >&2; exit 69; }
 
+# Manifest validation (ADR-002 layer 1): every manifest is validated against
+# its registry JSON Schema before it can reach the compiled cache. error.sh
+# supplies the BRIK_EXIT_* constants the validator returns on failure; the
+# validator itself requires jv, so validation is skipped (not failed) when jv
+# is absent, mirroring brik's jv-or-check-jsonschema tolerance.
+# shellcheck source=../lib/pipeline/error.sh
+. "${ROOT}/lib/pipeline/error.sh"
+# shellcheck source=../lib/registry/_validator.sh
+. "${ROOT}/lib/registry/_validator.sh"
+
 mkdir -p "$(dirname "$output")"
 
 tmp="$(mktemp "${output}.XXXXXX")"
@@ -103,6 +113,22 @@ if [[ -n "${BRIK_REGISTRY_EXTENSIONS_DIRS:-}" ]]; then
     fi
     manifest_dirs+=("$ext")
   done
+fi
+
+# Validate every manifest (builtins + extensions) against its registry JSON
+# Schema before compiling. A malformed manifest must never reach the cache.
+# Runs in both compile and check modes. Returns BRIK_EXIT_INVALID_INPUT on a
+# schema violation, matching registry.validate_manifest's own contract.
+if command -v jv >/dev/null 2>&1; then
+  for _mdir in "${manifest_dirs[@]}"; do
+    if ! registry.validate_all_manifests "$_mdir" >/dev/null; then
+      printf '[compile-registry] manifest validation failed in %s\n' "$_mdir" >&2
+      exit "$BRIK_EXIT_INVALID_INPUT"
+    fi
+  done
+  unset _mdir
+else
+  printf '[compile-registry] jv not found; skipping manifest schema validation\n' >&2
 fi
 
 # Emit one "id": <body> entry per manifest file under <dir>/<kind>/*.yml,

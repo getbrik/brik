@@ -22,6 +22,9 @@
 # Args: $1 = stack id (kebab-case), $2 = target file path.
 contract.write_stack() {
     local id="$1" path="$2"
+    # api/function identifiers must match ^[a-z][a-z0-9_.]*$ (no hyphens), so a
+    # hyphenated stack id maps to an underscore module segment.
+    local seg="${id//-/_}"
     cat > "$path" <<YAML
 apiVersion: brik.dev/v1
 kind: Stack
@@ -44,9 +47,10 @@ spec:
     test:   ["**/*.spec.${id}"]
     build:  [${id}.toml]
   api:
+    module: stacks.${seg}
     required:
-      - stacks.${id}.build
-      - stacks.${id}.test
+      - stacks.${seg}.build
+      - stacks.${seg}.test
 YAML
 }
 
@@ -54,6 +58,9 @@ YAML
 # Args: $1 = stage id, $2 = target file path, $3 (optional) = after-stage id.
 contract.write_stage() {
     local id="$1" path="$2" after="${3:-init}"
+    # module/function/api identifiers must match ^[a-z][a-z0-9_.]*$ (no hyphens);
+    # placement.slot must be a known slot and gate.mode one of blocking|opt_in.
+    local seg="${id//-/_}"
     cat > "$path" <<YAML
 apiVersion: brik.dev/v1
 kind: Stage
@@ -61,17 +68,18 @@ metadata:
   id: ${id}
   displayName: ${id}-display
 spec:
-  module: stages.${id}
-  function: stages.${id}
+  module: stages.${seg}
+  function: stages.${seg}
   placement:
-    slot: ${id}
+    slot: verify
     after: [${after}]
   runner:
     class: base
   gate:
-    mode: always
+    mode: blocking
+    contexts: [snapshot, release]
   api:
-    required: [stages.${id}]
+    required: [stages.${seg}]
 YAML
 }
 
