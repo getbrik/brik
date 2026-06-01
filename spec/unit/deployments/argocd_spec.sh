@@ -123,6 +123,39 @@ Describe "deploy/argocd.sh"
         The status should be success
       End
 
+      It "applies the default --timeout 300 on a synchronous sync"
+        invoke_default_timeout() {
+          deploy.argocd.sync --app my-app 2>/dev/null || return 1
+          grep -q "\-\-timeout 300" "$MOCK_LOG"
+        }
+        When call invoke_default_timeout
+        The status should be success
+      End
+
+      It "honours an explicit --timeout"
+        invoke_custom_timeout() {
+          deploy.argocd.sync --app my-app --timeout 60 2>/dev/null || return 1
+          grep -q "\-\-timeout 60" "$MOCK_LOG"
+        }
+        When call invoke_custom_timeout
+        The status should be success
+      End
+
+      It "omits --timeout when --async is requested"
+        invoke_async_no_timeout() {
+          deploy.argocd.sync --app my-app --async 2>/dev/null || return 1
+          ! grep -q "\-\-timeout" "$MOCK_LOG"
+        }
+        When call invoke_async_no_timeout
+        The status should be success
+      End
+
+      It "returns 2 for a non-numeric --timeout"
+        When call deploy.argocd.sync --app my-app --timeout abc
+        The status should equal 2
+        The stderr should include "timeout must be a positive integer"
+      End
+
       It "passes --server flag"
         invoke_server() {
           deploy.argocd.sync --app my-app --server https://argocd.example.com 2>/dev/null || return 1
