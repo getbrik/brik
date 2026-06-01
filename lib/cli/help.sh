@@ -6,8 +6,26 @@
 [[ -n "${_BRIK_MODULE_CLI_HELP_LOADED:-}" ]] && return 0
 _BRIK_MODULE_CLI_HELP_LOADED=1
 
+# cli.help._stage_list - canonical, comma-separated pipeline stage list.
+# Prefers the registry (registry.stage.list, the single source of truth) and
+# falls back to the documented fixed flow so `brik help` still works when the
+# registry cannot be loaded.
+cli.help._stage_list() {
+    brik.use registry.registry 2>/dev/null || true
+    if declare -f registry.stage.list >/dev/null 2>&1; then
+        local _ids
+        if _ids="$(registry.stage.list 2>/dev/null)" && [[ -n "$_ids" ]]; then
+            printf '%s' "$_ids" | paste -sd, - | sed 's/,/, /g'
+            return 0
+        fi
+    fi
+    printf '%s' "init, release, build, lint, sast, scan, test, package, container-scan, promote, deploy, notify"
+}
+
 # cli.help.run - print usage text.
 cli.help.run() {
+    local _stages
+    _stages="$(cli.help._stage_list)"
     cat <<EOF
 brik ${BRIK_VERSION} - Portable CI/CD pipeline CLI
 
@@ -72,7 +90,7 @@ Options for version:
   --verbose               Show additional info (home, install method, commit)
 
 Stages:
-  init, release, build, lint, sast, scan, test, package, container-scan, deploy, notify
+  ${_stages}
 
 Examples:
   brik validate
