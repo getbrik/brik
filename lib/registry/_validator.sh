@@ -63,20 +63,26 @@ registry.validate_manifest() {
   schema="$(_validator._schema "$kind")" || return $?
   [[ -f "$schema" ]] || { _validator._fail "schema not found: $schema"; return $?; }
 
-  # jv requires instance file path (stdin is not validated). Write to tempfile.
-  local instance diagnostic rc
-  instance="$(mktemp -t brik-registry-validate-XXXXXX.json)" || {
+  # jv requires instance file path (stdin is not validated). Write to a
+  # tempfile we name ourselves inside a mktemp -d directory. We cannot use
+  # `mktemp -t <prefix>-XXXXXX.json` because busybox mktemp (Alpine runner
+  # images) rejects a template with anything after the XXXXXX run; naming the
+  # file under a temp dir is portable across GNU, BSD and busybox and keeps
+  # the .json extension jv uses to pick the JSON parser.
+  local _tmpd instance diagnostic rc
+  _tmpd="$(mktemp -d)" || {
     _validator._fail "mktemp failed"
     return $?
   }
+  instance="$_tmpd/instance.json"
   if ! yq -o=json '.' "$file" > "$instance" 2>/dev/null; then
     _validator._fail "yq parse error on $file"
-    rm -f "$instance"
+    rm -rf "$_tmpd"
     return "$BRIK_EXIT_INVALID_INPUT"
   fi
   diagnostic="$(jv "$schema" "$instance" 2>&1)"
   rc=$?
-  rm -f "$instance"
+  rm -rf "$_tmpd"
   if [[ $rc -ne 0 ]]; then
     _validator._fail "manifest invalid: $file"
     printf '%s\n' "$diagnostic" >&2
