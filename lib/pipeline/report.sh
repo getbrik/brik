@@ -65,6 +65,7 @@ report.init() {
     local project="${BRIK_PROJECT_NAME:-unnamed}"
     local commit_ref="${BRIK_COMMIT_REF:-}"
 
+    # KCOV_EXCL_START  -- jq script body is not bash code
     jq -n \
         --arg pid "$pipeline_id" \
         --arg started "$started_at" \
@@ -88,6 +89,7 @@ report.init() {
         log.error "cannot initialize report: $backend"
         return "$BRIK_EXIT_IO_FAILURE"
     }
+    # KCOV_EXCL_STOP
     log.debug "report initialized: $backend"
     return 0
 }
