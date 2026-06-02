@@ -76,6 +76,8 @@ JQ
 # (Bash resolves function names at call time), but follows the dependency
 # direction for readability: storage, then fragment aggregation, then the
 # renderers that consume the jq library defined above.
+# shellcheck source=report/lifecycle.sh
+. "${BASH_SOURCE[0]%/*}/report/lifecycle.sh"
 # shellcheck source=report/store.sh
 . "${BASH_SOURCE[0]%/*}/report/store.sh"
 # shellcheck source=report/fragment.sh
