@@ -901,6 +901,26 @@ a:hover { border-bottom-color: var(--link); }
 }
 .skipped-banner .reason { font-size: 13px; color: var(--text-muted); }
 
+/* Not-run banner -- a planned stage that never executed because an upstream
+ * stage failed (or it was never reached). Uses the --warning tone so it
+ * reads as "blocked, needs attention" -- deliberately distinct from the grey
+ * --skipped tone (a planner choice) and from the red --failed tone. */
+.not-run-banner {
+  display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap;
+  padding: var(--space-3) var(--space-4);
+  background: color-mix(in oklch, var(--warning) 10%, transparent);
+  border: 1px solid color-mix(in oklch, var(--warning) 30%, transparent);
+  border-radius: var(--radius-tile);
+}
+.not-run-banner .label {
+  font-family: var(--font-mono); font-size: 11px; font-weight: 600;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--warning);
+  padding: 3px 10px; border-radius: var(--radius-chip);
+  background: color-mix(in oklch, var(--warning) 22%, transparent);
+}
+.not-run-banner .reason { font-size: 13px; color: var(--text-muted); }
+
 /* Stage-specific design tiles ------------------------------------ */
 .stage-grid {
   display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
