@@ -70,3 +70,22 @@ _verify._scan._run() {
     log.info "$label passed"
     return 0
 }
+
+# Stamp tech.tool_error=true on report stage $1 when a SARIF-emitting scanner
+# failed ($3 != 0) without producing a valid SARIF at $2 -- i.e. it crashed
+# before reporting, rather than finding real issues. This lets the report
+# renderers surface a "scanner error" instead of a misleading threshold breach
+# or a deceptive "0 findings". No-op when a valid SARIF exists (real findings
+# were reported) or when the tool exited cleanly. Best-effort: report.record
+# failures are swallowed so this never alters the caller's verdict.
+#
+# Usage: _verify.scan._flag_tool_error <report_stage> <sarif_path> <tool_rc>
+_verify.scan._flag_tool_error() {
+    local report_stage="$1" sarif="$2" tool_rc="$3"
+    [[ "$tool_rc" -ne 0 ]] || return 0
+    if [[ -f "$sarif" ]] && command -v jq >/dev/null 2>&1 \
+       && jq -e 'has("runs")' "$sarif" >/dev/null 2>&1; then
+        return 0
+    fi
+    report.record "$report_stage" "tech" "tool_error" "true" 2>/dev/null || true
+}

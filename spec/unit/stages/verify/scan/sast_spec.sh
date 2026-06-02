@@ -246,5 +246,37 @@ Describe "security/sast.sh"
         The stderr should include "skipping"
       End
     End
+
+    Describe "tool_error crash-guard (Phase 4)"
+      setup_te() { mock.setup; TEST_WS="$(mktemp -d)"; mock.activate; }
+      cleanup_te() { mock.cleanup; rm -rf "$TEST_WS"; }
+      Before 'setup_te'
+      After 'cleanup_te'
+
+      It "stamps tool_error when semgrep crashes without a SARIF"
+        semgrep_crash() {
+          report.record() { printf '%s\n' "$*" >> "$TEST_WS/rec.log"; }
+          mock.create_script "semgrep" 'echo "fatal: internal error" >&2
+exit 2'
+          mock.activate
+          verify.scan.sast.run "$TEST_WS" >/dev/null 2>&1
+          cat "$TEST_WS/rec.log" 2>/dev/null || true
+        }
+        When call semgrep_crash
+        The output should include "sast tech tool_error true"
+      End
+
+      It "does not stamp tool_error for a command override that fails"
+        override_fail() {
+          report.record() { printf '%s\n' "$*" >> "$TEST_WS/rec.log"; }
+          export BRIK_SECURITY_SAST_COMMAND="sh -c 'exit 1'"
+          verify.scan.sast.run "$TEST_WS" >/dev/null 2>&1
+          unset BRIK_SECURITY_SAST_COMMAND
+          cat "$TEST_WS/rec.log" 2>/dev/null || true
+        }
+        When call override_fail
+        The output should equal ""
+      End
+    End
   End
 End

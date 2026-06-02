@@ -71,4 +71,15 @@ verify.scan.sast.run() {
 
     _verify._scan._run sec_sast BRIK_SECURITY_SAST_COMMAND BRIK_SECURITY_SAST_TOOL \
         "$workspace" "SAST"
+    local _rc=$?
+
+    # semgrep emits a SARIF on every run (clean or --error findings); if SAST
+    # failed without one it crashed before reporting -- flag a scanner error so
+    # the report does not read it as a SAST threshold breach. Skipped for a
+    # command override (its own contract) and only checked on failure.
+    if [[ "$_rc" -ne 0 && -z "${BRIK_SECURITY_SAST_COMMAND:-}" ]]; then
+        local _sast_sarif="${workspace}/${BRIK_SECURITY_SAST_OUTPUT_PATH:-brik-artifacts/sast/sast.sarif}"
+        _verify.scan._flag_tool_error "sast" "$_sast_sarif" "$_rc"
+    fi
+    return "$_rc"
 }
