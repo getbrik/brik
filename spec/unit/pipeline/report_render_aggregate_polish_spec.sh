@@ -249,4 +249,47 @@ JSON
       The output should equal "0"
     End
   End
+
+  Describe "lifecycle states in the stages table (Phase 2d)"
+    # The aggregate carries the canonical per-stage lifecycle (stamped at
+    # aggregation, lib/pipeline/report/lifecycle.sh). The Status column reads
+    # .lifecycle when present so the markdown table matches the terminal and
+    # HTML renderers: a stage blocked by an upstream failure reads "not_run",
+    # not the legacy "skipped" it carries for schema back-compat. The
+    # `// .status` fallback keeps pre-lifecycle aggregates rendering unchanged.
+    write_lifecycle_md_aggregate() {
+      cat > "$BACKEND" <<'JSON'
+{
+  "schema_version": "1.1",
+  "pipeline": {"id":"3961","platform":"gitlab","project":"node-full-cve",
+    "started_at":"2026-05-12T10:00:00+0000","finished_at":"2026-05-12T10:02:00+0000",
+    "status":"failed"},
+  "stages": [
+    {"stage":"scan","status":"failed","rc":10,"duration_ms":5120,
+      "tech":{"status":"failed"},"lifecycle":"failed","lifecycle_reason":"stage failed",
+      "business":{"status":"error"}},
+    {"stage":"package","status":"skipped","rc":0,"duration_ms":0,
+      "lifecycle":"not_run","lifecycle_reason":"blocked by upstream failure",
+      "business":{"status":"success"}}
+  ],
+  "summary":{"stages":{"total":2,"passed":0,"failed":1,"skipped":1}}
+}
+JSON
+    }
+    Before 'write_lifecycle_md_aggregate'
+
+    It "renders the canonical lifecycle in the Status column, not the legacy skipped"
+      run() { _report._render_aggregate_md "$BACKEND" | grep -E '^\| package '; }
+      When call run
+      The output should include "not_run"
+      The output should include "[NOT-RUN]"
+      The output should not include "[SKIP]"
+    End
+
+    It "still renders [FAIL] for a failed stage via its lifecycle"
+      run() { _report._render_aggregate_md "$BACKEND" | grep -E '^\| scan '; }
+      When call run
+      The output should include "[FAIL]"
+    End
+  End
 End
