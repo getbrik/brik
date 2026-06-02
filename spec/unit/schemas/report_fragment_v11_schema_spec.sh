@@ -234,4 +234,116 @@ Describe "schemas/report/v1.1/fragment.schema.json"
       The status should not equal 0
     End
   End
+
+  # Phase 0 of the stage-lifecycle model: additive `lifecycle` /
+  # `lifecycle_reason` fields carrying the canonical per-stage cycle of life
+  # computed once during aggregation. Strictly additive: the legacy `status`
+  # enum (success/failed/skipped) is unchanged, so a synthesized not_run /
+  # running entry keeps status:skipped while lifecycle carries the precise
+  # state. A fragment without lifecycle stays valid (back-compat).
+  Describe "lifecycle field (additive, optional)"
+    It "validates a fragment without lifecycle (back-compat)"
+      Skip if "jv not installed" jv_missing
+      payload='{
+        "schema_version": "1.1",
+        "stage": "build",
+        "timestamp": "2026-05-10T10:00:00+0000",
+        "rc": 0,
+        "status": "success",
+        "runner": { "platform": "gitlab" },
+        "tech": { "kind": "ok" },
+        "business": { "status": "success" }
+      }'
+      When call validate_fragment_v11 "$payload"
+      The status should be success
+    End
+
+    It "accepts lifecycle=not_run with a lifecycle_reason (blocked by upstream failure)"
+      Skip if "jv not installed" jv_missing
+      payload='{
+        "schema_version": "1.1",
+        "stage": "package",
+        "timestamp": "2026-05-10T10:00:00+0000",
+        "rc": 0,
+        "status": "skipped",
+        "lifecycle": "not_run",
+        "lifecycle_reason": "blocked by upstream failure (scan)",
+        "runner": { "platform": "gitlab" },
+        "tech": { "kind": "not-applicable" },
+        "business": { "status": "success" }
+      }'
+      When call validate_fragment_v11 "$payload"
+      The status should be success
+    End
+
+    It "accepts lifecycle=running (in-flight stage rendering the report)"
+      Skip if "jv not installed" jv_missing
+      payload='{
+        "schema_version": "1.1",
+        "stage": "notify",
+        "timestamp": "2026-05-10T10:00:00+0000",
+        "rc": 0,
+        "status": "skipped",
+        "lifecycle": "running",
+        "lifecycle_reason": "in flight",
+        "runner": { "platform": "gitlab" },
+        "tech": { "kind": "ok" },
+        "business": { "status": "success" }
+      }'
+      When call validate_fragment_v11 "$payload"
+      The status should be success
+    End
+
+    It "accepts lifecycle=warning (derived from business.status, orthogonal to tech.status)"
+      Skip if "jv not installed" jv_missing
+      payload='{
+        "schema_version": "1.1",
+        "stage": "container-scan",
+        "timestamp": "2026-05-10T10:00:00+0000",
+        "rc": 0,
+        "status": "success",
+        "lifecycle": "warning",
+        "runner": { "platform": "gitlab" },
+        "tech": { "kind": "ok" },
+        "business": { "status": "warning", "reason": "3 findings ignored by policy" }
+      }'
+      When call validate_fragment_v11 "$payload"
+      The status should be success
+    End
+
+    It "accepts each canonical lifecycle value (success, failed, skipped)"
+      Skip if "jv not installed" jv_missing
+      payload='{
+        "schema_version": "1.1",
+        "stage": "test",
+        "timestamp": "2026-05-10T10:00:00+0000",
+        "rc": 1,
+        "status": "failed",
+        "lifecycle": "failed",
+        "lifecycle_reason": "test stage failed",
+        "runner": { "platform": "gitlab" },
+        "tech": { "kind": "check-failed" },
+        "business": { "status": "error", "reason": "0 tests detected" }
+      }'
+      When call validate_fragment_v11 "$payload"
+      The status should be success
+    End
+
+    It "rejects a lifecycle value outside the enum"
+      Skip if "jv not installed" jv_missing
+      payload='{
+        "schema_version": "1.1",
+        "stage": "build",
+        "timestamp": "2026-05-10T10:00:00+0000",
+        "rc": 0,
+        "status": "success",
+        "lifecycle": "in_flight",
+        "runner": { "platform": "gitlab" },
+        "tech": { "kind": "ok" },
+        "business": { "status": "success" }
+      }'
+      When call validate_fragment_v11 "$payload"
+      The status should not equal 0
+    End
+  End
 End

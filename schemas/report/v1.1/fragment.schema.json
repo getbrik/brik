@@ -36,6 +36,15 @@
       "type": "string",
       "enum": ["success", "failed", "skipped"]
     },
+    "lifecycle": {
+      "description": "Canonical per-stage cycle of life, computed once during aggregation from (tech status, business status, plan decision, fragment presence, upstream-failure, in-flight). Strictly additive: 'status' above stays the technical truth and is left unchanged. Synthesized entries for planned-run stages that never executed keep status='skipped' while lifecycle carries the precise state. 'not_run' = planned run but blocked by an upstream failure; 'running' = no fragment yet because the stage is rendering the report in-flight; 'warning' = executed with a degraded-but-non-blocking business outcome (orthogonal to tech status).",
+      "type": "string",
+      "enum": ["success", "warning", "failed", "skipped", "not_run", "running"]
+    },
+    "lifecycle_reason": {
+      "description": "Human-readable explanation of the lifecycle value (e.g. 'blocked by upstream failure (scan)', 'planner: not configured', 'in flight', 'not reached'). Optional.",
+      "type": "string"
+    },
     "runner": {
       "description": "Provenance of the execution environment.",
       "type": "object",
