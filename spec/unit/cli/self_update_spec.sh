@@ -153,7 +153,10 @@ Describe "brik self-update"
       git -C "${FAKE_NT_HOME}" commit -q -m "init"
       BARE_REPO="$(mktemp -d)"
       BARE_REPO="$(cd -P "${BARE_REPO}" && pwd)"
-      git clone --bare -q "${FAKE_NT_HOME}" "${BARE_REPO}/repo.git"
+      # --no-hardlinks: copy objects instead of hardlinking them. Bare clones
+      # on the same filesystem hardlink by default, which races under parallel
+      # test load + kcov ("fatal: hardlink different from source").
+      git clone --bare --no-hardlinks -q "${FAKE_NT_HOME}" "${BARE_REPO}/repo.git"
       git -C "${FAKE_NT_HOME}" remote remove origin 2>/dev/null || true
       git -C "${FAKE_NT_HOME}" remote add origin "${BARE_REPO}/repo.git"
 
