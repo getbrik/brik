@@ -2100,4 +2100,85 @@ JSON
       The output should include 'failure-banner'
     End
   End
+
+  Describe "failed-body coherence and exit-code labels (Phase 4)"
+    # The HTML banner translates a stage's exit code via EXIT_CODE_LABELS (a
+    # JS mirror of the taxonomy in lib/pipeline/error.sh) instead of a bare
+    # "check the job logs". A stage carrying tech.tool_error (a scanner that
+    # produced no valid report, stamped by verify.scan.deps) reads as a scanner
+    # error -- not the misleading "code 10 = threshold exceeded" -- and shows
+    # the honest "Results unavailable" note. A failed stage whose findings
+    # payload is present but empty must not render a deceptive "0 findings".
+
+    write_scan_tool_error_aggregate() {
+      cat > "$BACKEND" <<'JSON'
+{
+  "schema_version": "1.1",
+  "pipeline": {"id":"5001","platform":"gitlab","project":"scan-crash",
+    "started_at":"2026-05-12T10:00:00+0000","finished_at":"2026-05-12T10:00:30+0000",
+    "status":"failed","context":"snapshot","business":{"status":"error"}},
+  "stages": [
+    {"stage":"scan","status":"failed","rc":10,"duration_ms":1200,
+      "tech":{"exit_code":"10","status":"failed","tool_error":true},
+      "lifecycle":"failed","lifecycle_reason":"stage failed",
+      "business":{"status":"error"}}
+  ],
+  "summary":{"stages":{"total":1,"passed":0,"failed":1,"skipped":0}}
+}
+JSON
+    }
+
+    write_sast_empty_findings_aggregate() {
+      cat > "$BACKEND" <<'JSON'
+{
+  "schema_version": "1.1",
+  "pipeline": {"id":"5002","platform":"gitlab","project":"webapp",
+    "started_at":"2026-05-12T10:00:00+0000","finished_at":"2026-05-12T10:01:00+0000",
+    "status":"failed","context":"snapshot","business":{"status":"error"}},
+  "stages": [
+    {"stage":"sast","status":"failed","rc":10,"duration_ms":900,
+      "tech":{"tool":"semgrep","exit_code":"10","status":"failed"},
+      "lifecycle":"failed","lifecycle_reason":"stage failed",
+      "business":{"status":"error","findings":{}}}
+  ],
+  "summary":{"stages":{"total":1,"passed":0,"failed":1,"skipped":0}}
+}
+JSON
+    }
+
+    It "ships the EXIT_CODE_LABELS table mirroring lib/pipeline/error.sh"
+      write_scan_tool_error_aggregate
+      run() { _report._render_html "$BACKEND"; }
+      When call run
+      The output should include 'EXIT_CODE_LABELS'
+      The output should include 'quality or security threshold exceeded'
+      The output should include 'required tool or dependency missing'
+    End
+
+    It "translates the failure code in the banner via the label table"
+      write_scan_tool_error_aggregate
+      run() { _report._render_html "$BACKEND"; }
+      When call run
+      The output should include 'EXIT_CODE_LABELS[ec]'
+    End
+
+    It "renders a scanner-error reason and the unavailable note for tech.tool_error"
+      write_scan_tool_error_aggregate
+      run() { _report._render_html "$BACKEND"; }
+      When call run
+      The output should include 'Scanner error'
+      The output should include '"tool_error":true'
+      The output should include 'Results unavailable'
+    End
+
+    It "treats a present-but-empty findings object on a failed stage as no findings"
+      write_sast_empty_findings_aggregate
+      run() { _report._render_html "$BACKEND"; }
+      When call run
+      # findingsEmpty deep-checks an empty findings object so a present-but-
+      # empty {} does not slip through to a "0 findings" renderer.
+      The output should include "keys[0] === 'findings'"
+      The output should include 'Results unavailable'
+    End
+  End
 End
