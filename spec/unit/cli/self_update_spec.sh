@@ -151,6 +151,11 @@ Describe "brik self-update"
       git -C "${FAKE_NT_HOME}" config user.name "Test"
       git -C "${FAKE_NT_HOME}" add -A
       git -C "${FAKE_NT_HOME}" commit -q -m "init"
+      # Disable auto maintenance: self-update runs `git fetch`, which can spawn
+      # a detached background `gc --auto` that keeps writing into .git after the
+      # command returns, racing the After-hook rm ("Directory not empty").
+      git -C "${FAKE_NT_HOME}" config gc.auto 0
+      git -C "${FAKE_NT_HOME}" config maintenance.auto false
       BARE_REPO="$(mktemp -d)"
       BARE_REPO="$(cd -P "${BARE_REPO}" && pwd)"
       # --no-hardlinks: copy objects instead of hardlinking them. Bare clones
@@ -178,7 +183,15 @@ Describe "brik self-update"
     }
     cleanup_no_tags() {
       PATH="${ORIG_PATH_NT}"
-      rm -rf "${FAKE_USER_HOME_NT}" "${FAKE_BIN_NT}" "${BARE_REPO}"
+      # Tolerant teardown: the test assertion has already passed, and a stray
+      # background git process could still be touching .git. A single retry
+      # absorbs that race; never fail the example on cleanup.
+      local d
+      for d in "${FAKE_USER_HOME_NT}" "${FAKE_BIN_NT}" "${BARE_REPO}"; do
+        [[ -n "$d" ]] || continue
+        rm -rf "$d" 2>/dev/null || { sleep 0.3; rm -rf "$d" 2>/dev/null; } || true
+      done
+      return 0
     }
 
     Before "setup_no_tags"
