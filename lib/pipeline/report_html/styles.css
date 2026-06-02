@@ -838,6 +838,10 @@ a:hover { border-bottom-color: var(--link); }
 .business-stage h3.success { color: var(--success); }
 .business-stage h3.failed  { color: var(--failed); }
 .business-stage h3.skipped { color: var(--skipped); }
+/* not_run: blocked by an upstream failure -- amber, matching .not-run-banner,
+ * so the dot does not read as a grey planner skip. running: in flight. */
+.business-stage h3.not_run { color: var(--warning); }
+.business-stage h3.running { color: var(--text-muted); }
 .business-stage h3 .stage-name { color: var(--text); }
 .business-stage h3 .stage-dry-run-chip { font-family: var(--font-mono); }
 .business-stage h3 .duration-badge {
