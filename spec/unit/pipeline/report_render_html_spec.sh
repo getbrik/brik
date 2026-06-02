@@ -2057,6 +2057,14 @@ JSON
       The output should include 'blocked by upstream failure'
     End
 
+    It "colours the not_run stage-dot from lifecycle, not the placeholder skipped status"
+      write_lifecycle_not_run_aggregate
+      run() { _report._render_html "$BACKEND"; }
+      When call run
+      The output should include '.business-stage h3.not_run'
+      The output should include "lifecycle === 'not_run' || lifecycle === 'running'"
+    End
+
     It "carries the stamped lifecycle through the data island"
       write_lifecycle_not_run_aggregate
       run() { _report._render_html "$BACKEND"; }
