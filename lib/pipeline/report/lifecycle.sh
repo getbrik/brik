@@ -4,11 +4,11 @@
 # @description Pure classifier for the canonical per-stage lifecycle.
 #
 # Single source of truth for the cycle of life of a stage in the aggregate
-# report. Consumed by report.aggregate_fragments (to stamp stages[].lifecycle
-# + lifecycle_reason) and, transitively, by every renderer. Keeping the rule
-# in one pure function removes the historical divergence between the HTML,
-# terminal, and notify-recap classifications (each reclassified a missing
-# fragment with different rules).
+# report. report.aggregate_fragments stamps stages[].lifecycle +
+# lifecycle_reason from this function. The HTML, terminal, and notify-recap
+# renderers are migrated to consume that field in Phase 2 (until then they keep
+# their own classification); centralizing the rule here is what lets that
+# migration remove their historical divergence.
 
 # Guard against double-sourcing
 [[ -n "${_BRIK_REPORT_LIFECYCLE_LOADED:-}" ]] && return 0

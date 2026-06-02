@@ -456,6 +456,13 @@ report.aggregate_fragments() {
     _report._enrich_findings_items "$backend" "$fragment_dir" 2>/dev/null || \
         log.warn "could not enrich findings.items (non-fatal)"
 
+    # Stamp the canonical per-stage lifecycle and synthesize entries for
+    # planned-run stages that never produced a fragment (blocked by an upstream
+    # failure), so the aggregate is complete. The renderers begin consuming
+    # stages[].lifecycle in Phase 2; until then this is additive data. Non-fatal.
+    _report._stamp_lifecycle "$backend" 2>/dev/null || \
+        log.warn "could not stamp stage lifecycle (non-fatal)"
+
     # Render the markdown alongside the JSON. Use the aggregate-shape
     # renderer because the aggregate document differs from the local
     # backend (.pipeline.id vs .pipeline_id, .stages[].stage vs .name,
@@ -471,6 +478,152 @@ report.aggregate_fragments() {
 
     log.debug "aggregate report written: $backend"
     return 0
+}
+
+# Build a transitive-ancestors map {stage: [ancestor, ...]} from the registry
+# placement graph. Edges come from BOTH directions so the graph is complete
+# even when a manifest declares only one side: a stage's `after` lists its
+# parents, and a stage's `before` makes it a parent of those targets. Used to
+# decide whether a missing stage was blocked by an upstream failure (an
+# ancestor failed) rather than skipped or in-flight. Prints '{}' when the
+# registry cache is unreadable.
+# Usage: _report._ancestors_map <registry_cache_json>
+_report._ancestors_map() {
+    local cache="$1"
+    [[ -f "$cache" ]] || { printf '{}'; return 0; }
+    # KCOV_EXCL_START -- jq program body is not bash code
+    jq -c '
+        (.stages // {}) as $S
+        | [ $S | keys[] ] as $ids
+        | ( reduce $ids[] as $x ({};
+              reduce (($S[$x].spec.placement.after // [])[]) as $a (.;
+                .[$x] = ((.[$x] // []) + [$a]))
+              | reduce (($S[$x].spec.placement.before // [])[]) as $b (.;
+                .[$b] = ((.[$b] // []) + [$x]))
+            ) ) as $parents
+        | reduce range(0; ($ids | length)) as $_ ($parents;
+            . as $cur
+            | reduce $ids[] as $x ($cur;
+                .[$x] = ( ((.[$x] // []) + [ (.[$x] // [])[] as $p | ($cur[$p] // [])[] ]) | unique ) ))
+    ' "$cache" 2>/dev/null || printf '{}'
+    # KCOV_EXCL_STOP
+}
+
+# Stamp stages[].lifecycle + stages[].lifecycle_reason on the aggregate, using
+# the pure _report._classify_lifecycle as the single source of truth, and
+# synthesize entries for planned-run stages that never produced a fragment.
+# Best-effort: returns 0 (leaving the aggregate unchanged) when jq is missing
+# or any step fails.
+# Usage: _report._stamp_lifecycle <aggregate_json>
+_report._stamp_lifecycle() {
+    command -v jq >/dev/null 2>&1 || return 0
+    local agg="$1"
+    [[ -f "$agg" ]] || return 0
+
+    local dir; dir="$(dirname "$agg")"
+    local plan_file="${dir}/plan.json"
+    local cache="${BRIK_HOME:-}/lib/registry/cache/registry.json"
+    local current="${BRIK_STAGE_NAME:-}"
+
+    local have_plan="false"
+    if [[ -f "$plan_file" ]] && jq -e '(.stages | type) == "array"' "$plan_file" >/dev/null 2>&1; then
+        have_plan="true"
+    fi
+
+    # Canonical iteration order: plan stage ids (the intended flow) first, then
+    # any recorded stage absent from the plan, so every recorded stage is
+    # stamped even when it is not in plan.json. Without a plan, fall back to the
+    # recorded order.
+    local order_json
+    if [[ "$have_plan" == "true" ]]; then
+        local plan_ids
+        plan_ids="$(jq -c '[.stages[].id]' "$plan_file")"
+        order_json="$(jq -c --argjson plan "$plan_ids" '$plan + ([.stages[].stage] - $plan)' "$agg")"
+    else
+        order_json="$(jq -c '[.stages[].stage]' "$agg")"
+    fi
+
+    local anc_json failed_json
+    anc_json="$(_report._ancestors_map "$cache")"
+    failed_json="$(jq -c '[.stages[] | select((.tech.status // .status) == "failed") | .stage]' "$agg")"
+
+    # Classify every canonical stage through the shared pure classifier and
+    # accumulate a patch list. Keeping the classifier in bash (not duplicated
+    # in jq) is what makes lifecycle a single source of truth.
+    local patches='[]' sid
+    while IFS= read -r sid; do
+        [[ -z "$sid" ]] && continue
+        local recorded has_fragment tech_status business_status plan_decision upstream_failed is_current
+        recorded="$(jq -c --arg s "$sid" '[.stages[] | select(.stage==$s)][0] // empty' "$agg" 2>/dev/null)"
+        # A real recorded fragment always carries a tech block; a synthesized
+        # entry (added by a previous stamping pass) has none. Treating the
+        # latter as no-fragment makes re-stamping idempotent: a not_run stays
+        # not_run instead of degrading to skipped via its placeholder status.
+        if [[ -n "$recorded" ]] && jq -e 'has("tech")' <<<"$recorded" >/dev/null 2>&1; then
+            has_fragment="true"
+            tech_status="$(jq -r '.tech.status // .status // ""' <<<"$recorded")"
+            business_status="$(jq -r '.business.status // ""' <<<"$recorded")"
+        else
+            has_fragment="false"; tech_status=""; business_status=""
+        fi
+        if [[ "$have_plan" == "true" ]]; then
+            plan_decision="$(jq -r --arg s "$sid" '([.stages[]? | select(.id==$s)][0] | .decision) // "unknown"' "$plan_file" 2>/dev/null)"
+        else
+            plan_decision="unknown"
+        fi
+        upstream_failed="$(jq -rn --arg s "$sid" --argjson anc "$anc_json" --argjson failed "$failed_json" \
+            '(($anc[$s] // []) | any(. as $a | ($failed | index($a)) != null)) | if . then "true" else "false" end' 2>/dev/null)"
+        [[ "$upstream_failed" == "true" ]] || upstream_failed="false"
+        if [[ "$sid" == "$current" ]]; then is_current="true"; else is_current="false"; fi
+
+        local out lifecycle reason
+        out="$(_report._classify_lifecycle "$tech_status" "$business_status" "$plan_decision" "$has_fragment" "$upstream_failed" "$is_current")"
+        IFS=$'\t' read -r lifecycle reason <<<"$out"
+
+        patches="$(jq -c --arg s "$sid" --arg lc "$lifecycle" --arg rs "$reason" \
+            '. + [{stage:$s, lifecycle:$lc, reason:$rs}]' <<<"$patches")"
+    done < <(jq -r '.[]' <<<"$order_json")
+
+    local platform ts tmp
+    platform="$(jq -r '.pipeline.platform // "local"' "$agg" 2>/dev/null)"
+    ts="$(date +"%Y-%m-%dT%H:%M:%S%z")"
+    tmp="$(mktemp "${agg}.XXXXXX")" || return 0
+    # KCOV_EXCL_START -- jq program body is not bash code
+    if jq --argjson patches "$patches" --arg ts "$ts" --arg platform "$platform" '
+        reduce $patches[] as $p (.;
+            if any(.stages[]; .stage == $p.stage)
+            then .stages |= map(if .stage == $p.stage
+                                then . + {lifecycle: $p.lifecycle, lifecycle_reason: $p.reason}
+                                else . end)
+            elif $p.lifecycle == "running"
+            # In-flight stage: leave it ABSENT from stages[] so the renderers
+            # not yet migrated to read .lifecycle (Phase 2) keep detecting it as
+            # RUNNING via its absence. Synthesizing a status:skipped placeholder
+            # here would flip it to SKIPPED in the terminal recap.
+            then .
+            else .stages += [{
+                schema_version: "1.1", stage: $p.stage, timestamp: $ts, rc: 0,
+                status: "skipped", lifecycle: $p.lifecycle, lifecycle_reason: $p.reason,
+                runner: { platform: $platform }, business: { status: "success" }
+              }]
+            end)
+        # Keep summary.stages consistent with the final stages[] after
+        # synthesis (the counts were computed before synthesized entries
+        # existed). Legacy status semantics are preserved here; the lifecycle
+        # buckets are introduced when the renderers migrate (Phase 2).
+        | .summary.stages = {
+            total:   (.stages | length),
+            passed:  ([.stages[] | select((.tech.status // .status) == "success")] | length),
+            failed:  ([.stages[] | select((.tech.status // .status) == "failed")]  | length),
+            skipped: ([.stages[] | select((.tech.status // .status) == "skipped")] | length)
+          }
+      ' "$agg" > "$tmp" 2>/dev/null; then
+        mv "$tmp" "$agg"
+    else
+        rm -f "$tmp"
+        return 0
+    fi
+    # KCOV_EXCL_STOP
 }
 
 # Walk each stage in the aggregate JSON, find SARIF references inside its
