@@ -11,9 +11,16 @@ _BRIK_VERIFY_SCAN_DEPS_LOADED=1
 brik.use transverse.tools
 brik.use verify.scan._scan
 
-# Register security dependency scanners (sec_ prefix avoids collision with quality.deps)
-transverse.tools.register sec_deps osv-scanner osv-scanner "osv-scanner scan --format table ." 10
-transverse.tools.register sec_deps grype       grype       "grype dir:{workspace}"              20
+# Register security dependency scanners (sec_ prefix avoids collision with quality.deps).
+#
+# osv-scanner emits its SARIF from THIS single authoritative pass (--format
+# sarif --output-file). The run that decides pass/fail is the run that writes
+# the report, so the report can never disagree with the verdict and -- unlike
+# a second, rc-gated osv-scanner invocation -- it can never write a clean
+# report that masks a tool failure (chantier 20260508 P4 HIGH 1 / chantier #24
+# Phase 3). grype keeps its dir-mode table pass (no native SARIF here).
+transverse.tools.register sec_deps osv-scanner osv-scanner "osv-scanner scan --format sarif --output-file {output} ." 10
+transverse.tools.register sec_deps grype       grype       "grype dir:{workspace}"                                    20
 
 # Run security dependency scan on a workspace.
 # Usage: verify.scan.deps.run <workspace> [--severity <threshold>]
@@ -62,22 +69,131 @@ verify.scan.deps.run() {
     fi
 
     log.info "security dependency scan with $resolved"
+
+    local _deps_rel="${BRIK_SECURITY_DEPS_OUTPUT_PATH:-brik-artifacts/scan/deps.sarif}"
+    local _deps_sarif="${workspace}/${_deps_rel}"
+
+    # Make the findings gate available to both paths below.
+    if ! declare -f findings.scan_gate >/dev/null 2>&1; then
+        brik.use transverse.findings 2>/dev/null || true
+    fi
+
+    if [[ "$resolved" == "osv-scanner" ]]; then
+        _verify.scan.deps._run_osv "$workspace" "$_deps_rel" "$_deps_sarif"
+        return $?
+    fi
+
+    # Any non-osv tool (grype): legacy dir-mode table pass; the gate falls back
+    # to the tool exit code because grype produces no native SARIF here.
+    _verify.scan.deps._run_table "$workspace" "$resolved" "$severity" "$_deps_sarif"
+    return $?
+}
+
+# osv-scanner path: the single authoritative scan pass writes the SARIF. The
+# outcome is read from the SARIF, never invented from an empty fragment.
+#
+# Three cases, never conflated:
+#   1. packages scanned, no vulnerabilities -> valid SARIF, zero results -> pass
+#   2. packages scanned, vulnerabilities    -> valid SARIF, results > 0  -> fail (rc 10)
+#   3. no valid SARIF produced and not a "no package sources" skip -> the tool
+#      failed before reporting -> tech.tool_error + fail, NEVER a silent
+#      "0 findings" success (chantier #24 Phase 3, council case 3).
+_verify.scan.deps._run_osv() {
+    local workspace="$1" rel="$2" sarif="$3"
     local scan_output="" scan_rc=0
+
+    (cd "$workspace" && mkdir -p "$(dirname "$rel")") 2>/dev/null || true
+    # Clear any stale report from a prior run BEFORE scanning. Otherwise a
+    # crash that writes nothing could be masked by an old (possibly clean)
+    # SARIF left at this path. After this, the SARIF's presence proves THIS
+    # pass produced it -- which is what makes the case-3 tool-error check below
+    # sound on persistent/cached runners, not only on fresh CI workspaces.
+    rm -f "$sarif" 2>/dev/null || true
+    scan_output="$(cd "$workspace" && transverse.tools.exec sec_deps osv-scanner \
+        workspace="$workspace" output="$rel" 2>&1)" || scan_rc=$?
+
+    # No package sources: nothing to scan (osv-scanner exits non-zero and
+    # writes no SARIF). A legitimate skip, not a failure. Emit empty stubs so
+    # CI artifact uploads find the expected files.
+    if printf '%s' "$scan_output" | grep -qi "no package sources found"; then
+        log.warn "no package sources found for osv-scanner - skipping"
+        _verify.scan.deps._write_empty_reports "$workspace"
+        return 0
+    fi
+
+    # The SBOM is the dependency inventory ("what was scanned"), not the
+    # verdict ("did it pass"); emit it regardless so downstream supply-chain
+    # tooling has it. It cannot mask the failure signal (the SARIF is
+    # authoritative).
+    _verify.scan.deps._emit_sbom "$workspace"
+
+    # No valid SARIF from the authoritative pass. Distinguish a tool failure
+    # from a benign no-op using the exit status as the corroborating signal:
+    #   - non-zero exit -> osv-scanner failed before reporting (crash, OOM,
+    #     bad invocation). Surface a tool error -- NEVER a silent "0 findings"
+    #     success (council case 3). A real vulnerability run that somehow left
+    #     no SARIF also exits non-zero, so it is caught here, not masked.
+    #   - zero exit -> the tool ran and reported success but emitted no report
+    #     (e.g. a stubbed scanner). There is nothing to gate on; treat it as a
+    #     clean pass. Real osv-scanner always writes a SARIF on a zero exit, so
+    #     this branch never triggers for it in production.
+    if [[ ! -f "$sarif" ]] || ! jq -e 'has("runs")' "$sarif" >/dev/null 2>&1; then
+        if [[ "$scan_rc" -ne 0 ]]; then
+            report.record "scan" "tech" "tool_error" "true" 2>/dev/null || true
+            printf '%s\n' "$scan_output" >&2
+            log.error "security dependency scanner error: osv-scanner produced no valid report (exit ${scan_rc})"
+            return "$BRIK_EXIT_CHECK_FAILED"
+        fi
+        log.info "security dependency scan passed"
+        return 0
+    fi
+
+    # The SARIF is authoritative. Derive the gate's fallback verdict from the
+    # SARIF result count (robust across osv-scanner exit-code quirks) so an
+    # extraction error that still scanned cleanly is a pass; when a policy
+    # backend is present, findings.scan_gate's policy decision takes over.
+    local _results
+    _results="$(jq '[.runs[].results[]?] | length' "$sarif" 2>/dev/null || echo 0)"
+    [[ "$_results" =~ ^[0-9]+$ ]] || _results=0
+    local _content_rc=0
+    (( _results > 0 )) && _content_rc="$BRIK_EXIT_CHECK_FAILED"
+
+    if declare -f findings.scan_gate >/dev/null 2>&1; then
+        if findings.scan_gate "scan_deps" "$_content_rc" "$sarif" 2>/dev/null; then
+            log.info "security dependency scan passed"
+            return 0
+        fi
+        log.error "security dependency vulnerabilities found"
+        return "$BRIK_EXIT_CHECK_FAILED"
+    fi
+
+    # No findings module: the SARIF result count is the verdict.
+    if (( _results > 0 )); then
+        log.error "security dependency vulnerabilities found"
+        return "$BRIK_EXIT_CHECK_FAILED"
+    fi
+    log.info "security dependency scan passed"
+    return 0
+}
+
+# Non-osv path (grype): dir-mode pass that prints a human table. grype emits no
+# native SARIF here, so the gate falls back to the tool exit code.
+_verify.scan.deps._run_table() {
+    local workspace="$1" resolved="$2" severity="$3" sarif="$4"
+    local scan_output="" scan_rc=0
+
     scan_output="$(cd "$workspace" && transverse.tools.exec sec_deps "$resolved" \
         workspace="$workspace" severity="${severity^^}" 2>&1)" || scan_rc=$?
 
     if [[ "$scan_rc" -ne 0 ]]; then
-        # osv-scanner returns non-zero when no package sources found
+        # The tool returns non-zero when no package sources are found.
         if echo "$scan_output" | grep -qi "no package sources found"; then
             log.warn "no package sources found for $resolved - skipping"
-            # Emit empty stubs so CI artifact uploads (artifacts.reports.cyclonedx
-            # and artifacts.paths) find the expected files instead of warning.
             _verify.scan.deps._write_empty_reports "$workspace"
             return 0
         fi
-        # osv-scanner can exit non-zero on transient extraction errors
-        # (e.g. transitivedependency/pomxml RPC to deps.dev unreachable)
-        # while still reporting zero vulnerabilities. Treat that as a pass.
+        # Transient extraction errors (e.g. deps.dev RPC unreachable) can exit
+        # non-zero while still reporting zero vulnerabilities. Treat as a pass.
         if echo "$scan_output" | grep -qE "Total 0 packages affected by 0 known vulnerabilities"; then
             log.warn "$resolved reported extraction errors but found no vulnerabilities - treating as pass"
             printf '%s\n' "$scan_output" >&2
@@ -85,42 +201,8 @@ verify.scan.deps.run() {
         fi
     fi
 
-    # L4 enrichment: emit SARIF + CycloneDX reports for the aggregate-report
-    # business.deps.* aggregation. Only osv-scanner has native support for
-    # both formats here; grype takes a separate path. Failures of the
-    # report passes are non-fatal (informational outputs).
-    #
-    # SARIF stays gated on scan_rc == 0 (chantier 20260508 P4 review HIGH 1):
-    # a real tool failure must NOT trigger SARIF re-emission, because a
-    # second osv-scanner invocation could write a clean report that masks
-    # the original error from findings.scan_gate downstream.
-    #
-    # The SBOM (CycloneDX) is emitted regardless of scan_rc because the
-    # SBOM is the dependency inventory (the "what was scanned"), not the
-    # scan verdict (the "did it pass"). Even when the scan finds CVEs,
-    # downstream tooling and the user expect the SBOM to be available
-    # for inspection / supply-chain analysis. Emitting it after a vuln-
-    # finding scan does not mask anything: the [ERROR] log + non-zero
-    # return code remain the authoritative failure signal.
-    if [[ "$resolved" == "osv-scanner" ]]; then
-        if [[ "$scan_rc" -eq 0 ]]; then
-            _verify.scan.deps._emit_reports "$workspace"
-        else
-            _verify.scan.deps._emit_sbom "$workspace"
-        fi
-    fi
-
-    # Run the SARIF (when present) through the unified ingest -> policy ->
-    # aggregate pipeline (chantier 20260508 P4). findings.scan_gate gives
-    # the final stage rc: 0 when the policy-annotated business.findings has
-    # no failing entries, BRIK_EXIT_CHECK_FAILED otherwise; falls back to
-    # scan_rc when no SARIF was produced (e.g. grype dir-mode in P4).
-    if ! declare -f findings.scan_gate >/dev/null 2>&1; then
-        brik.use transverse.findings 2>/dev/null || true
-    fi
-    local _deps_sarif="${workspace}/${BRIK_SECURITY_DEPS_OUTPUT_PATH:-brik-artifacts/scan/deps.sarif}"
     if declare -f findings.scan_gate >/dev/null 2>&1; then
-        if findings.scan_gate "scan_deps" "$scan_rc" "$_deps_sarif" 2>/dev/null; then
+        if findings.scan_gate "scan_deps" "$scan_rc" "$sarif" 2>/dev/null; then
             log.info "security dependency scan passed"
             return 0
         fi
@@ -153,28 +235,10 @@ _verify.scan.deps._write_empty_reports() {
         || true
 }
 
-# Run osv-scanner twice more: once for SARIF, once for CycloneDX 1.5.
-# Both calls tolerate non-zero exit (the table pass already determined
-# pass/fail above; these passes only produce side-effect reports for the
-# L4 lib/stages/scan.sh aggregator).
-_verify.scan.deps._emit_reports() {
-    local workspace="$1"
-    local sarif="${BRIK_SECURITY_DEPS_OUTPUT_PATH:-brik-artifacts/scan/deps.sarif}"
-    local sarif_dir; sarif_dir="$(dirname "$sarif")"
-
-    (cd "$workspace" && mkdir -p "$sarif_dir" \
-        && osv-scanner scan --format sarif --output "$sarif" . >/dev/null 2>&1 || true)
-
-    _verify.scan.deps._emit_sbom "$workspace"
-}
-
-# Emit the CycloneDX SBOM only (no SARIF). Called both from the success
-# path (_emit_reports) and from the failure path -- in the latter case
-# the SBOM exists as the dependency inventory for downstream
-# supply-chain analysis even when the scan gate marks the stage as
-# failed. The SARIF stays guarded by the chantier 20260508 P4 safety
-# property; the SBOM lists the same components an osv-scanner success
-# would have produced, so emitting it cannot mask the failure signal.
+# Emit the CycloneDX SBOM (dependency inventory). Separate osv-scanner
+# invocation: the SBOM lists components, not the scan verdict, so producing it
+# after the authoritative SARIF pass cannot mask a failure. Non-fatal: a
+# missing SBOM only costs supply-chain inspection, never the verdict.
 _verify.scan.deps._emit_sbom() {
     local workspace="$1"
     local sbom="${BRIK_SECURITY_DEPS_SBOM_OUTPUT_PATH:-brik-artifacts/scan/sbom.cdx.json}"
@@ -182,6 +246,6 @@ _verify.scan.deps._emit_sbom() {
 
     if [[ "${BRIK_SECURITY_DEPS_SBOM_ENABLED:-true}" == "true" ]]; then
         (cd "$workspace" && mkdir -p "$sbom_dir" \
-            && osv-scanner scan --format cyclonedx-1-5 --output "$sbom" . >/dev/null 2>&1 || true)
+            && osv-scanner scan --format cyclonedx-1-5 --output-file "$sbom" . >/dev/null 2>&1 || true)
     fi
 }
