@@ -89,6 +89,13 @@ verify.scan.secret.run() {
         brik.use transverse.findings 2>/dev/null || true
     fi
     local _secret_sarif="${workspace}/${sarif}"
+    # gitleaks emits a SARIF on every run (clean or findings); if it failed
+    # without one it crashed before reporting -- flag a scanner error so the
+    # report does not read it as a secret-found threshold breach. trufflehog
+    # has no native SARIF here, so the guard is gitleaks-only.
+    if [[ "$resolved" == "gitleaks" ]]; then
+        _verify.scan._flag_tool_error "scan" "$_secret_sarif" "$_scan_rc"
+    fi
     if declare -f findings.scan_gate >/dev/null 2>&1; then
         if findings.scan_gate "scan_secret" "$_scan_rc" "$_secret_sarif" 2>/dev/null; then
             log.info "security secret scan passed"

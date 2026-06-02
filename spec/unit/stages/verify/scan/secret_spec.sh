@@ -273,5 +273,54 @@ Describe "security/secret_scan.sh"
         The stderr should include "no security secret scan tool available"
       End
     End
+
+    Describe "tool_error crash-guard (Phase 4)"
+      setup_te() { mock.setup; TEST_WS="$(mktemp -d)"; mock.activate; }
+      cleanup_te() { unset BRIK_SECURITY_SECRETS_TOOL; mock.cleanup; rm -rf "$TEST_WS"; }
+      Before 'setup_te'
+      After 'cleanup_te'
+
+      It "flags tool_error when a SARIF-emitting scanner failed without a report"
+        flag_no_sarif() {
+          report.record() { echo "RECORD $*"; }
+          _verify.scan._flag_tool_error "scan" "$TEST_WS/missing.sarif" 10
+        }
+        When call flag_no_sarif
+        The output should include "RECORD scan tech tool_error true"
+      End
+
+      It "does not flag when the tool exited cleanly"
+        flag_clean() {
+          report.record() { echo "RECORD $*"; }
+          _verify.scan._flag_tool_error "scan" "$TEST_WS/missing.sarif" 0
+        }
+        When call flag_clean
+        The output should equal ""
+      End
+
+      It "does not flag when a valid SARIF exists (real findings reported)"
+        flag_valid() {
+          report.record() { echo "RECORD $*"; }
+          printf '%s\n' '{"version":"2.1.0","runs":[]}' > "$TEST_WS/x.sarif"
+          _verify.scan._flag_tool_error "scan" "$TEST_WS/x.sarif" 10
+        }
+        When call flag_valid
+        The output should equal ""
+      End
+
+      It "stamps tool_error when gitleaks crashes without a SARIF"
+        gitleaks_crash() {
+          report.record() { printf '%s\n' "$*" >> "$TEST_WS/rec.log"; }
+          mock.create_script "gitleaks" 'echo "panic: runtime error" >&2
+exit 2'
+          mock.activate
+          export BRIK_SECURITY_SECRETS_TOOL="gitleaks"
+          verify.scan.secret.run "$TEST_WS" >/dev/null 2>&1
+          cat "$TEST_WS/rec.log" 2>/dev/null || true
+        }
+        When call gitleaks_crash
+        The output should include "scan tech tool_error true"
+      End
+    End
   End
 End
