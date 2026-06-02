@@ -53,6 +53,8 @@ _report._render_aggregate_md() {
           elif $s == "failed"  then "[FAIL]"
           elif $s == "skipped" then "[SKIP]"
           elif $s == "warning" then "[WARN]"
+          elif $s == "not_run" then "[NOT-RUN]"
+          elif $s == "running" then "[RUNNING]"
           else "[?]" end;
 
         # pad2 / human_duration_ms come from ${_BRIK_JQ_DURATION_DEFS}
@@ -242,7 +244,9 @@ _report._render_aggregate_md() {
         # ----- Phase 2: stages table (ordered, glyphed, human, linked) ----
         # Columns:
         #   Stage     -- stage id (init, build, lint, ...)
-        #   Status    -- technical outcome (success/failed/skipped/warning)
+        #   Status    -- canonical lifecycle stamped at aggregation
+        #                (success/warning/failed/skipped/not_run/running),
+        #                falling back to tech status for pre-lifecycle reports
         #   Business  -- business outcome (success/warning/error) from
         #                business.status
         #   Duration  -- human-readable elapsed time
@@ -265,7 +269,7 @@ _report._render_aggregate_md() {
            | .[]
            | (
                "| " + (.stage // "-")
-               + " | " + status_glyph(.status // "?") + " " + (.status // "-")
+               + " | " + status_glyph(.lifecycle // .status // "?") + " " + (.lifecycle // .status // "-")
                        + (if ((.tech.dry_run // false) | tostring) == "true" then " _(dry-run)_" else "" end)
                + " | " + biz_label(.business // null)
                + " | " + human_duration_ms(.duration_ms)
