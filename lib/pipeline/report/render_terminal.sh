@@ -249,6 +249,7 @@ report.render_aggregate_terminal() {
                 elif $s == "skipped" then "SKIPPED"
                 elif $s == "warning" then "WARNING"
                 elif $s == "running" then "RUNNING"
+                elif $s == "not_run" then "NOT-RUN"
                 else ($s | tostring | ascii_upcase) end;
             # When a stage is the in-flight stage (typically notify
             # aggregating its own pipeline), surface the pipeline-level
@@ -258,7 +259,7 @@ report.render_aggregate_terminal() {
             # --color-by Business: green for SUCCESS pipelines, yellow
             # for WARNING, red for ERROR.
             def biz_keyword($b; $tech):
-                if   $tech == "skipped" then "N/A"
+                if   $tech == "skipped" or $tech == "not_run" then "N/A"
                 elif $tech == "running" then ($pipeline_biz | ascii_upcase)
                 elif $b   == "success"  then "SUCCESS"
                 elif $b   == "warning"  then "WARNING"
@@ -276,7 +277,7 @@ report.render_aggregate_terminal() {
             | (($s | length) == 0) as $missing
             | (if $missing and $sid == $current then "running"
                elif $missing then "skipped"
-               else ($s.tech.status // $s.status // "skipped")
+               else ($s.lifecycle // $s.tech.status // $s.status // "skipped")
                end) as $tech
             | [
                 $sid,
@@ -294,14 +295,18 @@ report.render_aggregate_terminal() {
     # marker for the in-flight stage). Running is at most 1 (the current
     # stage). Skipped is the remainder, so total = passed + failed +
     # running + skipped holds.
-    local total passed failed running skipped
+    local total passed failed running skipped not_run
     total="$(jq -r --argjson plan "$plan_json" '
         if ($plan|type) == "object" and ($plan.stages|type) == "array"
         then $plan.stages | length
         else .stages | length
         end' "$report_path" 2>/dev/null)"
-    passed="$(jq -r '[.stages[] | select((.tech.status // .status) == "success")] | length' "$report_path" 2>/dev/null)"
-    failed="$(jq -r '[.stages[] | select((.tech.status // .status) == "failed")]  | length' "$report_path" 2>/dev/null)"
+    # Counts read the canonical lifecycle when present (a warning stage ran, so
+    # it counts as passed), falling back to tech.status/status for aggregates
+    # produced before lifecycle stamping.
+    passed="$(jq -r '[.stages[] | (.lifecycle // .tech.status // .status) | select(. == "success" or . == "warning")] | length' "$report_path" 2>/dev/null)"
+    failed="$(jq -r '[.stages[] | select((.lifecycle // .tech.status // .status) == "failed")] | length' "$report_path" 2>/dev/null)"
+    not_run="$(jq -r '[.stages[] | select((.lifecycle // "") == "not_run")] | length' "$report_path" 2>/dev/null)"
     running=0
     if [[ -n "$current_stage" ]] && jq -e --arg current "$current_stage" --argjson plan "$plan_json" '
         ($plan|type) == "object" and ($plan.stages|type) == "array"
@@ -310,13 +315,14 @@ report.render_aggregate_terminal() {
     ' "$report_path" >/dev/null 2>&1; then
         running=1
     fi
-    skipped=$(( total - passed - failed - running ))
+    skipped=$(( total - passed - failed - running - not_run ))
 
     render.section "Summary"
     render.kv "Total stages" "$total"   --key-width 14
     render.kv "Passed"       "$passed"  --key-width 14
     render.kv "Failed"       "$failed"  --key-width 14
     render.kv "Skipped"      "$skipped" --key-width 14
+    (( not_run > 0 )) && render.kv "Not run" "$not_run" --key-width 14
     (( running > 0 )) && render.kv "Running" "$running" --key-width 14
     render.blank
 
