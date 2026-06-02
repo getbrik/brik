@@ -1964,4 +1964,140 @@ JSON
       The output should equal "contains </script> raw close tag"
     End
   End
+
+  Describe "lifecycle-driven stage classification (Phase 2b)"
+    # The canonical per-stage `lifecycle` is stamped once at aggregation
+    # (lib/pipeline/report/lifecycle.sh) and consumed verbatim by the HTML
+    # renderer -- which never reclassifies. These fixtures hand-stamp the
+    # field the way report.aggregate_fragments would, and assert the renderer
+    # reads it: a not_run stage gets its own tile (never "still in flight"),
+    # the in-flight running tile stays gated on the in-flight signal, and a
+    # failed stage with no findings payload shows an honest note instead of a
+    # deceptive "0 findings".
+
+    write_lifecycle_not_run_aggregate() {
+      cat > "$BACKEND" <<'JSON'
+{
+  "schema_version": "1.1",
+  "pipeline": {"id":"3961","platform":"gitlab","project":"node-full-cve",
+    "started_at":"2026-05-12T10:00:00+0000","finished_at":"2026-05-12T10:02:00+0000",
+    "status":"failed","context":"snapshot","business":{"status":"error"}},
+  "stages": [
+    {"stage":"scan","status":"failed","rc":10,"duration_ms":5120,
+      "tech":{"deps":{"tool":"osv-scanner"},"exit_code":"10","status":"failed"},
+      "lifecycle":"failed","lifecycle_reason":"stage failed",
+      "business":{"status":"error",
+        "deps":{"vulnerabilities":{"total":17,"by_severity":{"critical":2,"high":5,"medium":7,"low":3,"info":0}},"affected_packages":9}}},
+    {"stage":"package","status":"skipped","rc":0,"duration_ms":0,
+      "lifecycle":"not_run","lifecycle_reason":"blocked by upstream failure",
+      "runner":{"platform":"gitlab"},"business":{"status":"success"}}
+  ],
+  "summary":{"stages":{"total":2,"passed":0,"failed":1,"skipped":1}}
+}
+JSON
+    }
+
+    write_lifecycle_failed_empty_aggregate() {
+      cat > "$BACKEND" <<'JSON'
+{
+  "schema_version": "1.1",
+  "pipeline": {"id":"4001","platform":"gitlab","project":"scan-crash",
+    "started_at":"2026-05-12T10:00:00+0000","finished_at":"2026-05-12T10:00:30+0000",
+    "status":"failed","context":"snapshot","business":{"status":"error"}},
+  "stages": [
+    {"stage":"scan","status":"failed","rc":10,"duration_ms":1200,
+      "tech":{"exit_code":"10","status":"failed"},
+      "lifecycle":"failed","lifecycle_reason":"stage failed",
+      "business":{"status":"error"}}
+  ],
+  "summary":{"stages":{"total":1,"passed":0,"failed":1,"skipped":0}}
+}
+JSON
+    }
+
+    write_lifecycle_inflight_aggregate() {
+      cat > "$BACKEND" <<'JSON'
+{
+  "schema_version": "1.1",
+  "pipeline": {"id":"4100","platform":"gitlab","project":"node-complete",
+    "started_at":"2026-05-12T10:00:00+0000","finished_at":"2026-05-12T10:02:00+0000",
+    "status":"success","context":"release","business":{"status":"success"}},
+  "stages": [
+    {"stage":"init","status":"success","rc":0,"duration_ms":100,
+      "lifecycle":"success","lifecycle_reason":"ok","business":{"status":"success"}}
+  ],
+  "summary":{"stages":{"total":1,"passed":1,"failed":0,"skipped":0}}
+}
+JSON
+      cat > "${HTML_TMP}/plan.json" <<'JSON'
+{ "stages": [ {"id":"init","decision":"run"}, {"id":"notify","decision":"run"} ] }
+JSON
+    }
+
+    It "exposes renderNotRunTile in the renderer source"
+      write_lifecycle_not_run_aggregate
+      run() { _report._render_html "$BACKEND"; }
+      When call run
+      The output should include 'function renderNotRunTile'
+    End
+
+    It "reads the canonical lifecycle field to classify not_run"
+      write_lifecycle_not_run_aggregate
+      run() { _report._render_html "$BACKEND"; }
+      When call run
+      The output should include "lifecycle === 'not_run'"
+    End
+
+    It "ships the not-run-banner tile, distinct from skipped and running"
+      write_lifecycle_not_run_aggregate
+      run() { _report._render_html "$BACKEND"; }
+      When call run
+      The output should include 'class="not-run-banner"'
+      The output should include '.not-run-banner {'
+      The output should include 'blocked by upstream failure'
+    End
+
+    It "carries the stamped lifecycle through the data island"
+      write_lifecycle_not_run_aggregate
+      run() { _report._render_html "$BACKEND"; }
+      When call run
+      The output should include '"lifecycle":"not_run"'
+      The output should include '"lifecycle_reason":"blocked by upstream failure"'
+    End
+
+    It "drops the over-broad isRunningMissing classification"
+      write_lifecycle_not_run_aggregate
+      run() { _report._render_html "$BACKEND"; }
+      When call run
+      The output should not include 'isRunningMissing'
+    End
+
+    It "keeps the in-flight running tile gated on the in-flight signal"
+      write_lifecycle_inflight_aggregate
+      run() { _report._render_html "$BACKEND"; }
+      When call run
+      # In-flight is detected by absence from stages[] + plan decision run
+      # (the stage rendering the report is left absent on purpose), or by an
+      # explicit lifecycle === 'running'. renderRunningTile must survive.
+      The output should include 'function renderRunningTile'
+      The output should include "lifecycle === 'running'"
+      The output should include "planEntry.decision === 'run'"
+    End
+
+    It "renders an honest note for a failed stage with no findings payload"
+      write_lifecycle_failed_empty_aggregate
+      run() { _report._render_html "$BACKEND"; }
+      When call run
+      The output should include 'function renderUnavailableNote'
+      The output should include 'function findingsEmpty'
+      The output should include 'Results unavailable'
+    End
+
+    It "still shows the failure banner alongside the unavailable note"
+      write_lifecycle_failed_empty_aggregate
+      run() { _report._render_html "$BACKEND"; }
+      When call run
+      The output should include 'failure-banner'
+    End
+  End
 End
