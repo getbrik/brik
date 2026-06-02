@@ -108,8 +108,11 @@ Describe "brik self-update"
       chmod +x "${FAKE_BIN_DG}/brew"
       ORIG_PATH_DG="${PATH}"
 
-      # Move to ~/.brik so _brik_detect_install_method returns "git"
-      FAKE_USER_HOME_DG="$(dirname "${FAKE_GIT_HOME}")"
+      # Move to ~/.brik so _brik_detect_install_method returns "git".
+      # Use a dedicated, unique fake HOME (not dirname of the temp dir, which
+      # resolves to the shared TMPDIR and collides with parallel test jobs).
+      FAKE_USER_HOME_DG="$(mktemp -d)"
+      FAKE_USER_HOME_DG="$(cd -P "${FAKE_USER_HOME_DG}" && pwd)"
       mv "${FAKE_GIT_HOME}" "${FAKE_USER_HOME_DG}/.brik"
       FAKE_GIT_HOME="${FAKE_USER_HOME_DG}/.brik"
 
@@ -119,7 +122,7 @@ Describe "brik self-update"
     }
     cleanup_dirty_git() {
       PATH="${ORIG_PATH_DG}"
-      rm -rf "${FAKE_GIT_HOME}" "${FAKE_BIN_DG}"
+      rm -rf "${FAKE_USER_HOME_DG}" "${FAKE_BIN_DG}"
     }
 
     Before "setup_dirty_git"
@@ -159,7 +162,10 @@ Describe "brik self-update"
       chmod +x "${FAKE_BIN_NT}/brew"
       ORIG_PATH_NT="${PATH}"
 
-      FAKE_USER_HOME_NT="$(dirname "${FAKE_NT_HOME}")"
+      # Dedicated, unique fake HOME (not dirname of the temp dir, which resolves
+      # to the shared TMPDIR and collides with parallel test jobs).
+      FAKE_USER_HOME_NT="$(mktemp -d)"
+      FAKE_USER_HOME_NT="$(cd -P "${FAKE_USER_HOME_NT}" && pwd)"
       mv "${FAKE_NT_HOME}" "${FAKE_USER_HOME_NT}/.brik"
       FAKE_NT_HOME="${FAKE_USER_HOME_NT}/.brik"
 
@@ -169,7 +175,7 @@ Describe "brik self-update"
     }
     cleanup_no_tags() {
       PATH="${ORIG_PATH_NT}"
-      rm -rf "${FAKE_NT_HOME}" "${FAKE_BIN_NT}" "${BARE_REPO}"
+      rm -rf "${FAKE_USER_HOME_NT}" "${FAKE_BIN_NT}" "${BARE_REPO}"
     }
 
     Before "setup_no_tags"
