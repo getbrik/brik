@@ -155,6 +155,12 @@ _verify.scan.deps._run_osv() {
     local _results
     _results="$(jq '[.runs[].results[]?] | length' "$sarif" 2>/dev/null || echo 0)"
     [[ "$_results" =~ ^[0-9]+$ ]] || _results=0
+
+    # Surface the advisories in the job log. In --output-file mode the SARIF
+    # goes to a file, so without this the readable advisory list never reaches
+    # the log. Runs whether the policy gate passes (below-threshold) or fails.
+    _verify.scan.deps._log_findings "$sarif"
+
     local _content_rc=0
     (( _results > 0 )) && _content_rc="$BRIK_EXIT_CHECK_FAILED"
 
@@ -233,6 +239,33 @@ _verify.scan.deps._write_empty_reports() {
         && printf '%s\n' '{"$schema":"https://json.schemastore.org/sarif-2.1.0.json","version":"2.1.0","runs":[]}' > "$sarif" \
         && printf '%s\n' '{"$schema":"http://cyclonedx.org/schema/bom-1.5.schema.json","bomFormat":"CycloneDX","specVersion":"1.5","version":1,"components":[],"vulnerabilities":[]}' > "$sbom") \
         || true
+}
+
+# Log a summary of the advisories in the authoritative SARIF so the job log
+# shows WHAT was found. In --format sarif --output-file mode the report goes to
+# a file, so without this the readable advisory list never reaches the log.
+# Logs the per-result message (osv-scanner phrases it as "Package <pkg> is
+# vulnerable to <CVE> (also known as <GHSA>)", so it carries the package and
+# every advisory alias), falling back to the rule id. No-op when the SARIF is
+# absent/empty. Logged at info and the header is worded with "vulnerabilities"
+# so it does not read as a stage error.
+_verify.scan.deps._log_findings() {
+    local sarif="$1"
+    [[ -f "$sarif" ]] && command -v jq >/dev/null 2>&1 || return 0
+    local count
+    count="$(jq -r '[.runs[].results[]?] | length' "$sarif" 2>/dev/null || echo 0)"
+    [[ "$count" =~ ^[0-9]+$ ]] && (( count > 0 )) || return 0
+    log.info "dependency vulnerabilities found (${count}):"
+    # gsub collapses any control chars (newlines, tabs, terminal escapes) so a
+    # message cannot split a finding across log lines or inject escape noise.
+    # One info line per advisory.
+    local line
+    while IFS= read -r line; do
+        [[ -n "$line" ]] && log.info "  ${line}"
+    done < <(jq -r '
+        .runs[].results[]?
+        | ((.message.text // .ruleId // "unknown") | gsub("[[:cntrl:]]+"; " "))
+    ' "$sarif" 2>/dev/null)
 }
 
 # Emit the CycloneDX SBOM (dependency inventory). Separate osv-scanner

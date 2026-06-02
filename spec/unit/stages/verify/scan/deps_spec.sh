@@ -14,7 +14,9 @@ Describe "security/deps.sh"
     osv_mock_sarif() {
       local nresults="$1" code="$2" results="" i=0
       while [ "$i" -lt "$nresults" ]; do
-        results="${results}{\"ruleId\":\"CVE-2026-${i}\",\"level\":\"error\"},"
+        # Mirror osv-scanner's result message: the canonical id is a CVE and the
+        # GHSA is carried as an alias inside the message text.
+        results="${results}{\"ruleId\":\"CVE-2026-${i}\",\"level\":\"error\",\"message\":{\"text\":\"Package 'pkg@1.0.0' is vulnerable to 'CVE-2026-${i}' (also known as 'GHSA-test-${i}').\"}},"
         i=$((i + 1))
       done
       results="${results%,}"
@@ -150,6 +152,14 @@ exit 128'
         }
         When call sarif_results
         The output should equal "3"
+      End
+
+      It "logs the advisory messages from the SARIF (CVE + GHSA alias) so the job log shows what was found"
+        When call verify.scan.deps.run "$TEST_WS"
+        The status should equal 10
+        The stderr should include "dependency vulnerabilities found (3)"
+        The stderr should include "CVE-2026-0"
+        The stderr should include "GHSA-test-0"
       End
     End
 
