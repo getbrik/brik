@@ -106,7 +106,7 @@ brik run stage build --config brik.yml --workspace .
 brik run stage deploy --dry-run
 brik run pipeline --continue-on-error --with-release --with-package --with-deploy
 brik run pipeline --with-deploy --dry-run
-brik self-update --channel edge --version v0.6.0
+brik self-update --channel edge --version v0.7.0
 brik self-uninstall --force
 brik version --verbose
 ```

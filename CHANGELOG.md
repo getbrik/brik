@@ -7,6 +7,105 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-06-03
+
+67 commits since 0.6.0.
+
+This release makes the pipeline **report tell the truth**. A canonical
+stage-lifecycle model now drives every renderer, a unified rendering
+library replaces the ad-hoc terminal output, and the scanners report what
+they actually found instead of misleading "0 findings".
+
+It also adds a **notion-based contract test layer** and a full spec
+reorganisation, and hardens the **registry** by gating manifest
+compilation on schema validation.
+
+### Added
+
+- **Unified rendering library** -- `lib/transverse/render.sh` becomes the
+  single source of truth for human-facing terminal output: pure-bash,
+  multi-byte safe, dependency-free. It ships composable primitives
+  (`section`, `kv`, `box`, `center`, `table` with Unicode box-drawing) and
+  semantic colour helpers. `GITLAB_CI` / `JENKINS_URL` now trump
+  `TERM=dumb`, so CI runner images still emit colour in the GitLab and
+  Jenkins web log viewers. `render.table --color-by COL` paints each row
+  from a key column.
+- **Canonical stage-lifecycle model** -- a pure classifier
+  (`_report._classify_lifecycle`) maps each stage's (tech status, business
+  status, plan decision, fragment presence, upstream failure, in-flight)
+  to one canonical `lifecycle`: `success`, `warning`, `failed`, `skipped`,
+  `not_run`, or `running`, plus a human reason. It is the single source of
+  truth replacing the divergent ad-hoc classification that lived in the
+  HTML, terminal, and notify-recap renderers. An additive `lifecycle` /
+  `lifecycle_reason` field is introduced on the report fragment schema
+  (v1.1), stamped during aggregation, and consumed by the terminal, HTML,
+  and Markdown renderers. The aggregate synthesizes entries for
+  planned-run stages that never produced a fragment, distinguishing an
+  upstream-blocked stage (`not_run`) from a planner skip (`skipped`).
+- **Plan-driven aggregate render** -- the terminal and HTML reports
+  iterate `plan.stages[]` in canonical execution order (backfilling
+  missing stages), so the report shows the complete planned pipeline with
+  the in-flight stage as `RUNNING`.
+- **Notion-based L0 contract test layer** -- a four-layer test
+  architecture aligned with the domain notions: a new `spec/contracts/`
+  layer pins per-notion I/O contracts via JSON Schema validation, with
+  shared sample fixtures.
+- **Dependency advisory summary in the scan log** -- now that the
+  dependency scan emits its SARIF to a file, a readable summary (count +
+  per-advisory osv message carrying the package and every advisory id) is
+  logged whenever findings are present, whether the severity policy passes
+  or fails the scan.
+- **Registry runner-class image mapping** -- `lib/registry/runner_classes.yml`
+  is the single source of truth for the runner image of each stage,
+  consumed identically by the GitLab and Jenkins adapters, eliminating the
+  previous duplication of OCI image paths.
+
+### Changed
+
+- **Manifest compilation gated on schema validation** --
+  `compile-registry.sh` validates every manifest (builtins + extensions)
+  against its registry JSON Schema before compiling, in both compile and
+  check modes, so a malformed manifest never reaches the compiled cache.
+  Validation requires `jv` and is skipped (not failed) when absent.
+- **Scanner errors surfaced in the reports** -- a scanner that exits
+  non-zero without producing a valid report is stamped `tech.tool_error`
+  (secret + SAST scans) so the report shows a scanner error instead of a
+  misleading threshold breach or "0 findings". The HTML failure banner
+  maps a stage exit code to a human reason (code 10 reads "quality or
+  security threshold exceeded") and shows "Results unavailable" when a
+  failed stage has no usable findings payload.
+- **Pipeline stage order sourced from the registry** -- the report and
+  related call sites read the canonical stage sequence from the registry
+  rather than a local list.
+- **`report.sh` and `findings.sh` decomposed** into focused submodules;
+  duplicated jq helpers and duration formatting consolidated.
+- **Spec suite reorganised** into `unit/`, `integration/`, and
+  `contracts/` layers, with per-notion Codecov coverage floors set from
+  measured kcov numbers, and cross-module specs relocated out of
+  `spec/unit/`.
+
+### Fixed
+
+- **Dependency scan SARIF** -- emit the SARIF from the single
+  authoritative osv-scanner pass and derive the verdict from its contents,
+  fixing the case where a scan that found vulnerabilities left no SARIF and
+  the report showed "exit 10 + 0 findings".
+- **`notify` is now always-blocking** -- it has no opt-in semantics in
+  practice (both adapters call it unconditionally); the previous opt-in
+  gate misled `brik plan` into marking it `SKIP` while the adapter ran it.
+- **`deploy.argocd.sync` bounded with `--timeout`** (default 300s) so a
+  stuck sync fails fast instead of blocking indefinitely.
+- **Jenkins runner-class image override applied end-to-end** -- the
+  `BRIK_RUNNER_CLASSES_FILE` override now reaches the stage containers
+  (absolute-path normalisation, env-file exclusion, and related fixes).
+- **E2E v0.6.0 divergences** across plan, stage, SARIF and the Jenkins
+  helper (opt-in reason text, changed-files in `plan.json`, commit
+  timestamp normalisation, CWE filtering to rules actually hit, robust
+  library resolution).
+- The `self-update` help example version is derived from `BRIK_VERSION`,
+  and several spec-isolation races (self-update fake HOME, L1 git config,
+  TTY hang under `--jobs`) are removed.
+
 ## [0.6.0] - 2026-05-24
 
 93 commits since 0.5.0.
