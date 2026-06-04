@@ -176,6 +176,16 @@
                   "type": "string",
                   "minLength": 1,
                   "description": "Image path within the candidate registry, e.g. 'myteam/api'."
+                },
+                "username_var": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Name of the environment variable holding the username for the candidate Docker registry (the value is never stored in brik.yml). The promote stage logs in with it before pulling the candidate. Omit for an anonymous-pull candidate registry."
+                },
+                "password_var": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Name of the environment variable holding the password/token for the candidate Docker registry. The promote stage logs in with it before pulling the candidate."
                 }
               }
             }
@@ -200,6 +210,16 @@
                   "type": "string",
                   "minLength": 1,
                   "description": "Image path within the release registry, e.g. 'myteam/api'."
+                },
+                "username_var": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Name of the environment variable holding the username for the release Docker registry (the value is never stored in brik.yml). The promote stage logs in with it before pushing the promoted image. Omit if the release registry needs no auth."
+                },
+                "password_var": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Name of the environment variable holding the password/token for the release Docker registry. The promote stage logs in with it before pushing the promoted image."
                 }
               }
             }
