@@ -16,6 +16,28 @@
 [[ -n "${_BRIK_STAGE_PROMOTE_LOADED:-}" ]] && return 0
 _BRIK_STAGE_PROMOTE_LOADED=1
 
+# Log in to a Docker registry when per-zone credentials are configured.
+# Mirrors the publish login in package-managers/docker.sh. No-op when the
+# username/password vars are empty (anonymous-access registry).
+# Args: $1 registry, $2 username_var name, $3 password_var name.
+_promote.docker_login() {
+    local registry="$1" username_var="$2" password_var="$3"
+    [[ -z "$username_var" || -z "$password_var" ]] && return 0
+    brik.use transverse.secrets
+    brik.use transverse.env
+    transverse.secrets.require_var "$username_var" "docker username" || return "$?"
+    transverse.secrets.require_var "$password_var" "docker password" || return "$?"
+    local _u _p
+    _u="$(transverse.env.resolve_indirect "$username_var")"
+    _p="$(transverse.env.resolve_indirect "$password_var")"
+    log.info "stages.promote: logging in to ${registry}"
+    printf '%s' "$_p" | docker login "$registry" --username "$_u" --password-stdin >/dev/null 2>&1 || {
+        log.error "stages.promote: docker login to ${registry} failed"
+        return "$BRIK_EXIT_EXTERNAL_FAIL"
+    }
+    return 0
+}
+
 stages.promote() {
     brik.use transverse.config
     brik.use pipeline.report
@@ -37,6 +59,12 @@ stages.promote() {
     candidate_image="$(config.get '.release.candidate.docker.image' '')"
     release_registry="$(config.get '.release.release.docker.registry' '')"
     release_image="$(config.get '.release.release.docker.image' '')"
+
+    local candidate_username_var candidate_password_var release_username_var release_password_var
+    candidate_username_var="$(config.get '.release.candidate.docker.username_var' '')"
+    candidate_password_var="$(config.get '.release.candidate.docker.password_var' '')"
+    release_username_var="$(config.get '.release.release.docker.username_var' '')"
+    release_password_var="$(config.get '.release.release.docker.password_var' '')"
 
     # Opt-in gate. A project that declares no release.{candidate,release}
     # .docker config has not opted into the 2-zone Docker promotion
@@ -101,6 +129,12 @@ stages.promote() {
         return "$BRIK_EXIT_MISSING_DEP"
     fi
 
+    if ! _promote.docker_login "$candidate_registry" "$candidate_username_var" "$candidate_password_var"; then
+        report.record "promote" "tech" "status" "failure" || true
+        report.record "promote" "tech" "kind"   "auth-failed" || true
+        return "$BRIK_EXIT_EXTERNAL_FAIL"
+    fi
+
     if ! docker pull "$candidate_ref" >/dev/null 2>&1; then
         log.error "stages.promote: docker pull ${candidate_ref} failed"
         report.record "promote" "tech" "status" "failure" || true
@@ -112,6 +146,12 @@ stages.promote() {
     candidate_digest="$(docker inspect --format '{{index .RepoDigests 0}}' "$candidate_ref" 2>/dev/null \
                       | sed 's/.*@//')"
     [[ -z "$candidate_digest" ]] && candidate_digest="unknown"
+
+    if ! _promote.docker_login "$release_registry" "$release_username_var" "$release_password_var"; then
+        report.record "promote" "tech" "status" "failure" || true
+        report.record "promote" "tech" "kind"   "auth-failed" || true
+        return "$BRIK_EXIT_EXTERNAL_FAIL"
+    fi
 
     docker tag "$candidate_ref" "$release_ref"
     docker tag "$candidate_ref" "$release_latest"

@@ -194,6 +194,57 @@ SH
     End
   End
 
+  Describe "docker registry auth (per-zone credentials)"
+    setup_auth_mocks() {
+      mock.setup
+      DOCKER_CALLS="$(mktemp)"
+      export DOCKER_CALLS
+      cat > "$MOCK_BIN/docker" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$DOCKER_CALLS"
+case "$1" in
+  inspect) printf 'r@sha256:abc\n' ;;
+  login)   cat >/dev/null 2>&1 || true; exit 0 ;;
+  *)       exit 0 ;;
+esac
+SH
+      chmod +x "$MOCK_BIN/docker"
+      mock.activate
+    }
+    teardown_auth_mocks() { rm -f "$DOCKER_CALLS"; mock.cleanup; }
+    Before 'setup_auth_mocks'
+    After 'teardown_auth_mocks'
+
+    It "logs in to the candidate and release registries with the configured creds"
+      cat > "$BRIK_CONFIG_FILE" <<'YAML'
+version: 1
+project:
+  name: t
+  stack: node
+release:
+  candidate:
+    docker:
+      registry: candidate.example.com
+      image: myteam/api
+      username_var: CAND_USER
+      password_var: CAND_PASS
+  release:
+    docker:
+      registry: release.example.com
+      image: myteam/api
+      username_var: REL_USER
+      password_var: REL_PASS
+YAML
+      invoke() {
+        export CAND_USER=cu CAND_PASS=cp REL_USER=ru REL_PASS=rp
+        stages.promote "$CTX_FILE" >/dev/null 2>&1
+        grep -c '^login ' "$DOCKER_CALLS"
+      }
+      When call invoke
+      The output should equal "2"
+    End
+  End
+
   Describe "docker pull failure"
     setup_pullfail() {
       mock.setup
