@@ -96,4 +96,45 @@ YAML
       The output should include "unsupported deploy target"
     End
   End
+
+  # Regression (chantier 25): a workflow profile injects a k8s-centric
+  # `namespace` default into every env. When the user overrides `target` to
+  # gitops (which has no --namespace option), deploy.sh must NOT leak
+  # --namespace to that target -- otherwise deploy.gitops.run aborts with
+  # "unknown option: --namespace". deploy.sh filters --namespace to the
+  # targets that consume it (k8s/helm/compose).
+  Describe "gitops target does not receive --namespace"
+    setup_gitops() {
+      cat > "$BRIK_CONFIG_FILE" <<'YAML'
+version: 1
+project:
+  name: test
+  stack: node
+deploy:
+  environments:
+    staging:
+      target: gitops
+      namespace: staging-ns
+      repo: https://example.test/config.git
+      path: k8s
+      source: k8s
+YAML
+      config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
+      report.init >/dev/null 2>&1 || true
+    }
+    Before 'setup_gitops'
+
+    It "dispatches deploy.gitops.run without --namespace even when namespace is set"
+      run_dispatch() {
+        brik.use() { :; }
+        deploy.gitops.run() { printf '%s ' "$@"; return 0; }
+        local ctx
+        ctx="$(context.create deploy)" 2>/dev/null || ctx="$(mktemp)"
+        stages.deploy "$ctx" 2>/dev/null
+      }
+      When call run_dispatch
+      The output should include "--target gitops"
+      The output should not include "--namespace"
+    End
+  End
 End
