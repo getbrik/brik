@@ -21,8 +21,11 @@ deploy.ssh.run() {
             --restart-cmd)  restart_cmd="$2";  shift 2 ;;
             --source)       source="$2";       shift 2 ;;
             --dry-run)      dry_run="true";    shift ;;
-            # Ignore deploy.run passthrough options
-            --target|--env) shift 2 ;;
+            # Ignore deploy.run passthrough options. --namespace is a
+            # k8s-centric field a workflow profile may inject into every env;
+            # ssh has no concept of a namespace, so tolerate (ignore) it
+            # rather than abort.
+            --target|--env|--namespace) shift 2 ;;
             *) log.error "unknown option: $1"; return "$BRIK_EXIT_INVALID_INPUT" ;;
         esac
     done

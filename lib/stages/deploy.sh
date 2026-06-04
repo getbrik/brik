@@ -135,7 +135,18 @@ stages.deploy() {
 
         local deploy_args=(--target "$target" --env "$env_name")
         local _v
-        _v="$(transverse.env.resolve_indirect "$namespace_var")";    [[ -n "$_v" ]] && deploy_args+=(--namespace "$_v")
+        # --namespace is only consumed by the k8s/helm/compose targets.
+        # gitops and ssh reject unknown options, and a workflow profile injects
+        # a k8s-centric `namespace` default into every env -- forwarding it to a
+        # gitops/ssh target (selected via a `target:` override) would abort the
+        # deploy with "unknown option: --namespace". Filter it to the targets
+        # that accept it.
+        case "$target" in
+            k8s|helm|compose)
+                _v="$(transverse.env.resolve_indirect "$namespace_var")"
+                [[ -n "$_v" ]] && deploy_args+=(--namespace "$_v")
+                ;;
+        esac
         _v="$(transverse.env.resolve_indirect "$manifest_var")";     [[ -n "$_v" ]] && deploy_args+=(--manifest "$_v")
         _v="$(transverse.env.resolve_indirect "$repo_var")";         [[ -n "$_v" ]] && deploy_args+=(--repo "$_v")
         _v="$(transverse.env.resolve_indirect "$path_var")";         [[ -n "$_v" ]] && deploy_args+=(--path "$_v")

@@ -11,6 +11,16 @@ Describe "deploy/ssh.sh"
       The stderr should include "unknown option"
     End
 
+    # chantier 25: a workflow profile injects a k8s-centric `namespace`
+    # default. deploy.sh filters it out for ssh (fix A), but ssh.run must
+    # also tolerate it defensively. Probed via the missing-host early return.
+    It "consumes --namespace instead of rejecting it as an unknown option"
+      When call deploy.ssh.run --namespace staging
+      The status should equal 2
+      The stderr should not include "unknown option"
+      The stderr should include "host is required"
+    End
+
     It "returns 2 when --host is missing"
       When call deploy.ssh.run --path /srv/myapp
       The status should equal 2

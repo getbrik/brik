@@ -483,8 +483,11 @@ deploy.gitops.run() {
             --git-token-var)  git_token_var="$2";  shift 2 ;;
             --auth-token-var) auth_token_var="$2"; shift 2 ;;
             --dry-run)        dry_run="true";      shift ;;
-            # Ignore deploy.run passthrough options
-            --target|--env)   shift 2 ;;
+            # Ignore deploy.run passthrough options. --namespace is a
+            # k8s-centric field a workflow profile may inject into every env;
+            # gitops renders it into the manifests, not as a CLI flag, so
+            # tolerate (ignore) it rather than abort.
+            --target|--env|--namespace) shift 2 ;;
             *) log.error "unknown option: $1"; return "$BRIK_EXIT_INVALID_INPUT" ;;
         esac
     done

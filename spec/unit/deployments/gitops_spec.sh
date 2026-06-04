@@ -1701,6 +1701,22 @@ SCRIPT
   End
 
   # =========================================================================
+  # deploy.gitops.run --namespace tolerance (chantier 25)
+  # =========================================================================
+  Describe "deploy.gitops.run --namespace tolerance"
+    # A workflow profile injects a k8s-centric `namespace` default into every
+    # env. deploy.sh filters it out for gitops (fix A), but gitops.run must
+    # also tolerate it defensively instead of aborting on "unknown option".
+    # Probed via the missing-repo early return so no git/network runs.
+    It "consumes --namespace instead of rejecting it as an unknown option"
+      When call deploy.gitops.run --namespace staging
+      The status should equal 2
+      The stderr should not include "unknown option"
+      The stderr should include "repo is required"
+    End
+  End
+
+  # =========================================================================
   # double-sourcing guard
   # =========================================================================
   Describe "double-sourcing guard"
