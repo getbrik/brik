@@ -65,9 +65,13 @@ rollout.profile.merge() {
     local profile_path
     profile_path="$(rollout.profile.resolve "$workflow")" || return $?
 
-    # Create temporary file for the merged result
+    # Create temporary file for the merged result. The template keeps the X
+    # run at the very end: busybox mktemp (Alpine runner images) rejects any
+    # suffix after the X's (e.g. "...XXXXXX.yml"), which would make the merge
+    # silently no-op and drop the whole profile. yq reads by content, so the
+    # absent .yml extension is irrelevant.
     local merged_file
-    merged_file="$(mktemp /tmp/brik-profile-XXXXXX.yml)"
+    merged_file="$(mktemp -t brik-profile.XXXXXX)"
     chmod 600 "$merged_file"
 
     # Deep merge: profile is the base, user brik.yml overrides on top.

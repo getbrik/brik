@@ -156,6 +156,52 @@ YAML
       End
     End
 
+    # Regression: the merge must use a busybox-portable mktemp template.
+    # busybox (Alpine runner images) rejects a template with anything after the
+    # trailing run of X's, which makes the merge silently no-op and drops the
+    # entire workflow profile on every GitLab/Jenkins runner.
+    Describe "portable temp file (busybox/Alpine runner images)"
+      setup_busybox_cfg() {
+        TEMP_CONFIG="$(mktemp)"
+        cat > "$TEMP_CONFIG" <<'YAML'
+version: 1
+project:
+  name: test
+  stack: node
+deploy:
+  workflow: trunk-based
+  environments:
+    staging:
+      target: gitops
+YAML
+      }
+      cleanup_busybox_cfg() { rm -f "$TEMP_CONFIG"; }
+      Before 'setup_busybox_cfg'
+      After 'cleanup_busybox_cfg'
+
+      It "applies the profile namespace under a busybox-strict mktemp"
+        merge_under_busybox_mktemp() {
+          # Shim mimicking busybox mktemp: reject a template that has any
+          # characters after its trailing run of X's (e.g. "...XXXXXX.yml").
+          mktemp() {
+            local _t="${!#}"
+            if [[ "$_t" == *XXXXXX* && "$_t" != *X ]]; then
+              echo "mktemp: : Invalid argument" >&2
+              return 1
+            fi
+            command mktemp "$@"
+          }
+          local merged
+          merged="$(rollout.profile.merge "trunk-based" "$TEMP_CONFIG")" || return 1
+          [[ -n "$merged" && -f "$merged" ]] || { echo "no-merged-file"; return 1; }
+          yq -r '.deploy.environments.staging.namespace' "$merged" 2>/dev/null
+          rm -f "$merged"
+        }
+        When call merge_under_busybox_mktemp
+        The output should equal "staging"
+      End
+    End
+
     Describe "user overrides take precedence over profile defaults"
       setup_override() {
         TEMP_CONFIG="$(mktemp)"
