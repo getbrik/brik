@@ -1,0 +1,85 @@
+# Brik GitLab CD pipeline (mode 2 -- explicit deploy).
+#
+# Separate from pipeline.yml (the event-driven CI flow): this pipeline runs
+# ONLY when BRIK_DEPLOY_VERSION and BRIK_DEPLOY_ENVIRONMENT are both provided
+# (the "Run pipeline" form or the pipelines API). It maps those inputs to a
+# single `brik deploy` invocation -- the verb resolves the version to a
+# digest-pinned ref in the channel the environment accepts, enforces the
+# require_digest gate, resolves the deployment definition at the version's git
+# ref, and runs the deploy stage. All business logic stays in lib/; this file
+# only maps params -> brik deploy.
+#
+# The parameters mirror lib/registry/pipeline-params.yml (single SoT) and are
+# kept 1:1 with the Jenkins BRIK_DEPLOY_* parameters
+# (spec/integration/adapter-parity/pipeline_params_parity_spec.sh).
+
+# ---------------------------------------------------------------------------
+# Trigger: explicit CD only. Without both CD inputs, no pipeline is created.
+# ---------------------------------------------------------------------------
+workflow:
+  rules:
+    - if: '$BRIK_DEPLOY_VERSION != "" && $BRIK_DEPLOY_ENVIRONMENT != ""'
+    - when: never
+
+variables:
+  BRIK_LIB_REF: "v0.7.0"
+  BRIK_REPO: "${CI_SERVER_URL}/brik/brik.git"
+  BRIK_HOME: "/opt/brik"
+  BRIK_LOG_LEVEL: "info"
+  BRIK_PLATFORM: "gitlab"
+  # The deploy runner image ships the CD toolchain (kubectl/helm/argocd).
+  BRIK_CI_IMAGE: "ghcr.io/getbrik/brik-runner-deploy:latest"
+  # CD inputs (SoT: lib/registry/pipeline-params.yml).
+  BRIK_DEPLOY_VERSION:
+    value: ""
+    description: "Artifact version to deploy (e.g. v1.2.3). Required."
+  BRIK_DEPLOY_ENVIRONMENT:
+    value: ""
+    description: "Target environment key from deploy.environments. Required."
+  BRIK_DRY_RUN:
+    value: "false"
+    options:
+      - "false"
+      - "true"
+    description: "Skip destructive deploy actions; print what would run instead."
+
+stages:
+  - deploy
+
+default:
+  image: ${BRIK_CI_IMAGE}
+  before_script:
+    # Clone the Brik runtime if the runner image does not already bundle it.
+    - |
+      if [ ! -d "${BRIK_HOME}" ]; then
+        echo "[brik] Cloning Brik runtime (${BRIK_LIB_REF})..."
+        git clone --depth 1 --branch "${BRIK_LIB_REF}" "${BRIK_REPO}" "${BRIK_HOME}" 2>/dev/null \
+          || git clone --depth 1 "${BRIK_REPO}" "${BRIK_HOME}"
+      fi
+    # Put the brik CLI on PATH.
+    - |
+      command -v brik >/dev/null 2>&1 || ln -sf "${BRIK_HOME}/bin/brik" /usr/local/bin/brik
+
+# ---------------------------------------------------------------------------
+# The single CD job: map the form inputs to `brik deploy`.
+# ---------------------------------------------------------------------------
+brik-cd-deploy:
+  stage: deploy
+  script:
+    - |
+      brik deploy \
+        --version "${BRIK_DEPLOY_VERSION}" \
+        --environment "${BRIK_DEPLOY_ENVIRONMENT}" \
+        --workspace "${CI_PROJECT_DIR}"
+  artifacts:
+    when: always
+    expire_in: 1 month
+    name: "cd-deploy-${CI_PIPELINE_ID}"
+    paths:
+      - .brik-logs/
+      - brik-artifacts/
+    exclude:
+      - .brik-logs/*.lock
+      - .brik-logs/context-*
+    reports:
+      dotenv: .brik-logs/pipeline.env
