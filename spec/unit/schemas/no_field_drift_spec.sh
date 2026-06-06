@@ -36,6 +36,11 @@ Describe "no field drift in schemas/plan/v1/plan.schema.json"
   #   - Lot 1+3 additions (runner_class)
   #   - legacy fields kept for v1 stability (brikVersion: predates the
   #     justification rule; will be reconsidered on a future v2 bump)
+  #   - CD plan-kind (additive): planType + the deploy block
+  #     {version, environment, channel, digest} -- an explicit deploy is
+  #     parameterized by (version, environment); channel/digest record what
+  #     was resolved. None is derivable from the others. See
+  #     20260606_cicd-decoupling-implementation-plan.md (T3).
   allowlist() {
     cat <<'EOF'
 brikVersion
@@ -67,6 +72,11 @@ to
 to_ref
 version
 workspace
+planType
+deploy
+environment
+channel
+digest
 EOF
   }
 
