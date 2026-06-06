@@ -111,3 +111,48 @@ ENDSSH
     log.info "compose deployment completed successfully"
     return 0
 }
+
+# Read back the digest of the image a running compose service was created from.
+# Reads the container's Config.Image, which preserves the exact ref used to
+# create it (so a service started from registry/app@sha256:X reports that ref).
+# Usage: deploy.compose.get_deployed_digest --service <name> [--project <name>]
+# Output: "sha256:<hex>" when pinned, else "unknown" (also when not running).
+# Returns: 2 invalid input; 3 docker missing; 5 docker query failed.
+deploy.compose.get_deployed_digest() {
+    local service="" project=""
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --service) service="$2"; shift 2 ;;
+            --project) project="$2"; shift 2 ;;
+            *) log.error "unknown option: $1"; return "$BRIK_EXIT_INVALID_INPUT" ;;
+        esac
+    done
+
+    if [[ -z "$service" ]]; then
+        log.error "service name is required (--service)"
+        return "$BRIK_EXIT_INVALID_INPUT"
+    fi
+    pipeline.require_tool docker || return "$BRIK_EXIT_MISSING_DEP"
+    brik.use deployments._image_ref
+
+    local -a psc=(docker compose)
+    [[ -n "$project" ]] && psc+=(-p "$project")
+    psc+=(ps -q "$service")
+
+    local cid
+    cid="$("${psc[@]}" 2>/dev/null)" || {
+        log.error "docker compose ps failed for service: ${service}"
+        return "$BRIK_EXIT_EXTERNAL_FAIL"
+    }
+    if [[ -z "$cid" ]]; then
+        printf 'unknown'
+        return 0
+    fi
+
+    local image
+    image="$(docker inspect --format '{{.Config.Image}}' "$cid" 2>/dev/null)" || {
+        log.error "docker inspect failed for container: ${cid}"
+        return "$BRIK_EXIT_EXTERNAL_FAIL"
+    }
+    deploy.image_ref.extract_digest "$image"
+}

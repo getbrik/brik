@@ -335,6 +335,51 @@ deploy.argocd.status() {
 }
 
 # ---------------------------------------------------------------------------
+# deploy.argocd.get_deployed_digest
+# ---------------------------------------------------------------------------
+
+# Read back the digest of the first image ArgoCD reports for an application.
+# Usage: deploy.argocd.get_deployed_digest --app <name> [--server <url>]
+#        [--auth-token-var <VAR>]
+# Output: "sha256:<hex>" when the live image is digest-pinned, else "unknown".
+# Returns: 2 invalid input; 3 argocd/jq missing; 5 query/parse failed.
+deploy.argocd.get_deployed_digest() {
+    local app_name="" server="" auth_token_var=""
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --app)            app_name="$2";       shift 2 ;;
+            --server)         server="$2";         shift 2 ;;
+            --auth-token-var) auth_token_var="$2"; shift 2 ;;
+            *) log.error "unknown option: $1"; return "$BRIK_EXIT_INVALID_INPUT" ;;
+        esac
+    done
+
+    _deploy.argocd._validate_app_name "$app_name" || return $?
+    pipeline.require_tool argocd || return "$BRIK_EXIT_MISSING_DEP"
+    pipeline.require_tool jq     || return "$BRIK_EXIT_MISSING_DEP"
+    brik.use deployments._image_ref
+
+    local -a cmd=(argocd app get "$app_name" -o json)
+    _deploy.argocd._add_server_auth cmd "$server" "$auth_token_var" || return $?
+
+    local raw_json image
+    raw_json=$("${cmd[@]}") || {
+        log.error "argocd app get failed for: ${app_name}"
+        return "$BRIK_EXIT_EXTERNAL_FAIL"
+    }
+    image=$(printf '%s' "$raw_json" | jq -r '.status.summary.images[0] // ""') || {
+        log.error "failed to parse argocd app images"
+        return "$BRIK_EXIT_EXTERNAL_FAIL"
+    }
+    if [[ -z "$image" ]]; then
+        printf 'unknown'
+        return 0
+    fi
+    deploy.image_ref.extract_digest "$image"
+}
+
+# ---------------------------------------------------------------------------
 # deploy.argocd.is_synced
 # ---------------------------------------------------------------------------
 

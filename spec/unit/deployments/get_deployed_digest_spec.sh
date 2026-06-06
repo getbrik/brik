@@ -1,0 +1,121 @@
+Describe "deployments live digest read-back"
+  Include "$BRIK_PIPELINE_LIB/logging.sh"
+  Include "$BRIK_PIPELINE_LIB/tools.sh"
+  Include "$BRIK_PIPELINE_LIB/loader.sh"
+  Include "$BRIK_DEPLOYMENTS_LIB/_image_ref.sh"
+  Include "$BRIK_DEPLOYMENTS_LIB/k8s.sh"
+  Include "$BRIK_DEPLOYMENTS_LIB/compose.sh"
+  Include "$BRIK_DEPLOYMENTS_LIB/argocd.sh"
+  Include "$BRIK_HOME/spec/support/mock_helper.sh"
+
+  DIGEST="sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+  PINNED="registry.release/app@${DIGEST}"
+
+  BeforeEach 'mock.setup'
+  AfterEach 'mock.cleanup'
+
+  # =========================================================================
+  # deploy.image_ref.extract_digest
+  # =========================================================================
+  Describe "deploy.image_ref.extract_digest"
+    It "extracts the sha256 digest from a pinned ref"
+      When call deploy.image_ref.extract_digest "$PINNED"
+      The output should equal "$DIGEST"
+    End
+
+    It "returns unknown for a tag-only ref"
+      When call deploy.image_ref.extract_digest "registry.release/app:v1.2.3"
+      The output should equal "unknown"
+    End
+  End
+
+  # =========================================================================
+  # deploy.k8s.get_deployed_digest
+  # =========================================================================
+  Describe "deploy.k8s.get_deployed_digest"
+    It "returns the digest of the running deployment image"
+      k8s_digest() {
+        mock.create_output "kubectl" "$PINNED" 0
+        mock.activate
+        deploy.k8s.get_deployed_digest --deployment app --namespace staging
+      }
+      When call k8s_digest
+      The output should equal "$DIGEST"
+    End
+
+    It "returns unknown when the running image is tag-based"
+      k8s_tag() {
+        mock.create_output "kubectl" "registry.release/app:v1.2.3" 0
+        mock.activate
+        deploy.k8s.get_deployed_digest --deployment app --namespace staging
+      }
+      When call k8s_tag
+      The output should equal "unknown"
+    End
+
+    It "fails external_fail (5) when kubectl errors"
+      k8s_fail() {
+        mock.create_exit "kubectl" 1
+        mock.activate
+        deploy.k8s.get_deployed_digest --deployment app --namespace staging
+      }
+      When call k8s_fail
+      The status should equal 5
+      The stderr should include "kubectl"
+    End
+  End
+
+  # =========================================================================
+  # deploy.compose.get_deployed_digest
+  # =========================================================================
+  Describe "deploy.compose.get_deployed_digest"
+    It "returns the digest of the running container image"
+      compose_digest() {
+        mock.create_script "docker" '
+          for a in "$@"; do [ "$a" = "ps" ] && { echo "cid123"; exit 0; }; done
+          [ "$1" = "inspect" ] && echo "registry.release/app@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"'
+        mock.activate
+        deploy.compose.get_deployed_digest --service web --project proj
+      }
+      When call compose_digest
+      The output should equal "$DIGEST"
+    End
+
+    It "returns unknown when no container is running"
+      compose_none() {
+        mock.create_script "docker" 'for a in "$@"; do [ "$a" = "ps" ] && exit 0; done'
+        mock.activate
+        deploy.compose.get_deployed_digest --service web --project proj
+      }
+      When call compose_none
+      The output should equal "unknown"
+    End
+  End
+
+  # =========================================================================
+  # deploy.argocd.get_deployed_digest
+  # =========================================================================
+  Describe "deploy.argocd.get_deployed_digest"
+    It "returns the digest from the app summary images"
+      argocd_digest() {
+        mock.create_script "argocd" '
+          printf "%s" "{\"status\":{\"summary\":{\"images\":[\"registry.release/app@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\"]}}}"'
+        mock.activate
+        deploy.argocd.get_deployed_digest --app app-staging
+      }
+      When call argocd_digest
+      The output should equal "$DIGEST"
+    End
+
+    It "returns unknown when the app reports a tag-based image"
+      argocd_tag() {
+        mock.create_script "argocd" '
+          printf "%s" "{\"status\":{\"summary\":{\"images\":[\"registry.release/app:v1.2.3\"]}}}"'
+        mock.activate
+        deploy.argocd.get_deployed_digest --app app-staging
+      }
+      When call argocd_tag
+      The output should equal "unknown"
+    End
+  End
+End

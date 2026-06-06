@@ -56,3 +56,39 @@ deploy.k8s.run() {
     log.info "deployment completed successfully"
     return 0
 }
+
+# Read back the digest of the image currently running in a Deployment.
+# Usage: deploy.k8s.get_deployed_digest --deployment <name> [--namespace <ns>]
+#        [--context <ctx>]
+# Output: "sha256:<hex>" when the live image is digest-pinned, else "unknown".
+# Returns: 2 invalid input; 3 kubectl missing; 5 kubectl query failed.
+deploy.k8s.get_deployed_digest() {
+    local deployment="" namespace="" context=""
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --deployment) deployment="$2"; shift 2 ;;
+            --namespace)  namespace="$2";  shift 2 ;;
+            --context)    context="$2";    shift 2 ;;
+            *) log.error "unknown option: $1"; return "$BRIK_EXIT_INVALID_INPUT" ;;
+        esac
+    done
+
+    if [[ -z "$deployment" ]]; then
+        log.error "deployment name is required (--deployment)"
+        return "$BRIK_EXIT_INVALID_INPUT"
+    fi
+    pipeline.require_tool kubectl || return "$BRIK_EXIT_MISSING_DEP"
+    brik.use deployments._image_ref
+
+    local -a cmd=(kubectl get deployment "$deployment"
+                  -o "jsonpath={.spec.template.spec.containers[0].image}")
+    [[ -n "$namespace" ]] && cmd+=(--namespace "$namespace")
+    [[ -n "$context" ]]   && cmd+=(--context "$context")
+
+    local image
+    image="$("${cmd[@]}" 2>/dev/null)" || {
+        log.error "kubectl get deployment failed for: ${deployment}"
+        return "$BRIK_EXIT_EXTERNAL_FAIL"
+    }
+    deploy.image_ref.extract_digest "$image"
+}

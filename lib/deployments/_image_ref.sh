@@ -21,6 +21,19 @@ deploy.image_ref.is_pinned() {
     [[ "$1" =~ $_BRIK_IMAGE_REF_PINNED_RE ]]
 }
 
+# deploy.image_ref.extract_digest - echo the sha256 digest of a ref.
+# Used by the live read-back: a tag-based (non-pinned) running image yields
+# "unknown" rather than a fabricated value, so drift stays visible.
+# Usage: deploy.image_ref.extract_digest <ref>
+# Output: "sha256:<hex>" or "unknown". Always returns 0.
+deploy.image_ref.extract_digest() {
+    if [[ "$1" =~ @(sha256:[0-9a-f]{64}) ]]; then
+        printf '%s' "${BASH_REMATCH[1]}"
+    else
+        printf 'unknown'
+    fi
+}
+
 # deploy.image_ref.pinned - build a digest-pinned ref from an image + digest.
 # Any existing :tag or @digest on the image is stripped first; the digest is
 # normalized to "sha256:<hex>" (a bare 64-hex string is accepted).
