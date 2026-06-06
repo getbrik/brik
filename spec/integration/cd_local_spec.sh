@@ -1,7 +1,8 @@
 Describe "brik deploy E2E local (CD, digest-pinned)"
   # Exercises the full CD verb against a real workspace: resolve the version to
   # a digest in the accepted channel, enforce require_digest, and apply a k8s
-  # manifest with the image pinned. crane and kubectl are mocked on PATH.
+  # manifest with the image pinned. The registry (curl, OCI distribution API)
+  # and kubectl are mocked on PATH.
 
   DIGEST="sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 
@@ -57,8 +58,10 @@ YAML
 
   It "resolves the digest and applies a manifest pinned to it"
     deploy_ok() {
-      printf '#!/bin/sh\necho "%s"\n' "$DIGEST" > "${MOCKBIN}/crane"
-      chmod +x "${MOCKBIN}/crane"
+      # curl returns a manifest response whose Docker-Content-Digest header
+      # carries the immutable digest (headers go to stdout via -D -).
+      printf '#!/bin/sh\nprintf "HTTP/1.1 200 OK\\r\\nDocker-Content-Digest: %s\\r\\n\\r\\n"\nexit 0\n' "$DIGEST" > "${MOCKBIN}/curl"
+      chmod +x "${MOCKBIN}/curl"
       cd "$REPO"
       PATH="${MOCKBIN}:$PATH" "$BRIK_BIN" deploy --version v1.2.3 --environment staging
     }
@@ -70,9 +73,10 @@ YAML
 
   It "fails closed when require_digest is set and the digest cannot be resolved"
     deploy_failclosed() {
-      # crane fails: no digest can be resolved for the version.
-      printf '#!/bin/sh\nexit 1\n' > "${MOCKBIN}/crane"
-      chmod +x "${MOCKBIN}/crane"
+      # The registry has no such version: a 404 carries no digest header, so
+      # resolution fails on every scheme and the gate must fail closed.
+      printf '#!/bin/sh\nprintf "HTTP/1.1 404 Not Found\\r\\n\\r\\n"\nexit 0\n' > "${MOCKBIN}/curl"
+      chmod +x "${MOCKBIN}/curl"
       cd "$REPO"
       PATH="${MOCKBIN}:$PATH" "$BRIK_BIN" deploy --version v9.9.9 --environment staging
     }

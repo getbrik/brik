@@ -57,9 +57,17 @@ YAML
     BeforeEach 'mock.setup'
     AfterEach 'mock.cleanup'
 
+    # The resolver talks the OCI distribution API over curl: a manifest GET
+    # returns the immutable digest in the Docker-Content-Digest response
+    # header. The curl mock emits a canned header block regardless of args
+    # (the https attempt succeeds, so the http fallback is never reached).
+    ok_headers() {
+      printf 'HTTP/1.1 200 OK\r\nDocker-Content-Digest: %s\r\nContent-Type: application/vnd.oci.image.manifest.v1+json\r\n\r\n' "$1"
+    }
+
     It "resolves a known version to a digest-pinned ref"
       resolve_ok() {
-        mock.create_output "crane" "$VALID_DIGEST" 0
+        mock.create_output "curl" "$(ok_headers "$VALID_DIGEST")" 0
         mock.activate
         channel.resolve_digest v1.2.3 release
       }
@@ -69,7 +77,8 @@ YAML
 
     It "fails external_fail (5) when the version is absent from the channel"
       resolve_absent() {
-        mock.create_exit "crane" 1
+        # 404: the manifest endpoint returns no Docker-Content-Digest header.
+        mock.create_output "curl" "$(printf 'HTTP/1.1 404 Not Found\r\n\r\n')" 0
         mock.activate
         channel.resolve_digest v9.9.9 release
       }
@@ -80,7 +89,7 @@ YAML
 
     It "fails external_fail (5) when the resolver returns a malformed digest"
       resolve_malformed() {
-        mock.create_output "crane" "not-a-digest" 0
+        mock.create_output "curl" "$(ok_headers "not-a-digest")" 0
         mock.activate
         channel.resolve_digest v1.2.3 release
       }
@@ -99,14 +108,75 @@ YAML
       resolve_no_tool() {
         mock.preserve_cmds
         # Keep yq available so the channel registry lookup succeeds and the
-        # resolver-missing path (crane absent) is the one under test.
+        # resolver-missing path (curl absent) is the one under test.
         ln -s "$(command -v yq)" "${MOCK_BIN}/yq" 2>/dev/null || true
         mock.isolate
         channel.resolve_digest v1.2.3 release
       }
       When call resolve_no_tool
       The status should equal 3
-      The stderr should include "crane"
+      The stderr should include "curl"
+    End
+  End
+
+  # =========================================================================
+  # _channel._extract_digest (pure header parsing)
+  # =========================================================================
+  Describe "_channel._extract_digest"
+    It "reads the digest from a CRLF header block"
+      headers="$(printf 'HTTP/1.1 200 OK\r\nDocker-Content-Digest: %s\r\n' "$VALID_DIGEST")"
+      When call _channel._extract_digest "$headers"
+      The output should equal "$VALID_DIGEST"
+    End
+
+    It "is empty when no digest header is present"
+      When call _channel._extract_digest "$(printf 'HTTP/1.1 404 Not Found\r\n')"
+      The output should equal ""
+    End
+  End
+
+  # =========================================================================
+  # _channel._basic_credential (docker config, then BRIK_REGISTRY_* fallback)
+  # =========================================================================
+  Describe "_channel._basic_credential"
+    It "derives Basic auth from BRIK_REGISTRY_* when no docker credential exists"
+      from_env() {
+        # No DOCKER_CONFIG file -> docker-config lookup misses; the env
+        # convention (already used by lib/deployments/compose.sh) supplies it.
+        export DOCKER_CONFIG="$(mktemp -d)"
+        export BRIK_REGISTRY_USER="admin" BRIK_REGISTRY_PASSWORD="s3cr3t"
+        _channel._basic_credential "nexus.internal:8082"
+      }
+      When call from_env
+      The output should equal "$(printf 'admin:s3cr3t' | base64 | tr -d '\n')"
+    End
+
+    It "does not send env creds to a host other than BRIK_REGISTRY_HOST"
+      wrong_host() {
+        export DOCKER_CONFIG="$(mktemp -d)"
+        export BRIK_REGISTRY_HOST="nexus.internal:8082"
+        export BRIK_REGISTRY_USER="admin" BRIK_REGISTRY_PASSWORD="s3cr3t"
+        _channel._basic_credential "other.registry:5000"
+      }
+      When call wrong_host
+      The status should not equal 0
+      The output should equal ""
+    End
+  End
+
+  Describe "_channel._registry_digest input shape"
+    BeforeEach 'mock.setup'
+    AfterEach 'mock.cleanup'
+
+    It "rejects a registry endpoint without a repository path"
+      bad_registry() {
+        mock.create_output "curl" "" 0
+        mock.activate
+        _channel._registry_digest "registry.only" v1.2.3
+      }
+      When call bad_registry
+      The status should equal 5
+      The stderr should include "repository"
     End
   End
 End
