@@ -60,6 +60,19 @@ def call(Map params = [:]) {
                     name: 'BRIK_RUNNER_CLASSES_FILE',
                     defaultValue: '',
                     description: 'Override the runner-class image registry (lib/registry/runner_classes.yml). Absolute path, or a path relative to the brik library root (resolved per stage container). Used for mirrors, air-gapped registries, or an e2e stub image fleet. Empty = bundled default.'
+                ),
+                // CD inputs (mode 2): set both to run an explicit deploy
+                // (planType=deploy). Declared in lib/registry/pipeline-params.yml
+                // (single SoT) and mirrored 1:1 by the GitLab BRIK_DEPLOY_* variables.
+                string(
+                    name: 'BRIK_DEPLOY_VERSION',
+                    defaultValue: '',
+                    description: 'Artifact version to deploy (e.g. v1.2.3). Set together with BRIK_DEPLOY_ENVIRONMENT to trigger an explicit CD run.'
+                ),
+                string(
+                    name: 'BRIK_DEPLOY_ENVIRONMENT',
+                    defaultValue: '',
+                    description: 'Target environment key from deploy.environments. Set together with BRIK_DEPLOY_VERSION to trigger an explicit CD run.'
                 )
             ])
         ])

@@ -1,0 +1,68 @@
+# Single source of truth for user-facing pipeline parameters.
+#
+# The platform surfaces mirror this manifest:
+#   - GitLab : the long-form `variables:` block in
+#     shared-libs/gitlab/templates/pipeline.yml (Run pipeline form).
+#   - Jenkins: the properties([parameters([...])]) block in
+#     shared-libs/jenkins/vars/brikPipeline.groovy (Build with Parameters).
+#
+# spec/integration/adapter-parity/pipeline_params_parity_spec.sh enforces that
+# every param here is exposed on the surface(s) its `parity` declares, and that
+# no surface exposes a parameter absent from this manifest. Until surface
+# generation is tooled, the surfaces are aligned by hand and this spec is the
+# blocking gate.
+#
+# Fields:
+#   name        BRIK_* environment variable name.
+#   type        bool | string | enum.
+#   default     default value (string form).
+#   scope       ci | cd | both -- which flow the parameter drives.
+#   parity      both | gitlab-only | jenkins-only -- which surfaces expose it.
+#               Any non-`both` value is a documented, justified asymmetry.
+#   description one-line operator-facing help.
+
+schema_version: v1
+
+params:
+  - name: BRIK_DRY_RUN
+    type: bool
+    default: "false"
+    scope: both
+    parity: both
+    description: "Skip destructive deploy actions (compose up, k8s apply, helm upgrade, argocd sync, rsync). Print what would run instead."
+
+  - name: BRIK_TAG
+    type: string
+    default: ""
+    scope: ci
+    parity: both
+    description: "Release tag for this build (e.g. v0.1.0). Leave empty for snapshot builds. Mirrors GitLab CI_COMMIT_TAG."
+
+  - name: BRIK_DEPLOY_VERSION
+    type: string
+    default: ""
+    scope: cd
+    parity: both
+    description: "Artifact version to deploy (e.g. v1.2.3). Set together with BRIK_DEPLOY_ENVIRONMENT to trigger an explicit CD run (planType=deploy)."
+
+  - name: BRIK_DEPLOY_ENVIRONMENT
+    type: enum
+    default: ""
+    scope: cd
+    parity: both
+    description: "Target environment key from deploy.environments. Set together with BRIK_DEPLOY_VERSION to trigger an explicit CD run."
+
+  # Documented asymmetries (parity != both). These are justified, not drift.
+  - name: BRIK_WITH_DEPLOY
+    type: bool
+    default: "false"
+    scope: ci
+    parity: jenkins-only
+    description: "Opt into the deploy stage in the CI flow. GitLab consumes this as a hidden CI variable rather than a form input. Slated for removal once CD fully leaves the CI flow (plan section 2.2)."
+
+  - name: BRIK_RUNNER_CLASSES_FILE
+    type: string
+    default: ""
+    scope: ci
+    parity: jenkins-only
+    description: "Override the runner-class image registry (lib/registry/runner_classes.yml). Infra-level override, not a per-run parameter; slated to move under BRIK_CONFIG_DIR (plan section 3.3)."

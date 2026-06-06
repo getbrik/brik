@@ -88,6 +88,15 @@ variables:
   BRIK_TAG:
     value: ""
     description: "Release tag for this build (e.g. v0.1.0). Leave empty for snapshot builds. Mirrors GitLab CI_COMMIT_TAG semantics."
+  # CD inputs (mode 2): set both to run an explicit deploy (planType=deploy)
+  # from the Run pipeline form / API. Declared in lib/registry/pipeline-params.yml
+  # (single SoT) and mirrored 1:1 by the Jenkins BRIK_DEPLOY_* parameters.
+  BRIK_DEPLOY_VERSION:
+    value: ""
+    description: "Artifact version to deploy (e.g. v1.2.3). Set together with BRIK_DEPLOY_ENVIRONMENT to trigger an explicit CD run."
+  BRIK_DEPLOY_ENVIRONMENT:
+    value: ""
+    description: "Target environment key from deploy.environments. Set together with BRIK_DEPLOY_VERSION to trigger an explicit CD run."
   # Cache relocation: redirect tool caches into $CI_PROJECT_DIR (GitLab constraint)
   PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
   MAVEN_OPTS: "-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository"
