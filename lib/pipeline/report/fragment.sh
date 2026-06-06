@@ -309,6 +309,10 @@ report.aggregate_fragments() {
     local commit_message_subject="${BRIK_COMMIT_MESSAGE_SUBJECT:-}"
     local commit_repo_url="${BRIK_COMMIT_REPO_URL:-}"
     local triggered_by="${BRIK_TRIGGERED_BY:-}"
+    # Trigger provenance surfaced by the platform wrapper (push, tag scan, and
+    # branch builds -> "push"; merge/pull requests -> "merge_request_event").
+    # Not derivable from pipeline.context (push and MR share context=snapshot).
+    local pipeline_source="${BRIK_PIPELINE_SOURCE:-}"
 
     local backend="${log_dir}/aggregate-report.json"
     local tmp
@@ -368,6 +372,7 @@ report.aggregate_fragments() {
         --arg commit_message_subject "$commit_message_subject" \
         --arg commit_repo_url "$commit_repo_url" \
         --arg triggered_by "$triggered_by" \
+        --arg pipeline_source "$pipeline_source" \
         --arg policy_preset "$policy_preset" \
         --arg policy_source "$policy_source" \
         --arg policy_org_url "$policy_org_url" \
@@ -424,6 +429,7 @@ report.aggregate_fragments() {
             + ( if $pipeline_url != "" then { url:          $pipeline_url } else {} end )
             + ( if ($commit | length) > 0 then { commit:    $commit       } else {} end )
             + ( if $triggered_by != "" then { triggered_by: $triggered_by } else {} end )
+            + ( if $pipeline_source != "" then { pipeline_source: $pipeline_source } else {} end )
             + ( if $dry_run == "true" then { tech: { dry_run: true } } else {} end )
           ) as $pipeline
         | {

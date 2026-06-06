@@ -94,6 +94,11 @@
           "description": "Origin of the pipeline run: a user identifier, 'push', 'schedule', 'manual', etc.",
           "type": "string"
         },
+        "pipeline_source": {
+          "description": "Trigger source surfaced by the platform wrapper (BRIK_PIPELINE_SOURCE), mirroring the wrapper-context enum. 'push' for branch/tag pushes on both GitLab and Jenkins; 'merge_request_event' for GitLab MR pipelines and Jenkins merge/pull-request builds (CHANGE_ID). Not derivable from context: push and merge_request_event both run as context=snapshot. Optional; absent on local runs without a platform wrapper.",
+          "type": "string",
+          "enum": ["push", "merge_request_event", "schedule", "web", "api"]
+        },
         "notify": {
           "description": "Notification dispatch metadata, injected by stages.notify after the aggregate is built. Surfaces which channels were configured at run time, the policy each one used (BRIK_NOTIFY_*_ON), whether the policy matched this run, and the pipeline gatekeeper decision. Absent in pre-notify-v2 archives; renderers must treat it as optional.",
           "type": "object",

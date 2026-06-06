@@ -233,6 +233,35 @@ Describe "jenkins-wrapper.sh"
         The output should equal "push"
       End
 
+      It "sets BRIK_PIPELINE_SOURCE to merge_request_event when CHANGE_ID is present"
+        # Parity with GitLab: a merge/pull request must surface the canonical
+        # 'merge_request_event' source (not 'push'), so conditions.eval gates
+        # on pipeline_source identically across adapters. CHANGE_ID is the
+        # host-agnostic signal any Jenkins branch-source plugin (Gitea, GitLab,
+        # GitHub...) sets on a change-request build.
+        setup_and_check() {
+          export CHANGE_ID="42"
+          brik.jenkins.setup "$BRIK_HOME" >/dev/null 2>&1
+          printf '%s' "$BRIK_PIPELINE_SOURCE"
+        }
+        When call setup_and_check
+        The output should equal "merge_request_event"
+      End
+
+      It "keeps BRIK_PIPELINE_SOURCE push for a tag build (TAG_NAME, no CHANGE_ID)"
+        # A tag-scan build is a push in GitLab terms (CI_PIPELINE_SOURCE=push);
+        # the release nature is carried by BRIK_COMMIT_TAG/context, not the
+        # pipeline source. Tag must NOT map to merge_request_event.
+        setup_and_check() {
+          unset CHANGE_ID 2>/dev/null || true
+          export TAG_NAME="v1.0.0"
+          brik.jenkins.setup "$BRIK_HOME" >/dev/null 2>&1
+          printf '%s' "$BRIK_PIPELINE_SOURCE"
+        }
+        When call setup_and_check
+        The output should equal "push"
+      End
+
       It "exports BRIK_MERGE_REQUEST_ID from CHANGE_ID"
         setup_and_check() {
           export CHANGE_ID="99"

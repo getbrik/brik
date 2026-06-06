@@ -25,7 +25,7 @@ Describe "pipeline.context persistence"
   cleanup_dirs() {
     rm -rf "$CTX_LOG_DIR" "$CTX_FRAG_DIR"
     unset BRIK_LOG_DIR BRIK_WORKSPACE BRIK_CONFIG_FILE BRIK_RUN_ID
-    unset BRIK_COMMIT_TAG BRIK_CONTINUE_ON_ERROR
+    unset BRIK_COMMIT_TAG BRIK_CONTINUE_ON_ERROR BRIK_PIPELINE_SOURCE
   }
 
   Describe "pipeline.run (local mode)"
@@ -88,6 +88,49 @@ Describe "pipeline.context persistence"
       }
       When call ci_release
       The output should equal "release"
+    End
+  End
+
+  # pipeline.pipeline_source records the trigger provenance surfaced by the
+  # platform wrapper (BRIK_PIPELINE_SOURCE). It is NOT derivable from
+  # pipeline.context: a branch push and a merge/pull request both yield
+  # context=snapshot, yet differ by source (push vs merge_request_event).
+  # Recording it makes the trigger an auditable business outcome that E2E
+  # parity assertions can read from the report instead of job colors.
+  Describe "pipeline.pipeline_source persistence"
+    Before 'setup_dirs'
+    After 'cleanup_dirs'
+
+    It "records pipeline.pipeline_source=merge_request_event for an MR build"
+      mr_source_recorded() {
+        export BRIK_PIPELINE_SOURCE="merge_request_event"
+        pipeline.run >/dev/null 2>&1
+        jq -r '.pipeline.pipeline_source' "$CTX_LOG_DIR/aggregate-report.json"
+      }
+      When call mr_source_recorded
+      The output should equal "merge_request_event"
+    End
+
+    It "records pipeline.pipeline_source=push for a branch/tag push build"
+      push_source_recorded() {
+        export BRIK_PIPELINE_SOURCE="push"
+        pipeline.run >/dev/null 2>&1
+        jq -r '.pipeline.pipeline_source' "$CTX_LOG_DIR/aggregate-report.json"
+      }
+      When call push_source_recorded
+      The output should equal "push"
+    End
+
+    It "omits pipeline.pipeline_source when BRIK_PIPELINE_SOURCE is unset"
+      # Local runs without a platform wrapper carry no trigger source; the
+      # field must be absent (optional in the schema) rather than empty.
+      absent_when_unset() {
+        unset BRIK_PIPELINE_SOURCE
+        pipeline.run >/dev/null 2>&1
+        jq -r '.pipeline | has("pipeline_source")' "$CTX_LOG_DIR/aggregate-report.json"
+      }
+      When call absent_when_unset
+      The output should equal "false"
     End
   End
 End

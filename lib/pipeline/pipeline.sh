@@ -146,6 +146,30 @@ _pipeline._stamp_dry_run() {
     fi
 }
 
+# Stamp pipeline.pipeline_source onto the local backend from the platform
+# wrapper's BRIK_PIPELINE_SOURCE, so local runs record trigger provenance the
+# same way CI mode does (parity with the fragment aggregator). No-op when
+# BRIK_PIPELINE_SOURCE is unset, which keeps the field absent (rather than
+# present-and-empty) on plain local runs without a platform wrapper.
+_pipeline._stamp_pipeline_source() {
+    local source="${BRIK_PIPELINE_SOURCE:-}"
+    [[ -n "$source" ]] || return 0
+    local backend
+    backend="$(_report._backend_path)"
+    [[ -f "$backend" ]] || return 0
+    command -v jq >/dev/null 2>&1 || return 0
+
+    local tmp
+    tmp="$(mktemp "${backend}.XXXXXX")" || return 0
+    if jq --arg src "$source" \
+            '. + { pipeline: ((.pipeline // {}) + { pipeline_source: $src }) }' \
+            "$backend" > "$tmp" 2>/dev/null; then
+        mv "$tmp" "$backend" || rm -f "$tmp"
+    else
+        rm -f "$tmp"
+    fi
+}
+
 # Decide whether a stage should be skipped based on opt-in flags.
 # Returns 0 (true) if the stage should be skipped, 1 otherwise.
 #
@@ -242,6 +266,7 @@ pipeline.run() {
     report.init || return "$?"
     _pipeline._stamp_context "$pipeline_context"
     _pipeline._stamp_dry_run
+    _pipeline._stamp_pipeline_source
 
     # Local mode treats per-stage fragments as a CI-only mechanism: pipeline.run
     # produces the canonical aggregate-report.{md,json} directly via report.render

@@ -69,8 +69,20 @@ brik.jenkins.setup() {
         export BRIK_COMMIT_REF="$BRIK_BRANCH"
     fi
 
-    # Jenkins has no direct equivalent of pipeline_source; default to "push"
-    export BRIK_PIPELINE_SOURCE="push"
+    # Derive pipeline_source for parity with GitLab (CI_PIPELINE_SOURCE).
+    # CHANGE_ID is Jenkins' own branch-source signal for a change request: it
+    # is set by ANY branch-source plugin (Gitea, GitLab, GitHub, Bitbucket...)
+    # on a merge/pull request build, independent of which git host backs the
+    # repo. This keeps the adapter coupled to the orchestrator (Jenkins) and
+    # agnostic to the git host. Surface the canonical 'merge_request_event'
+    # source so conditions.eval gates identically across adapters. Every other
+    # trigger (branch push, tag scan) is a "push" in GitLab terms; the release
+    # nature is carried by BRIK_COMMIT_TAG/context, never by pipeline_source.
+    if [[ -n "${CHANGE_ID:-}" ]]; then
+        export BRIK_PIPELINE_SOURCE="merge_request_event"
+    else
+        export BRIK_PIPELINE_SOURCE="push"
+    fi
 
     # CHANGE_ID is set by Jenkins Multibranch for PRs
     export BRIK_MERGE_REQUEST_ID="${CHANGE_ID:-}"

@@ -81,7 +81,7 @@
       "minLength": 1
     },
     "BRIK_PIPELINE_SOURCE": {
-      "description": "Trigger source. v1 enum mirrors observed v0.6.0 values: 'push' (default on Jenkins + GitLab branch/tag pushes), 'merge_request_event' (GitLab MR pipelines), 'schedule' (cron), 'web' (manual UI trigger), 'api' (programmatic trigger).",
+      "description": "Trigger source. v1 enum mirrors observed values: 'push' (default on Jenkins + GitLab branch/tag pushes), 'merge_request_event' (GitLab MR pipelines and Jenkins merge/pull request builds, surfaced via CHANGE_ID), 'schedule' (cron), 'web' (manual UI trigger), 'api' (programmatic trigger).",
       "type": "string",
       "enum": ["push", "merge_request_event", "schedule", "web", "api"]
     },
