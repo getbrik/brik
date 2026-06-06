@@ -239,7 +239,7 @@ Measured by [ShellSpec](https://shellspec.info) with [kcov](https://github.com/S
 
 ## Transparency notice
 
-We use AI-assisted development ([Claude Code](https://claude.ai/code) and [Everything Claude Code](https://github.com/aspect-build/everything-claude-code)) to accelerate implementation. Every contribution, human or AI-generated, goes through the same gates: code review, ShellSpec coverage, ShellCheck, end-to-end runs on briklab, and CI.
+We use AI-assisted development ([Claude Code](https://claude.ai/code) and [ECC](https://github.com/affaan-m/ECC)) to accelerate implementation. Every contribution, human or AI-generated, goes through the same gates: code review, ShellSpec coverage, ShellCheck, end-to-end runs on briklab, and CI.
 
 ## License
 
