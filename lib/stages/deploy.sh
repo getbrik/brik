@@ -62,6 +62,12 @@ stages.deploy() {
 
     while IFS= read -r env_name; do
         [[ -z "$env_name" ]] && continue
+        # Explicit CD deploy (brik deploy --environment <e>) targets a single
+        # environment; skip all others. The chosen env also bypasses its `when`
+        # condition below, because the operator selected it explicitly.
+        if [[ -n "${BRIK_DEPLOY_ONLY_ENV:-}" && "$env_name" != "${BRIK_DEPLOY_ONLY_ENV}" ]]; then
+            continue
+        fi
         upper_env="$(printf '%s' "$env_name" | tr '[:lower:]-' '[:upper:]_')"
 
         local target_var="BRIK_DEPLOY_${upper_env}_TARGET"
@@ -101,8 +107,10 @@ stages.deploy() {
             continue
         fi
 
-        # Evaluate deploy condition if set
-        if [[ -n "$when_cond" ]]; then
+        # Evaluate deploy condition if set. An explicit CD deploy
+        # (BRIK_DEPLOY_ONLY_ENV) skips the `when` gate: the operator chose this
+        # environment directly, so the event-driven condition does not apply.
+        if [[ -z "${BRIK_DEPLOY_ONLY_ENV:-}" && -n "$when_cond" ]]; then
             if ! conditions.eval "$when_cond"; then
                 log.info "skipping $env_name (condition not met: $when_cond)"
                 continue
@@ -162,6 +170,9 @@ stages.deploy() {
         _v="$(transverse.env.resolve_indirect "$git_token_var_var")"; [[ -n "$_v" ]] && deploy_args+=(--git-token-var "$_v")
         _v="$(transverse.env.resolve_indirect "$auth_token_var_var")"; [[ -n "$_v" ]] && deploy_args+=(--auth-token-var "$_v")
         _v="$(transverse.env.resolve_indirect "$restart_cmd_var")";  [[ -n "$_v" ]] && deploy_args+=(--restart-cmd "$_v")
+        # CD flow: inject the digest-pinned image ref resolved by `brik deploy`
+        # so the target deploys exactly that digest (require_digest).
+        [[ -n "${BRIK_DEPLOY_IMAGE_REF:-}" ]] && deploy_args+=(--image-ref "${BRIK_DEPLOY_IMAGE_REF}")
 
         # Inline deploy dispatch: load deployments.<target> + call deploy.<target>.run.
         if ! brik.use "deployments.${target}"; then

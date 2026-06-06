@@ -98,6 +98,15 @@ brik.local.run_stage() {
     brik.wrapper.run_stage "$@"
 }
 
+# Run the deploy stage for an explicit CD deploy (mode 2). Thin: cli.deploy
+# has already resolved the digest and set BRIK_DEPLOY_ONLY_ENV /
+# BRIK_DEPLOY_IMAGE_REF; this just runs the deploy stage via the same path as
+# the CI flow, so local and CI execute identical business logic.
+# Usage: brik.local.run_deploy
+brik.local.run_deploy() {
+    brik.local.run_stage deploy
+}
+
 # ---------------------------------------------------------------------------
 # Pipeline orchestration
 # ---------------------------------------------------------------------------
