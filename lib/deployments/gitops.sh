@@ -149,7 +149,7 @@ deploy.gitops.render_manifests() {
 #        [--git-token-var <VAR>] [--dry-run]
 deploy.gitops.push_manifests() {
     local repo="" branch="" target_path="" source_dir="" message="" git_token_var=""
-    local image_tag=""
+    local image_tag="" image_ref=""
     local dry_run="${BRIK_DRY_RUN:-}"
 
     while [[ $# -gt 0 ]]; do
@@ -161,6 +161,7 @@ deploy.gitops.push_manifests() {
             --message)       message="$2";       shift 2 ;;
             --git-token-var) git_token_var="$2"; shift 2 ;;
             --image-tag)     image_tag="$2";     shift 2 ;;
+            --image-ref)     image_ref="$2";     shift 2 ;;
             --dry-run)       dry_run="true";     shift ;;
             *) log.error "unknown option: $1"; return "$BRIK_EXIT_INVALID_INPUT" ;;
         esac
@@ -223,8 +224,26 @@ deploy.gitops.push_manifests() {
         return "$BRIK_EXIT_IO_FAILURE"
     fi
 
-    # Substitute image tags if --image-tag was provided
-    if [[ -n "$image_tag" ]]; then
+    # Pin the full image ref (registry/app@sha256:X) when --image-ref is given;
+    # this takes precedence over --image-tag so the pushed manifest is
+    # digest-pinned rather than tag-mutable. Falls back to tag substitution.
+    if [[ -n "$image_ref" ]]; then
+        brik.use deployments._image_ref
+        if ! deploy.image_ref.is_pinned "$image_ref"; then
+            log.error "refusing to push a non-digest-pinned image ref: ${image_ref}"
+            rm -rf "$tmpdir"
+            return "$BRIK_EXIT_INVALID_INPUT"
+        fi
+        brik.use transverse.yaml
+        local manifest_file
+        while IFS= read -r manifest_file; do
+            transverse.yaml.set_image "$manifest_file" \
+                ".spec.template.spec.containers[]?.image" "$image_ref" 2>/dev/null || true
+            transverse.yaml.set_image "$manifest_file" \
+                ".spec.template.spec.initContainers[]?.image" "$image_ref" 2>/dev/null || true
+        done < <(find "$dest" -name '*.yaml' -o -name '*.yml')
+        log.info "image pinned to ${image_ref}"
+    elif [[ -n "$image_tag" ]]; then
         brik.use transverse.yaml
         local manifest_file
         while IFS= read -r manifest_file; do

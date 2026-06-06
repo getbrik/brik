@@ -11,7 +11,7 @@ _BRIK_DEPLOYMENTS_HELM_LOADED=1
 # Usage: deploy.helm.run --chart <chart> [--release <name>]
 #        [--namespace <ns>] [--values <file>] [--env <env>] [--dry-run]
 deploy.helm.run() {
-    local chart="" release_name="" namespace="" values="" environment=""
+    local chart="" release_name="" namespace="" values="" environment="" image_ref=""
     local dry_run="${BRIK_DRY_RUN:-}"
 
     while [[ $# -gt 0 ]]; do
@@ -20,6 +20,7 @@ deploy.helm.run() {
             --release)      release_name="$2"; shift 2 ;;
             --namespace)    namespace="$2";    shift 2 ;;
             --values)       values="$2";       shift 2 ;;
+            --image-ref)    image_ref="$2";    shift 2 ;;
             --dry-run)      dry_run="true";    shift ;;
             # Ignore deploy.run passthrough options
             --target)       shift 2 ;;
@@ -61,7 +62,20 @@ deploy.helm.run() {
         fi
         cmd+=(--values "$values")
     fi
-    if [[ -n "$tag" ]]; then
+    if [[ -n "$image_ref" ]]; then
+        # Digest-pinned deploy: set repository + digest and clear the tag so
+        # the chart renders registry/app@sha256:X. The chart's image template
+        # must honor .Values.image.digest (the conventional values contract).
+        brik.use deployments._image_ref
+        if ! deploy.image_ref.is_pinned "$image_ref"; then
+            log.error "refusing a non-digest-pinned image ref: ${image_ref}"
+            return "$BRIK_EXIT_INVALID_INPUT"
+        fi
+        local _img_repo="${image_ref%@*}" _img_digest="${image_ref#*@}"
+        cmd+=(--set "image.repository=${_img_repo}"
+              --set "image.digest=${_img_digest}"
+              --set "image.tag=")
+    elif [[ -n "$tag" ]]; then
         if ! [[ "$tag" =~ ^[a-zA-Z0-9._+-]+$ ]]; then
             log.error "invalid image tag format: $tag"
             return "$BRIK_EXIT_INVALID_INPUT"

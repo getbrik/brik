@@ -11,13 +11,14 @@ _BRIK_DEPLOYMENTS_K8S_LOADED=1
 # Usage: deploy.k8s.run [--manifest <path>] [--namespace <ns>]
 #        [--context <ctx>] [--dry-run]
 deploy.k8s.run() {
-    local manifest="" namespace="" context="" dry_run="${BRIK_DRY_RUN:-}"
+    local manifest="" namespace="" context="" image_ref="" dry_run="${BRIK_DRY_RUN:-}"
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --manifest) manifest="$2"; shift 2 ;;
             --namespace) namespace="$2"; shift 2 ;;
             --context) context="$2"; shift 2 ;;
+            --image-ref) image_ref="$2"; shift 2 ;;
             --dry-run) dry_run="true"; shift ;;
             # Ignore deploy.run passthrough options
             --target|--env) shift 2 ;;
@@ -32,6 +33,25 @@ deploy.k8s.run() {
 
     pipeline.require_file "$manifest" || return "$BRIK_EXIT_IO_FAILURE"
     pipeline.require_tool kubectl || return "$BRIK_EXIT_MISSING_DEP"
+
+    # When a digest-pinned ref is supplied, apply a staged copy with the image
+    # pinned, never mutating the user's manifest on disk.
+    local _staged=""
+    if [[ -n "$image_ref" ]]; then
+        brik.use deployments._image_ref
+        if ! deploy.image_ref.is_pinned "$image_ref"; then
+            log.error "refusing a non-digest-pinned image ref: ${image_ref}"
+            return "$BRIK_EXIT_INVALID_INPUT"
+        fi
+        brik.use transverse.yaml
+        _staged="$(mktemp -t brik-k8s-manifest.XXXXXX)"
+        cp "$manifest" "$_staged"
+        transverse.yaml.set_image "$_staged" \
+            ".spec.template.spec.containers[]?.image" "$image_ref" 2>/dev/null || true
+        transverse.yaml.set_image "$_staged" \
+            ".spec.template.spec.initContainers[]?.image" "$image_ref" 2>/dev/null || true
+        manifest="$_staged"
+    fi
 
     # Build kubectl command
     local -a cmd=(kubectl apply -f "$manifest")
@@ -48,10 +68,13 @@ deploy.k8s.run() {
         log.info "applying manifest: ${cmd[*]}"
     fi
 
-    "${cmd[@]}" || {
+    local _apply_rc=0
+    "${cmd[@]}" || _apply_rc=$?
+    [[ -n "$_staged" ]] && rm -f "$_staged"
+    if [[ "$_apply_rc" -ne 0 ]]; then
         log.error "kubectl apply failed"
         return "$BRIK_EXIT_EXTERNAL_FAIL"
-    }
+    fi
 
     log.info "deployment completed successfully"
     return 0

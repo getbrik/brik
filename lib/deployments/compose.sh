@@ -11,7 +11,7 @@ _BRIK_DEPLOYMENTS_COMPOSE_LOADED=1
 # Usage: deploy.compose.run [--namespace <project>] [--file <compose_file>]
 #        [--host <host>] [--path <path>] [--dry-run]
 deploy.compose.run() {
-    local namespace="" compose_file="" host="" remote_path=""
+    local namespace="" compose_file="" host="" remote_path="" image_ref=""
     local dry_run="${BRIK_DRY_RUN:-}"
 
     while [[ $# -gt 0 ]]; do
@@ -20,6 +20,7 @@ deploy.compose.run() {
             --file)         compose_file="$2"; shift 2 ;;
             --host)         host="$2";         shift 2 ;;
             --path)         remote_path="$2";  shift 2 ;;
+            --image-ref)    image_ref="$2";    shift 2 ;;
             --dry-run)      dry_run="true";    shift ;;
             # Ignore deploy.run passthrough options
             --target|--env) shift 2 ;;
@@ -62,6 +63,17 @@ deploy.compose.run() {
     # Make image tag available for compose variable substitution
     export IMAGE_TAG="${BRIK_APP_VERSION:-${BRIK_COMMIT_SHORT_SHA:-latest}}"
 
+    # When a digest-pinned ref is supplied, expose it as IMAGE_REF so a compose
+    # file written as `image: ${IMAGE_REF}` pulls exactly that digest.
+    if [[ -n "$image_ref" ]]; then
+        brik.use deployments._image_ref
+        if ! deploy.image_ref.is_pinned "$image_ref"; then
+            log.error "refusing a non-digest-pinned image ref: ${image_ref}"
+            return "$BRIK_EXIT_INVALID_INPUT"
+        fi
+        export IMAGE_REF="$image_ref"
+    fi
+
     if [[ -n "$host" ]]; then
         # Reuse SSH agent setup from transverse helper
         brik.use transverse.ssh
@@ -80,9 +92,10 @@ deploy.compose.run() {
             }
             log.info "running docker compose on remote: $host"
             local _ssh_exit=0
-            ssh "${ssh_opts[@]}" "$host" bash -s -- "$remote_path" "$project_name" "$IMAGE_TAG" <<'ENDSSH' || _ssh_exit=$?
+            ssh "${ssh_opts[@]}" "$host" bash -s -- "$remote_path" "$project_name" "$IMAGE_TAG" "${IMAGE_REF:-}" <<'ENDSSH' || _ssh_exit=$?
 set -euo pipefail
 export IMAGE_TAG="$3"
+[ -n "$4" ] && export IMAGE_REF="$4"
 cd "$1" || exit 1
 docker compose -p "$2" up -d
 ENDSSH

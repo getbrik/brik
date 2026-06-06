@@ -11,7 +11,7 @@ _BRIK_DEPLOYMENTS_SSH_LOADED=1
 # Usage: deploy.ssh.run --host <host> --path <remote_path>
 #        [--source <local_path>] [--restart-cmd <cmd>] [--dry-run]
 deploy.ssh.run() {
-    local host="" remote_path="" restart_cmd="" source=""
+    local host="" remote_path="" restart_cmd="" source="" image_ref=""
     local dry_run="${BRIK_DRY_RUN:-}"
 
     while [[ $# -gt 0 ]]; do
@@ -20,6 +20,7 @@ deploy.ssh.run() {
             --path)         remote_path="$2";  shift 2 ;;
             --restart-cmd)  restart_cmd="$2";  shift 2 ;;
             --source)       source="$2";       shift 2 ;;
+            --image-ref)    image_ref="$2";    shift 2 ;;
             --dry-run)      dry_run="true";    shift ;;
             # Ignore deploy.run passthrough options. --namespace is a
             # k8s-centric field a workflow profile may inject into every env;
@@ -53,6 +54,28 @@ deploy.ssh.run() {
     # Determine source files: --source or current directory
     local src="${source:-.}"
 
+    # When a digest-pinned ref is supplied, sync a staged copy with image refs
+    # pinned in any YAML, never mutating the user's source tree.
+    local _staged=""
+    if [[ -n "$image_ref" ]]; then
+        brik.use deployments._image_ref
+        if ! deploy.image_ref.is_pinned "$image_ref"; then
+            log.error "refusing a non-digest-pinned image ref: ${image_ref}"
+            return "$BRIK_EXIT_INVALID_INPUT"
+        fi
+        brik.use transverse.yaml
+        _staged="$(mktemp -d)"
+        cp -r "${src}/." "${_staged}/"
+        local _yaml_file
+        while IFS= read -r _yaml_file; do
+            transverse.yaml.set_image "$_yaml_file" \
+                ".spec.template.spec.containers[]?.image" "$image_ref" 2>/dev/null || true
+            transverse.yaml.set_image "$_yaml_file" \
+                ".services[]?.image" "$image_ref" 2>/dev/null || true
+        done < <(find "$_staged" \( -name '*.yaml' -o -name '*.yml' \))
+        src="$_staged"
+    fi
+
     # Build rsync command. Exclude internal CI state directories that the
     # workspace accumulates between stages: .ssh holds the deployer key
     # plus an ssh-agent socket that rsync cannot transfer (--exclude
@@ -75,10 +98,13 @@ deploy.ssh.run() {
         log.info "running: ${rsync_cmd[*]}"
     fi
 
-    "${rsync_cmd[@]}" || {
+    local _rsync_rc=0
+    "${rsync_cmd[@]}" || _rsync_rc=$?
+    [[ -n "$_staged" ]] && rm -rf "$_staged"
+    if [[ "$_rsync_rc" -ne 0 ]]; then
         log.error "rsync failed"
         return "$BRIK_EXIT_EXTERNAL_FAIL"
-    }
+    fi
 
     # Execute restart command via ssh if provided
     if [[ -n "$restart_cmd" ]]; then
