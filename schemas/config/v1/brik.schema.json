@@ -71,6 +71,29 @@
       "description": "Publish stage configuration for publishing artefacts to registries (npm, Docker, Maven, PyPI, Cargo, NuGet).",
       "$ref": "#/$defs/publish"
     },
+    "artifacts": {
+      "description": "Artifact channel definitions for the CD flow. A channel is a named registry endpoint an artifact lives in (e.g. candidate, release). The deploy flow resolves a version to a digest within the channel an environment accepts (deploy.environments.<env>.accepts_channel).",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "channels": {
+          "description": "Named artifact channels. Each key is a channel name; the value declares the registry endpoint that channel resolves against.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["registry"],
+            "properties": {
+              "registry": {
+                "description": "Registry repository endpoint for this channel (e.g. registry.internal/app). A version is resolved to a digest as <registry>:<version> -> <registry>@sha256:<hex>.",
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      }
+    },
     "deploy": {
       "description": "Deploy stage configuration. Defines one or more named environments with conditions and deployment targets.",
       "$ref": "#/$defs/deploy"
@@ -955,6 +978,23 @@
           "description": "Deployment strategy for targets that support it.",
           "type": "string",
           "enum": ["rolling", "blue-green", "canary"]
+        },
+        "accepts_channel": {
+          "description": "Name of the artifacts.channels.<name> this environment's artifact is resolved from. The CD flow resolves --version to a digest within this channel's registry. Optional; absent means no channel resolution (legacy tag-based deploy).",
+          "type": "string",
+          "minLength": 1
+        },
+        "gates": {
+          "description": "Deployment gates enforced before this environment is deployed.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "require_digest": {
+              "description": "When true, the deployment must use a digest-pinned image ref; the CD flow fails closed if the version cannot be resolved to a digest in the accepted channel.",
+              "type": "boolean",
+              "default": false
+            }
+          }
         }
       }
     },

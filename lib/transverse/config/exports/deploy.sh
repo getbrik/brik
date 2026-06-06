@@ -131,6 +131,14 @@ _config._export_deploy_env_vars() {
 
         val="$(config.get ".deploy.environments.${env_name}.strategy" '')"
         [[ -n "$val" ]] && export "BRIK_DEPLOY_${upper_env}_STRATEGY=$val"
+
+        # CD flow (P0): the channel an environment accepts and whether a
+        # digest-pinned image ref is mandatory before deploying.
+        val="$(config.get ".deploy.environments.${env_name}.accepts_channel" '')"
+        [[ -n "$val" ]] && export "BRIK_DEPLOY_${upper_env}_CHANNEL=$val"
+
+        val="$(config.get ".deploy.environments.${env_name}.gates.require_digest" '')"
+        [[ -n "$val" ]] && export "BRIK_DEPLOY_${upper_env}_REQUIRE_DIGEST=$val"
     done <<< "$env_keys"
 
     return 0
