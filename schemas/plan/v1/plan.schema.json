@@ -27,6 +27,36 @@
       "enum": ["safe", "balanced", "aggressive"],
       "description": "Selection mode. safe = context-only filtering, balanced = per-file impact via globs, aggressive = per-subproject impact (deferred to v0.7+, planner errors out)."
     },
+    "planType": {
+      "type": "string",
+      "enum": ["ci", "deploy"],
+      "default": "ci",
+      "description": "Plan kind. Absent (default ci) = the event-driven CI flow over the full fixed pipeline. deploy = an explicit CD run parameterized by (version, environment); CI stages are skipped and only the deploy subset (promote?, deploy, notify) runs. Omitted for ci plans so their bytes stay identical to pre-CD plans."
+    },
+    "deploy": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "CD parameters, present only when planType=deploy.",
+      "properties": {
+        "version": {
+          "type": "string",
+          "description": "The artifact version being deployed (the --version input of the CD run)."
+        },
+        "environment": {
+          "type": "string",
+          "description": "The target environment key from deploy.environments (the --environment input of the CD run)."
+        },
+        "channel": {
+          "type": "string",
+          "description": "The artifact channel the environment accepts (resolved from deploy.environments.<env>.accepts_channel). The digest is resolved within this channel's registry."
+        },
+        "digest": {
+          "type": "string",
+          "description": "The resolved digest-pinned image ref (registry@sha256:<hex>) the deployment applies.",
+          "pattern": "^[a-z0-9._/-]+@sha256:[0-9a-f]{64}$"
+        }
+      }
+    },
     "workspace": {
       "type": "string",
       "minLength": 1,

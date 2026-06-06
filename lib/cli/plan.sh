@@ -52,6 +52,7 @@ cli.plan.run() {
     local mode=""
     local out="" explain=false validate_only=false format=""
     local with_release=false with_package=false with_deploy=false
+    local plan_type="" deploy_version="" deploy_environment=""
     local -a passthrough=()
     local mode_from_cli=false
 
@@ -61,6 +62,12 @@ cli.plan.run() {
                          workspace="$2"; shift 2 ;;
             --mode)      brik_require_arg "--mode" "${2-}" || return "$?"
                          mode="$2"; mode_from_cli=true; shift 2 ;;
+            --type)      brik_require_arg "--type" "${2-}" || return "$?"
+                         plan_type="$2"; shift 2 ;;
+            --version)   brik_require_arg "--version" "${2-}" || return "$?"
+                         deploy_version="$2"; shift 2 ;;
+            --environment) brik_require_arg "--environment" "${2-}" || return "$?"
+                         deploy_environment="$2"; shift 2 ;;
             --out)       brik_require_arg "--out" "${2-}" || return "$?"
                          out="$2"; shift 2 ;;
             --explain)         explain=true; shift ;;
@@ -97,6 +104,9 @@ cli.plan.run() {
     fi
 
     passthrough+=(--workspace "$workspace" --mode "$mode")
+    [[ -n "$plan_type" ]]         && passthrough+=(--type "$plan_type")
+    [[ -n "$deploy_version" ]]    && passthrough+=(--version "$deploy_version")
+    [[ -n "$deploy_environment" ]] && passthrough+=(--environment "$deploy_environment")
     $with_release && passthrough+=(--with-release)
     $with_package && passthrough+=(--with-package)
     $with_deploy  && passthrough+=(--with-deploy)

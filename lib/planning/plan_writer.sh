@@ -27,6 +27,7 @@ plan_writer.from_stream() {
     local workspace="" mode="" context=""
     local source="none" from="" to=""
     local release_profile="none" release_version="0.0.0" is_candidate="0"
+    local plan_type="ci" deploy_version="" deploy_environment=""
     local -a stage_rows=()
     local -a changes_files_rows=()
 
@@ -44,6 +45,9 @@ plan_writer.from_stream() {
             "# release_profile="*)   release_profile="${line#\# release_profile=}" ;;
             "# release_version="*)   release_version="${line#\# release_version=}" ;;
             "# is_candidate="*)      is_candidate="${line#\# is_candidate=}" ;;
+            "# plan_type="*)         plan_type="${line#\# plan_type=}" ;;
+            "# deploy_version="*)    deploy_version="${line#\# deploy_version=}" ;;
+            "# deploy_environment="*) deploy_environment="${line#\# deploy_environment=}" ;;
             "#"*)                    : ;;
             "")                      : ;;
             *)                       stage_rows+=("$line") ;;
@@ -129,6 +133,19 @@ plan_writer.from_stream() {
     # Self-hash idiom: assemble with fingerprint="", hash the canonical
     # bytes, substitute the real fingerprint. Round-tripping the same
     # plan re-produces the same fingerprint.
+    # The deploy block is added only for a deploy plan-kind, so a ci plan's
+    # bytes (and therefore its fingerprint) are unchanged from before this
+    # field existed. Empty version/environment entries are dropped.
+    local deploy_obj="{}"
+    if [[ "$plan_type" == "deploy" ]]; then
+        deploy_obj="$(jq -nc \
+            --arg pt "$plan_type" \
+            --arg dv "$deploy_version" \
+            --arg de "$deploy_environment" \
+            '{planType: $pt, deploy: ({version: $dv, environment: $de}
+                | with_entries(select(.value != "")))}')"
+    fi
+
     local body
     body="$(jq -nS \
         --arg sv "v1" \
@@ -140,6 +157,7 @@ plan_writer.from_stream() {
         --argjson edges   "$edges_json" \
         --argjson chg     "$changes_obj" \
         --argjson release "$release_obj" \
+        --argjson deploy_extra "$deploy_obj" \
         '
         # KCOV_EXCL_START -- inline jq object literal, not bash code
         {
@@ -153,7 +171,7 @@ plan_writer.from_stream() {
             stages:        $stages,
             dag:           { edges: $edges },
             fingerprint:   ""
-        }
+        } + $deploy_extra
         # KCOV_EXCL_STOP
         ')"
 

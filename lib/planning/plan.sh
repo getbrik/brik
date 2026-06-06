@@ -127,11 +127,15 @@ plan.compute() {
     local workspace="${BRIK_WORKSPACE:-$PWD}"
     local mode="safe"
     local with_release=false with_package=false with_deploy=false
+    local plan_type="ci" deploy_version="" deploy_environment=""
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --workspace) workspace="$2"; shift 2 ;;
             --mode)      mode="$2"; shift 2 ;;
+            --type)      plan_type="$2"; shift 2 ;;
+            --version)   deploy_version="$2"; shift 2 ;;
+            --environment) deploy_environment="$2"; shift 2 ;;
             --with-release) with_release=true; shift ;;
             --with-package) with_package=true; shift ;;
             --with-deploy)  with_deploy=true; shift ;;
@@ -139,6 +143,22 @@ plan.compute() {
                return "$BRIK_EXIT_INVALID_INPUT" ;;
         esac
     done
+
+    case "$plan_type" in
+        ci|deploy) : ;;
+        *) printf '[plan] invalid --type: %s (expected ci|deploy)\n' "$plan_type" >&2
+           return "$BRIK_EXIT_INVALID_INPUT" ;;
+    esac
+
+    # The deploy plan-kind is a subset of the fixed flow: only these stages
+    # run; every CI stage is force-skipped. promote self-skips at runtime
+    # when not configured. Padded with spaces for whole-word matching.
+    local _deploy_subset=" promote deploy notify "
+    if [[ "$plan_type" == "deploy" ]]; then
+        # A deploy run is explicit (mode 2): the deploy stage must run, so the
+        # --with-deploy opt-in is implied rather than required at the UI.
+        with_deploy=true
+    fi
 
     case "$mode" in
         safe|balanced) : ;;
@@ -153,8 +173,15 @@ plan.compute() {
             return "$BRIK_EXIT_INVALID_INPUT" ;;
     esac
 
+    # CI context comes from the commit tag. A deploy run is parameterized by
+    # an explicit --version, so it resolves to the release context whenever a
+    # version is supplied (the artifact being deployed is a released one).
     local context="snapshot"
-    [[ -n "${BRIK_COMMIT_TAG:-}" ]] && context="release"
+    if [[ "$plan_type" == "deploy" ]]; then
+        [[ -n "$deploy_version" ]] && context="release"
+    else
+        [[ -n "${BRIK_COMMIT_TAG:-}" ]] && context="release"
+    fi
 
     local stack_id=""
     stack_id="$(registry.stack.detect "$workspace" 2>/dev/null || true)"
@@ -204,13 +231,25 @@ plan.compute() {
     printf '# release_profile=%s\n' "$_release_profile"
     printf '# release_version=%s\n' "$_release_version"
     printf '# is_candidate=%s\n' "$_is_candidate"
+    # plan_type is always emitted; the writer only surfaces planType/deploy in
+    # plan.json when it is "deploy", so ci plans stay byte-identical.
+    printf '# plan_type=%s\n' "$plan_type"
+    printf '# deploy_version=%s\n' "$deploy_version"
+    printf '# deploy_environment=%s\n' "$deploy_environment"
 
     local stage decision reason gate_mode runner_class fn matched
     while IFS= read -r stage; do
-        local result; result="$(plan.decide \
-            "$stage" "$mode" "$context" \
-            "$with_release" "$with_package" "$with_deploy" \
-            "$stack_id" "$changes_file")"
+        local result
+        if [[ "$plan_type" == "deploy" && "$_deploy_subset" != *" $stage "* ]]; then
+            # CI stage in a deploy plan: force skip so `brik plan gate <ci>`
+            # returns skip (an absent stage would default to run).
+            result=$'skip\tnot-in-deploy-plan'
+        else
+            result="$(plan.decide \
+                "$stage" "$mode" "$context" \
+                "$with_release" "$with_package" "$with_deploy" \
+                "$stack_id" "$changes_file")"
+        fi
         IFS=$'\t' read -r decision reason <<<"$result"
 
         gate_mode="$(registry.stage.gate_mode "$stage" 2>/dev/null || true)"
