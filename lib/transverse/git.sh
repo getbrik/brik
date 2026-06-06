@@ -273,3 +273,33 @@ transverse.git.short_sha() {
     local ref="${1:-HEAD}"
     git rev-parse --short=7 "$ref" 2>/dev/null
 }
+
+# transverse.git.worktree_at - materialize a ref into a disposable detached
+# worktree and echo its path. Used by the CD flow to resolve a deployment
+# definition at the version's git ref (co-versioned regime), without disturbing
+# the caller's working tree.
+# Usage: dir="$(transverse.git.worktree_at <repo> <ref>)"
+# Output: absolute worktree path on stdout; returns non-zero on failure.
+transverse.git.worktree_at() {
+    local repo="$1" ref="$2"
+    local parent dest
+    parent="$(mktemp -d)"
+    dest="${parent}/tree"
+    if git -C "$repo" worktree add --detach "$dest" "$ref" >/dev/null 2>&1; then
+        printf '%s' "$dest"
+        return 0
+    fi
+    rm -rf "$parent"
+    return "$BRIK_EXIT_EXTERNAL_FAIL"
+}
+
+# transverse.git.worktree_remove - remove a worktree created by worktree_at and
+# clean up its temp parent directory. Best-effort (never fails the caller).
+# Usage: transverse.git.worktree_remove <repo> <worktree_path>
+transverse.git.worktree_remove() {
+    local repo="$1" dest="$2"
+    [[ -z "$dest" ]] && return 0
+    git -C "$repo" worktree remove --force "$dest" >/dev/null 2>&1 || true
+    rm -rf "$(dirname "$dest")" 2>/dev/null || true
+    return 0
+}
