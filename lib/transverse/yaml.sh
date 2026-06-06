@@ -217,3 +217,73 @@ transverse.yaml.set_image_tag() {
 
     return 0
 }
+
+# transverse.yaml.set_image - replace the FULL image ref at a yq path.
+# Unlike set_image_tag (which rewrites only the ":tag" suffix), this sets the
+# whole value, so a digest-pinned ref (registry/app@sha256:<hex>) can be
+# injected. A path matching zero nodes is a no-op (success), so the same call
+# is safe across manifests that do not all carry an image field.
+#
+# Usage:
+#   transverse.yaml.set_image <file> <image_path> <ref> [--output <dest>]
+#
+# <image_path> is a yq selector yielding zero or more image strings,
+# e.g. ".spec.template.spec.containers[]?.image".
+transverse.yaml.set_image() {
+    local file="" image_path="" ref="" ref_set="" output=""
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --output) output="$2"; shift 2 ;;
+            --*)      log.error "unknown option: $1"; return "$BRIK_EXIT_INVALID_INPUT" ;;
+            *)
+                if [[ -z "$file" ]]; then
+                    file="$1"
+                elif [[ -z "$image_path" ]]; then
+                    image_path="$1"
+                elif [[ -z "$ref_set" ]]; then
+                    ref="$1"
+                    ref_set="1"
+                else
+                    log.error "unexpected positional argument: $1"
+                    return "$BRIK_EXIT_INVALID_INPUT"
+                fi
+                shift
+                ;;
+        esac
+    done
+
+    if [[ -z "$file" ]]; then
+        log.error "file is required (first positional)"
+        return "$BRIK_EXIT_INVALID_INPUT"
+    fi
+    if [[ -z "$image_path" ]]; then
+        log.error "image_path is required (second positional)"
+        return "$BRIK_EXIT_INVALID_INPUT"
+    fi
+    if [[ -z "$ref_set" || -z "$ref" ]]; then
+        log.error "ref is required (third positional)"
+        return "$BRIK_EXIT_INVALID_INPUT"
+    fi
+    if [[ ! -f "$file" ]]; then
+        log.error "file not found: $file"
+        return "$BRIK_EXIT_IO_FAILURE"
+    fi
+
+    pipeline.require_tool yq || return "$BRIK_EXIT_MISSING_DEP"
+
+    local expr="(${image_path}) = \"${ref}\""
+    local yq_stderr yq_rc=0
+    if [[ -n "$output" ]]; then
+        yq_stderr="$(yq eval "$expr" "$file" 2>&1 1>"$output")" || yq_rc=$?
+    else
+        yq_stderr="$(yq eval -i "$expr" "$file" 2>&1)" || yq_rc=$?
+    fi
+
+    if [[ "$yq_rc" -ne 0 ]]; then
+        log.error "yaml set_image failed: $yq_stderr"
+        return "$BRIK_EXIT_EXTERNAL_FAIL"
+    fi
+
+    return 0
+}

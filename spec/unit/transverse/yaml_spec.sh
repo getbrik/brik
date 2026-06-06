@@ -159,6 +159,65 @@ YAML
     End
   End
 
+  Describe "transverse.yaml.set_image"
+    Before 'setup_tmp'
+    After 'teardown_tmp'
+
+    DIG="sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+
+    write_deploy() {
+      cat > "${_YAML_TMP}/deploy.yml" <<'YAML'
+apiVersion: apps/v1
+kind: Deployment
+spec:
+  template:
+    spec:
+      containers:
+        - name: app
+          image: registry.example.com/app:oldtag
+YAML
+    }
+
+    It "replaces the full image ref (including a digest) at the path"
+      write_deploy
+      When call transverse.yaml.set_image \
+          "${_YAML_TMP}/deploy.yml" \
+          ".spec.template.spec.containers[]?.image" \
+          "registry.release/app@${DIG}"
+      The status should be success
+      The contents of file "${_YAML_TMP}/deploy.yml" should include "registry.release/app@${DIG}"
+      The contents of file "${_YAML_TMP}/deploy.yml" should not include "oldtag"
+    End
+
+    It "is a no-op (success) when the path matches no node"
+      printf 'dummy: ok\n' > "${_YAML_TMP}/none.yml"
+      When call transverse.yaml.set_image \
+          "${_YAML_TMP}/none.yml" \
+          ".spec.template.spec.containers[]?.image" \
+          "registry.release/app@${DIG}"
+      The status should be success
+    End
+
+    It "writes to --output leaving the source unchanged"
+      write_deploy
+      When call transverse.yaml.set_image \
+          "${_YAML_TMP}/deploy.yml" \
+          ".spec.template.spec.containers[]?.image" \
+          "registry.release/app@${DIG}" \
+          --output "${_YAML_TMP}/out.yml"
+      The status should be success
+      The contents of file "${_YAML_TMP}/out.yml" should include "@${DIG}"
+      The contents of file "${_YAML_TMP}/deploy.yml" should include "oldtag"
+    End
+
+    It "fails when ref is missing"
+      printf 'dummy: ok\n' > "${_YAML_TMP}/file.yml"
+      When call transverse.yaml.set_image "${_YAML_TMP}/file.yml" ".img" ""
+      The status should equal "$BRIK_EXIT_INVALID_INPUT"
+      The stderr should include "ref"
+    End
+  End
+
   Describe "error paths - option and positional validation"
     Before 'setup_tmp'
     After 'teardown_tmp'
