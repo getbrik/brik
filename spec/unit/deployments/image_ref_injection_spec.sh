@@ -101,10 +101,14 @@ YAML
     It "exports IMAGE_REF as the pinned ref"
       compose_inject() {
         unset BRIK_DRY_RUN
+        # The compose file must consume ${IMAGE_REF} or the run fails closed.
+        local cf
+        cf="$(mktemp)"
+        printf 'services:\n  app:\n    image: ${IMAGE_REF}\n' > "$cf"
         # docker mock echoes the IMAGE_REF it sees in its environment.
         mock.create_script "docker" 'echo "IMAGE_REF=$IMAGE_REF"'
         mock.activate
-        deploy.compose.run --namespace proj --file /tmp/none-compose.yml --image-ref "$PINNED"
+        deploy.compose.run --namespace proj --file "$cf" --image-ref "$PINNED"
       }
       When call compose_inject
       The status should be success

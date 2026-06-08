@@ -71,6 +71,14 @@ deploy.compose.run() {
             log.error "refusing a non-digest-pinned image ref: ${image_ref}"
             return "$BRIK_EXIT_INVALID_INPUT"
         fi
+        # compose substitutes IMAGE_REF at runtime; it does not rewrite the
+        # file. If the file never references it, the resolved digest would be
+        # silently dropped and a mutable tag deployed instead. Fail closed so a
+        # pinned deploy never degrades into an unpinned one.
+        if ! grep -q 'IMAGE_REF' "$compose_file" 2>/dev/null; then
+            log.error "compose file '${compose_file}' does not reference \${IMAGE_REF}; the pinned digest would be ignored"
+            return "$BRIK_EXIT_INVALID_INPUT"
+        fi
         export IMAGE_REF="$image_ref"
     fi
 

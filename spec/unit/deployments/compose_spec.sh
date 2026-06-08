@@ -2,7 +2,12 @@ Describe "deploy/compose.sh"
   Include "$BRIK_PIPELINE_LIB/logging.sh"
   Include "$BRIK_PIPELINE_LIB/tools.sh"
   Include "$BRIK_DEPLOYMENTS_LIB/compose.sh"
+  Include "$BRIK_DEPLOYMENTS_LIB/_image_ref.sh"
   Include "$BRIK_HOME/spec/support/mock_helper.sh"
+
+  # compose.sh lazy-loads _image_ref via brik.use; the lib is already included
+  # above, so neutralize the loader in the unit context.
+  brik.use() { :; }
 
   Describe "deploy.compose.run"
     It "returns 2 for unknown option"
@@ -123,6 +128,42 @@ Describe "deploy/compose.sh"
           [[ ! -f "$log" ]] || ! grep -q "up" "$log"
         }
         When call invoke_dryrun_noexec
+        The status should be success
+      End
+
+      # Digest-pinned image-ref injection (CD). compose does not rewrite the
+      # file; it exposes IMAGE_REF for `image: ${IMAGE_REF}` substitution. If
+      # the file never references IMAGE_REF, the pinned digest is silently
+      # dropped and a mutable tag deploys instead -- fail closed (doctrine
+      # S2.7), do not deploy a ref that ignores the resolved digest.
+      PINNED="registry.example.com/app@sha256:1111111111111111111111111111111111111111111111111111111111111111"
+
+      It "fails closed when --image-ref is set but the compose file ignores IMAGE_REF"
+        # The setup fixture writes `image: myapp` (no IMAGE_REF reference).
+        When call deploy.compose.run --namespace myapp \
+          --file "${TEST_WS}/docker-compose.yml" \
+          --image-ref "$PINNED"
+        The status should equal 2
+        The stderr should include "IMAGE_REF"
+      End
+
+      It "refuses a non-digest-pinned image-ref"
+        When call deploy.compose.run --namespace myapp \
+          --file "${TEST_WS}/docker-compose.yml" \
+          --image-ref "registry.example.com/app:1.2.3"
+        The status should equal 2
+        The stderr should include "non-digest-pinned"
+      End
+
+      It "proceeds when the compose file consumes \${IMAGE_REF}"
+        invoke_pinned_ok() {
+          printf 'services:\n  app:\n    image: ${IMAGE_REF}\n' > "${TEST_WS}/pinned-compose.yml"
+          deploy.compose.run --namespace myapp \
+            --file "${TEST_WS}/pinned-compose.yml" \
+            --image-ref "$PINNED" 2>/dev/null || return 1
+          grep -q "up -d" "$MOCK_LOG"
+        }
+        When call invoke_pinned_ok
         The status should be success
       End
     End
