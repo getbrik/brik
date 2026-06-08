@@ -142,8 +142,9 @@ Bash has limits, and Brik treats them seriously: 3635 ShellSpec tests, 80% cover
 ### 💻 Same pipeline on your laptop
 
 ```bash
-brik integrate                # full pipeline locally
+brik integrate                # full CI flow locally
 brik stage test              # one stage
+brik deploy --version v1.2.3 --environment staging   # CD: deploy a built version
 brik plan --explain              # show what will run on this commit, and why
 brik validate                    # validate brik.yml against the schema
 brik doctor                      # check prerequisites

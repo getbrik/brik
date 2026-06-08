@@ -5,6 +5,26 @@ define pipeline structure; you configure behavior *within* each stage through
 `brik.yml`. This is deliberate: a fixed flow makes pipelines consistent,
 auditable, and predictable across every project and every platform.
 
+## CI flow and CD flow
+
+Brik has two entrypoints, selected by how a run is triggered -- never one
+monolithic pipeline:
+
+- **`brik integrate`** runs the event-driven **CI flow** below (the 12 stages).
+  It produces one immutable, digest-addressed artifact and publishes it to the
+  candidate channel. On GitLab this is the `brik-integrate.yml` template; on
+  Jenkins, `brikIntegrate()`.
+- **`brik deploy --version <v> --environment <e>`** runs the **CD flow**: it
+  resolves an already-built version to its digest in the channel the environment
+  accepts, fails closed on `require_digest`, and deploys that pinned digest. It
+  is re-invocable per `(version, environment)` and decoupled in time from CI --
+  the same artifact deploys to staging today and to prod next week. On GitLab
+  this is the `brik-deploy.yml` template; on Jenkins, `brikDeploy()`.
+
+The Deploy stage in the 12-stage graph below stays available as an opt-in stage
+of the integrated path; the decoupled CD verb is the way to deploy a built
+version on its own cadence.
+
 ## The stage graph
 
 ```mermaid
