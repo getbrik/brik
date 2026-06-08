@@ -9,6 +9,7 @@ Describe "deployments digest-pinned ref injection (--image-ref)"
   Include "$BRIK_DEPLOYMENTS_LIB/helm.sh"
   Include "$BRIK_DEPLOYMENTS_LIB/compose.sh"
   Include "$BRIK_DEPLOYMENTS_LIB/ssh.sh"
+  Include "$BRIK_DEPLOYMENTS_LIB/gitops.sh"
   Include "$BRIK_HOME/spec/support/mock_helper.sh"
 
   DIGEST="sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
@@ -165,6 +166,25 @@ YAML
       }
       When call ssh_untouched
       The output should equal "1"
+    End
+  End
+
+  # =========================================================================
+  # gitops: deploy.gitops.run must forward --image-ref to push_manifests so the
+  # digest-pinned ref reaches the config repo (regression: run() accepted only
+  # --image-tag, dropping the CD digest -- caught by the live CD keystone).
+  # =========================================================================
+  Describe "deploy.gitops.run --image-ref"
+    It "forwards the digest-pinned ref to push_manifests"
+      gitops_forward() {
+        # Stub the push so the test stays hermetic (no git); capture its args.
+        deploy.gitops.push_manifests() { printf 'push: %s\n' "$*"; }
+        deploy.gitops.run --repo "http://example/config.git" --path k8s \
+            --source k8s --image-ref "$PINNED" 2>/dev/null
+      }
+      When call gitops_forward
+      The status should be success
+      The output should include "--image-ref ${PINNED}"
     End
   End
 End

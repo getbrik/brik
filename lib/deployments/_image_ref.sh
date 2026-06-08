@@ -11,8 +11,9 @@
 [[ -n "${_BRIK_MODULE_DEPLOY_IMAGE_REF_LOADED:-}" ]] && return 0
 _BRIK_MODULE_DEPLOY_IMAGE_REF_LOADED=1
 
-# A digest-pinned ref: a lowercase repository path, '@', then a sha256 digest.
-_BRIK_IMAGE_REF_PINNED_RE='^[a-z0-9._/-]+@sha256:[0-9a-f]{64}$'
+# A digest-pinned ref: a lowercase repository path (a registry host:port is
+# allowed, e.g. nexus.test:8082/app), '@', then a sha256 digest.
+_BRIK_IMAGE_REF_PINNED_RE='^[a-z0-9._/:-]+@sha256:[0-9a-f]{64}$'
 
 # deploy.image_ref.is_pinned - test whether a ref is digest-pinned.
 # Usage: deploy.image_ref.is_pinned <ref>

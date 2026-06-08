@@ -19,6 +19,11 @@ Describe "deployments/_image_ref.sh"
       The output should equal "registry.release/app@${DIGEST}"
     End
 
+    It "preserves a registry host:port while stripping the tag"
+      When call deploy.image_ref.pinned "nexus.briklab.test:8082/brik/app:0.1.0" "$DIGEST"
+      The output should equal "nexus.briklab.test:8082/brik/app@${DIGEST}"
+    End
+
     It "strips an existing @digest before re-pinning"
       When call deploy.image_ref.pinned "registry.release/app@sha256:dead" "$DIGEST"
       The output should equal "registry.release/app@${DIGEST}"
@@ -54,6 +59,11 @@ Describe "deployments/_image_ref.sh"
   Describe "deploy.image_ref.is_pinned"
     It "accepts a well-formed digest-pinned ref"
       When call deploy.image_ref.is_pinned "registry.release/app@${DIGEST}"
+      The status should equal 0
+    End
+
+    It "accepts a ref with a registry host:port"
+      When call deploy.image_ref.is_pinned "nexus.briklab.test:8082/brik/app@${DIGEST}"
       The status should equal 0
     End
 

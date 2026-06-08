@@ -487,7 +487,7 @@ deploy.gitops.rollback() {
 #        [--git-token-var <VAR>] [--auth-token-var <VAR>] [--dry-run]
 deploy.gitops.run() {
     local repo="" branch="main" target_path="" source_dir="." render_type=""
-    local controller="" app_name="" git_token_var="" auth_token_var=""
+    local controller="" app_name="" git_token_var="" auth_token_var="" image_ref=""
     local dry_run="${BRIK_DRY_RUN:-}"
 
     while [[ $# -gt 0 ]]; do
@@ -499,6 +499,7 @@ deploy.gitops.run() {
             --type)           render_type="$2";    shift 2 ;;
             --controller)     controller="$2";     shift 2 ;;
             --app-name)       app_name="$2";       shift 2 ;;
+            --image-ref)      image_ref="$2";      shift 2 ;;
             --git-token-var)  git_token_var="$2";  shift 2 ;;
             --auth-token-var) auth_token_var="$2"; shift 2 ;;
             --dry-run)        dry_run="true";      shift ;;
@@ -540,6 +541,9 @@ deploy.gitops.run() {
         --message "deploy: update to ${tag}"
     )
     [[ -n "$git_token_var" ]] && push_args+=(--git-token-var "$git_token_var")
+    # Digest-pinned ref (CD) takes precedence; push_manifests prefers it over
+    # the mutable --image-tag fallback.
+    [[ -n "$image_ref" ]] && push_args+=(--image-ref "$image_ref")
     [[ "$tag" != "unknown" ]] && push_args+=(--image-tag "$tag")
     deploy.gitops.push_manifests "${push_args[@]}" "${common_args[@]}" || return $?
 
