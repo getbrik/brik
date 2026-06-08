@@ -185,4 +185,15 @@ Describe "shared-libs/jenkins brikIntegrate.groovy - artifact layout"
       The status should not equal 0
     End
   End
+
+  # Concurrent builds of the same branch/job race on the shared @libs cache
+  # and on the workspace checkout. The CI flow must serialize them; the CD
+  # flow lives in a separate job, so deploys are not serialized against CI.
+  Describe "serializes concurrent builds of the same job"
+    It "declares disableConcurrentBuilds in the job properties"
+      When call grep -F "disableConcurrentBuilds()" "$GROOVY"
+      The status should be success
+      The output should be present
+    End
+  End
 End

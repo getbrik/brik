@@ -74,7 +74,12 @@ def call(Map params = [:]) {
                     defaultValue: '',
                     description: 'Target environment key from deploy.environments. Set together with BRIK_DEPLOY_VERSION to trigger an explicit CD run.'
                 )
-            ])
+            ]),
+            // Serialize builds of the same job: concurrent builds of one branch
+            // race on the shared @libs cache and on the workspace checkout,
+            // which can corrupt the runtime clone. The CD flow is a separate
+            // job, so this never serializes deploys against integrations.
+            disableConcurrentBuilds()
         ])
 
         ansiColor('xterm') {
