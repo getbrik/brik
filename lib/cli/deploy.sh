@@ -176,12 +176,21 @@ cli.deploy.run() {
         --version "$version" --environment "$environment" --out "$_plan" >/dev/null 2>&1
     set -e
 
+    # Serialize concurrent deploys to the same environment (E5): two
+    # `brik deploy` runs against one env must not interleave their applies.
+    brik.use transverse.lock
+    if ! transverse.lock.acquire "deploy-${environment}"; then
+        [[ -n "$worktree" ]] && transverse.git.worktree_remove "${orig_workspace}" "${worktree}"
+        return "${BRIK_EXIT_FAILURE}"
+    fi
+
     # Run the deploy stage (restricted to this env, pinned ref injected).
     set +e
     brik.local.run_deploy
     rc=$?
     set -e
 
+    transverse.lock.release "deploy-${environment}"
     [[ -n "$worktree" ]] && transverse.git.worktree_remove "${orig_workspace}" "${worktree}"
     return "$rc"
 }

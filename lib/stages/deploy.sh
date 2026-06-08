@@ -17,6 +17,17 @@ stages.deploy() {
         "$_deploy_fn" "${deploy_args[@]}" "$@"
     }
 
+    # Post-deploy read-back (D5): record the resolved digest and, where the
+    # target exposes a live query, the actually-deployed digest + match flag.
+    # Best-effort, never fails the deploy.
+    _brik.deploy._readback() {
+        local _env="$1" _target="$2" _uenv="$3" _ctrl
+        brik.use deployments.readback 2>/dev/null || return 0
+        _ctrl="$(transverse.env.resolve_indirect "BRIK_DEPLOY_${_uenv}_CONTROLLER")"
+        deploy.readback.record --env "$_env" --target "$_target" \
+            --controller "$_ctrl" 2>/dev/null || true
+    }
+
     config.export_deploy_vars
 
     # SC20: honour deploy.trigger.{on-tag, on-main, on-feature, manual}.
@@ -195,9 +206,12 @@ stages.deploy() {
                 k8s|helm)
                     brik.use rollout.strategy
                     log.info "deploying $env_name with strategy: $strategy"
-                    rollout.strategy.run --type "$strategy" \
-                        --deploy-fn "_brik.deploy._strategy_wrapper" \
-                        || ((deploy_failed++))
+                    if rollout.strategy.run --type "$strategy" \
+                        --deploy-fn "_brik.deploy._strategy_wrapper"; then
+                        _brik.deploy._readback "$env_name" "$target" "$upper_env"
+                    else
+                        ((deploy_failed++))
+                    fi
                     continue
                     ;;
                 ssh|compose)
@@ -207,7 +221,11 @@ stages.deploy() {
         fi
 
         log.info "deploying with target: $target"
-        "$_deploy_fn" "${deploy_args[@]}" || ((deploy_failed++))
+        if "$_deploy_fn" "${deploy_args[@]}"; then
+            _brik.deploy._readback "$env_name" "$target" "$upper_env"
+        else
+            ((deploy_failed++))
+        fi
     done <<< "$BRIK_DEPLOY_ENVIRONMENTS"
 
     if command -v jq >/dev/null 2>&1 && [[ "$_business_envs_json" != "[]" ]]; then
