@@ -348,7 +348,7 @@ registry.stage.impact_use_stack_impact() {
 # source of truth consumed identically by the GitLab adapter (via dotenv
 # exported by init: BRIK_IMG_<CLASS>) and the Jenkins adapter (via
 # brikDriver.resolveImage). Avoids the previous duplication where image
-# paths were hardcoded in both pipeline.yml and brikPipeline.groovy.
+# paths were hardcoded in both brik-integrate.yml and brikIntegrate.groovy.
 #
 # The 'stack' class is dynamic: its image is computed by init from the
 # project's stack (node/python/...) and exposed via the env var declared

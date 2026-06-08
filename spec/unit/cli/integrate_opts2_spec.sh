@@ -1,4 +1,4 @@
-Describe "brik run pipeline optional flags (deploy, continue-on-error)"
+Describe "brik integrate optional flags (deploy, continue-on-error)"
   Include "$BRIK_HOME/spec/support/mock_helper.sh"
 
     setup() {
@@ -24,14 +24,14 @@ Describe "brik run pipeline optional flags (deploy, continue-on-error)"
     After 'cleanup'
 
     It "accepts --with-deploy flag"
-      When run script "$BRIK_BIN" run pipeline --workspace "$WORKSPACE" --config "$CONFIG" --with-deploy
+      When run script "$BRIK_BIN" integrate --workspace "$WORKSPACE" --config "$CONFIG" --with-deploy
       The status should be success
       The stdout should include "Pipeline Summary"
       The stderr should be present
     End
 
     It "accepts --continue-on-error flag"
-      When run script "$BRIK_BIN" run pipeline --workspace "$WORKSPACE" --config "$CONFIG" --continue-on-error
+      When run script "$BRIK_BIN" integrate --workspace "$WORKSPACE" --config "$CONFIG" --continue-on-error
       The status should be success
       The stdout should include "Pipeline Summary"
       The stderr should be present

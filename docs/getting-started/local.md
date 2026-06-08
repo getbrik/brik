@@ -56,13 +56,13 @@ config that passes locally passes init in CI. See
 
 ```bash
 # A single stage
-brik run stage build --config brik.yml --workspace .
+brik stage build --config brik.yml --workspace .
 
 # The full pipeline
-brik run pipeline --with-release --with-package --with-deploy
+brik integrate --with-release --with-package --with-deploy
 ```
 
-Valid stages for `brik run stage`: `init`, `release`, `build`, `lint`, `sast`,
+Valid stages for `brik stage`: `init`, `release`, `build`, `lint`, `sast`,
 `scan`, `test`, `package`, `container-scan`, `promote`, `deploy`, `notify`.
 
 The opt-in flags (`--with-release`, `--with-package`, `--with-deploy`) enable
@@ -74,8 +74,8 @@ and release tag creation print what they would do without performing the
 destructive action:
 
 ```bash
-brik run stage deploy --dry-run
-brik run pipeline --with-deploy --dry-run
+brik stage deploy --dry-run
+brik integrate --with-deploy --dry-run
 ```
 
 The same behaviour can be triggered by exporting `BRIK_DRY_RUN=true` in the
@@ -88,8 +88,8 @@ caller shell; the CLI flag is the supported way to surface it.
 | `brik validate` | Validate `brik.yml` against the JSON Schema |
 | `brik doctor` | Check prerequisites (tools, stack detection) |
 | `brik init` | Scaffold `brik.yml` and a platform bootstrap file |
-| `brik run stage <name>` | Execute a single pipeline stage locally |
-| `brik run pipeline` | Execute the full pipeline locally |
+| `brik stage <name>` | Execute a single pipeline stage locally |
+| `brik integrate` | Execute the full pipeline locally |
 | `brik plan` | Compute the per-stage selection plan (`--explain`, `--mode <safe\|balanced>`, `--validate-only`, `--out`) |
 | `brik plan gate <stage>` | Decide run/skip for a stage against the active plan |
 | `brik extension test <dir>` | Run the contract harness against a Brik extension directory |
@@ -102,10 +102,10 @@ caller shell; the CLI flag is the supported way to surface it.
 brik validate --config path/to/brik.yml --schema path/to/schema.json
 brik doctor --workspace ./my-project
 brik init --stack node --platform gitlab --dir ./my-project --non-interactive
-brik run stage build --config brik.yml --workspace .
-brik run stage deploy --dry-run
-brik run pipeline --continue-on-error --with-release --with-package --with-deploy
-brik run pipeline --with-deploy --dry-run
+brik stage build --config brik.yml --workspace .
+brik stage deploy --dry-run
+brik integrate --continue-on-error --with-release --with-package --with-deploy
+brik integrate --with-deploy --dry-run
 brik self-update --channel edge --version v0.7.0
 brik self-uninstall --force
 brik version --verbose

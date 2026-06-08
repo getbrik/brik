@@ -18,7 +18,7 @@ The GitLab shared library is the primary platform adapter. It maps the
 
 ## The job graph
 
-`shared-libs/gitlab/templates/pipeline.yml` is a single classic pipeline. A
+`shared-libs/gitlab/templates/brik-integrate.yml` is a single classic pipeline. A
 `brik-plan` job computes the execution plan first; then one job per stage runs,
 each gating itself on the plan. Lint, SAST, Scan, and Test share the single
 GitLab `verify` stage and run in parallel via separate `needs`:
@@ -282,7 +282,7 @@ the templated job:
 include:
   - project: 'brik/gitlab-templates'
     ref: v0.7.0
-    file: '/templates/pipeline.yml'
+    file: '/templates/brik-integrate.yml'
 
 # java example: switch the format to jacoco and point at the jacoco file.
 brik-test:
@@ -298,7 +298,7 @@ junit) still applies.
 
 ## Pipeline workflow filter
 
-`pipeline.yml` declares a top-level `workflow:` block that gates
+`brik-integrate.yml` declares a top-level `workflow:` block that gates
 pipeline creation **before** any job runs. GitLab evaluates this once
 per push / API call and decides whether the pipeline exists at all.
 

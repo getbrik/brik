@@ -1,4 +1,4 @@
-Describe "brik run pipeline"
+Describe "brik integrate"
   Include "$BRIK_HOME/spec/support/mock_helper.sh"
 
     setup() {
@@ -27,14 +27,14 @@ Describe "brik run pipeline"
       # Fixture has no quality.lint.* tool, so lint reaches the
       # not-applicable auto-skip branch and the pipeline succeeds. The
       # Pipeline Summary header is emitted because Notify always runs.
-      When run script "$BRIK_BIN" run pipeline --workspace "$WORKSPACE" --config "$CONFIG"
+      When run script "$BRIK_BIN" integrate --workspace "$WORKSPACE" --config "$CONFIG"
       The status should be success
       The stdout should include "Pipeline Summary"
       The stderr should be present
     End
 
     It "rejects unknown pipeline flags"
-      When run script "$BRIK_BIN" run pipeline --workspace "$WORKSPACE" --config "$CONFIG" --bad-flag
+      When run script "$BRIK_BIN" integrate --workspace "$WORKSPACE" --config "$CONFIG" --bad-flag
       The status should equal 2
       The stderr should include "unknown"
     End

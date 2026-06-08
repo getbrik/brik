@@ -38,7 +38,7 @@ fields every stage declares; the rest are optional but commonly used.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `id` | string | yes | kebab-case (`^[a-z][a-z0-9-]*$`). Surface name (`brik run stage <id>`). |
+| `id` | string | yes | kebab-case (`^[a-z][a-z0-9-]*$`). Surface name (`brik stage <id>`). |
 | `displayName` | string | yes | Human-readable. Surfaced in CLI, report. |
 | `owner` | string | no | Free-form. |
 | `minBrikVersion` / `maxBrikVersion` | semver | no | Same semantics as for stacks. |
@@ -223,8 +223,8 @@ api:
 ## metadata.aliases
 
 Stage-level aliases. `metadata.aliases` is an array of alternate ids;
-when a manifest declares them, the runtime treats `brik run stage
-<alias>` as `brik run stage <canonical-id>`. Used during migrations
+when a manifest declares them, the runtime treats `brik stage
+<alias>` as `brik stage <canonical-id>`. Used during migrations
 where a stage was renamed but consumers still reference the old name.
 
 ```yaml

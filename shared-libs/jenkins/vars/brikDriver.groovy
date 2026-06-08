@@ -1,8 +1,8 @@
 /**
- * brikDriver - Generic stage iterator for brikPipeline.groovy.
+ * brikDriver - Generic stage iterator for brikIntegrate.groovy.
  *
  * Replaces the 130-line block of hardcoded `runStageWithPlan('Foo', 'foo')
- * { runStage('foo') }` calls in brikPipeline.groovy with a single loop
+ * { runStage('foo') }` calls in brikIntegrate.groovy with a single loop
  * driven by `brik registry stages --format json`. The same registry data
  * is consumed by the GitLab adapter (via the static jobs/*.yml templates
  * verified by the parity specs); Jenkins reads it dynamically at pipeline
@@ -96,7 +96,7 @@ def planSaysRun(stageId, brikHome) {
     // BRIK_WORKSPACE must be set so the gate's report.write_fragment lands
     // in the job workspace (not /tmp/brik/logs/). Without it the SKIP
     // fragment was orphaned, the stash was empty, and the Notify aggregate
-    // missed the stage. GitLab side sets these too in pipeline.yml's
+    // missed the stage. GitLab side sets these too in brik-integrate.yml's
     // /tmp/brik-plan-gate.sh helper -- this is the Jenkins-side equivalent.
     def rc = sh(
         script: "BRIK_WORKSPACE='${env.WORKSPACE}' " +

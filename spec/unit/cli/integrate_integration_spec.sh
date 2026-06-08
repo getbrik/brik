@@ -1,11 +1,11 @@
-Describe "brik run pipeline - integration"
+Describe "brik integrate - integration"
   Include "$BRIK_HOME/spec/support/mock_helper.sh"
 
-  # --- plan-driven pipeline (cli.run.pipeline --plan / --auto-select) -------
+  # --- plan-driven pipeline (cli.integrate.run --plan / --auto-select) -------
   # Covers run.sh argument handling for --plan and --auto-select plus the
   # plan-driven block: a valid --plan path, a missing --plan path, and
   # --auto-select which runs the planner first.
-  Describe "brik run pipeline --plan"
+  Describe "brik integrate --plan"
     Include "$BRIK_HOME/spec/support/mock_helper.sh"
 
     setup() {
@@ -35,26 +35,26 @@ Describe "brik run pipeline - integration"
     After 'cleanup'
 
     It "runs the pipeline against an existing plan file"
-      When run script "$BRIK_BIN" run pipeline --workspace "$WORKSPACE" --plan "$PLAN_FILE"
+      When run script "$BRIK_BIN" integrate --workspace "$WORKSPACE" --plan "$PLAN_FILE"
       The status should be success
       The stdout should include "Pipeline Summary"
       The stderr should be present
     End
 
     It "errors when the --plan file does not exist"
-      When run script "$BRIK_BIN" run pipeline --workspace "$WORKSPACE" --plan "$WORKSPACE/missing-plan.json"
+      When run script "$BRIK_BIN" integrate --workspace "$WORKSPACE" --plan "$WORKSPACE/missing-plan.json"
       The status should equal 2
       The stderr should include "plan file not found"
     End
 
     It "errors when --plan has no argument"
-      When run script "$BRIK_BIN" run pipeline --workspace "$WORKSPACE" --plan
+      When run script "$BRIK_BIN" integrate --workspace "$WORKSPACE" --plan
       The status should equal 2
       The stderr should be present
     End
   End
 
-  Describe "brik run pipeline --auto-select"
+  Describe "brik integrate --auto-select"
     Include "$BRIK_HOME/spec/support/mock_helper.sh"
 
     setup() {
@@ -86,7 +86,7 @@ Describe "brik run pipeline - integration"
     After 'cleanup'
 
     It "runs the planner first then executes the pipeline"
-      When run script "$BRIK_BIN" run pipeline --workspace "$WORKSPACE" --auto-select
+      When run script "$BRIK_BIN" integrate --workspace "$WORKSPACE" --auto-select
       The status should be success
       The stdout should include "Pipeline Summary"
       The stderr should be present
@@ -94,7 +94,7 @@ Describe "brik run pipeline - integration"
     End
 
     It "passes opt-in flags through to the planner"
-      When run script "$BRIK_BIN" run pipeline --workspace "$WORKSPACE" --auto-select --with-deploy
+      When run script "$BRIK_BIN" integrate --workspace "$WORKSPACE" --auto-select --with-deploy
       The status should be success
       The stdout should be present
       The stderr should be present
@@ -102,14 +102,14 @@ Describe "brik run pipeline - integration"
 
     It "refuses to run the pipeline when the auto-select planner fails"
       # A workspace plan_writer stub that returns non-zero makes
-      # cli.plan.run fail, so cli.run.pipeline aborts before setup.
+      # cli.plan.run fail, so cli.integrate.run aborts before setup.
       mkdir -p "$WORKSPACE/.brik/lib/planning"
       {
         printf '#!/usr/bin/env bash\n'
         printf '_BRIK_MODULE_PLANNING_PLAN_WRITER_LOADED=1\n'
         printf 'plan_writer.write() { return 1; }\n'
       } > "$WORKSPACE/.brik/lib/planning/plan_writer.sh"
-      When run script "$BRIK_BIN" run pipeline --workspace "$WORKSPACE" --auto-select
+      When run script "$BRIK_BIN" integrate --workspace "$WORKSPACE" --auto-select
       The status should equal 1
       The stderr should include "auto-select planner failed"
     End

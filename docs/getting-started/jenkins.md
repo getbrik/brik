@@ -41,7 +41,7 @@ Add a two-line `Jenkinsfile` to your project root:
 
 ```groovy
 @Library('brik') _
-brikPipeline()
+brikIntegrate()
 ```
 
 ## 3. Add a `brik.yml`

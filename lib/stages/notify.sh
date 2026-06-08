@@ -430,7 +430,7 @@ stages.notify() {
         # status with the real outcome.
         #
         # Located INSIDE the CI-aggregation branch so local mode
-        # (brik run pipeline) stays untouched: in local mode the framework
+        # (brik integrate) stays untouched: in local mode the framework
         # builds the aggregate directly via report.record per stage, and
         # the post-stage hook records notify itself.
         report.record "notify" "tech" "status" "success"   || true

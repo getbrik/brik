@@ -1,9 +1,9 @@
 /**
- * brikPipeline - Orchestrate the Brik fixed CI/CD flow on Jenkins.
+ * brikIntegrate - Orchestrate the Brik fixed CI/CD flow on Jenkins.
  *
  * Usage in Jenkinsfile:
  *   @Library('brik') _
- *   brikPipeline()
+ *   brikIntegrate()
  *
  * Parameters:
  *   brikHome        - Override path to the Brik shared library (default: auto-detected)
@@ -199,7 +199,7 @@ def call(Map params = [:]) {
 
             // Stage runner images are resolved uniformly from
             // runner_classes.yml via brikDriver.resolveImage (BRIK_IMG_<CLASS>,
-            // posted by Init's dotenv); brikPipeline holds no image literal of
+            // posted by Init's dotenv); brikIntegrate holds no image literal of
             // its own. resolvedImage carries the stack image once Init reads
             // .brik-logs/pipeline.env and exposes BRIK_CI_IMAGE, and is passed
             // to resolveImage as the stack fallback.

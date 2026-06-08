@@ -6,8 +6,8 @@ Describe "pipeline params: SoT <-> GitLab/Jenkins parity"
   #   - no surface exposes a BRIK_* parameter absent from the SoT.
 
   SOT="$BRIK_HOME/lib/registry/pipeline-params.yml"
-  GITLAB="$BRIK_HOME/shared-libs/gitlab/templates/pipeline.yml"
-  JENKINS="$BRIK_HOME/shared-libs/jenkins/vars/brikPipeline.groovy"
+  GITLAB="$BRIK_HOME/shared-libs/gitlab/templates/brik-integrate.yml"
+  JENKINS="$BRIK_HOME/shared-libs/jenkins/vars/brikIntegrate.groovy"
 
   gitlab_has_param() { yq -e ".variables.\"$1\"" "$GITLAB" >/dev/null 2>&1; }
   jenkins_has_param() { grep -q "name: '$1'" "$JENKINS"; }

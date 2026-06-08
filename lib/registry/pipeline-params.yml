@@ -2,9 +2,9 @@
 #
 # The platform surfaces mirror this manifest:
 #   - GitLab : the long-form `variables:` block in
-#     shared-libs/gitlab/templates/pipeline.yml (Run pipeline form).
+#     shared-libs/gitlab/templates/brik-integrate.yml (Run pipeline form).
 #   - Jenkins: the properties([parameters([...])]) block in
-#     shared-libs/jenkins/vars/brikPipeline.groovy (Build with Parameters).
+#     shared-libs/jenkins/vars/brikIntegrate.groovy (Build with Parameters).
 #
 # spec/integration/adapter-parity/pipeline_params_parity_spec.sh enforces that
 # every param here is exposed on the surface(s) its `parity` declares, and that

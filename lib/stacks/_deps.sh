@@ -19,7 +19,7 @@ _BRIK_STACKS_DEPS_LOADED=1
 #   1. GitLab job templates (build/lint/package/sast/scan/test.yml) declare
 #      these under cache.paths so dependency downloads survive across runs.
 #      The inline YAML list is kept in sync via spec/integration/cache_paths_parity_spec.sh.
-#   2. Jenkins brikPipeline.groovy maps each path to a "<top-level>/**"
+#   2. Jenkins brikIntegrate.groovy maps each path to a "<top-level>/**"
 #      EXCLUDE pattern for cleanWs, so cached deps survive cross-build cleanups.
 #   3. shared-libs/gitlab/scripts/gitlab-wrapper.sh pre-creates each path
 #      with a .brik-keep marker so GitLab's cache step never logs

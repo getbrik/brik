@@ -135,7 +135,7 @@ Sample output for a healthy extension:
 
 ```bash
 BRIK_REGISTRY_EXTENSIONS_DIRS=./my-extension scripts/compile-registry.sh
-BRIK_LIB_EXTENSIONS=./my-extension/lib brik run pipeline
+BRIK_LIB_EXTENSIONS=./my-extension/lib brik integrate
 ```
 
 The first call merges the manifest into a fresh registry cache. The

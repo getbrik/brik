@@ -107,7 +107,7 @@ Decides run/skip for `<stage_id>` against the active plan. Return
 codes:
 
 - **rc=0** -- the stage should run. Caller proceeds with
-  `brik run stage <id>`.
+  `brik stage <id>`.
 - **rc=1** -- the stage should skip. The gate has already written a
   per-stage fragment to `brik-artifacts/<id>/<id>.json` with
   `tech.status=skipped`, `tech.kind=not-applicable`, and

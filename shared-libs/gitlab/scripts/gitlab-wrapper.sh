@@ -56,7 +56,7 @@ brik.gitlab.setup() {
     # automatically, but the contract for BRIK_DRY_RUN -- exact string
     # "true" enables, anything else disables -- is enforced here so that
     # the value lib/ sees is always canonical. Mirrors the Jenkins
-    # booleanParam semantics declared in vars/brikPipeline.groovy.
+    # booleanParam semantics declared in vars/brikIntegrate.groovy.
     _brik_gitlab_normalize_dry_run
 
     brik.wrapper.set_standard_env

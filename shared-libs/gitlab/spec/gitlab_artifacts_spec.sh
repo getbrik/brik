@@ -197,7 +197,7 @@ Describe "shared-libs/gitlab templates - brik-artifacts paths"
       ! yq -e ".${job_key}.artifacts.reports.sarif" "$file" >/dev/null 2>&1
     }
 
-    pipeline_yml() { printf '%s' "${TEMPLATES_DIR}/../pipeline.yml"; }
+    pipeline_yml() { printf '%s' "${TEMPLATES_DIR}/../brik-integrate.yml"; }
 
     It "scan.yml declares reports.cyclonedx pointing at the SBOM (free tier compatible)"
       Skip if "yq not installed" yq_missing
@@ -235,13 +235,13 @@ Describe "shared-libs/gitlab templates - brik-artifacts paths"
       The status should be success
     End
 
-    It "pipeline.yml references sast-reports overlay (conditional include)"
+    It "brik-integrate.yml references sast-reports overlay (conditional include)"
       When call grep -F "sast-reports.yml" "$(pipeline_yml)"
       The status should be success
       The output should be present
     End
 
-    It "pipeline.yml references scan-reports overlay (conditional include)"
+    It "brik-integrate.yml references scan-reports overlay (conditional include)"
       When call grep -F "scan-reports.yml" "$(pipeline_yml)"
       The status should be success
       The output should be present

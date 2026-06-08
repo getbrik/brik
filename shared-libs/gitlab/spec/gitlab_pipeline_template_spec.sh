@@ -9,8 +9,8 @@ Describe "shared-libs/gitlab templates - classic plan-aware pipeline"
 
   yq_missing() { ! command -v yq >/dev/null 2>&1; }
 
-  Describe "pipeline.yml"
-    PIPELINE="${TEMPLATES_DIR}/pipeline.yml"
+  Describe "brik-integrate.yml"
+    PIPELINE="${TEMPLATES_DIR}/brik-integrate.yml"
 
     It "declares 'plan' as the first stage"
       Skip if "yq not installed" yq_missing

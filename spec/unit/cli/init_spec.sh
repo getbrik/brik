@@ -41,7 +41,7 @@ Describe "brik init"
     It ".gitlab-ci.yml includes brik pipeline template"
       When run script "${BRIK_BIN}" init --stack node --platform gitlab --dir "${TEMP_DIR}" --non-interactive
       The output should include "Created"
-      The contents of file "${TEMP_DIR}/.gitlab-ci.yml" should include "pipeline.yml"
+      The contents of file "${TEMP_DIR}/.gitlab-ci.yml" should include "brik-integrate.yml"
     End
   End
 

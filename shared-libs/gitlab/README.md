@@ -16,7 +16,7 @@ shared-libs/gitlab/
   scripts/
     gitlab-wrapper.sh    - bridges GitLab CI env to stage.run
   templates/
-    pipeline.yml         - main entry point (stages, defaults, includes)
+    brik-integrate.yml         - main entry point (stages, defaults, includes)
     jobs/
       plan.yml           - Plan stage job (computes plan.json)
       init.yml           - Init stage job

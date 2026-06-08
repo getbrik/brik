@@ -2,7 +2,7 @@
 # Contract for shared-libs/jenkins/vars/brikReadDotenv.groovy.
 #
 # brikReadDotenv parses a KEY=VALUE dotenv (init's .brik-logs/pipeline.env)
-# into a Groovy Map consumed by brikPipeline / brikDriver to resolve runner
+# into a Groovy Map consumed by brikIntegrate / brikDriver to resolve runner
 # images.
 
 Describe "shared-libs/jenkins/vars/brikReadDotenv.groovy"

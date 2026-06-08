@@ -1,7 +1,7 @@
-Describe "brik run stage - integration"
+Describe "brik stage - integration"
   Include "$BRIK_HOME/spec/support/mock_helper.sh"
 
-  Describe "brik run stage build --config"
+  Describe "brik stage build --config"
     setup() {
       mock.setup
       mock.create_script "npm" 'echo "mock npm: $*"'
@@ -21,14 +21,14 @@ Describe "brik run stage - integration"
     After 'cleanup'
 
     It "accepts --config option"
-      When run script "$BRIK_BIN" run stage build --workspace "$WORKSPACE" --config "$CONFIG"
+      When run script "$BRIK_BIN" stage build --workspace "$WORKSPACE" --config "$CONFIG"
       The status should be success
       The stdout should be present
       The stderr should include "stage build completed successfully"
     End
   End
 
-  Describe "brik run stage build"
+  Describe "brik stage build"
     setup() {
       mock.setup
       mock.create_script "npm" 'echo "mock npm: $*"'
@@ -47,14 +47,14 @@ Describe "brik run stage - integration"
     After 'cleanup'
 
     It "executes successfully with a node workspace"
-      When run script "$BRIK_BIN" run stage build --workspace "$WORKSPACE"
+      When run script "$BRIK_BIN" stage build --workspace "$WORKSPACE"
       The status should be success
       The stdout should be present
       The stderr should include "stage build completed successfully"
     End
   End
 
-  Describe "brik run stage test"
+  Describe "brik stage test"
     setup() {
       mock.setup
       mock.create_script "npx" 'echo "mock npx: $*"'
@@ -72,14 +72,14 @@ Describe "brik run stage - integration"
     After 'cleanup'
 
     It "executes test stage successfully with a node workspace"
-      When run script "$BRIK_BIN" run stage test --workspace "$WORKSPACE"
+      When run script "$BRIK_BIN" stage test --workspace "$WORKSPACE"
       The status should be success
       The stdout should be present
       The stderr should include "stage test completed successfully"
     End
   End
 
-  Describe "brik run stage init"
+  Describe "brik stage init"
     setup() {
       WORKSPACE="$(mktemp -d)"
       printf '{"name":"cli-test","version":"1.0.0"}\n' > "${WORKSPACE}/package.json"
@@ -91,14 +91,14 @@ Describe "brik run stage - integration"
     After 'cleanup'
 
     It "executes init stage successfully"
-      When run script "$BRIK_BIN" run stage init --workspace "$WORKSPACE" --config "$CONFIG"
+      When run script "$BRIK_BIN" stage init --workspace "$WORKSPACE" --config "$CONFIG"
       The status should be success
       The stdout should include "cli-test"
       The stderr should include "stage init completed successfully"
     End
   End
 
-  Describe "brik run stage lint"
+  Describe "brik stage lint"
     Include "$BRIK_HOME/spec/support/mock_helper.sh"
 
     setup() {
@@ -121,7 +121,7 @@ Describe "brik run stage - integration"
     After 'cleanup'
 
     It "executes lint stage successfully"
-      When run script "$BRIK_BIN" run stage lint --workspace "$WORKSPACE" --config "$CONFIG"
+      When run script "$BRIK_BIN" stage lint --workspace "$WORKSPACE" --config "$CONFIG"
       The status should be success
       The stdout should include "lint"
       The stderr should be present

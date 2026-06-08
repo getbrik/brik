@@ -1,4 +1,4 @@
-Describe "brik run pipeline optional flags (package, release)"
+Describe "brik integrate optional flags (package, release)"
   Include "$BRIK_HOME/spec/support/mock_helper.sh"
 
     setup() {
@@ -24,14 +24,14 @@ Describe "brik run pipeline optional flags (package, release)"
     After 'cleanup'
 
     It "accepts --with-package flag"
-      When run script "$BRIK_BIN" run pipeline --workspace "$WORKSPACE" --config "$CONFIG" --with-package
+      When run script "$BRIK_BIN" integrate --workspace "$WORKSPACE" --config "$CONFIG" --with-package
       The status should be success
       The stdout should include "Pipeline Summary"
       The stderr should be present
     End
 
     It "accepts --with-release flag"
-      When run script "$BRIK_BIN" run pipeline --workspace "$WORKSPACE" --config "$CONFIG" --with-release
+      When run script "$BRIK_BIN" integrate --workspace "$WORKSPACE" --config "$CONFIG" --with-release
       The status should be success
       The stdout should include "Pipeline Summary"
       The stderr should be present

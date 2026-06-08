@@ -1,5 +1,5 @@
-Describe "shared-libs/jenkins brikPipeline.groovy - artifact layout"
-  GROOVY="${BRIK_HOME}/shared-libs/jenkins/vars/brikPipeline.groovy"
+Describe "shared-libs/jenkins brikIntegrate.groovy - artifact layout"
+  GROOVY="${BRIK_HOME}/shared-libs/jenkins/vars/brikIntegrate.groovy"
 
   It "junit testResults pattern points at brik-artifacts/test/"
     When call grep -F "junit testResults: 'brik-artifacts/test/junit.xml,brik-artifacts/test/junit/**/*.xml'" "$GROOVY"
@@ -149,7 +149,7 @@ Describe "shared-libs/jenkins brikPipeline.groovy - artifact layout"
 
   # Image selection is uniform: every stage resolves its runner image from
   # runner_classes.yml via brikDriver.resolveImage (BRIK_IMG_<CLASS>, posted
-  # by init's dotenv). brikPipeline declares no image literal of its own --
+  # by init's dotenv). brikIntegrate declares no image literal of its own --
   # the single accepted bootstrap literal lives in brikDriver.resolveImage's
   # fallback, used before init's dotenv exists.
   Describe "uniform image selection via the runner_classes registry"

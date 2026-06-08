@@ -51,13 +51,13 @@ highest priority first:
 
 ```bash
 # Snapshot, keep going past failures (default).
-brik run pipeline
+brik integrate
 
 # Snapshot, force fail-fast for a CI lane that wants strict gating.
-BRIK_CONTINUE_ON_ERROR=0 brik run pipeline
+BRIK_CONTINUE_ON_ERROR=0 brik integrate
 
 # Release, force continue to collect every stage report.
-BRIK_COMMIT_TAG=v1.2.3 BRIK_CONTINUE_ON_ERROR=1 brik run pipeline
+BRIK_COMMIT_TAG=v1.2.3 BRIK_CONTINUE_ON_ERROR=1 brik integrate
 ```
 
 ## Pipeline outcome and the gatekeeper

@@ -2,7 +2,7 @@
 #
 # Reproduces divergence D1 of e2e-cross-platform-v0.6.0: the BRIK_WITH_DEPLOY
 # opt-in must reach the deploy stage's gate. Each CI execution environment
-# (GitLab plan.yml, Jenkins brikPipeline.groovy) translates the env var into
+# (GitLab plan.yml, Jenkins brikIntegrate.groovy) translates the env var into
 # the `--with-deploy` flag passed to `brik plan`. This spec pins the bash
 # boundary of that contract -- `brik plan` MUST gate the deploy stage solely
 # on `--with-deploy` -- so the divergence is caught in ~1s without running

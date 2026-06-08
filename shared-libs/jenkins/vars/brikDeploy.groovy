@@ -6,8 +6,8 @@
  *   brikDeploy()
  *
  * This is the Jenkins analogue of
- * shared-libs/gitlab/templates/pipeline-deploy.yml. It is intentionally
- * separate from brikPipeline (the event-driven CI flow): a CD run is NOT
+ * shared-libs/gitlab/templates/brik-deploy.yml. It is intentionally
+ * separate from brikIntegrate (the event-driven CI flow): a CD run is NOT
  * the fixed CI flow, it is a single `brik deploy` invocation parameterized
  * by (version, environment). The verb resolves the version to a
  * digest-pinned image in the channel the environment accepts, enforces the
@@ -97,7 +97,7 @@ def call(Map params = [:]) {
                         // the next cleanWs can remove them. Docker-out-of-docker:
                         // --volumes-from the Jenkins container so the helper
                         // sees the same /var/jenkins_home tree (see the same
-                        // pattern in brikPipeline.runInDeploy).
+                        // pattern in brikIntegrate.runInDeploy).
                         def jenkinsUid = sh(script: 'id -u', returnStdout: true).trim()
                         def jenkinsGid = sh(script: 'id -g', returnStdout: true).trim()
                         def deployHostContainer = sh(

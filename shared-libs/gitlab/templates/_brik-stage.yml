@@ -9,7 +9,7 @@
 #
 # Notes:
 #   - The gate sits at script[0] (not before_script) because the
-#     default.before_script block in pipeline.yml generates the
+#     default.before_script block in brik-integrate.yml generates the
 #     /tmp/brik-plan-gate.sh helper; overriding before_script at the
 #     job level would discard that bootstrap.
 #   - artifacts.reports.dotenv is enforced everywhere so the pipeline.env

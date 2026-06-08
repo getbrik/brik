@@ -1,5 +1,5 @@
-Describe "L.3 - local plan-driven pipeline (brik run pipeline --auto-select)"
-  # Phase L.3 of the architecture refactor: `brik run pipeline
+Describe "L.3 - local plan-driven pipeline (brik integrate --auto-select)"
+  # Phase L.3 of the architecture refactor: `brik integrate
   # --auto-select` on three commit shapes (docs-only, lockfile-only,
   # full source) must produce three aggregate-report.json files whose
   # run/skip set is COHERENT with the plan.json the planner wrote.
@@ -93,7 +93,7 @@ JSON
           git add README.md >/dev/null
           git commit -q -m "docs: update"
         )
-        "$BRIK_BIN" run pipeline --workspace "$L3_WS" --auto-select >/dev/null 2>&1 || true
+        "$BRIK_BIN" integrate --workspace "$L3_WS" --auto-select >/dev/null 2>&1 || true
         coherence_report
       }
       When call run_docs
@@ -109,7 +109,7 @@ JSON
           git add README.md >/dev/null
           git commit -q -m "docs: again"
         )
-        "$BRIK_BIN" run pipeline --workspace "$L3_WS" --auto-select >/dev/null 2>&1 || true
+        "$BRIK_BIN" integrate --workspace "$L3_WS" --auto-select >/dev/null 2>&1 || true
         jq -r '[.stages[] | select(.tech.kind == "not-applicable")] | length' \
           "$L3_WS/brik-artifacts/aggregate-report.json"
       }
@@ -133,7 +133,7 @@ JSON
           git add package-lock.json >/dev/null
           git commit -q -m "lockfile: bump"
         )
-        "$BRIK_BIN" run pipeline --workspace "$L3_WS" --auto-select >/dev/null 2>&1 || true
+        "$BRIK_BIN" integrate --workspace "$L3_WS" --auto-select >/dev/null 2>&1 || true
         coherence_report
       }
       When call run_lockfile
@@ -154,7 +154,7 @@ JSON
           git add package-lock.json >/dev/null
           git commit -q -m "lockfile: bump"
         )
-        "$BRIK_BIN" run pipeline --workspace "$L3_WS" --auto-select >/dev/null 2>&1 || true
+        "$BRIK_BIN" integrate --workspace "$L3_WS" --auto-select >/dev/null 2>&1 || true
         plan_run_set
       }
       When call plan_for_lockfile
@@ -172,7 +172,7 @@ JSON
           git add src/index.ts >/dev/null
           git commit -q -m "feat: add a const"
         )
-        "$BRIK_BIN" run pipeline --workspace "$L3_WS" --auto-select >/dev/null 2>&1 || true
+        "$BRIK_BIN" integrate --workspace "$L3_WS" --auto-select >/dev/null 2>&1 || true
         coherence_report
       }
       When call run_source

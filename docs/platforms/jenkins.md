@@ -9,7 +9,7 @@ detail of the `vars/` wrappers see
 
 ```
 Jenkinsfile (2 lines)
-  -> brikPipeline.groovy   (orchestrator: node {}, SCM checkout, fixed flow, Notify finally)
+  -> brikIntegrate.groovy   (orchestrator: node {}, SCM checkout, fixed flow, Notify finally)
     -> brikStage.groovy    (stage executor)
       -> jenkins-wrapper.sh (Jenkins env -> BRIK_* normalization)
         -> portable stages  (lib/stages/*.sh via stage.run)
@@ -28,14 +28,14 @@ orchestration. `shared-libs/jenkins/vars/` defines six small variables:
 
 | Var | Responsibility |
 |-----|----------------|
-| `brikPipeline` | Entry point. Declares `node {}`, runs SCM checkout, sets up helpers, runs the fixed flow plus Notify in `finally`. |
+| `brikIntegrate` | Entry point. Declares `node {}`, runs SCM checkout, sets up helpers, runs the fixed flow plus Notify in `finally`. |
 | `brikStage` | Sources `jenkins-wrapper.sh` and dispatches to a portable Bash stage via `brik.jenkins.run_stage`. |
 | `brikRunStage` | Wraps `docker.image(image).inside(args) { brikStage(...) }` and injects `-e BRIK_RUNNER_IMAGE` so each fragment records its real execution image. |
 | `brikResolveHome` | Locates the Brik shared library inside `${WORKSPACE}@libs/`. |
 | `brikDockerArgs` | Builds the Docker run args (HOME redirection, JVM cache paths, memory cap, network attachment, `--env-file` for `NEXUS_` / `BRIK_` / `REGISTRY_` / `ARGOCD_` / `CARGO_` / `SSH_` vars). |
 | `brikReadDotenv` | Parses `.brik-logs/pipeline.env` so the controller can extract `BRIK_CI_IMAGE`, mirroring GitLab's dotenv contract (single-file, projected from the report env section). |
 
-`brikPipeline` exposes five per-image stage helpers -- `runInBase`, `runStage`,
+`brikIntegrate` exposes five per-image stage helpers -- `runInBase`, `runStage`,
 `runInAnalysis`, `runInScanner`, `runInDeploy` -- all routed through
 `brikRunStage`.
 
@@ -72,7 +72,7 @@ directly on the Jenkins agent (same as `useDockerAgent: false`).
 
 ## Stage selection
 
-After Init, `brikPipeline` runs a **Plan** stage. The planner runs on the
+After Init, `brikIntegrate` runs a **Plan** stage. The planner runs on the
 agent (it only needs `jq`/`yq`/`git`) and writes `.brik-logs/plan.json`,
 pointed at via the `BRIK_PLAN_FILE` env var. Every subsequent stage is
 plan-driven: the `runStageWithPlan` helper still creates the Jenkins stage
@@ -81,7 +81,7 @@ only runs when `brik plan gate <stage>` (the `planSaysRun` check) returns
 zero. On a skip, the gate records a not-applicable fragment so the
 aggregate report explains why the stage did not run.
 
-The planner gates Release, Package, and Deploy off by default. `brikPipeline`
+The planner gates Release, Package, and Deploy off by default. `brikIntegrate`
 translates CI context into the matching opt-in flags: a tag context
 (`BRIK_TAG` or `TAG_NAME` set) enables `--with-release` and `--with-package`,
 and the `BRIK_WITH_DEPLOY` job parameter enables `--with-deploy`. If the
@@ -90,7 +90,7 @@ unconditional flow (`BRIK_PLAN_FILE` unset means every gate returns true).
 
 ## Parameters
 
-`brikPipeline` accepts:
+`brikIntegrate` accepts:
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
@@ -102,12 +102,12 @@ unconditional flow (`BRIK_PLAN_FILE` unset means every gate returns true).
 
 ```groovy
 @Library('brik') _
-brikPipeline(useDockerAgent: false)   // run on the agent instead of containers
+brikIntegrate(useDockerAgent: false)   // run on the agent instead of containers
 ```
 
 ### Job parameters (user-overridable inputs)
 
-`brikPipeline.groovy` declares three job parameters via
+`brikIntegrate.groovy` declares three job parameters via
 `properties([parameters([...])])`:
 
 | Parameter | Type | Default | Description |
@@ -147,7 +147,7 @@ as `BRIK_HOME` -- no extra clone.
 
 ### Docker integration and caches
 
-With `useDockerAgent: true`, `brikPipeline` runs Init on the agent to read
+With `useDockerAgent: true`, `brikIntegrate` runs Init on the agent to read
 `brik.yml`, resolves the stack image, pulls it, and runs Build, Lint, Test, and
 Package inside it. Init and Notify run in the base image; SAST runs in the
 analysis image; Scan and Container Scan run in the scanner image; Deploy runs

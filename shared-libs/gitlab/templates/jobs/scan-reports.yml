@@ -1,7 +1,7 @@
 # Brik Scan Reports Overlay (Ultimate)
 # Adds artifacts.reports.sarif to brik-scan so osv-scanner and gitleaks
 # findings surface in the GitLab Security tab. The reports.sarif key is
-# rejected at YAML parse time on Free / Premium tiers; pipeline.yml includes
+# rejected at YAML parse time on Free / Premium tiers; brik-integrate.yml includes
 # this overlay only when CI_GITLAB_FEATURES advertises dependency_scanning
 # or secret_detection support.
 

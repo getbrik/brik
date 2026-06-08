@@ -1,6 +1,6 @@
 # Brik GitLab CD pipeline (mode 2 -- explicit deploy).
 #
-# Separate from pipeline.yml (the event-driven CI flow): this pipeline runs
+# Separate from brik-integrate.yml (the event-driven CI flow): this pipeline runs
 # ONLY when BRIK_DEPLOY_VERSION and BRIK_DEPLOY_ENVIRONMENT are both provided
 # (the "Run pipeline" form or the pipelines API). It maps those inputs to a
 # single `brik deploy` invocation -- the verb resolves the version to a

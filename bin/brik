@@ -130,11 +130,19 @@ cmd_self_uninstall() {
 }
 
 # ---------------------------------------------------------------------------
-# Command: run
+# Command: integrate
 # ---------------------------------------------------------------------------
-cmd_run() {
-    brik.use cli.run
-    cli.run.run "$@"
+cmd_integrate() {
+    brik.use cli.integrate
+    cli.integrate.run "$@"
+}
+
+# ---------------------------------------------------------------------------
+# Command: stage
+# ---------------------------------------------------------------------------
+cmd_stage() {
+    brik.use cli.stage
+    cli.stage.run "$@"
 }
 
 # ---------------------------------------------------------------------------
@@ -196,8 +204,12 @@ main() {
             cmd_init "$@"
             exit "$?"
             ;;
-        run)
-            cmd_run "$@"
+        integrate)
+            cmd_integrate "$@"
+            exit "$?"
+            ;;
+        stage)
+            cmd_stage "$@"
             exit "$?"
             ;;
         plan)

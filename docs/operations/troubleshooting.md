@@ -48,7 +48,7 @@ If stages fail with "permission denied", the shell scripts lost their execute
 bit in the repository. Restore it, or point Brik at a known-good path:
 
 ```groovy
-brikPipeline(brikHome: '/custom/path/to/brik')
+brikIntegrate(brikHome: '/custom/path/to/brik')
 ```
 
 ## Sandbox restrictions (Jenkins)
@@ -69,10 +69,10 @@ If runner containers cannot reach external services (registries, Git servers,
 ArgoCD), pass the correct network explicitly:
 
 ```groovy
-brikPipeline(dockerNetwork: 'my-network')
+brikIntegrate(dockerNetwork: 'my-network')
 ```
 
-By default `brikPipeline` auto-detects the network from the Jenkins container.
+By default `brikIntegrate` auto-detects the network from the Jenkins container.
 
 ## Private registry / cannot pull `ghcr.io`
 

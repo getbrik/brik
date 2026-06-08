@@ -173,7 +173,7 @@ cli.plan.run() {
 # Gate sub-command: decide run|skip for <stage_id> against the active plan.
 #
 # Returns:
-#   0 -> stage should run (caller proceeds with brik run stage <id>)
+#   0 -> stage should run (caller proceeds with brik stage <id>)
 #   1 -> stage should skip; this function has already written a per-stage
 #        fragment to the report with tech.status=skipped, tech.kind=
 #        not-applicable, business.reason=<plan reason>, so the aggregate

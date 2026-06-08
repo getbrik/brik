@@ -17,7 +17,7 @@ shared-libs/jenkins/
   scripts/
     jenkins-wrapper.sh       - normalizes Jenkins env to BRIK_* and dispatches to stage.run
   vars/
-    brikPipeline.groovy      - entry point: node {}, SCM checkout, fixed flow, Notify finally
+    brikIntegrate.groovy      - entry point: node {}, SCM checkout, fixed flow, Notify finally
     brikStage.groovy         - stage executor (sources jenkins-wrapper.sh)
     brikRunStage.groovy      - wraps docker.image(...).inside(...) { brikStage(...) }
     brikResolveHome.groovy   - locates the shared library under ${WORKSPACE}@libs/
@@ -30,7 +30,7 @@ shared-libs/jenkins/
 
 ```
 Jenkinsfile (2 lines)
-  -> brikPipeline.groovy   (orchestrator)
+  -> brikIntegrate.groovy   (orchestrator)
     -> brikStage.groovy    (stage executor)
       -> jenkins-wrapper.sh (Jenkins env -> BRIK_* normalization)
         -> portable stages  (lib/stages/*.sh via stage.run)

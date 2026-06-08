@@ -142,7 +142,7 @@ Make the module discoverable by adding its parent dir to
 
 ```bash
 export BRIK_LIB_EXTENSIONS="/path/to/my-extensions/lib:${BRIK_LIB_EXTENSIONS}"
-brik run stage build
+brik stage build
 ```
 
 The loader iterates `BRIK_LIB_EXTENSIONS` in order; the first directory
@@ -156,7 +156,7 @@ discover them automatically:
 ```bash
 brik doctor                        # reports the runner image of myteam
 brik plan --explain                # lists security-audit alongside builtins
-brik run stage security-audit      # dispatches to stages.security_audit
+brik stage security-audit      # dispatches to stages.security_audit
 ```
 
 No code change in `brik/` is required.

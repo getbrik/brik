@@ -99,12 +99,12 @@ Examples:
   brik doctor --workspace ./my-project
   brik init
   brik init --stack node --platform gitlab
-  brik run stage build
-  brik run stage lint --workspace ./my-project
-  brik run stage deploy --dry-run
-  brik run pipeline
-  brik run pipeline --with-package --continue-on-error
-  brik run pipeline --with-deploy --dry-run
+  brik stage build
+  brik stage lint --workspace ./my-project
+  brik stage deploy --dry-run
+  brik integrate
+  brik integrate --with-package --continue-on-error
+  brik integrate --with-deploy --dry-run
   brik extension test ./my-extension
   brik self-update
   brik self-update --channel edge

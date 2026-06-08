@@ -5,7 +5,7 @@
 # This script has NO dependency on the Brik runtime -- it uses echo instead
 # of log.info and contains a minimal copy of the package manager detection.
 #
-# Usage (from pipeline.yml before_script):
+# Usage (from brik-integrate.yml before_script):
 #   . /path/to/bootstrap-prereqs.sh
 #   bootstrap_prereqs
 #

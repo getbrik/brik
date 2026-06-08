@@ -32,7 +32,7 @@ The rationale, in short:
   and reads naturally for the shape of a manifest (nested
   `spec.detect.markers.any`).
 - JSON is what the runtime parses. `jq` is in every brik-runner image,
-  `yq` is not. End users running `brik run` never have to install `yq`.
+  `yq` is not. End users running `brik integrate` never have to install `yq`.
 - The compiler runs `yq -o=json` then pipes through `jq -S` to get a
   deterministic byte stream. The sha256 of the cache is stable across
   OSes; CI verifies this via `scripts/compile-registry.sh --check`.

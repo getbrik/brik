@@ -116,7 +116,7 @@ _cli.init._generate_bootstrap() {
 include:
   - project: 'brik/gitlab-templates'
     ref: ${BRIK_REF}
-    file: '/templates/pipeline.yml'
+    file: '/templates/brik-integrate.yml'
 YAML
             ;;
         github)
@@ -139,7 +139,7 @@ YAML
         jenkins)
             cat > "${target_dir}/Jenkinsfile" <<GROOVY
 @Library('brik@${BRIK_REF}') _
-brikPipeline()
+brikIntegrate()
 GROOVY
             ;;
     esac

@@ -4,8 +4,8 @@ Describe "shared-libs/jenkins brikResolveHome.groovy"
   # Smoke checks on the Groovy source (cold-cache race fix, 2026-05-25).
 
   Describe "matching criterion"
-    It "scans @libs/*/vars/brikPipeline.groovy (strict invariant of the library)"
-      When call grep -F "vars/brikPipeline.groovy" "$GROOVY"
+    It "scans @libs/*/vars/brikIntegrate.groovy (strict invariant of the library)"
+      When call grep -F "vars/brikIntegrate.groovy" "$GROOVY"
       The status should be success
       The output should be present
     End
@@ -72,10 +72,10 @@ Describe "shared-libs/jenkins brikResolveHome.groovy"
       unset WORKSPACE
     }
 
-    It "returns the hash-named directory that carries vars/brikPipeline.groovy"
+    It "returns the hash-named directory that carries vars/brikIntegrate.groovy"
       run_payload() {
         mkdir -p "${WORKSPACE}@libs/abc123/vars"
-        : > "${WORKSPACE}@libs/abc123/vars/brikPipeline.groovy"
+        : > "${WORKSPACE}@libs/abc123/vars/brikIntegrate.groovy"
         bash -c "$(extract_shell_payload)"
       }
       When call run_payload
@@ -86,7 +86,7 @@ Describe "shared-libs/jenkins brikResolveHome.groovy"
     It "picks the right candidate among multiple hash-named directories"
       run_payload() {
         mkdir -p "${WORKSPACE}@libs/aaa/vars" "${WORKSPACE}@libs/bbb/vars"
-        : > "${WORKSPACE}@libs/bbb/vars/brikPipeline.groovy"
+        : > "${WORKSPACE}@libs/bbb/vars/brikIntegrate.groovy"
         bash -c "$(extract_shell_payload)"
       }
       When call run_payload
@@ -99,7 +99,7 @@ Describe "shared-libs/jenkins brikResolveHome.groovy"
         mkdir -p "${WORKSPACE}@libs/noise/vars"
         : > "${WORKSPACE}@libs/noise/vars/anotherFile.groovy"
         mkdir -p "${WORKSPACE}@libs/real/vars"
-        : > "${WORKSPACE}@libs/real/vars/brikPipeline.groovy"
+        : > "${WORKSPACE}@libs/real/vars/brikIntegrate.groovy"
         bash -c "$(extract_shell_payload)"
       }
       When call run_payload

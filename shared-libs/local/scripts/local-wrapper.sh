@@ -11,7 +11,7 @@
 #   source "${BRIK_HOME}/shared-libs/local/scripts/local-wrapper.sh"
 #   brik.local.setup
 #   brik.local.run_stage <stage_name>
-#   brik.local.run_pipeline [flags]
+#   brik.local.run_integrate [flags]
 
 # Guard against double-sourcing
 [[ -n "${_BRIK_LOCAL_WRAPPER_LOADED:-}" ]] && return 0
@@ -119,11 +119,11 @@ brik.local.run_deploy() {
 # The recap is best-effort -- a render failure does not mask pipeline.run's
 # exit code.
 #
-# Usage: brik.local.run_pipeline [--continue-on-error] [--with-release]
+# Usage: brik.local.run_integrate [--continue-on-error] [--with-release]
 #        [--with-package] [--with-deploy]
 # Exit codes: pipeline.run's exit code
 #   (0 all passed, BRIK_EXIT_FAILURE any failed, BRIK_EXIT_INVALID_INPUT bad flag).
-brik.local.run_pipeline() {
+brik.local.run_integrate() {
     local rc=0
     pipeline.run "$@"
     rc=$?

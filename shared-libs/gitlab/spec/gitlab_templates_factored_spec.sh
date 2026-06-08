@@ -312,10 +312,10 @@ Describe "shared-libs/gitlab/templates - factored Lot 3"
   End
 
   # -------------------------------------------------------------------------
-  # pipeline.yml: includes _brik-stage.yml, drops redundant image variables
+  # brik-integrate.yml: includes _brik-stage.yml, drops redundant image variables
   # -------------------------------------------------------------------------
-  Describe "pipeline.yml"
-    PIPELINE="${TEMPLATES_DIR}/pipeline.yml"
+  Describe "brik-integrate.yml"
+    PIPELINE="${TEMPLATES_DIR}/brik-integrate.yml"
 
     It "includes _brik-stage.yml in the local includes list"
       When run grep -qE "_brik-stage\.yml" "$PIPELINE"

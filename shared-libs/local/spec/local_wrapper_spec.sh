@@ -501,9 +501,9 @@ Describe "local-wrapper.sh"
   # --with-package / --with-deploy flag tests). No wrapper-side duplicate.
 
   # =========================================================================
-  # brik.local.run_pipeline
+  # brik.local.run_integrate
   # =========================================================================
-  Describe "brik.local.run_pipeline"
+  Describe "brik.local.run_integrate"
     Include "$BRIK_HOME/shared-libs/local/scripts/local-wrapper.sh"
 
     setup_pipeline_env() {
@@ -553,7 +553,7 @@ MOCKEOF
     After 'cleanup_pipeline_env'
 
     It "returns error for unknown flag"
-      When call brik.local.run_pipeline "--bad-flag"
+      When call brik.local.run_integrate "--bad-flag"
       The status should equal 2
       The error should include "unknown flag"
     End
@@ -562,7 +562,7 @@ MOCKEOF
       # Fixture has no quality.lint.* tool, so lint reaches the
       # not-applicable auto-skip branch and the pipeline succeeds.
       # The Pipeline Summary header is emitted because Notify always runs.
-      When call brik.local.run_pipeline
+      When call brik.local.run_integrate
       The status should be success
       The output should include "Pipeline Summary"
       The output should include "SKIP"
@@ -572,7 +572,7 @@ MOCKEOF
     It "skips release/package/deploy by default (notify always runs)"
       check_skipped() {
         local output
-        output="$(brik.local.run_pipeline 2>/dev/null)"
+        output="$(brik.local.run_integrate 2>/dev/null)"
         local release_line package_line deploy_line
         release_line="$(echo "$output" | grep -F "release")"
         package_line="$(echo "$output" | grep -F "package")"
@@ -599,7 +599,7 @@ MOCKEOF
         # continue-on-error=true; force fail-fast via the explicit override.
         stages.build() { return 1; }
         local output
-        output="$(BRIK_CONTINUE_ON_ERROR=0 brik.local.run_pipeline 2>/dev/null)"
+        output="$(BRIK_CONTINUE_ON_ERROR=0 brik.local.run_integrate 2>/dev/null)"
         local build_line test_line
         build_line="$(echo "$output" | grep -F "build")"
         test_line="$(echo "$output" | grep -F "test")"
@@ -618,7 +618,7 @@ MOCKEOF
         # Override stages.build to fail
         stages.build() { return 1; }
         local output
-        output="$(brik.local.run_pipeline --continue-on-error 2>/dev/null)"
+        output="$(brik.local.run_integrate --continue-on-error 2>/dev/null)"
         local test_line
         test_line="$(echo "$output" | grep -F "test")"
         # test should have run (PASS or FAIL), not SKIP
@@ -652,7 +652,7 @@ MOCKEOF
     End
   End
 
-  Describe "brik.local.run_pipeline with --with-release"
+  Describe "brik.local.run_integrate with --with-release"
     Include "$BRIK_HOME/shared-libs/local/scripts/local-wrapper.sh"
 
     setup_pipeline_release() {
@@ -704,7 +704,7 @@ MOCKEOF
     It "includes release stage with --with-release"
       check_release() {
         local output
-        output="$(brik.local.run_pipeline --with-release 2>/dev/null)"
+        output="$(brik.local.run_integrate --with-release 2>/dev/null)"
         local release_line
         release_line="$(echo "$output" | grep -F "release")"
         if echo "$release_line" | grep -qF "SKIP"; then
@@ -718,7 +718,7 @@ MOCKEOF
     End
 
     It "warns about deploy danger with --with-deploy"
-      When call brik.local.run_pipeline --with-deploy
+      When call brik.local.run_integrate --with-deploy
       The output should be present
       The error should include "review target environment before running"
       # The stage opt-out (--enabled=false) is gone; lint runs to completion
@@ -734,7 +734,7 @@ MOCKEOF
         # would map to business=warning and exit 0 instead.
         export BRIK_COMMIT_TAG="v9.9.9"
         stages.build() { return 1; }
-        brik.local.run_pipeline >/dev/null 2>&1
+        brik.local.run_integrate >/dev/null 2>&1
         local rc=$?
         unset BRIK_COMMIT_TAG
         echo "$rc"

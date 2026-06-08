@@ -135,7 +135,7 @@ orchestrator, and do the things only a live platform can prove actually hold?
 
 L3 runs **full pipelines on real infrastructure** (briklab: real GitLab, real
 Jenkins, real ArgoCD). It is reserved for what L2 cannot fake: orchestrator
-parity (the same brik run behaves identically on GitLab and Jenkins) and real
+parity (the same brik integrate behaves identically on GitLab and Jenkins) and real
 deploy targets (GitOps sync, rollback). It is deliberately tiny because each
 scenario is slow and a failure is hard to localise.
 

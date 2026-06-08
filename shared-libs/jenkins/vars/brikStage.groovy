@@ -8,7 +8,7 @@
  * portable stage logic via brik.jenkins.run_stage. Maps the bash exit
  * code into Jenkins outcomes:
  *   - 0    : success
- *   - else : error() so the surrounding try/catch in brikPipeline marks
+ *   - else : error() so the surrounding try/catch in brikIntegrate marks
  *            the build FAILURE. The stage's business outcome
  *            (success / warning / error) is reported separately via
  *            aggregate-report.json; warnings do not fail the job.

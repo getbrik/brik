@@ -22,7 +22,7 @@
 | `brik.local.setup` | local | `shared-libs/local/scripts/local-wrapper.sh:33` |
 | `_brik_local_setup_git_context` | local | `shared-libs/local/scripts/local-wrapper.sh:58` |
 | `brik.local.run_stage` | local | `shared-libs/local/scripts/local-wrapper.sh:97` |
-| `brik.local.run_pipeline` | local | `shared-libs/local/scripts/local-wrapper.sh:117` |
+| `brik.local.run_integrate` | local | `shared-libs/local/scripts/local-wrapper.sh:117` |
 
 ## Total
 

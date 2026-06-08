@@ -47,7 +47,7 @@ Add a `.gitlab-ci.yml` to your project root:
 include:
   - project: 'brik/gitlab-templates'
     ref: v0.7.0
-    file: '/templates/pipeline.yml'
+    file: '/templates/brik-integrate.yml'
 ```
 
 This is a single classic pipeline: a `brik-plan` job computes the

@@ -3,7 +3,7 @@ Describe "cache paths parity across consumers"
   # Three downstream consumers must stay in sync with it:
   #   1. GitLab job templates declare cache.paths inline (kept verbatim to
   #      keep the YAML readable -- GitLab cannot source bash at template parse).
-  #   2. Jenkins brikPipeline.groovy maps each path to a "<top-level>/**"
+  #   2. Jenkins brikIntegrate.groovy maps each path to a "<top-level>/**"
   #      EXCLUDE pattern for cleanWs.
   #   3. shared-libs/gitlab/scripts/gitlab-wrapper.sh (after P2) pre-creates
   #      a .brik-keep marker under each path. The marker function reads
@@ -31,7 +31,7 @@ Describe "cache paths parity across consumers"
     ' "$yml"
   }
 
-  # Extract the cleanWs EXCLUDE patterns from brikPipeline.groovy and emit
+  # Extract the cleanWs EXCLUDE patterns from brikIntegrate.groovy and emit
   # the bare top-level directory for each. The result is the set of
   # top-level dirs Jenkins protects across cleanWs cycles.
   extract_jenkins_dirs() {
@@ -74,10 +74,10 @@ Describe "cache paths parity across consumers"
     End
   End
 
-  Describe "Jenkins brikPipeline cleanWs excludes"
+  Describe "Jenkins brikIntegrate cleanWs excludes"
     It "covers every top-level dir from stacks.cache_paths"
       check_jenkins() {
-        local groovy="$BRIK_HOME/shared-libs/jenkins/vars/brikPipeline.groovy"
+        local groovy="$BRIK_HOME/shared-libs/jenkins/vars/brikIntegrate.groovy"
         local jenkins_dirs canonical_top
         jenkins_dirs="$(extract_jenkins_dirs "$groovy" | sort -u)"
         canonical_top="$(canonical_paths | normalize_paths | cut -d/ -f1 | sort -u)"

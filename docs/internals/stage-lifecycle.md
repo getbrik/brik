@@ -59,7 +59,7 @@ See the [hooks reference](../configuration/reference/hooks.md) for the
 The fragment / aggregate split makes `aggregate-report.{md,json,html}` work
 identically in local mode and in multi-container CI.
 
-- **Local mode** (`brik run pipeline`). One process, one `$BRIK_LOG_DIR`.
+- **Local mode** (`brik integrate`). One process, one `$BRIK_LOG_DIR`.
   `pipeline.run` calls `report.init`, every stage records into the same
   `aggregate-report.json` backend, and `report.render` produces the final
   Markdown / JSON / HTML triple. Each `stage.run` also writes a

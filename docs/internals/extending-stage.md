@@ -11,7 +11,7 @@ change touches the stage entry point, every platform adapter, and the schema.
    through [`stage.run`](stage-lifecycle.md)).
 
 2. **Shared library template** -- add the stage to
-   `shared-libs/gitlab/templates/pipeline.yml` (and the other platform
+   `shared-libs/gitlab/templates/brik-integrate.yml` (and the other platform
    adapters). For GitLab specifically, the new job template **must declare**
    `artifacts.reports.dotenv: .brik-logs/pipeline.env`, otherwise downstream
    jobs will see a stale snapshot of `pipeline.env` and lose any keys

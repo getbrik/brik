@@ -6,8 +6,8 @@
  * path.
  *
  * Matching criterion: a hash-named directory is the Brik library when it
- * contains vars/brikPipeline.groovy. This is a strict invariant -- if
- * Jenkins is currently running brikPipeline(), then that file MUST exist
+ * contains vars/brikIntegrate.groovy. This is a strict invariant -- if
+ * Jenkins is currently running brikIntegrate(), then that file MUST exist
  * in one of the hash-named clones under @libs/. Earlier revisions checked
  * for lib/, which is a weaker marker that can be absent from shallow clones.
  *
@@ -33,7 +33,7 @@ def call() {
             while [ "$attempts" -lt "$max_attempts" ]; do
                 if [ -d "$libs_dir" ]; then
                     for d in "$libs_dir"/*/; do
-                        if [ -f "${d}vars/brikPipeline.groovy" ]; then
+                        if [ -f "${d}vars/brikIntegrate.groovy" ]; then
                             printf '%s' "${d%/}"
                             exit 0
                         fi

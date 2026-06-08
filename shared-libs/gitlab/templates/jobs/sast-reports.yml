@@ -1,7 +1,7 @@
 # Brik SAST Reports Overlay (Ultimate)
 # Adds artifacts.reports.sarif to brik-sast so semgrep findings surface in
 # the GitLab Security tab. The reports.sarif key is rejected at YAML parse
-# time on Free / Premium tiers; pipeline.yml includes this overlay only when
+# time on Free / Premium tiers; brik-integrate.yml includes this overlay only when
 # CI_GITLAB_FEATURES advertises sast support.
 
 brik-sast:

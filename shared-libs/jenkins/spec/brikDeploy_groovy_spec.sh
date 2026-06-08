@@ -1,7 +1,7 @@
 #shellcheck shell=bash
 Describe "shared-libs/jenkins brikDeploy.groovy - CD entry (mode 2)"
   # Structural guards for the separate Jenkins CD var. It is the Jenkins
-  # analogue of shared-libs/gitlab/templates/pipeline-deploy.yml: a thin
+  # analogue of shared-libs/gitlab/templates/brik-deploy.yml: a thin
   # entry that maps the two CD inputs (BRIK_DEPLOY_VERSION /
   # BRIK_DEPLOY_ENVIRONMENT) to a single `brik deploy` invocation. All
   # business logic stays in lib/ (the deploy verb); this var only declares

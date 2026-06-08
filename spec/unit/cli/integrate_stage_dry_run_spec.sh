@@ -1,23 +1,25 @@
-Describe "cli/run.sh - --dry-run flag"
+Describe "cli integrate/stage - --dry-run flag"
   Include "$BRIK_PIPELINE_LIB/version-info.sh"
   Include "$BRIK_PIPELINE_LIB/logging.sh"
   Include "$BRIK_PIPELINE_LIB/error.sh"
   Include "$BRIK_PIPELINE_LIB/tools.sh"
   Include "$BRIK_PIPELINE_LIB/loader.sh"
   Include "$BRIK_CLI_LIB/helpers.sh"
-  Include "$BRIK_CLI_LIB/run.sh"
+  Include "$BRIK_CLI_LIB/local_runner.sh"
+  Include "$BRIK_CLI_LIB/integrate.sh"
+  Include "$BRIK_CLI_LIB/stage.sh"
 
   setup() {
     WORKSPACE="$(mktemp -d)"
     printf 'version: 1\nproject:\n  name: dryrun-test\n  stack: node\n' > "${WORKSPACE}/brik.yml"
 
-    # Stub the heavy plumbing so cli.run.stage / cli.run.pipeline never
+    # Stub the heavy plumbing so cli.stage.run / cli.integrate.run never
     # actually source the local wrapper or run a stage. We only care that
     # BRIK_DRY_RUN is exported correctly when the flag is parsed.
-    _cli.run._setup_local_env() { return 0; }
-    _cli.run._runtime() { return 0; }
+    cli.local_runner.setup_env() { return 0; }
+    cli.local_runner.runtime() { return 0; }
     brik.local.run_stage() { return 0; }
-    brik.local.run_pipeline() { return 0; }
+    brik.local.run_integrate() { return 0; }
 
     unset BRIK_DRY_RUN 2>/dev/null || true
   }
@@ -28,10 +30,10 @@ Describe "cli/run.sh - --dry-run flag"
   Before 'setup'
   After 'cleanup'
 
-  Describe "cli.run.stage"
+  Describe "cli.stage.run"
     It "exports BRIK_DRY_RUN=true when --dry-run is passed"
       run_with_flag() {
-        cli.run.stage build --workspace "$WORKSPACE" --dry-run >/dev/null 2>&1
+        cli.stage.run build --workspace "$WORKSPACE" --dry-run >/dev/null 2>&1
         printf '%s' "${BRIK_DRY_RUN:-UNSET}"
       }
       When call run_with_flag
@@ -40,7 +42,7 @@ Describe "cli/run.sh - --dry-run flag"
 
     It "leaves BRIK_DRY_RUN unset when --dry-run is omitted"
       run_without_flag() {
-        cli.run.stage build --workspace "$WORKSPACE" >/dev/null 2>&1
+        cli.stage.run build --workspace "$WORKSPACE" >/dev/null 2>&1
         printf '%s' "${BRIK_DRY_RUN:-UNSET}"
       }
       When call run_without_flag
@@ -50,7 +52,7 @@ Describe "cli/run.sh - --dry-run flag"
     It "preserves a pre-existing BRIK_DRY_RUN=true exported by the caller"
       run_with_caller_env() {
         export BRIK_DRY_RUN="true"
-        cli.run.stage build --workspace "$WORKSPACE" >/dev/null 2>&1
+        cli.stage.run build --workspace "$WORKSPACE" >/dev/null 2>&1
         printf '%s' "$BRIK_DRY_RUN"
       }
       When call run_with_caller_env
@@ -59,7 +61,7 @@ Describe "cli/run.sh - --dry-run flag"
 
     It "accepts --dry-run combined with --config and --workspace"
       run_combined() {
-        cli.run.stage build --workspace "$WORKSPACE" --config "${WORKSPACE}/brik.yml" --dry-run >/dev/null 2>&1
+        cli.stage.run build --workspace "$WORKSPACE" --config "${WORKSPACE}/brik.yml" --dry-run >/dev/null 2>&1
         printf '%s' "${BRIK_DRY_RUN:-UNSET}"
       }
       When call run_combined
@@ -67,10 +69,10 @@ Describe "cli/run.sh - --dry-run flag"
     End
   End
 
-  Describe "cli.run.pipeline"
+  Describe "cli.integrate.run"
     It "exports BRIK_DRY_RUN=true when --dry-run is passed"
       run_with_flag() {
-        cli.run.pipeline --workspace "$WORKSPACE" --dry-run >/dev/null 2>&1
+        cli.integrate.run --workspace "$WORKSPACE" --dry-run >/dev/null 2>&1
         printf '%s' "${BRIK_DRY_RUN:-UNSET}"
       }
       When call run_with_flag
@@ -79,7 +81,7 @@ Describe "cli/run.sh - --dry-run flag"
 
     It "leaves BRIK_DRY_RUN unset when --dry-run is omitted"
       run_without_flag() {
-        cli.run.pipeline --workspace "$WORKSPACE" >/dev/null 2>&1
+        cli.integrate.run --workspace "$WORKSPACE" >/dev/null 2>&1
         printf '%s' "${BRIK_DRY_RUN:-UNSET}"
       }
       When call run_without_flag
@@ -88,7 +90,7 @@ Describe "cli/run.sh - --dry-run flag"
 
     It "accepts --dry-run alongside pipeline shape flags"
       run_combined() {
-        cli.run.pipeline --workspace "$WORKSPACE" --with-deploy --dry-run --continue-on-error >/dev/null 2>&1
+        cli.integrate.run --workspace "$WORKSPACE" --with-deploy --dry-run --continue-on-error >/dev/null 2>&1
         printf '%s' "${BRIK_DRY_RUN:-UNSET}"
       }
       When call run_combined

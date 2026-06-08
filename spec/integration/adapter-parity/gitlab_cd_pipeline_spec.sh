@@ -1,9 +1,9 @@
-Describe "GitLab CD pipeline template (pipeline-deploy.yml)"
+Describe "GitLab CD pipeline template (brik-deploy.yml)"
   # Structural guards for the separate CD pipeline: it must trigger only on the
   # explicit CD inputs, expose the SoT CD params, and map them to `brik deploy`.
   # Runtime behaviour is validated by the briklab E2E suite.
 
-  CD="$BRIK_HOME/shared-libs/gitlab/templates/pipeline-deploy.yml"
+  CD="$BRIK_HOME/shared-libs/gitlab/templates/brik-deploy.yml"
 
   It "is valid YAML"
     parse() { yq -e '.' "$CD" >/dev/null; }

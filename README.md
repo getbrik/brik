@@ -72,7 +72,7 @@ From that single file, Brik produces:
 
 - a working GitLab pipeline via a one-line `include:`
 - a working Jenkins pipeline via the Brik shared library
-- a working local run via `brik run pipeline`
+- a working local run via `brik integrate`
 - a release flow that triggers only on tags
 
 ## Pipeline at a glance
@@ -113,7 +113,7 @@ The 12 stages are non-negotiable. The decision of which stages actually *run* on
 - A feature branch is **snapshot context**: the pipeline keeps going past failures so the operator sees the full picture.
 - A tagged release is **release context**: fail-fast, because a broken stage in a release pipeline is not a learning opportunity.
 
-The plan is one platform-agnostic JSON document. GitLab, Jenkins, and `brik run` consume the same plan. Same commit, same plan, same outcome, anywhere. Inspect any decision with `brik plan --explain`.
+The plan is one platform-agnostic JSON document. GitLab, Jenkins, and `brik integrate` consume the same plan. Same commit, same plan, same outcome, anywhere. Inspect any decision with `brik plan --explain`.
 
 ### 🛡️ Security that knows the difference between "we can fix this" and "the vendor won't"
 
@@ -142,14 +142,14 @@ Bash has limits, and Brik treats them seriously: 3635 ShellSpec tests, 80% cover
 ### 💻 Same pipeline on your laptop
 
 ```bash
-brik run pipeline                # full pipeline locally
-brik run stage test              # one stage
+brik integrate                # full pipeline locally
+brik stage test              # one stage
 brik plan --explain              # show what will run on this commit, and why
 brik validate                    # validate brik.yml against the schema
 brik doctor                      # check prerequisites
 ```
 
-The local runner uses the same Bash code path as the CI adapters. Reproducing a CI failure locally is `brik run stage <name>`, not "clone the repo, install a 600 MB runner image, and pray".
+The local runner uses the same Bash code path as the CI adapters. Reproducing a CI failure locally is `brik stage <name>`, not "clone the repo, install a 600 MB runner image, and pray".
 
 ## How the layers fit
 
@@ -183,7 +183,7 @@ The stack is detected from project files when not specified. Every stack ships w
 | **GitLab CI** | ✅ Functional | Shared library + pipeline template (`include:` one line) |
 | **Jenkins** | ✅ Functional | Jenkins Shared Library (works with Configuration-as-Code + Gitea) |
 | **GitHub Actions** | 🚧 Bootstrap shipped, reusable workflows in progress | `brik init --platform github` scaffolds today |
-| **Local CLI** | ✅ Functional | `brik run pipeline` |
+| **Local CLI** | ✅ Functional | `brik integrate` |
 
 ## Get started
 
@@ -202,7 +202,7 @@ brew install brik
 brik doctor    # check prerequisites
 brik init      # scaffold brik.yml + your platform bootstrap
 brik validate  # confirm the config is valid
-brik run pipeline
+brik integrate
 ```
 
 Full documentation: **[docs/README.md](docs/README.md)**.

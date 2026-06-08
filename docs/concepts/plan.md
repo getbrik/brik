@@ -86,8 +86,8 @@ Override at the CLI with `brik plan --mode <m>`.
 
 | Adapter | Path |
 |---|---|
-| Local (`brik run pipeline --auto-select`) | `${BRIK_WORKSPACE}/.brik-logs/plan.json` |
-| Jenkins (`brikPipeline`) | `${WORKSPACE}/.brik-logs/plan.json`, exposed as `BRIK_PLAN_FILE` |
+| Local (`brik integrate --auto-select`) | `${BRIK_WORKSPACE}/.brik-logs/plan.json` |
+| Jenkins (`brikIntegrate`) | `${WORKSPACE}/.brik-logs/plan.json`, exposed as `BRIK_PLAN_FILE` |
 | GitLab | the `brik-plan` job artifact at `.brik-logs/plan.json` |
 
 The `pipeline.plan.*` API in [`lib/planning/plan_reader.sh`](../../lib/planning/plan_reader.sh)
@@ -124,7 +124,7 @@ the plan marks `skip` and records a `not-applicable` fragment with the
 plan's reason. Without the env var, the runtime behaves exactly like
 the pre-planner runtime (the gate is a no-op).
 
-In Jenkins (`brikPipeline.groovy`), each downstream stage runs through
+In Jenkins (`brikIntegrate.groovy`), each downstream stage runs through
 `planSaysRun(<id>)` -- a `sh "brik plan gate <id>"` round-trip. A
 skipped stage stays in the Stage View as "skipped per plan" and its
 fragment is still stashed so `brik-notify` aggregates it.

@@ -32,11 +32,10 @@ Format: `<notion>.<submodule>.<verb>` (convention layout.md).
 | `cli.registry._usage` | `cli/registry.sh:33` |
 | `cli.registry.stages` | `cli/registry.sh:55` |
 | `cli.registry._stage_entry` | `cli/registry.sh:101` |
-| `cli.run.run` | `cli/run.sh:12` |
-| `_cli.run._setup_local_env` | `cli/run.sh:34` |
-| `_cli.run._runtime` | `cli/run.sh:49` |
-| `cli.run.stage` | `cli/run.sh:60` |
-| `cli.run.pipeline` | `cli/run.sh:122` |
+| `cli.local_runner.setup_env` | `cli/local_runner.sh` |
+| `cli.local_runner.runtime` | `cli/local_runner.sh` |
+| `cli.stage.run` | `cli/stage.sh` |
+| `cli.integrate.run` | `cli/integrate.sh` |
 | `cli.self_uninstall.run` | `cli/self_uninstall.sh:12` |
 | `cli.self_update.run` | `cli/self_update.sh:12` |
 | `_cli.self_update._git` | `cli/self_update.sh:73` |

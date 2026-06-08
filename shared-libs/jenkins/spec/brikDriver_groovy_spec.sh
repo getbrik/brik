@@ -4,9 +4,9 @@
 #
 # brikDriver factors out the per-stage orchestration that used to live as
 # imperative `runStageWithPlan('Foo', 'foo') {...}` calls in
-# brikPipeline.groovy. It reads `brik registry stages --format json` at
+# brikIntegrate.groovy. It reads `brik registry stages --format json` at
 # pipeline start to obtain the structural stage list, then exposes 4
-# helpers consumed by the slim brikPipeline.groovy loop.
+# helpers consumed by the slim brikIntegrate.groovy loop.
 
 Describe "shared-libs/jenkins/vars/brikDriver.groovy - Lot 4 driver"
   DRIVER="${BRIK_HOME}/shared-libs/jenkins/vars/brikDriver.groovy"
@@ -16,7 +16,7 @@ Describe "shared-libs/jenkins/vars/brikDriver.groovy - Lot 4 driver"
     The status should be success
   End
 
-  Describe "declares the 4 helpers consumed by brikPipeline.groovy"
+  Describe "declares the 4 helpers consumed by brikIntegrate.groovy"
     Parameters
       "stagesList"
       "resolveImage"
@@ -57,8 +57,8 @@ Describe "shared-libs/jenkins/vars/brikDriver.groovy - Lot 4 driver"
   End
 End
 
-Describe "shared-libs/jenkins/vars/brikPipeline.groovy - Lot 4 refactor"
-  GROOVY="${BRIK_HOME}/shared-libs/jenkins/vars/brikPipeline.groovy"
+Describe "shared-libs/jenkins/vars/brikIntegrate.groovy - Lot 4 refactor"
+  GROOVY="${BRIK_HOME}/shared-libs/jenkins/vars/brikIntegrate.groovy"
 
   Describe "hardcoded runStageWithPlan calls have been removed"
     # Lot 4 replaces these imperative calls with a loop over brikDriver.
@@ -70,14 +70,14 @@ Describe "shared-libs/jenkins/vars/brikPipeline.groovy - Lot 4 refactor"
       "Deploy"
     End
 
-    It "brikPipeline.groovy no longer contains runStageWithPlan('$1', ..."
+    It "brikIntegrate.groovy no longer contains runStageWithPlan('$1', ..."
       When run grep -qF "runStageWithPlan('$1'" "$GROOVY"
       The status should be failure
     End
   End
 
   Describe "the driver is wired in"
-    It "brikPipeline.groovy references brikDriver"
+    It "brikIntegrate.groovy references brikDriver"
       When run grep -qF "brikDriver" "$GROOVY"
       The status should be success
     End
@@ -103,7 +103,7 @@ Describe "shared-libs/jenkins/vars/brikPipeline.groovy - Lot 4 refactor"
     # qualitative (no hardcoded stage list), enforced by the grep
     # asserts above. This budget catches an accidental ballooning of
     # the file without demanding an arbitrary reduction.
-    It "brikPipeline.groovy stays within 600 lines"
+    It "brikIntegrate.groovy stays within 600 lines"
       under_600() {
         local n
         n="$(wc -l < "$GROOVY" | tr -d ' ')"
