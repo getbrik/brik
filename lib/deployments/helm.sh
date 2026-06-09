@@ -100,3 +100,51 @@ deploy.helm.run() {
     log.info "helm deployment completed successfully"
     return 0
 }
+
+# Read back the live image digest of a Helm release: render its live manifests
+# with `helm get manifest`, take the first Deployment container image, and
+# reduce it to its digest. Lets the deploy stage confirm the running image is
+# the digest we deployed.
+# Usage: deploy.helm.get_deployed_digest --release <name>
+#        [--namespace <ns>] [--kube-context <ctx>]
+# stdout: "sha256:..." | "unknown"
+deploy.helm.get_deployed_digest() {
+    local release="" namespace="" kube_context=""
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --release)      release="$2";      shift 2 ;;
+            --namespace)    namespace="$2";    shift 2 ;;
+            --kube-context) kube_context="$2"; shift 2 ;;
+            *) log.error "unknown option: $1"; return "$BRIK_EXIT_INVALID_INPUT" ;;
+        esac
+    done
+
+    if [[ -z "$release" ]]; then
+        log.error "release name is required (--release)"
+        return "$BRIK_EXIT_INVALID_INPUT"
+    fi
+    pipeline.require_tool helm || return "$BRIK_EXIT_MISSING_DEP"
+    brik.use deployments._image_ref
+
+    local -a cmd=(helm get manifest "$release")
+    [[ -n "$namespace" ]]    && cmd+=(--namespace "$namespace")
+    [[ -n "$kube_context" ]] && cmd+=(--kube-context "$kube_context")
+
+    local manifests
+    manifests="$("${cmd[@]}" 2>/dev/null)" || {
+        log.error "helm get manifest failed for release: ${release}"
+        return "$BRIK_EXIT_EXTERNAL_FAIL"
+    }
+
+    local image=""
+    if command -v yq >/dev/null 2>&1; then
+        image="$(printf '%s\n' "$manifests" \
+            | yq e 'select(.kind == "Deployment") | .spec.template.spec.containers[0].image' - 2>/dev/null \
+            | grep -v '^null$' | head -1)"
+    fi
+    if [[ -z "$image" ]]; then
+        printf 'unknown'
+        return 0
+    fi
+    deploy.image_ref.extract_digest "$image"
+}

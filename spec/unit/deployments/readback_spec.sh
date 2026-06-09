@@ -1,4 +1,4 @@
-Describe "deployments/readback.sh - deployed digest read-back (D5, S6.4)"
+Describe "deployments/readback.sh - deployed digest read-back"
   Include "$BRIK_PIPELINE_LIB/version-info.sh"
   Include "$BRIK_PIPELINE_LIB/logging.sh"
   Include "$BRIK_PIPELINE_LIB/error.sh"
@@ -60,16 +60,81 @@ Describe "deployments/readback.sh - deployed digest read-back (D5, S6.4)"
     End
   End
 
-  Describe "targets without a read-back primitive"
-    It "marks live unsupported for helm without failing"
+  Describe "targets without a live query"
+    It "marks live unsupported for ssh without failing"
+      run_it() {
+        export BRIK_DEPLOY_IMAGE_REF="$PINNED"
+        deploy.readback.record --env staging --target ssh
+      }
+      When call run_it
+      The status should be success
+      The result of 'recorded_digest()' should equal "$DIGEST"
+      The result of 'deployed_obj()' should include "\"live\":\"unsupported\""
+      The result of 'deployed_obj()' should include "\"match\":false"
+    End
+  End
+
+  Describe "helm read-back"
+    It "records a live match when the release digest matches the resolved one"
+      run_it() {
+        export BRIK_DEPLOY_IMAGE_REF="$PINNED"
+        export BRIK_DEPLOY_STAGING_RELEASE_NAME="app"
+        deploy.helm.get_deployed_digest() { printf '%s' "$DIGEST"; }
+        deploy.readback.record --env staging --target helm
+      }
+      When call run_it
+      The status should be success
+      The result of 'deployed_obj()' should include "\"live\":\"${DIGEST}\""
+      The result of 'deployed_obj()' should include "\"match\":true"
+    End
+
+    It "records match=false and warns when the release digest differs"
+      run_it() {
+        export BRIK_DEPLOY_IMAGE_REF="$PINNED"
+        export BRIK_DEPLOY_STAGING_RELEASE_NAME="app"
+        deploy.helm.get_deployed_digest() { printf '%s' "$OTHER"; }
+        deploy.readback.record --env staging --target helm
+      }
+      When call run_it
+      The status should be success
+      The result of 'deployed_obj()' should include "\"match\":false"
+      The stderr should include "mismatch"
+    End
+
+    It "marks live unknown when no release name is configured"
       run_it() {
         export BRIK_DEPLOY_IMAGE_REF="$PINNED"
         deploy.readback.record --env staging --target helm
       }
       When call run_it
       The status should be success
-      The result of 'recorded_digest()' should equal "$DIGEST"
-      The result of 'deployed_obj()' should include "\"live\":\"unsupported\""
+      The result of 'deployed_obj()' should include "\"live\":\"unknown\""
+      The result of 'deployed_obj()' should include "\"match\":false"
+    End
+  End
+
+  Describe "compose read-back (explicit service)"
+    It "records a live match when the compose service digest matches"
+      run_it() {
+        export BRIK_DEPLOY_IMAGE_REF="$PINNED"
+        export BRIK_DEPLOY_STAGING_SERVICE="web"
+        deploy.compose.get_deployed_digest() { printf '%s' "$DIGEST"; }
+        deploy.readback.record --env staging --target compose
+      }
+      When call run_it
+      The status should be success
+      The result of 'deployed_obj()' should include "\"live\":\"${DIGEST}\""
+      The result of 'deployed_obj()' should include "\"match\":true"
+    End
+
+    It "marks live unknown when no service is configured"
+      run_it() {
+        export BRIK_DEPLOY_IMAGE_REF="$PINNED"
+        deploy.readback.record --env staging --target compose
+      }
+      When call run_it
+      The status should be success
+      The result of 'deployed_obj()' should include "\"live\":\"unknown\""
       The result of 'deployed_obj()' should include "\"match\":false"
     End
   End

@@ -959,6 +959,11 @@
           "minLength": 1,
           "default": "docker-compose.yml"
         },
+        "service": {
+          "description": "Docker Compose service name inspected for the post-deploy digest read-back (compose target). When omitted, the read-back reports the live digest as unknown rather than guessing a service.",
+          "type": "string",
+          "minLength": 1
+        },
         "remote_path": {
           "description": "Absolute path on the remote host where the application is deployed (ssh target).",
           "type": "string",
@@ -978,6 +983,12 @@
           "description": "Deployment strategy for targets that support it.",
           "type": "string",
           "enum": ["rolling", "blue-green", "canary"]
+        },
+        "on_health_failure": {
+          "description": "What brik does when a deployment or its post-rollout health check fails. 'hold' (default) leaves the environment on the previous version and marks the run failed. 'rollback' additionally reverts the deployment where the target supports it (the gitops target reverts the last config-repo commit); a target with no rollback path holds and logs that rollback is unsupported. A failed deploy is never reported as success.",
+          "type": "string",
+          "enum": ["hold", "rollback"],
+          "default": "hold"
         },
         "accepts_channel": {
           "description": "Name of the artifacts.channels.<name> this environment's artifact is resolved from. The CD flow resolves --version to a digest within this channel's registry. Optional; absent means no channel resolution (legacy tag-based deploy).",

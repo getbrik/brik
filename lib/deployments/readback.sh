@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
 # @module deployments.readback
-# @description Post-deploy read-back of the live image digest (D5 / design S6.4).
-#   Records the resolved digest and, where the target exposes a live query, the
-#   actually-deployed digest + match flag into the deploy stage report. P0 is
-#   observability only: a mismatch warns but never fails the deploy (the gate
-#   lands in P1).
+# @description Post-deploy read-back of the live image digest. Records the
+#   resolved digest and, where the target exposes a live query, the
+#   actually-deployed digest + a match flag into the deploy stage report. This
+#   is observability: a mismatch warns but does not fail the deploy by itself.
 
 # Guard against double-sourcing.
 [[ -n "${_BRIK_MODULE_DEPLOYMENTS_READBACK_LOADED:-}" ]] && return 0
@@ -55,6 +54,36 @@ _deploy.readback._live() {
             local -a a=(--deployment "$dep")
             [[ -n "$ns" ]] && a+=(--namespace "$ns")
             deploy.k8s.get_deployed_digest "${a[@]}" 2>/dev/null || printf 'unknown'
+            ;;
+        helm)
+            local release ns
+            release="$(_deploy.readback._resolve "BRIK_DEPLOY_${upper_env}_RELEASE_NAME")"
+            ns="$(_deploy.readback._resolve "BRIK_DEPLOY_${upper_env}_NAMESPACE")"
+            [[ -z "$release" ]] && { printf 'unknown'; return 0; }
+            declare -f deploy.helm.get_deployed_digest >/dev/null 2>&1 \
+                || brik.use deployments.helm
+            local -a a=(--release "$release")
+            [[ -n "$ns" ]] && a+=(--namespace "$ns")
+            deploy.helm.get_deployed_digest "${a[@]}" 2>/dev/null || printf 'unknown'
+            ;;
+        compose)
+            local service project
+            service="$(_deploy.readback._resolve "BRIK_DEPLOY_${upper_env}_SERVICE")"
+            # compose deploys use the env namespace as the compose project name.
+            project="$(_deploy.readback._resolve "BRIK_DEPLOY_${upper_env}_NAMESPACE")"
+            [[ -z "$service" ]] && { printf 'unknown'; return 0; }
+            declare -f deploy.compose.get_deployed_digest >/dev/null 2>&1 \
+                || brik.use deployments.compose
+            local -a a=(--service "$service")
+            [[ -n "$project" ]] && a+=(--project "$project")
+            deploy.compose.get_deployed_digest "${a[@]}" 2>/dev/null || printf 'unknown'
+            ;;
+        ssh)
+            # rsync+restart exposes no live image query: the primitive reports
+            # "unsupported" rather than a circular read of the local payload.
+            declare -f deploy.ssh.get_deployed_digest >/dev/null 2>&1 \
+                || brik.use deployments.ssh
+            deploy.ssh.get_deployed_digest 2>/dev/null || printf 'unsupported'
             ;;
         *)
             printf 'unsupported'

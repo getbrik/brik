@@ -114,6 +114,9 @@ _config._export_deploy_env_vars() {
         val="$(config.get ".deploy.environments.${env_name}.compose_file" '')"
         [[ -n "$val" ]] && export "BRIK_DEPLOY_${upper_env}_COMPOSE_FILE=$val"
 
+        val="$(config.get ".deploy.environments.${env_name}.service" '')"
+        [[ -n "$val" ]] && export "BRIK_DEPLOY_${upper_env}_SERVICE=$val"
+
         val="$(config.get ".deploy.environments.${env_name}.remote_path" '')"
         [[ -n "$val" ]] && export "BRIK_DEPLOY_${upper_env}_REMOTE_PATH=$val"
 
@@ -131,6 +134,9 @@ _config._export_deploy_env_vars() {
 
         val="$(config.get ".deploy.environments.${env_name}.strategy" '')"
         [[ -n "$val" ]] && export "BRIK_DEPLOY_${upper_env}_STRATEGY=$val"
+
+        val="$(config.get ".deploy.environments.${env_name}.on_health_failure" '')"
+        [[ -n "$val" ]] && export "BRIK_DEPLOY_${upper_env}_ON_HEALTH_FAILURE=$val"
 
         # CD flow (P0): the channel an environment accepts and whether a
         # digest-pinned image ref is mandatory before deploying.

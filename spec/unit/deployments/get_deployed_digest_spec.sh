@@ -6,6 +6,8 @@ Describe "deployments live digest read-back"
   Include "$BRIK_DEPLOYMENTS_LIB/k8s.sh"
   Include "$BRIK_DEPLOYMENTS_LIB/compose.sh"
   Include "$BRIK_DEPLOYMENTS_LIB/argocd.sh"
+  Include "$BRIK_DEPLOYMENTS_LIB/helm.sh"
+  Include "$BRIK_DEPLOYMENTS_LIB/ssh.sh"
   Include "$BRIK_HOME/spec/support/mock_helper.sh"
 
   DIGEST="sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
@@ -116,6 +118,88 @@ Describe "deployments live digest read-back"
       }
       When call argocd_tag
       The output should equal "unknown"
+    End
+  End
+
+  # =========================================================================
+  # deploy.helm.get_deployed_digest
+  # =========================================================================
+  Describe "deploy.helm.get_deployed_digest"
+    It "returns the digest of the live release manifest"
+      helm_digest() {
+        mock.create_script "helm" '
+cat <<YAML
+apiVersion: apps/v1
+kind: Service
+metadata:
+  name: app
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app
+spec:
+  template:
+    spec:
+      containers:
+        - name: app
+          image: registry.release/app@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+YAML'
+        mock.activate
+        deploy.helm.get_deployed_digest --release app --namespace staging
+      }
+      When call helm_digest
+      The output should equal "$DIGEST"
+    End
+
+    It "returns unknown when the release image is tag-based"
+      helm_tag() {
+        mock.create_script "helm" '
+cat <<YAML
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app
+spec:
+  template:
+    spec:
+      containers:
+        - name: app
+          image: registry.release/app:v1.2.3
+YAML'
+        mock.activate
+        deploy.helm.get_deployed_digest --release app --namespace staging
+      }
+      When call helm_tag
+      The output should equal "unknown"
+    End
+
+    It "returns 2 when --release is missing"
+      When call deploy.helm.get_deployed_digest --namespace staging
+      The status should equal 2
+      The stderr should include "release name is required"
+    End
+
+    It "fails external_fail (5) when helm errors"
+      helm_fail() {
+        mock.create_exit "helm" 1
+        mock.activate
+        deploy.helm.get_deployed_digest --release app --namespace staging
+      }
+      When call helm_fail
+      The status should equal 5
+      The stderr should include "helm get manifest failed"
+    End
+  End
+
+  # =========================================================================
+  # deploy.ssh.get_deployed_digest
+  # =========================================================================
+  Describe "deploy.ssh.get_deployed_digest"
+    It "reports unsupported (no live image query for rsync+restart)"
+      When call deploy.ssh.get_deployed_digest
+      The output should equal "unsupported"
+      The status should be success
     End
   End
 End

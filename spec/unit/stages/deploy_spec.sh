@@ -152,6 +152,108 @@ YAML
     The output should equal "canary"
   End
 
+  It "logs strategy n/a for gitops (reconciled by controller) instead of staying silent"
+    run_deploy_gitops_strategy() {
+      cat > "$BRIK_CONFIG_FILE" <<'YAML'
+version: 1
+project:
+  name: test
+  stack: node
+deploy:
+  environments:
+    staging:
+      target: gitops
+      repo: https://git.example/config.git
+      strategy: canary
+YAML
+      config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
+      brik.use() { :; }
+      deploy.gitops.run() { return 0; }
+      local ctx
+      ctx="$(context.create "deploy")" 2>/dev/null || ctx="$(mktemp)"
+      stages.deploy "$ctx" 2>&1 >/dev/null || true
+    }
+    When call run_deploy_gitops_strategy
+    The output should include "n/a for target 'gitops': reconciled by controller"
+  End
+
+  It "holds on the previous version (default) when a deploy fails"
+    run_deploy_hold() {
+      cat > "$BRIK_CONFIG_FILE" <<'YAML'
+version: 1
+project:
+  name: test
+  stack: node
+deploy:
+  environments:
+    staging:
+      target: k8s
+      namespace: stg
+YAML
+      config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
+      brik.use() { :; }
+      deploy.k8s.run() { return 1; }
+      local ctx
+      ctx="$(context.create "deploy")" 2>/dev/null || ctx="$(mktemp)"
+      stages.deploy "$ctx" 2>&1 >/dev/null || true
+    }
+    When call run_deploy_hold
+    The output should include "holding on the previous version"
+  End
+
+  It "rolls back the config repo when on_health_failure=rollback for gitops"
+    run_deploy_rollback() {
+      cat > "$BRIK_CONFIG_FILE" <<'YAML'
+version: 1
+project:
+  name: test
+  stack: node
+deploy:
+  environments:
+    staging:
+      target: gitops
+      repo: https://git.example/config.git
+      path: apps/app
+      on_health_failure: rollback
+YAML
+      config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
+      brik.use() { :; }
+      deploy.gitops.run() { return 1; }
+      deploy.gitops.rollback() { printf 'ROLLBACK %s\n' "$*"; return 0; }
+      local ctx
+      ctx="$(context.create "deploy")" 2>/dev/null || ctx="$(mktemp)"
+      stages.deploy "$ctx" 2>/dev/null || true
+    }
+    When call run_deploy_rollback
+    The output should include "ROLLBACK"
+    The output should include "--repo https://git.example/config.git"
+  End
+
+  It "degrades rollback to hold for a target with no rollback path"
+    run_deploy_rollback_unsupported() {
+      cat > "$BRIK_CONFIG_FILE" <<'YAML'
+version: 1
+project:
+  name: test
+  stack: node
+deploy:
+  environments:
+    staging:
+      target: k8s
+      namespace: stg
+      on_health_failure: rollback
+YAML
+      config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
+      brik.use() { :; }
+      deploy.k8s.run() { return 1; }
+      local ctx
+      ctx="$(context.create "deploy")" 2>/dev/null || ctx="$(mktemp)"
+      stages.deploy "$ctx" 2>&1 >/dev/null || true
+    }
+    When call run_deploy_rollback_unsupported
+    The output should include "no rollback path"
+  End
+
   It "omits deploy.business.environments[].strategy when not configured"
     run_deploy_no_strategy() {
       cat > "$BRIK_CONFIG_FILE" <<'YAML'

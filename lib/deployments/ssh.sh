@@ -130,3 +130,16 @@ deploy.ssh.run() {
     return 0
 }
 
+# Read back the live image digest of an SSH deploy.
+# A generic rsync+restart deploy exposes no live image query, so the running
+# image digest cannot be read back. Reading the local synced payload would be
+# circular -- it reflects what was pushed, not the running state -- so we report
+# "unsupported" rather than a tautological match that would be a false green.
+# A deploy that mandates digest verification must therefore fail closed on this
+# target rather than trust an unverifiable read-back.
+# stdout: "unsupported"
+deploy.ssh.get_deployed_digest() {
+    printf 'unsupported'
+    return 0
+}
+

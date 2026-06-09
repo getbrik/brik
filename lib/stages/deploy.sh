@@ -17,8 +17,52 @@ stages.deploy() {
         "$_deploy_fn" "${deploy_args[@]}" "$@"
     }
 
-    # Post-deploy read-back (D5): record the resolved digest and, where the
-    # target exposes a live query, the actually-deployed digest + match flag.
+    # Apply the on_health_failure policy when a deploy attempt fails. 'hold'
+    # (the default) leaves the environment on its previous version; 'rollback'
+    # reverts the deployment where the target supports it, otherwise holds and
+    # says so. This only logs intent and (for rollback) acts -- the caller still
+    # records the failure, so a failed deploy is never reported as success.
+    _brik.deploy._on_failure() {
+        local _env="$1" _target="$2" _uenv="$3" _policy
+        _policy="$(transverse.env.resolve_indirect "BRIK_DEPLOY_${_uenv}_ON_HEALTH_FAILURE")"
+        [[ -z "$_policy" ]] && _policy="hold"
+
+        if [[ "$_policy" != "rollback" ]]; then
+            log.error "deploy of '$_env' failed; holding on the previous version (on_health_failure=hold)"
+            return 0
+        fi
+
+        case "$_target" in
+            gitops)
+                # GitOps rolls back by reverting the last config-repo commit so
+                # the controller reconciles back to the previous desired state.
+                local _repo _path _token
+                _repo="$(transverse.env.resolve_indirect "BRIK_DEPLOY_${_uenv}_REPO")"
+                _path="$(transverse.env.resolve_indirect "BRIK_DEPLOY_${_uenv}_PATH")"
+                _token="$(transverse.env.resolve_indirect "BRIK_DEPLOY_${_uenv}_GIT_TOKEN_VAR")"
+                if [[ -z "$_repo" ]]; then
+                    log.error "rollback requested for '$_env' but no repo is configured; holding on the previous version"
+                    return 0
+                fi
+                log.warn "deploy of '$_env' failed; rolling back the last config-repo commit"
+                brik.use deployments.gitops
+                local -a _rb=(--repo "$_repo" --branch main)
+                [[ -n "$_path" ]]  && _rb+=(--path "$_path")
+                [[ -n "$_token" ]] && _rb+=(--git-token-var "$_token")
+                deploy.gitops.rollback "${_rb[@]}" \
+                    || log.error "rollback of '$_env' failed; manual intervention required"
+                ;;
+            *)
+                # Push targets have no generic rollback path here, so a rollback
+                # request degrades to a hold rather than a silent success.
+                log.error "rollback requested for '$_env' but target '$_target' has no rollback path; holding on the previous version"
+                ;;
+        esac
+        return 0
+    }
+
+    # Post-deploy read-back: record the resolved digest and, where the target
+    # exposes a live query, the actually-deployed digest + match flag.
     # Best-effort, never fails the deploy.
     _brik.deploy._readback() {
         local _env="$1" _target="$2" _uenv="$3" _ctrl
@@ -210,9 +254,16 @@ stages.deploy() {
                         --deploy-fn "_brik.deploy._strategy_wrapper"; then
                         _brik.deploy._readback "$env_name" "$target" "$upper_env"
                     else
+                        _brik.deploy._on_failure "$env_name" "$target" "$upper_env"
                         ((deploy_failed++))
                     fi
                     continue
+                    ;;
+                gitops)
+                    # Pull-based: the GitOps controller reconciles the desired
+                    # state, so brik applies no rollout strategy itself. Log it
+                    # explicitly instead of silently ignoring the strategy.
+                    log.info "strategy '$strategy' n/a for target 'gitops': reconciled by controller"
                     ;;
                 ssh|compose)
                     log.debug "strategy '$strategy' ignored for target '$target' (no native primitive)"
@@ -224,6 +275,7 @@ stages.deploy() {
         if "$_deploy_fn" "${deploy_args[@]}"; then
             _brik.deploy._readback "$env_name" "$target" "$upper_env"
         else
+            _brik.deploy._on_failure "$env_name" "$target" "$upper_env"
             ((deploy_failed++))
         fi
     done <<< "$BRIK_DEPLOY_ENVIRONMENTS"
