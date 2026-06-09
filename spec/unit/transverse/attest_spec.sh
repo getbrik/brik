@@ -96,6 +96,7 @@ Describe "transverse.attest"
       When call attest.sign "$REF" --sbom "${SHELLSPEC_TMPBASE}/sbom.json"
       The status should be success
       The contents of file "$COSIGN_ARGS_FILE" should include "--key env://COSIGN_PRIVATE_KEY"
+      The contents of file "$COSIGN_ARGS_FILE" should include "--tlog-upload=false"
     End
 
     It "dry-run does not invoke cosign"
@@ -127,6 +128,7 @@ Describe "transverse.attest"
       When call attest.verify "$REF"
       The status should be success
       The contents of file "$COSIGN_ARGS_FILE" should include "--key env://COSIGN_PUBLIC_KEY"
+      The contents of file "$COSIGN_ARGS_FILE" should include "--insecure-ignore-tlog=true"
     End
 
     It "propagates a cosign verification failure (fail-closed)"

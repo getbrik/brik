@@ -128,9 +128,12 @@ attest.sign() {
 
     pipeline.require_tool cosign || return "$BRIK_EXIT_MISSING_DEP"
 
-    # Key flag shared by every attestation; empty in keyless mode.
+    # Key flag plus transparency-log policy, shared by every attestation.
+    # Local-key signing targets environments without Sigstore infrastructure, so
+    # it does not publish to the public Rekor transparency log; keyless keeps the
+    # tlog (public transparency is the point of keyless).
     local -a key_args=()
-    [[ "$(attest.mode)" == "key" ]] && key_args=(--key "$BRIK_COSIGN_KEY")
+    [[ "$(attest.mode)" == "key" ]] && key_args=(--key "$BRIK_COSIGN_KEY" --tlog-upload=false)
 
     if [[ "$dry_run" == "true" ]]; then
         log.info "[dry-run] would attest (${sbom_type}$([[ -n "$provenance" ]] && printf ' + provenance')) on ${ref} [$(attest.mode)]"
@@ -194,7 +197,8 @@ attest.verify() {
 
     local -a args=(verify-attestation --type "$att_type")
     if [[ "$(attest.mode)" == "key" ]]; then
-        args+=(--key "$BRIK_COSIGN_KEY")
+        # Local key: signing created no public tlog entry, so do not require one.
+        args+=(--key "$BRIK_COSIGN_KEY" --insecure-ignore-tlog=true)
     else
         # Keyless: the signer identity and issuer are the residual root of
         # trust (who is allowed to sign). Without them the verification would
