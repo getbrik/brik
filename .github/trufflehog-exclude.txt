@@ -1,0 +1,9 @@
+# Paths excluded from the trufflehog secret scan (--exclude-paths).
+# One path regex per line.
+#
+# The ShellSpec suite holds fake credential-bearing URLs on purpose: many specs
+# assert that brik REDACTS credentials (e.g. https://token@host -> https://***@host)
+# or injects a token into a URL, so the fixtures must contain credential-shaped
+# strings. They are not real secrets. Production code (bin/, lib/, shared-libs/)
+# is still scanned.
+^spec/

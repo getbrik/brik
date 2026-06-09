@@ -41,7 +41,8 @@ _transverse.state_repo._inject_token() {
         log.error "token variable is empty: ${token_var}"
         return "$BRIK_EXIT_INVALID_ENV"
     fi
-    # Inject token into https URL: https://TOKEN@host/...
+    # Prefix the host with the token so git authenticates (the token becomes the
+    # URL userinfo).
     printf '%s' "$repo" | sed "s|https://|https://${token}@|"
 }
 
