@@ -236,5 +236,56 @@ JSON
         The output should match pattern "[0-9]*"
       End
     End
+
+    # Evidence signing: the post-scan step that attaches a signed SBOM +
+    # provenance to the published digest. cosign/syft are stubbed so the
+    # contract checks orchestration, not the real signer.
+    Describe "_stages.container_scan._sign_evidence"
+      REF="registry.example.com/app@sha256:2222222222222222222222222222222222222222222222222222222222222222"
+
+      setup_sign() {
+        export BRIK_LOG_DIR
+        BRIK_LOG_DIR="$(mktemp -d)"
+        brik.use() { :; }
+        attest.provenance_predicate() { printf '{}'; }
+        log.info() { :; }
+        log.warn() { :; }
+        log.error() { :; }
+      }
+      cleanup_sign() { rm -rf "$BRIK_LOG_DIR"; }
+      Before 'setup_sign'
+      After 'cleanup_sign'
+
+      It "skips (rc 0) when no signer is on the runner"
+        attest.available() { return 1; }
+        When call _stages.container_scan._sign_evidence "$REF"
+        The status should be success
+      End
+
+      It "signs the digest when cosign and syft are present"
+        attest.available() { return 0; }
+        syft() { : >"${BRIK_LOG_DIR}/evidence/sbom.cyclonedx.json"; }
+        signed_ref=""
+        attest.sign() { signed_ref="$1"; return 0; }
+        invoke_sign() {
+          _stages.container_scan._sign_evidence "$REF"
+          local rc=$?
+          printf '%s' "$signed_ref"
+          return $rc
+        }
+        When call invoke_sign
+        The status should be success
+        The output should equal "$REF"
+        The path "${BRIK_LOG_DIR}/evidence/provenance.slsa.json" should be exist
+      End
+
+      It "fails when signing is attempted but cosign fails"
+        attest.available() { return 0; }
+        syft() { : >"${BRIK_LOG_DIR}/evidence/sbom.cyclonedx.json"; }
+        attest.sign() { return 5; }
+        When call _stages.container_scan._sign_evidence "$REF"
+        The status should be failure
+      End
+    End
   End
 End

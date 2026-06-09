@@ -97,5 +97,64 @@ stages.container_scan() {
     _scan_dur_ms=$(( _scan_end_ms - _scan_start_ms ))
     [[ "$_scan_dur_ms" -lt 0 ]] && _scan_dur_ms=0
     report.record "container-scan" "tech" "scan_duration_ms" "$_scan_dur_ms" 2>/dev/null || true
+
+    # Attach signed evidence to the published digest. This is the only stage
+    # that holds both the image digest and the signer (cosign ships in the
+    # scanner image), so the SBOM + provenance are signed here. A signing
+    # failure when cosign is present is a real integrity gap and fails the
+    # stage; a missing cosign is a silent skip (the deploy verifies fail-closed
+    # and refuses an unsigned image there).
+    if [[ -n "$image_digest" ]]; then
+        local _ref="${image%:*}@${image_digest}"
+        if ! _stages.container_scan._sign_evidence "$_ref" && [[ "$_scan_rc" -eq 0 ]]; then
+            _scan_rc="$BRIK_EXIT_EXTERNAL_FAIL"
+        fi
+    fi
     return "$_scan_rc"
+}
+
+# Generate the SBOM and SLSA provenance for the published digest and attach them
+# as signed cosign attestations. Returns 0 (skip) when no signer is on the
+# runner; returns non-zero only when signing is attempted and fails.
+# Usage: _stages.container_scan._sign_evidence <name@sha256:...>
+_stages.container_scan._sign_evidence() {
+    local ref="$1"
+
+    brik.use transverse.attest
+    if ! attest.available; then
+        log.info "cosign not on PATH - skipping evidence signing (deploy verifies fail-closed)"
+        return 0
+    fi
+    if ! command -v syft >/dev/null 2>&1; then
+        log.warn "syft not on PATH - cannot produce an SBOM to sign; skipping"
+        return 0
+    fi
+
+    local _ev_dir="${BRIK_LOG_DIR:-${BRIK_WORKSPACE:-.}/.brik-logs}/evidence"
+    mkdir -p "$_ev_dir" || { log.error "cannot create evidence dir: $_ev_dir"; return "$BRIK_EXIT_IO_FAILURE"; }
+    local _sbom="${_ev_dir}/sbom.cyclonedx.json"
+    local _prov="${_ev_dir}/provenance.slsa.json"
+
+    log.info "generating SBOM for ${ref}"
+    if ! syft "$ref" -o "cyclonedx-json=${_sbom}" >/dev/null 2>&1; then
+        log.error "syft failed to generate an SBOM for ${ref}"
+        return "$BRIK_EXIT_EXTERNAL_FAIL"
+    fi
+
+    if ! attest.provenance_predicate \
+            --version "${BRIK_COMMIT_TAG:-${BRIK_COMMIT_SHORT_SHA:-unknown}}" \
+            --commit  "${BRIK_COMMIT_SHA:-unknown}" \
+            --repo    "git+${BRIK_COMMIT_REPO_URL:-unknown}" \
+            --builder "https://brik.sh/builder/${BRIK_PLATFORM:-local}" \
+            --run-id  "${BRIK_RUN_ID:-${BRIK_PIPELINE_ID:-unknown}}" \
+            > "$_prov"; then
+        log.error "failed to build the provenance predicate for ${ref}"
+        return "$BRIK_EXIT_EXTERNAL_FAIL"
+    fi
+
+    attest.sign "$ref" --sbom "$_sbom" --provenance "$_prov" || return $?
+
+    report.record "container-scan" "tech" "signed" "true" 2>/dev/null || true
+    report.record "container-scan" "tech" "attestation_subject" "$ref" 2>/dev/null || true
+    return 0
 }
