@@ -91,6 +91,32 @@
               }
             }
           }
+        },
+        "evidence": {
+          "description": "State-repo where CI records BuildEvidence for each published digest (evidence/<version>/sha256-<digest>.json). When unset, evidence signing still attaches attestations to the image but no evidence file is committed.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["repo"],
+          "properties": {
+            "repo": {
+              "description": "Git URL of the evidence state-repo (append-only, file-per-digest).",
+              "type": "string",
+              "minLength": 1
+            },
+            "branch": {
+              "description": "Branch to commit evidence on (default: the repo default branch).",
+              "type": "string"
+            },
+            "token_var": {
+              "description": "Name of the environment variable holding the write token for the evidence repo (resolved indirectly, never inlined).",
+              "type": "string"
+            },
+            "sign": {
+              "description": "When true, sign the evidence commit (git commit -S) in addition to the attestations on the digest.",
+              "type": "boolean",
+              "default": false
+            }
+          }
         }
       }
     },
@@ -1004,6 +1030,19 @@
               "description": "When true, the deployment must use a digest-pinned image ref; the CD flow fails closed if the version cannot be resolved to a digest in the accepted channel.",
               "type": "boolean",
               "default": false
+            },
+            "require_provenance": {
+              "description": "When true, the CD flow verifies the signed SBOM/provenance attestation on the resolved digest before deploying and fails closed if it is missing or does not verify.",
+              "type": "boolean",
+              "default": false
+            },
+            "verify_identity": {
+              "description": "Expected signer identity (regexp) for keyless attestation verification (e.g. the CI job's certificate identity). Required when require_provenance is set and BRIK_COSIGN_KEY is not used.",
+              "type": "string"
+            },
+            "verify_issuer": {
+              "description": "Expected OIDC issuer (regexp) for keyless attestation verification (e.g. the platform's Sigstore issuer). Required when require_provenance is set and BRIK_COSIGN_KEY is not used.",
+              "type": "string"
             }
           }
         }

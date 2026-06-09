@@ -94,4 +94,45 @@ YAML
     The status should equal 7
     The stderr should include "unknown deploy environment"
   End
+
+  Describe "provenance gate (require_provenance)"
+    # Enable keyless provenance verification on the staging environment and
+    # resolve the digest as usual; cosign is mocked to accept or reject.
+    enable_provenance() {
+      yq -i '.deploy.environments.staging.gates.require_provenance = true
+             | .deploy.environments.staging.gates.verify_identity = "https://ci/job/.*"
+             | .deploy.environments.staging.gates.verify_issuer = "https://issuer.example"' \
+        "$REPO/brik.yml"
+      printf '#!/bin/sh\nprintf "HTTP/1.1 200 OK\\r\\nDocker-Content-Digest: %s\\r\\n\\r\\n"\nexit 0\n' \
+        "$DIGEST" > "${MOCKBIN}/curl"
+      chmod +x "${MOCKBIN}/curl"
+    }
+
+    It "verifies the attestation and deploys when it verifies"
+      deploy_prov_ok() {
+        enable_provenance
+        printf '#!/bin/sh\nexit 0\n' > "${MOCKBIN}/cosign"
+        chmod +x "${MOCKBIN}/cosign"
+        cd "$REPO"
+        PATH="${MOCKBIN}:$PATH" "$BRIK_BIN" deploy --version v1.2.3 --environment staging
+      }
+      When call deploy_prov_ok
+      The status should equal 0
+      The stderr should include "provenance verified"
+      The output should include "@${DIGEST}"
+    End
+
+    It "fails closed when the attestation does not verify"
+      deploy_prov_ko() {
+        enable_provenance
+        printf '#!/bin/sh\nexit 1\n' > "${MOCKBIN}/cosign"
+        chmod +x "${MOCKBIN}/cosign"
+        cd "$REPO"
+        PATH="${MOCKBIN}:$PATH" "$BRIK_BIN" deploy --version v1.2.3 --environment staging
+      }
+      When call deploy_prov_ko
+      The status should equal 5
+      The stderr should include "failing closed"
+    End
+  End
 End

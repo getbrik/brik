@@ -163,6 +163,31 @@ cli.deploy.run() {
         return "${BRIK_EXIT_CONFIG_ERROR}"
     fi
 
+    # Provenance gate: verify the signed attestation on the resolved digest
+    # before deploying. Fail-closed -- an environment that requires provenance
+    # but has no digest to verify, or whose attestation does not verify, is
+    # refused rather than deployed.
+    local require_provenance
+    require_provenance="$(transverse.env.resolve_indirect "BRIK_DEPLOY_${upper_env}_REQUIRE_PROVENANCE")"
+    if [[ "$require_provenance" == "true" ]]; then
+        if [[ -z "$pinned" ]]; then
+            brik_error "require_provenance: no digest-pinned ref to verify for '${environment}' -- failing closed"
+            return "${BRIK_EXIT_EXTERNAL_FAIL}"
+        fi
+        brik.use transverse.attest
+        local verify_identity verify_issuer
+        verify_identity="$(transverse.env.resolve_indirect "BRIK_DEPLOY_${upper_env}_VERIFY_IDENTITY")"
+        verify_issuer="$(transverse.env.resolve_indirect "BRIK_DEPLOY_${upper_env}_VERIFY_ISSUER")"
+        local -a verify_args=("$pinned")
+        [[ -n "$verify_identity" ]] && verify_args+=(--identity "$verify_identity")
+        [[ -n "$verify_issuer" ]]   && verify_args+=(--issuer "$verify_issuer")
+        if ! attest.verify "${verify_args[@]}"; then
+            brik_error "require_provenance: attestation did not verify for ${pinned} -- failing closed"
+            return "${BRIK_EXIT_EXTERNAL_FAIL}"
+        fi
+        log.info "provenance verified for ${pinned}"
+    fi
+
     # Strategy override (CLI wins over brik.yml) and single-env targeting.
     [[ -n "$strategy" ]] && export "BRIK_DEPLOY_${upper_env}_STRATEGY=$strategy"
     export BRIK_DEPLOY_ONLY_ENV="$environment"

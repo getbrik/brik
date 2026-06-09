@@ -156,5 +156,49 @@ _stages.container_scan._sign_evidence() {
 
     report.record "container-scan" "tech" "signed" "true" 2>/dev/null || true
     report.record "container-scan" "tech" "attestation_subject" "$ref" 2>/dev/null || true
+
+    _stages.container_scan._record_evidence "$ref" "$_sbom" "$_prov" || return $?
+    return 0
+}
+
+# Record BuildEvidence for the signed digest in the configured state-repo.
+# Self-skips when no artifacts.evidence.repo is configured (the attestations on
+# the digest stand on their own); a configured publish that fails is an error.
+# Usage: _stages.container_scan._record_evidence <ref> <sbom> <provenance>
+_stages.container_scan._record_evidence() {
+    local ref="$1" sbom="$2" prov="$3"
+
+    brik.use transverse.config
+    local _repo _branch _token_var _sign
+    _repo="$(config.get '.artifacts.evidence.repo' '' 2>/dev/null || printf '')"
+    if [[ -z "$_repo" ]]; then
+        return 0
+    fi
+    _branch="$(config.get '.artifacts.evidence.branch' '' 2>/dev/null || printf '')"
+    _token_var="$(config.get '.artifacts.evidence.token_var' '' 2>/dev/null || printf '')"
+    _sign="$(config.get '.artifacts.evidence.sign' 'false' 2>/dev/null || printf 'false')"
+
+    local _digest="${ref#*@}"
+    local _version="${BRIK_COMMIT_TAG:-${BRIK_COMMIT_SHORT_SHA:-unknown}}"
+
+    brik.use transverse.evidence
+    local -a _pub=(--repo "$_repo" --version "$_version" --digest "$_digest")
+    [[ -n "$_branch" ]]    && _pub+=(--branch "$_branch")
+    [[ -n "$_token_var" ]] && _pub+=(--token-var "$_token_var")
+    [[ "$_sign" == "true" ]] && _pub+=(--sign)
+
+    if ! evidence.build \
+            --version "$_version" --digest "$_digest" \
+            --commit "${BRIK_COMMIT_SHA:-unknown}" \
+            --run-id "${BRIK_RUN_ID:-${BRIK_PIPELINE_ID:-unknown}}" \
+            --platform "${BRIK_PLATFORM:-local}" \
+            --sbom-ref "$(basename "$sbom")" \
+            --provenance-ref "$(basename "$prov")" \
+            --version-ref "${BRIK_COMMIT_TAG:-}" \
+            | evidence.publish "${_pub[@]}"; then
+        log.error "failed to record BuildEvidence for ${ref}"
+        return "$BRIK_EXIT_EXTERNAL_FAIL"
+    fi
+    report.record "container-scan" "tech" "evidence_recorded" "true" 2>/dev/null || true
     return 0
 }

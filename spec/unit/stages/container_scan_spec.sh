@@ -286,6 +286,38 @@ JSON
         When call _stages.container_scan._sign_evidence "$REF"
         The status should be failure
       End
+
+      Describe "_record_evidence"
+        It "self-skips when no evidence repo is configured"
+          config.get() { printf '%s' "${2:-}"; }   # every key resolves to its default
+          When call _stages.container_scan._record_evidence "$REF" /tmp/sbom.json /tmp/prov.json
+          The status should be success
+        End
+
+        It "publishes evidence when artifacts.evidence.repo is set"
+          config.get() {
+            case "$1" in
+              .artifacts.evidence.repo) printf 'https://git/state.git' ;;
+              *) printf '%s' "${2:-}" ;;
+            esac
+          }
+          evidence.build() { printf '{}'; }
+          # publish runs on the right of a pipe (subshell) in the module, so
+          # record the repo it was called with to a file.
+          REPO_REC="$(mktemp)"
+          evidence.publish() {
+            while [[ $# -gt 0 ]]; do [[ "$1" == "--repo" ]] && printf '%s' "$2" >"$REPO_REC"; shift; done
+            cat >/dev/null
+          }
+          run_rec() {
+            _stages.container_scan._record_evidence "$REF" /tmp/sbom.json /tmp/prov.json
+            cat "$REPO_REC"; rm -f "$REPO_REC"
+          }
+          When call run_rec
+          The status should be success
+          The output should equal "https://git/state.git"
+        End
+      End
     End
   End
 End

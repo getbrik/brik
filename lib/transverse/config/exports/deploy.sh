@@ -145,6 +145,18 @@ _config._export_deploy_env_vars() {
 
         val="$(config.get ".deploy.environments.${env_name}.gates.require_digest" '')"
         [[ -n "$val" ]] && export "BRIK_DEPLOY_${upper_env}_REQUIRE_DIGEST=$val"
+
+        # Provenance gate: verify the signed attestation on the resolved digest
+        # before deploying. The identity/issuer pin the expected signer for
+        # keyless verification (BRIK_COSIGN_KEY overrides them with a local key).
+        val="$(config.get ".deploy.environments.${env_name}.gates.require_provenance" '')"
+        [[ -n "$val" ]] && export "BRIK_DEPLOY_${upper_env}_REQUIRE_PROVENANCE=$val"
+
+        val="$(config.get ".deploy.environments.${env_name}.gates.verify_identity" '')"
+        [[ -n "$val" ]] && export "BRIK_DEPLOY_${upper_env}_VERIFY_IDENTITY=$val"
+
+        val="$(config.get ".deploy.environments.${env_name}.gates.verify_issuer" '')"
+        [[ -n "$val" ]] && export "BRIK_DEPLOY_${upper_env}_VERIFY_ISSUER=$val"
     done <<< "$env_keys"
 
     return 0
