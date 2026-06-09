@@ -97,6 +97,7 @@ Describe "transverse.attest"
       The status should be success
       The contents of file "$COSIGN_ARGS_FILE" should include "--key env://COSIGN_PRIVATE_KEY"
       The contents of file "$COSIGN_ARGS_FILE" should include "--tlog-upload=false"
+      The contents of file "$COSIGN_ARGS_FILE" should include "--use-signing-config=false"
     End
 
     It "dry-run does not invoke cosign"

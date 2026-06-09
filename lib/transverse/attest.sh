@@ -132,8 +132,11 @@ attest.sign() {
     # Local-key signing targets environments without Sigstore infrastructure, so
     # it does not publish to the public Rekor transparency log; keyless keeps the
     # tlog (public transparency is the point of keyless).
+    # --use-signing-config=false drops cosign's default Sigstore signing config
+    # (which mandates a Rekor service); --tlog-upload=false then suppresses the
+    # transparency-log upload for the local key.
     local -a key_args=()
-    [[ "$(attest.mode)" == "key" ]] && key_args=(--key "$BRIK_COSIGN_KEY" --tlog-upload=false)
+    [[ "$(attest.mode)" == "key" ]] && key_args=(--key "$BRIK_COSIGN_KEY" --use-signing-config=false --tlog-upload=false)
 
     if [[ "$dry_run" == "true" ]]; then
         log.info "[dry-run] would attest (${sbom_type}$([[ -n "$provenance" ]] && printf ' + provenance')) on ${ref} [$(attest.mode)]"
