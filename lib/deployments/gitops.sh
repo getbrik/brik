@@ -15,29 +15,19 @@
 [[ -n "${_BRIK_DEPLOYMENTS_GITOPS_LOADED:-}" ]] && return 0
 _BRIK_DEPLOYMENTS_GITOPS_LOADED=1
 
-# Internal helper: inject git token into a repo URL via variable indirection.
+# Token injection and URL masking are owned by transverse.state_repo (the single
+# git accessor for brik state stores). These thin forwarders keep the gitops
+# internal API stable for diff/rollback/push_manifests; the logic lives once.
 # Usage: _deploy.gitops._inject_token <repo_url> <token_var_name>
-# stdout: URL with token injected, or original URL if no token var
 _deploy.gitops._inject_token() {
-    local repo="$1" token_var="$2"
-    if [[ -z "$token_var" ]]; then
-        printf '%s' "$repo"
-        return 0
-    fi
-    brik.use transverse.env
-    local token
-    token="$(transverse.env.resolve_indirect "$token_var")"
-    if [[ -z "$token" ]]; then
-        log.error "token variable is empty: ${token_var}"
-        return "$BRIK_EXIT_INVALID_ENV"
-    fi
-    # Inject token into https URL: https://TOKEN@host/...
-    printf '%s' "$repo" | sed "s|https://|https://${token}@|"
+    brik.use transverse.state_repo
+    _transverse.state_repo._inject_token "$@"
 }
 
-# Internal helper: mask credentials in a URL for safe logging.
+# Usage: _deploy.gitops._safe_url <url>
 _deploy.gitops._safe_url() {
-    printf '%s' "$1" | sed 's|://[^@]*@|://***@|'
+    brik.use transverse.state_repo
+    _transverse.state_repo._safe_url "$@"
 }
 
 # Render Kubernetes manifests from various sources.
@@ -203,13 +193,13 @@ deploy.gitops.push_manifests() {
     fi
 
     # Clone into temp directory (explicit cleanup -- trap RETURN is
-    # incompatible with kcov which enables functrace)
+    # incompatible with kcov which enables functrace). clone_url already carries
+    # the injected token, so the state-repo primitive clones it as-is.
     local tmpdir
     tmpdir="$(mktemp -d)"
 
-    log.info "cloning config repo: $safe_url (branch: $branch)"
-    brik.use transverse.git
-    if ! transverse.git.clone_shallow "$clone_url" "$tmpdir" --branch "$branch"; then
+    brik.use transverse.state_repo
+    if ! transverse.state_repo.clone "$clone_url" "$tmpdir" --branch "$branch"; then
         rm -rf "$tmpdir"
         return "$BRIK_EXIT_EXTERNAL_FAIL"
     fi
@@ -255,30 +245,15 @@ deploy.gitops.push_manifests() {
         log.info "image tags substituted to :${image_tag}"
     fi
 
-    # Commit and push
-    if ! git -C "$tmpdir" add .; then
-        log.error "git add failed"
+    # Commit and push via the state-repo primitive. commit is idempotent: a
+    # clean tree (manifests already up-to-date) logs "no changes" and returns 0,
+    # so a no-op push that follows is harmless ("Everything up-to-date").
+    if ! transverse.state_repo.commit "$tmpdir" "$message"; then
         rm -rf "$tmpdir"
         return "$BRIK_EXIT_EXTERNAL_FAIL"
     fi
 
-    local commit_exit=0
-    git -C "$tmpdir" -c user.email="brik-ci@noreply" -c user.name="Brik CI" commit -m "$message" || commit_exit=$?
-    if [[ "$commit_exit" -eq 1 ]]; then
-        log.info "no changes to commit (manifests already up-to-date)"
-        rm -rf "$tmpdir"
-        return 0
-    elif [[ "$commit_exit" -ne 0 ]]; then
-        log.error "git commit failed"
-        rm -rf "$tmpdir"
-        return "$BRIK_EXIT_EXTERNAL_FAIL"
-    fi
-
-    local push_err
-    if ! push_err="$(GIT_TERMINAL_PROMPT=0 git -C "$tmpdir" push 2>&1)"; then
-        local safe_err
-        safe_err="$(printf '%s' "$push_err" | sed 's|://[^@]*@|://***@|')"
-        log.error "git push failed: $safe_err"
+    if ! transverse.state_repo.push "$tmpdir"; then
         rm -rf "$tmpdir"
         return "$BRIK_EXIT_EXTERNAL_FAIL"
     fi
@@ -427,8 +402,8 @@ deploy.gitops.rollback() {
     local tmpdir
     tmpdir="$(mktemp -d)"
 
-    brik.use transverse.git
-    if ! transverse.git.clone_shallow "$clone_url" "$tmpdir" --branch "$branch" --depth 10; then
+    brik.use transverse.state_repo
+    if ! transverse.state_repo.clone "$clone_url" "$tmpdir" --branch "$branch" --depth 10; then
         rm -rf "$tmpdir"
         return "$BRIK_EXIT_EXTERNAL_FAIL"
     fi
@@ -469,8 +444,8 @@ deploy.gitops.rollback() {
         fi
     fi
 
-    if ! GIT_TERMINAL_PROMPT=0 git -C "$tmpdir" push; then
-        log.error "git push failed after rollback"
+    if ! transverse.state_repo.push "$tmpdir"; then
+        log.error "rollback push failed"
         rm -rf "$tmpdir"
         return "$BRIK_EXIT_EXTERNAL_FAIL"
     fi

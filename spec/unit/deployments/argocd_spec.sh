@@ -1396,6 +1396,7 @@ SCRIPT
   # deploy.argocd.deploy - integration tests
   # ---------------------------------------------------------------------------
   Describe "deploy.argocd.deploy - dry-run integration"
+    Include "$BRIK_TRANSVERSE_LIB/state_repo.sh"
     Include "$BRIK_DEPLOYMENTS_LIB/gitops.sh"
 
     setup_deploy_dryrun() {
@@ -1433,6 +1434,7 @@ SCRIPT
 
   Describe "deploy.argocd.deploy - happy path with mocks"
     Include "$BRIK_TRANSVERSE_LIB/git.sh"
+    Include "$BRIK_TRANSVERSE_LIB/state_repo.sh"
     Include "$BRIK_DEPLOYMENTS_LIB/gitops.sh"
 
     setup_deploy_happy() {

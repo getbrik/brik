@@ -3,6 +3,8 @@ Describe "deploy/gitops.sh"
   Include "$BRIK_PIPELINE_LIB/tools.sh"
   Include "$BRIK_PIPELINE_LIB/loader.sh"
   Include "$BRIK_TRANSVERSE_LIB/env.sh"
+  Include "$BRIK_TRANSVERSE_LIB/git.sh"
+  Include "$BRIK_TRANSVERSE_LIB/state_repo.sh"
   Include "$BRIK_DEPLOYMENTS_LIB/gitops.sh"
   Include "$BRIK_HOME/spec/support/mock_helper.sh"
 
@@ -391,6 +393,10 @@ if [ "\$1" = "clone" ]; then
   dest="\$(echo "\$*" | rev | cut -d' ' -f1 | rev)"
   mkdir -p "\$dest"
 fi
+# Simulate a dirty tree after manifests are copied so the commit proceeds.
+case "\$*" in
+  *status*) echo " M deploy.yaml" ;;
+esac
 exit 0
 SCRIPT
         chmod +x "${MOCK_BIN}/git"
