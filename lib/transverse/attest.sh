@@ -53,6 +53,20 @@ _attest._require_digest() {
     return 0
 }
 
+# Append cosign registry-connection flags to the named argv array. Lets cosign
+# reach the same registry brik publishes to: plain HTTP when BRIK_COSIGN_ALLOW_HTTP
+# is set (insecure registries such as a lab Nexus), and basic auth from the
+# canonical BRIK_REGISTRY_USER/PASSWORD when present (attaching a referrer is a
+# registry write).
+# Usage: _attest._registry_args <array_name>
+_attest._registry_args() {
+    local -n _argv="$1"
+    [[ "${BRIK_COSIGN_ALLOW_HTTP:-}" == "true" ]] && _argv+=(--allow-http-registry)
+    if [[ -n "${BRIK_REGISTRY_USER:-}" && -n "${BRIK_REGISTRY_PASSWORD:-}" ]]; then
+        _argv+=(--registry-username "$BRIK_REGISTRY_USER" --registry-password "$BRIK_REGISTRY_PASSWORD")
+    fi
+}
+
 # Emit an in-toto SLSA provenance predicate body (the document cosign wraps as
 # a slsaprovenance attestation). Captures the version, source commit, builder
 # identity and CI run id so a deploy can trace an image back to its build.
@@ -137,6 +151,7 @@ attest.sign() {
     # transparency-log upload for the local key.
     local -a key_args=()
     [[ "$(attest.mode)" == "key" ]] && key_args=(--key "$BRIK_COSIGN_KEY" --use-signing-config=false --tlog-upload=false)
+    _attest._registry_args key_args
 
     if [[ "$dry_run" == "true" ]]; then
         log.info "[dry-run] would attest (${sbom_type}$([[ -n "$provenance" ]] && printf ' + provenance')) on ${ref} [$(attest.mode)]"
@@ -212,6 +227,7 @@ attest.verify() {
         fi
         args+=(--certificate-identity-regexp "$identity" --certificate-oidc-issuer-regexp "$issuer")
     fi
+    _attest._registry_args args
     args+=("$ref")
 
     if [[ "$dry_run" == "true" ]]; then

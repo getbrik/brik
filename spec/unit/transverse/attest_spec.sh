@@ -106,6 +106,17 @@ Describe "transverse.attest"
       The status should be success
       The contents of file "$COSIGN_ARGS_FILE" should equal ""
     End
+
+    It "passes registry HTTP + auth flags when configured (insecure lab registry)"
+      unset BRIK_COSIGN_KEY
+      export BRIK_COSIGN_ALLOW_HTTP=true BRIK_REGISTRY_USER=u BRIK_REGISTRY_PASSWORD=p
+      printf '{}' >"${SHELLSPEC_TMPBASE}/sbom.json"
+      When call attest.sign "$REF" --sbom "${SHELLSPEC_TMPBASE}/sbom.json"
+      The status should be success
+      The contents of file "$COSIGN_ARGS_FILE" should include "--allow-http-registry"
+      The contents of file "$COSIGN_ARGS_FILE" should include "--registry-username u"
+      The contents of file "$COSIGN_ARGS_FILE" should include "--registry-password p"
+    End
   End
 
   Describe "attest.verify"
