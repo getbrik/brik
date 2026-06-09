@@ -52,6 +52,14 @@ Describe "GitLab CD pipeline template (brik-deploy.yml)"
     The output should include "BRIK_DEPLOY_ENVIRONMENT"
   End
 
+  It "scopes the deploy job to the target environment for env-scoped variables"
+    deploy_env() {
+      yq -r '.["brik-cd-deploy"].environment.name' "$CD"
+    }
+    When call deploy_env
+    The output should equal '${BRIK_DEPLOY_ENVIRONMENT}'
+  End
+
   It "ships the pipeline.env dotenv report (propagation parity)"
     dotenv() {
       yq -r '.["brik-cd-deploy"].artifacts.reports.dotenv' "$CD"

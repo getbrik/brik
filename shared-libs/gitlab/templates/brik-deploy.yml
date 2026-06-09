@@ -65,6 +65,14 @@ default:
 # ---------------------------------------------------------------------------
 brik-cd-deploy:
   stage: deploy
+  # Declare the target environment so GitLab applies environment-scoped CI/CD
+  # variables to this job. Operators scope the privileged deploy credentials
+  # (e.g. ARGOCD_TOKEN, SSH keys, the prod registry token) to the environment,
+  # so they reach only this deploy job and never the CI build/test jobs, which
+  # run without an environment.
+  environment:
+    name: "${BRIK_DEPLOY_ENVIRONMENT}"
+    action: start
   script:
     - |
       brik deploy \

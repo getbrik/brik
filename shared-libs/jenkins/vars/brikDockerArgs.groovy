@@ -57,26 +57,40 @@ def call(Map config = [:]) {
     ).trim()
     def policyArg = policyHost ? "-v ${policyHost}:/etc/brik/policy:ro" : ''
 
-    // BRIK_RUNNER_CLASSES_FILE is excluded from the env-file: brikRunStage
-    // forwards it explicitly as `-e BRIK_RUNNER_CLASSES_FILE=<absolute>`
-    // (a relative param value resolved against brikHome). The env-file is
-    // appended AFTER that -e on the docker run line, and Docker lets the
-    // rightmost source win -- so leaving the raw (relative) param value in
-    // the env-file would clobber the resolved absolute path. Inside the
-    // stage container the CWD is the workspace, not the @libs/<hash>
-    // checkout, so the relative path would not resolve and the registry
-    // override would silently fall back to the bundled default. Drop it
-    // here and let the explicit -e be the single source.
+    // Scope credentials by phase rather than injecting every prefix into every
+    // container. Deploy credentials (ARGOCD_, SSH_) are more privileged than
+    // build credentials and must not reach CI stage containers; the
+    // package-publish credentials (CARGO_) have no business in the deploy
+    // container. So we write two env-files: one for CI stages, one for the
+    // deploy stage. Registry and runtime prefixes (NEXUS_, REGISTRY_, BRIK_)
+    // are shared -- CI pushes the image, the deploy reads it back.
+    //
+    // BRIK_RUNNER_CLASSES_FILE is excluded from both files: brikRunStage
+    // forwards it explicitly as `-e BRIK_RUNNER_CLASSES_FILE=<absolute>` (a
+    // relative param value resolved against brikHome). The env-file is appended
+    // AFTER that -e on the docker run line, and Docker lets the rightmost
+    // source win -- so leaving the raw (relative) value in the env-file would
+    // clobber the resolved absolute path. Inside the stage container the CWD is
+    // the workspace, not the @libs/<hash> checkout, so the relative path would
+    // not resolve and the registry override would silently fall back to the
+    // bundled default.
     def envFile = "/tmp/brik-env-${env.BUILD_TAG}"
-    sh """env | grep -E '^(NEXUS_|BRIK_|REGISTRY_|ARGOCD_|CARGO_|SSH_)' | grep -v '^BRIK_RUNNER_CLASSES_FILE=' > '${envFile}' 2>/dev/null || true"""
+    sh """env | grep -E '^(NEXUS_|BRIK_|REGISTRY_|CARGO_)' | grep -v '^BRIK_RUNNER_CLASSES_FILE=' > '${envFile}' 2>/dev/null || true"""
     def envFileArg = fileExists(envFile) && readFile(envFile).trim() ? "--env-file ${envFile}" : ''
 
+    def deployEnvFile = "/tmp/brik-deploy-env-${env.BUILD_TAG}"
+    sh """env | grep -E '^(NEXUS_|BRIK_|REGISTRY_|ARGOCD_|SSH_)' | grep -v '^BRIK_RUNNER_CLASSES_FILE=' > '${deployEnvFile}' 2>/dev/null || true"""
+    def deployEnvFileArg = fileExists(deployEnvFile) && readFile(deployEnvFile).trim() ? "--env-file ${deployEnvFile}" : ''
+
     def javaEnvArgs = "-e MAVEN_OPTS=\"-Dmaven.repo.local=${env.WORKSPACE}/.m2/repository\" -e GRADLE_USER_HOME=${env.WORKSPACE}/.gradle"
-    def dockerArgs = "-e HOME=${env.WORKSPACE} ${javaEnvArgs} --memory=4g -v /var/run/docker.sock:/var/run/docker.sock ${networkArg} ${envFileArg} ${policyArg}"
+    def baseArgs = "-e HOME=${env.WORKSPACE} ${javaEnvArgs} --memory=4g -v /var/run/docker.sock:/var/run/docker.sock ${networkArg}"
+    def dockerArgs       = "${baseArgs} ${envFileArg} ${policyArg}"
+    def deployDockerArgs = "-u 0:0 ${baseArgs} ${deployEnvFileArg} ${policyArg}"
 
     return [
         dockerArgs:       dockerArgs,
-        deployDockerArgs: "-u 0:0 ${dockerArgs}",
+        deployDockerArgs: deployDockerArgs,
         envFile:          envFile,
+        deployEnvFile:    deployEnvFile,
     ]
 }

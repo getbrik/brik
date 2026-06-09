@@ -228,6 +228,7 @@ def call(Map params = [:]) {
             def dockerArgs       = args.dockerArgs
             def deployDockerArgs = args.deployDockerArgs
             def envFile          = args.envFile
+            def deployEnvFile    = args.deployEnvFile
 
             // Stash each stage's brik-artifacts/ subdirectory so the Notify
             // stage can unstash and aggregate them via report.aggregate_fragments.
@@ -555,7 +556,7 @@ def call(Map params = [:]) {
                         echo "[brik] stage Notify failed: ${e.message}"
                     }
                 }
-                sh """rm -f '${envFile}' 2>/dev/null || true"""
+                sh """rm -f '${envFile}' '${deployEnvFile}' 2>/dev/null || true"""
             }
 
             } // withEnv(scmEnv)

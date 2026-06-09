@@ -118,7 +118,7 @@ def call(Map params = [:]) {
                 archiveArtifacts artifacts: 'brik-artifacts/**/*,.brik-logs/**/*',
                                  excludes: '.brik-logs/*.lock,.brik-logs/context-*',
                                  allowEmptyArchive: true
-                sh "rm -f '${args.envFile}' || true"
+                sh "rm -f '${args.envFile}' '${args.deployEnvFile}' || true"
             }
         }
         }

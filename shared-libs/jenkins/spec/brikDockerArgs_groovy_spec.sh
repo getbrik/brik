@@ -13,8 +13,25 @@ Describe "shared-libs/jenkins/vars/brikDockerArgs.groovy"
     The status should be success
   End
 
-  It "filters env vars by Brik-relevant prefixes"
-    When run grep -qF "grep -E '^(NEXUS_|BRIK_|REGISTRY_|ARGOCD_|CARGO_|SSH_)'" "$GROOVY"
+  It "scopes the CI env-file to build and publish prefixes (no deploy creds)"
+    When run grep -qF "grep -E '^(NEXUS_|BRIK_|REGISTRY_|CARGO_)'" "$GROOVY"
+    The status should be success
+  End
+
+  It "scopes the deploy env-file to deploy prefixes (no package-publish creds)"
+    When run grep -qF "grep -E '^(NEXUS_|BRIK_|REGISTRY_|ARGOCD_|SSH_)'" "$GROOVY"
+    The status should be success
+  End
+
+  It "does not leak deploy creds (ARGOCD_/SSH_) into the CI env-file"
+    leaks_ci() { grep -F "grep -E '^(NEXUS_|BRIK_|REGISTRY_|ARGOCD_|CARGO_|SSH_)'" "$GROOVY"; }
+    When run leaks_ci
+    The status should be failure
+    The output should equal ""
+  End
+
+  It "builds a separate deploy env-file"
+    When run grep -qF "brik-deploy-env-" "$GROOVY"
     The status should be success
   End
 
