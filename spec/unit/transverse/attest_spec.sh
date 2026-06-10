@@ -18,6 +18,7 @@ Describe "transverse.attest"
   log.error() { printf 'ERROR: %s\n' "$*" >&2; }
   pipeline.require_tool() { command -v "$1" >/dev/null 2>&1; }
 
+  Include "${BRIK_HOME}/lib/transverse/env.sh"
   Include "${BRIK_HOME}/lib/transverse/infra.sh"
   Include "${BRIK_HOME}/lib/transverse/attest.sh"
 
@@ -28,7 +29,13 @@ Describe "transverse.attest"
   ATTEST_INFRA=""
   setup_recorder() {
     COSIGN_ARGS_FILE="$(mktemp)"
-    cosign() { printf '%s\n' "$*" >"$COSIGN_ARGS_FILE"; return 0; }
+    # Record argv plus the KMS address env so tests can assert the OpenBAO
+    # connection wiring without a real cosign.
+    cosign() {
+      printf '%s\n' "$*" >"$COSIGN_ARGS_FILE"
+      printf 'BAO_ADDR=%s\n' "${BAO_ADDR:-}" >>"$COSIGN_ARGS_FILE"
+      return 0
+    }
     oras()   { printf '%s\n' "$*"; return 0; }
 
     ATTEST_INFRA="$(mktemp -d)"
@@ -43,7 +50,52 @@ url: https://registry.example.com
 tls:
   trust: system
 YAML
+    cat > "$ATTEST_INFRA/endpoints/signing.yml" <<'YAML'
+apiVersion: brik.dev/referential/v1
+kind: Signing
+name: signing
+backend: keyless
+transparency: rekor-public
+YAML
     export BRIK_INFRA_DIR="$ATTEST_INFRA"
+  }
+
+  # Switch the fixture's Signing endpoint to a referenced local key with no
+  # transparency log (the air-gapped / lab posture).
+  use_key_backend() {
+    cat > "$ATTEST_INFRA/endpoints/signing.yml" <<'YAML'
+apiVersion: brik.dev/referential/v1
+kind: Signing
+name: signing
+backend: key
+key: env://COSIGN_PRIVATE_KEY
+transparency: none
+YAML
+  }
+
+  # Switch the fixture to the OpenBAO Transit KMS backend (key never leaves
+  # the secret manager) and declare the SecretManager endpoint it needs.
+  use_kms_backend() {
+    cat > "$ATTEST_INFRA/endpoints/signing.yml" <<'YAML'
+apiVersion: brik.dev/referential/v1
+kind: Signing
+name: signing
+backend: kms
+kms_uri: openbao://brik-signing
+transparency: none
+YAML
+    cat > "$ATTEST_INFRA/endpoints/secret-manager.yml" <<'YAML'
+apiVersion: brik.dev/referential/v1
+kind: SecretManager
+name: secret-manager
+url: http://bao.lab:8200
+auth:
+  method: token
+  ref: env://ATTEST_SPEC_BAO_TOKEN
+tls:
+  trust: insecure
+YAML
+    export ATTEST_SPEC_BAO_TOKEN="t0ken"
   }
   cleanup_recorder() {
     [[ -n "$COSIGN_ARGS_FILE" ]] && rm -f "$COSIGN_ARGS_FILE"
@@ -56,16 +108,28 @@ YAML
   REF="registry.example.com/app@sha256:1111111111111111111111111111111111111111111111111111111111111111"
 
   Describe "attest.mode"
-    It "is keyless by default"
-      unset BRIK_COSIGN_KEY
+    It "reads the keyless backend from the Signing endpoint"
       When call attest.mode
       The output should equal "keyless"
     End
 
-    It "switches to key when BRIK_COSIGN_KEY is set"
-      BRIK_COSIGN_KEY="cosign.key"
-      When call attest.mode
+    It "reads the key backend from the Signing endpoint"
+      mode_key() { use_key_backend; attest.mode; }
+      When call mode_key
       The output should equal "key"
+    End
+
+    It "reads the kms backend from the Signing endpoint"
+      mode_kms() { use_kms_backend; attest.mode; }
+      When call mode_kms
+      The output should equal "kms"
+    End
+
+    It "fails closed (7) when no Signing endpoint is declared"
+      mode_none() { rm "$ATTEST_INFRA/endpoints/signing.yml"; attest.mode; }
+      When call mode_none
+      The status should equal 7
+      The stderr should include "Signing"
     End
   End
 
@@ -112,14 +176,37 @@ YAML
       The contents of file "$COSIGN_ARGS_FILE" should not include "--key"
     End
 
-    It "key mode: passes the local key to cosign"
-      BRIK_COSIGN_KEY="env://COSIGN_PRIVATE_KEY"
+    It "key backend: passes the referenced key and no-transparency flags"
       printf '{}' >"${SHELLSPEC_TMPBASE}/sbom.json"
-      When call attest.sign "$REF" --sbom "${SHELLSPEC_TMPBASE}/sbom.json"
+      sign_key() { use_key_backend; attest.sign "$REF" --sbom "${SHELLSPEC_TMPBASE}/sbom.json"; }
+      When call sign_key
       The status should be success
       The contents of file "$COSIGN_ARGS_FILE" should include "--key env://COSIGN_PRIVATE_KEY"
       The contents of file "$COSIGN_ARGS_FILE" should include "--tlog-upload=false"
       The contents of file "$COSIGN_ARGS_FILE" should include "--use-signing-config=false"
+    End
+
+    It "kms backend: passes the KMS URI and wires the OpenBAO connection env"
+      printf '{}' >"${SHELLSPEC_TMPBASE}/sbom.json"
+      sign_kms() { use_kms_backend; attest.sign "$REF" --sbom "${SHELLSPEC_TMPBASE}/sbom.json"; }
+      When call sign_kms
+      The status should be success
+      The contents of file "$COSIGN_ARGS_FILE" should include "--key openbao://brik-signing"
+      The contents of file "$COSIGN_ARGS_FILE" should include "--tlog-upload=false"
+      The contents of file "$COSIGN_ARGS_FILE" should include "BAO_ADDR=http://bao.lab:8200"
+    End
+
+    It "key backend: refuses (7) a bao:// key reference (kms is the OpenBAO path)"
+      printf '{}' >"${SHELLSPEC_TMPBASE}/sbom.json"
+      sign_bao_key() {
+        use_key_backend
+        yq -i '.key = "bao://secret/ci/cosign#key"' "$ATTEST_INFRA/endpoints/signing.yml"
+        attest.sign "$REF" --sbom "${SHELLSPEC_TMPBASE}/sbom.json"
+      }
+      When call sign_bao_key
+      The status should equal 7
+      The stderr should include "kms"
+      The contents of file "$COSIGN_ARGS_FILE" should equal ""
     End
 
     It "dry-run does not invoke cosign"
@@ -187,11 +274,11 @@ YAML
       The contents of file "$COSIGN_ARGS_FILE" should include "--certificate-oidc-issuer-regexp https://gitlab"
     End
 
-    It "key mode: verifies with the local key"
-      BRIK_COSIGN_KEY="env://COSIGN_PUBLIC_KEY"
-      When call attest.verify "$REF"
+    It "key backend: verifies with the referenced key and ignores the absent tlog"
+      verify_key() { use_key_backend; attest.verify "$REF"; }
+      When call verify_key
       The status should be success
-      The contents of file "$COSIGN_ARGS_FILE" should include "--key env://COSIGN_PUBLIC_KEY"
+      The contents of file "$COSIGN_ARGS_FILE" should include "--key env://COSIGN_PRIVATE_KEY"
       The contents of file "$COSIGN_ARGS_FILE" should include "--insecure-ignore-tlog=true"
     End
 

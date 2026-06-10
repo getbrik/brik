@@ -148,7 +148,8 @@ _config._export_deploy_env_vars() {
 
         # Provenance gate: verify the signed attestation on the resolved digest
         # before deploying. The identity/issuer pin the expected signer for
-        # keyless verification (BRIK_COSIGN_KEY overrides them with a local key).
+        # keyless verification (the key and kms backends verify with the
+        # referential's key instead).
         val="$(config.get ".deploy.environments.${env_name}.gates.require_provenance" '')"
         [[ -n "$val" ]] && export "BRIK_DEPLOY_${upper_env}_REQUIRE_PROVENANCE=$val"
 

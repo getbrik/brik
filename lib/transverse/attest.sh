@@ -9,14 +9,19 @@
 # does not verify -- the digest is the subject, so a tampered image yields a
 # different digest and fails the gate.
 #
-# Two signing modes, selected by BRIK_COSIGN_KEY:
-#   keyless (default) - Fulcio short-lived cert from the platform OIDC token,
-#                       transparency via Rekor. Use in hosted CI.
-#   key               - BRIK_COSIGN_KEY (e.g. env://COSIGN_PRIVATE_KEY or a
-#                       file path) for air-gapped runners with no OIDC.
+# The signing backend comes from the Signing endpoint the infrastructure
+# referential declares (one per instance):
+#   keyless - Fulcio short-lived cert from the platform OIDC token,
+#             transparency via Rekor. P-open default.
+#   key     - a referenced local key (env:// or file://), for runners
+#             without OIDC or Sigstore infrastructure.
+#   kms     - a key held by OpenBAO Transit (openbao:// / hashivault://),
+#             never exported to the runner. P-entreprise default.
+# The endpoint's transparency stance (rekor-public, rekor-private, none)
+# governs the transparency-log flags on both sign and verify.
 #
 # Functions:
-#   attest.mode                  - echo "keyless" | "key"
+#   attest.mode                  - echo "keyless" | "key" | "kms"
 #   attest.available             - rc 0 when cosign is on PATH
 #   attest.provenance_predicate  - emit an in-toto SLSA provenance predicate
 #   attest.sign <ref> --sbom F   - attach signed SBOM (+ provenance) to a digest
@@ -26,13 +31,17 @@
 [[ -n "${_BRIK_MODULE_TRANSVERSE_ATTEST_LOADED:-}" ]] && return 0
 _BRIK_MODULE_TRANSVERSE_ATTEST_LOADED=1
 
-# Signing mode: local key when BRIK_COSIGN_KEY is set, keyless otherwise.
+# _attest._signing - echo (as JSON) the Signing endpoint of the referential.
+_attest._signing() {
+    brik.use transverse.infra
+    infra.endpoint_of_kind Signing
+}
+
+# Signing backend declared by the referential: keyless, key or kms.
 attest.mode() {
-    if [[ -n "${BRIK_COSIGN_KEY:-}" ]]; then
-        printf 'key'
-    else
-        printf 'keyless'
-    fi
+    local sig
+    sig="$(_attest._signing)" || return "$?"
+    printf '%s' "$sig" | jq -rj '.backend'
 }
 
 # Return 0 when the cosign signer is available on this runner.
@@ -49,6 +58,124 @@ _attest._require_digest() {
     if [[ "$ref" != *@sha256:* ]]; then
         log.error "attest: reference is not digest-pinned (need name@sha256:...): ${ref}"
         return "$BRIK_EXIT_INVALID_INPUT"
+    fi
+    return 0
+}
+
+# _attest._key_arg - translate a Signing key reference into the value cosign
+# accepts as --key: env:// passes through (cosign resolves it natively),
+# file:// becomes a path (relative paths resolve against the referential
+# root). A bao:// reference is a configuration error: OpenBAO-held keys go
+# through the kms backend so the key never leaves the secret manager.
+_attest._key_arg() {
+    local ref="$1"
+    case "$ref" in
+        env://*)
+            printf '%s' "$ref"
+            ;;
+        file://*)
+            local path="${ref#file://}"
+            if [[ "$path" != /* ]]; then
+                local root
+                root="$(infra.root)" || return "$?"
+                path="${root}/${path}"
+            fi
+            printf '%s' "$path"
+            ;;
+        bao://*)
+            log.error "attest: a bao:// key reference is not a file key - use the kms backend (openbao://) instead"
+            return "$BRIK_EXIT_CONFIG_ERROR"
+            ;;
+        *)
+            log.error "attest: unsupported key reference '${ref}' (expected env:// or file://)"
+            return "$BRIK_EXIT_CONFIG_ERROR"
+            ;;
+    esac
+}
+
+# _attest._kms_env - export the connection environment the cosign KMS driver
+# reads: BAO_ADDR/BAO_TOKEN for openbao://, VAULT_ADDR/VAULT_TOKEN for the
+# hashivault:// alias, TRANSIT_SECRET_ENGINE_PATH for a non-default Transit
+# mount. Values come from the SecretManager endpoint and its referenced
+# credential; the signing key itself never leaves OpenBAO.
+_attest._kms_env() {
+    local sig="$1"
+    local uri sm url token
+    uri="$(printf '%s' "$sig" | jq -r '.kms_uri')"
+
+    brik.use transverse.infra
+    sm="$(infra.endpoint_of_kind SecretManager)" || return "$?"
+    url="$(printf '%s' "$sm" | jq -r '.url')"
+    token="$(infra.resolve_ref "$(printf '%s' "$sm" | jq -r '.auth.ref')")" || return "$?"
+
+    case "$uri" in
+        openbao://*)    export BAO_ADDR="$url" BAO_TOKEN="$token" ;;
+        hashivault://*) export VAULT_ADDR="$url" VAULT_TOKEN="$token" ;;
+        *)
+            log.error "attest: unsupported KMS URI '${uri}' (expected openbao:// or hashivault://)"
+            return "$BRIK_EXIT_CONFIG_ERROR"
+            ;;
+    esac
+
+    local mount
+    mount="$(printf '%s' "$sm" | jq -r '.transit_mount // ""')"
+    [[ -n "$mount" ]] && export TRANSIT_SECRET_ENGINE_PATH="$mount"
+    return 0
+}
+
+# _attest._backend_args - append the cosign flags the declared backend and
+# transparency stance require. <op> is sign or verify (the transparency
+# flags differ between the two).
+# Usage: _attest._backend_args <array_name> <signing_json> <op>
+_attest._backend_args() {
+    local -n _bargv="$1"
+    local _sig="$2" _op="$3"
+    local _backend _transparency
+    _backend="$(printf '%s' "$_sig" | jq -r '.backend')"
+    _transparency="$(printf '%s' "$_sig" | jq -r '.transparency')"
+
+    case "$_backend" in
+        keyless) ;;
+        key)
+            local _key
+            _key="$(_attest._key_arg "$(printf '%s' "$_sig" | jq -r '.key')")" || return "$?"
+            _bargv+=(--key "$_key")
+            ;;
+        kms)
+            _bargv+=(--key "$(printf '%s' "$_sig" | jq -r '.kms_uri')")
+            _attest._kms_env "$_sig" || return "$?"
+            ;;
+        *)
+            log.error "attest: unknown signing backend '${_backend}' in the referential"
+            return "$BRIK_EXIT_CONFIG_ERROR"
+            ;;
+    esac
+
+    case "$_transparency" in
+        none)
+            if [[ "$_op" == "sign" ]]; then
+                # --tlog-upload=false requires --use-signing-config=false on
+                # cosign v3: the default signing config mandates a Rekor
+                # service, contradicting the no-transparency stance.
+                _bargv+=(--use-signing-config=false --tlog-upload=false)
+            else
+                _bargv+=(--insecure-ignore-tlog=true)
+            fi
+            ;;
+        rekor-private)
+            [[ "$_op" == "sign" ]] && _bargv+=(--rekor-url "$(printf '%s' "$_sig" | jq -r '.rekor_url')")
+            ;;
+    esac
+
+    if [[ "$_op" == "verify" ]]; then
+        local _troot
+        _troot="$(printf '%s' "$_sig" | jq -r '.trusted_root // ""')"
+        if [[ -n "$_troot" ]]; then
+            local _iroot
+            _iroot="$(infra.root)" || return "$?"
+            [[ "$_troot" != /* ]] && _troot="${_iroot}/${_troot}"
+            _bargv+=(--trusted-root "$_troot")
+        fi
     fi
     return 0
 }
@@ -156,18 +283,15 @@ attest.sign() {
 
     pipeline.require_tool cosign || return "$BRIK_EXIT_MISSING_DEP"
 
-    # Key flag plus transparency-log policy, shared by every attestation.
-    # Local-key signing targets environments without Sigstore infrastructure, so
-    # it does not publish to the public Rekor transparency log; keyless keeps the
-    # tlog (public transparency is the point of keyless).
-    # --use-signing-config=false drops cosign's default Sigstore signing config
-    # (which mandates a Rekor service); --tlog-upload=false then suppresses the
-    # transparency-log upload for the local key.
+    local sig backend
+    sig="$(_attest._signing)" || return "$?"
+    backend="$(printf '%s' "$sig" | jq -r '.backend')"
+
     local -a key_args=()
-    [[ "$(attest.mode)" == "key" ]] && key_args=(--key "$BRIK_COSIGN_KEY" --use-signing-config=false --tlog-upload=false)
+    _attest._backend_args key_args "$sig" sign || return "$?"
 
     if [[ "$dry_run" == "true" ]]; then
-        log.info "[dry-run] would attest (${sbom_type}$([[ -n "$provenance" ]] && printf ' + provenance')) on ${ref} [$(attest.mode)]"
+        log.info "[dry-run] would attest (${sbom_type}$([[ -n "$provenance" ]] && printf ' + provenance')) on ${ref} [${backend}]"
         return 0
     fi
 
@@ -178,7 +302,7 @@ attest.sign() {
 
     _attest._registry_args key_args "$ref" || return "$?"
 
-    log.info "attesting ${sbom_type} SBOM on ${ref} [$(attest.mode)]"
+    log.info "attesting ${sbom_type} SBOM on ${ref} [${backend}]"
     if ! cosign attest "${key_args[@]}" --predicate "$sbom" --type "$sbom_type" -y "$ref"; then
         log.error "attest.sign: cosign failed to attach the SBOM attestation"
         return "$BRIK_EXIT_EXTERNAL_FAIL"
@@ -189,7 +313,7 @@ attest.sign() {
             log.error "attest.sign: provenance file not found: ${provenance}"
             return "$BRIK_EXIT_IO_FAILURE"
         fi
-        log.info "attesting SLSA provenance on ${ref} [$(attest.mode)]"
+        log.info "attesting SLSA provenance on ${ref} [${backend}]"
         if ! cosign attest "${key_args[@]}" --predicate "$provenance" --type slsaprovenance -y "$ref"; then
             log.error "attest.sign: cosign failed to attach the provenance attestation"
             return "$BRIK_EXIT_EXTERNAL_FAIL"
@@ -228,11 +352,12 @@ attest.verify() {
 
     pipeline.require_tool cosign || return "$BRIK_EXIT_MISSING_DEP"
 
+    local sig backend
+    sig="$(_attest._signing)" || return "$?"
+    backend="$(printf '%s' "$sig" | jq -r '.backend')"
+
     local -a args=(verify-attestation --type "$att_type")
-    if [[ "$(attest.mode)" == "key" ]]; then
-        # Local key: signing created no public tlog entry, so do not require one.
-        args+=(--key "$BRIK_COSIGN_KEY" --insecure-ignore-tlog=true)
-    else
+    if [[ "$backend" == "keyless" ]]; then
         # Keyless: the signer identity and issuer are the residual root of
         # trust (who is allowed to sign). Without them the verification would
         # accept any Fulcio cert, so leaving them empty is itself a failure.
@@ -242,15 +367,17 @@ attest.verify() {
         fi
         args+=(--certificate-identity-regexp "$identity" --certificate-oidc-issuer-regexp "$issuer")
     fi
+    _attest._backend_args args "$sig" verify || return "$?"
+
     if [[ "$dry_run" == "true" ]]; then
-        log.info "[dry-run] would verify ${att_type} attestation on ${ref} [$(attest.mode)]"
+        log.info "[dry-run] would verify ${att_type} attestation on ${ref} [${backend}]"
         return 0
     fi
 
     _attest._registry_args args "$ref" || return "$?"
     args+=("$ref")
 
-    log.info "verifying ${att_type} attestation on ${ref} [$(attest.mode)]"
+    log.info "verifying ${att_type} attestation on ${ref} [${backend}]"
     if ! cosign "${args[@]}"; then
         log.error "attest.verify: attestation did not verify for ${ref} (fail-closed)"
         return "$BRIK_EXIT_EXTERNAL_FAIL"

@@ -369,6 +369,48 @@ YAML
   End
 
   # =========================================================================
+  # infra.endpoint_of_kind
+  # =========================================================================
+  Describe "infra.endpoint_of_kind"
+    Before 'make_instance'
+    After 'cleanup_instance'
+
+    write_signing() {
+      cat > "$INFRA_DIR/endpoints/signing.yml" <<'YAML'
+apiVersion: brik.dev/referential/v1
+kind: Signing
+name: signing
+backend: keyless
+transparency: rekor-public
+YAML
+    }
+
+    It "echoes the single endpoint of the kind"
+      single_kind() { write_signing; infra.endpoint_of_kind Signing; }
+      When call single_kind
+      The output should include '"backend": "keyless"'
+    End
+
+    It "fails closed (7) when no endpoint of the kind is declared"
+      When call infra.endpoint_of_kind Signing
+      The status should equal 7
+      The stderr should include "Signing"
+    End
+
+    It "fails closed (7) when several endpoints of the kind are declared"
+      ambiguous_kind() {
+        write_signing
+        cp "$INFRA_DIR/endpoints/signing.yml" "$INFRA_DIR/endpoints/signing-bis.yml"
+        yq -i '.name = "signing-bis"' "$INFRA_DIR/endpoints/signing-bis.yml"
+        infra.endpoint_of_kind Signing
+      }
+      When call ambiguous_kind
+      The status should equal 7
+      The stderr should include "multiple"
+    End
+  End
+
+  # =========================================================================
   # infra.resolve_ref
   # =========================================================================
   Describe "infra.resolve_ref"

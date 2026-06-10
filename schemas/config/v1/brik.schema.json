@@ -1037,11 +1037,11 @@
               "default": false
             },
             "verify_identity": {
-              "description": "Expected signer identity (regexp) for keyless attestation verification (e.g. the CI job's certificate identity). Required when require_provenance is set and BRIK_COSIGN_KEY is not used.",
+              "description": "Expected signer identity (regexp) for keyless attestation verification (e.g. the CI job's certificate identity). Required when require_provenance is set and the referential's Signing backend is keyless.",
               "type": "string"
             },
             "verify_issuer": {
-              "description": "Expected OIDC issuer (regexp) for keyless attestation verification (e.g. the platform's Sigstore issuer). Required when require_provenance is set and BRIK_COSIGN_KEY is not used.",
+              "description": "Expected OIDC issuer (regexp) for keyless attestation verification (e.g. the platform's Sigstore issuer). Required when require_provenance is set and the referential's Signing backend is keyless.",
               "type": "string"
             }
           }

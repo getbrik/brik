@@ -63,6 +63,13 @@ url: https://registry.release
 tls:
   trust: system
 YAML
+    cat > "$INFRA/endpoints/signing.yml" <<'YAML'
+apiVersion: brik.dev/referential/v1
+kind: Signing
+name: signing
+backend: keyless
+transparency: rekor-public
+YAML
     export BRIK_INFRA_DIR="$INFRA"
   }
   cleanup_repo() { rm -rf "$REPO" "$MOCKBIN" "$INFRA"; unset BRIK_INFRA_DIR; }

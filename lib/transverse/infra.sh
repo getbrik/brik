@@ -287,6 +287,37 @@ infra.credential_for() {
     infra.credential "$cred"
 }
 
+# infra.endpoint_of_kind - echo (as JSON) the single endpoint of <kind>
+# declared by the instance. Capabilities that consume platform-wide services
+# (Signing, SecretManager) resolve their endpoint by kind: zero is a missing
+# declaration, several an ambiguity; both fail closed.
+# Usage: infra.endpoint_of_kind <kind>
+# Returns: 2 no kind; 7 none or several; infra.root codes when unconfigured.
+infra.endpoint_of_kind() {
+    local kind="$1"
+    if [[ -z "$kind" ]]; then
+        log.error "infra.endpoint_of_kind: a kind is required"
+        return "$BRIK_EXIT_INVALID_INPUT"
+    fi
+
+    local root file found=""
+    root="$(infra.root)" || return "$?"
+    for file in "${root}/endpoints"/*.yml "${root}/endpoints"/*.yaml; do
+        [[ -f "$file" ]] || continue
+        [[ "$(yq '.kind // ""' "$file")" == "$kind" ]] || continue
+        if [[ -n "$found" ]]; then
+            log.error "multiple ${kind} endpoints declared in the referential (expected exactly one)"
+            return "$BRIK_EXIT_CONFIG_ERROR"
+        fi
+        found="$file"
+    done
+    if [[ -z "$found" ]]; then
+        log.error "no ${kind} endpoint declared in the referential"
+        return "$BRIK_EXIT_CONFIG_ERROR"
+    fi
+    yq -o json '.' "$found"
+}
+
 # infra.registry_for - echo (as JSON) the Registry endpoint whose URL
 # authority matches <host> (host[:port]). The declared scheme and TLS trust
 # govern how every registry consumer (digest resolution, cosign referrers)
