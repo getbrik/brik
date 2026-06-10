@@ -3,6 +3,18 @@ Describe "brik deploy E2E local (CD, digest-pinned)"
   # a digest in the accepted channel, enforce require_digest, and apply a k8s
   # manifest with the image pinned. The registry (curl, OCI distribution API)
   # and kubectl are mocked on PATH.
+  #
+  # The verb is exercised as the sourced cli.deploy.run function (not the
+  # bin/brik child process) so kcov attributes the executed lines; one
+  # dispatcher round-trip below keeps the bin/brik contract pinned.
+  Include "$BRIK_HOME/lib/pipeline/logging.sh"
+  Include "$BRIK_HOME/lib/pipeline/error.sh"
+  Include "$BRIK_HOME/lib/pipeline/tools.sh"
+  Include "$BRIK_HOME/lib/pipeline/loader.sh"
+  Include "$BRIK_HOME/lib/cli/helpers.sh"
+  Include "$BRIK_HOME/lib/cli/deploy.sh"
+  # The dispatcher (bin/brik) owns this default; the sourced verb needs it.
+  export BRIK_DEFAULT_CONFIG="brik.yml"
 
   DIGEST="sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 
@@ -98,17 +110,35 @@ YAML
       printf '#!/bin/sh\nprintf "HTTP/1.1 404 Not Found\\r\\n\\r\\n"\nexit 0\n' > "${MOCKBIN}/curl"
       chmod +x "${MOCKBIN}/curl"
       cd "$REPO"
-      PATH="${MOCKBIN}:$PATH" "$BRIK_BIN" deploy --version v9.9.9 --environment staging
+      PATH="${MOCKBIN}:$PATH" cli.deploy.run --version v9.9.9 --environment staging
     }
     When call deploy_failclosed
     The status should equal 5
     The stderr should include "failing closed"
   End
 
+  It "requires --version"
+    When call cli.deploy.run --environment staging
+    The status should equal 2
+    The stderr should include "requires --version"
+  End
+
+  It "requires --environment"
+    When call cli.deploy.run --version v1.2.3
+    The status should equal 2
+    The stderr should include "requires --environment"
+  End
+
+  It "rejects an unknown option"
+    When call cli.deploy.run --version v1.2.3 --environment staging --bogus
+    The status should equal 2
+    The stderr should include "unknown option"
+  End
+
   It "rejects an unknown environment"
     deploy_badenv() {
       cd "$REPO"
-      PATH="${MOCKBIN}:$PATH" "$BRIK_BIN" deploy --version v1.2.3 --environment ghost
+      PATH="${MOCKBIN}:$PATH" cli.deploy.run --version v1.2.3 --environment ghost
     }
     When call deploy_badenv
     The status should equal 7
@@ -134,7 +164,7 @@ YAML
         printf '#!/bin/sh\nexit 0\n' > "${MOCKBIN}/cosign"
         chmod +x "${MOCKBIN}/cosign"
         cd "$REPO"
-        PATH="${MOCKBIN}:$PATH" "$BRIK_BIN" deploy --version v1.2.3 --environment staging
+        PATH="${MOCKBIN}:$PATH" cli.deploy.run --version v1.2.3 --environment staging
       }
       When call deploy_prov_ok
       The status should equal 0
@@ -148,7 +178,7 @@ YAML
         printf '#!/bin/sh\nexit 1\n' > "${MOCKBIN}/cosign"
         chmod +x "${MOCKBIN}/cosign"
         cd "$REPO"
-        PATH="${MOCKBIN}:$PATH" "$BRIK_BIN" deploy --version v1.2.3 --environment staging
+        PATH="${MOCKBIN}:$PATH" cli.deploy.run --version v1.2.3 --environment staging
       }
       When call deploy_prov_ko
       The status should equal 5
@@ -196,7 +226,7 @@ YAML
       deploy_ev_ok() {
         sign_evidence_head
         cd "$REPO"
-        PATH="${MOCKBIN}:$PATH" "$BRIK_BIN" deploy --version v1.2.3 --environment staging
+        PATH="${MOCKBIN}:$PATH" cli.deploy.run --version v1.2.3 --environment staging
       }
       When call deploy_ev_ok
       The status should equal 0
@@ -208,7 +238,7 @@ YAML
       deploy_ev_unsigned() {
         git -C "$EV_REPO" commit -q -m "evidence: seed"
         cd "$REPO"
-        PATH="${MOCKBIN}:$PATH" "$BRIK_BIN" deploy --version v1.2.3 --environment staging
+        PATH="${MOCKBIN}:$PATH" cli.deploy.run --version v1.2.3 --environment staging
       }
       When call deploy_ev_unsigned
       The status should equal 5
@@ -221,7 +251,7 @@ YAML
         # Flip the declaration: unsigned evidence is a legal posture.
         yq -i '.artifacts.evidence.sign = false' "$REPO/brik.yml"
         cd "$REPO"
-        PATH="${MOCKBIN}:$PATH" "$BRIK_BIN" deploy --version v1.2.3 --environment staging
+        PATH="${MOCKBIN}:$PATH" cli.deploy.run --version v1.2.3 --environment staging
       }
       When call deploy_ev_unsigned_ok
       The status should equal 0
