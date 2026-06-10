@@ -5,7 +5,7 @@
   "description": "Serialized output of the Brik planner. Produced by `brik plan` and consumed by adapters (GitLab child, Jenkins, local) plus the in-process gatekeeper pipeline.plan.gate. Reproducible: two invocations against the same HEAD and the same brik.yml produce a byte-identical file (timestamps excluded).",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "brikVersion", "context", "mode", "release", "stages", "dag", "fingerprint"],
+  "required": ["schemaVersion", "brikVersion", "context", "mode", "release", "infra", "stages", "dag", "fingerprint"],
   "properties": {
     "schemaVersion": {
       "type": "string",
@@ -81,6 +81,19 @@
         "is_candidate": {
           "type": "boolean",
           "description": "True when the current commit is a release candidate (BRIK_COMMIT_TAG set, or a profile-specific condition). Adapters use this to gate the promote stage."
+        }
+      }
+    },
+    "infra": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fingerprint"],
+      "description": "Infrastructure referential the plan was derived against. The referential is mandatory: plan derivation fails closed when none is configured, so reproducibility extends to the declared environment.",
+      "properties": {
+        "fingerprint": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "description": "sha256 over the relative paths and contents of the referential instance (location-independent). Two plans derived against the same instance carry the same fingerprint."
         }
       }
     },

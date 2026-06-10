@@ -4,6 +4,7 @@ Describe "stages.init"
   Include "$BRIK_HOME/lib/pipeline/report.sh"
   Include "$BRIK_HOME/lib/pipeline/pipeline-env.sh"
   Include "$BRIK_HOME/lib/transverse/config.sh"
+  Include "$BRIK_HOME/lib/transverse/infra.sh"
   Include "$BRIK_HOME/lib/stages/init.sh"
   Include "$BRIK_HOME/spec/support/mock_helper.sh"
 
@@ -15,6 +16,7 @@ Describe "stages.init"
     export BRIK_CONFIG_FILE="$BRIK_CONFIG_DIR/brik.yml"
     printf 'version: 1\nproject:\n  name: test-project\n  stack: node\n' > "$BRIK_CONFIG_FILE"
     mock.workspace.setup
+    mock.infra.setup
     export BRIK_LOG_DIR
     BRIK_LOG_DIR="$(mktemp -d)"
     export BRIK_PROJECT_DIR="$BRIK_WORKSPACE"
@@ -29,6 +31,7 @@ Describe "stages.init"
   cleanup_env() {
     rm -rf "$BRIK_CONFIG_DIR" "$BRIK_LOG_DIR"
     mock.workspace.teardown
+    mock.infra.teardown
     unset BRIK_RUN_ID BRIK_PIPELINE_ENV BRIK_CONFIG_DIR 2>/dev/null || true
   }
 
@@ -135,5 +138,44 @@ Describe "stages.init"
     }
     When call run_init_prereqs
     The output should equal '{"yq":true,"jq":true}'
+  End
+
+  # The infrastructure referential is mandatory: init validates it eagerly
+  # and records its fingerprint so the run's evidence pins the environment
+  # declaration it executed against.
+  It "fails closed when no referential is configured"
+    run_init_no_infra() {
+      unset BRIK_INFRA_DIR BRIK_INFRA_REPO
+      local ctx
+      ctx="$(context.create "init")" 2>/dev/null || ctx="$(mktemp)"
+      stages.init "$ctx" >/dev/null
+    }
+    When call run_init_no_infra
+    The status should equal "$BRIK_EXIT_INVALID_ENV"
+    The stderr should include "no infrastructure referential configured"
+  End
+
+  It "fails closed on an invalid referential instance"
+    run_init_bad_infra() {
+      printf 'apiVersion: wrong/v0\nkind: Referential\nprofile: p-lab\n' \
+        > "$BRIK_INFRA_DIR/referential.yml"
+      local ctx
+      ctx="$(context.create "init")" 2>/dev/null || ctx="$(mktemp)"
+      stages.init "$ctx" >/dev/null
+    }
+    When call run_init_bad_infra
+    The status should equal "$BRIK_EXIT_CONFIG_ERROR"
+    The stderr should include "unexpected apiVersion"
+  End
+
+  It "records init.tech.infra_fingerprint for the validated instance"
+    run_init_infra_fp() {
+      local ctx
+      ctx="$(context.create "init")" 2>/dev/null || ctx="$(mktemp)"
+      stages.init "$ctx" >/dev/null 2>&1 || return $?
+      read_init_tech "infra_fingerprint"
+    }
+    When call run_init_infra_fp
+    The output should equal "$(infra.fingerprint "$BRIK_INFRA_DIR")"
   End
 End

@@ -215,5 +215,8 @@
       "runner_class": "base"
     }
   ],
-  "workspace": "/builds/brik/node-deploy-k8s"
+  "workspace": "/builds/brik/node-deploy-k8s",
+  "infra": {
+    "fingerprint": "1111111111111111111111111111111111111111111111111111111111111111"
+  }
 }

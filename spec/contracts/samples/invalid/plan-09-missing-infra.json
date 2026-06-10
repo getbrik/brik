@@ -217,8 +217,5 @@
       "runner_class": "base"
     }
   ],
-  "workspace": "/builds/brik/node-minimal",
-  "infra": {
-    "fingerprint": "1111111111111111111111111111111111111111111111111111111111111111"
-  }
+  "workspace": "/builds/brik/node-minimal"
 }

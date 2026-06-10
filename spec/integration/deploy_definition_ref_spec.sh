@@ -3,7 +3,10 @@ Describe "brik deploy resolves the definition at the version git ref (T6)"
   # was AT V's tag, not the current working tree. A later edit on the base must
   # not leak into a re-deploy of the older version.
 
+  Include "$BRIK_HOME/spec/support/mock_helper.sh"
+
   setup_repo() {
+    mock.infra.setup
     REPO="$(mktemp -d)"
     MOCKBIN="$(mktemp -d)"
     (
@@ -47,7 +50,7 @@ YAML
     printf '#!/bin/sh\n[ "$1" = "apply" ] && cat "$3"\nexit 0\n' > "${MOCKBIN}/kubectl"
     chmod +x "${MOCKBIN}/kubectl"
   }
-  cleanup_repo() { rm -rf "$REPO" "$MOCKBIN"; }
+  cleanup_repo() { rm -rf "$REPO" "$MOCKBIN";  mock.infra.teardown; }
   Before 'setup_repo'
   After 'cleanup_repo'
 

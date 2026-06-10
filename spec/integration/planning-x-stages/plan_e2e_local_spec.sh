@@ -3,7 +3,10 @@ Describe "brik plan E2E local (L.3)"
   # what GitLab/Jenkins should produce on the same commit; the chantier
   # promise is "same plan, three adapters".
 
+  Include "$BRIK_HOME/spec/support/mock_helper.sh"
+
   setup_repo() {
+    mock.infra.setup
     REPO="$(mktemp -d)"
     (
       cd "$REPO"
@@ -29,6 +32,7 @@ JSON
     )
   }
   cleanup_repo() {
+    mock.infra.teardown
     rm -rf "$REPO"
   }
 

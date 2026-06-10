@@ -11,7 +11,10 @@ Describe "brik plan cold-start safety net"
   # git history must still produce a plan where every blocking stage
   # has decision=run.
 
+  Include "$BRIK_HOME/spec/support/mock_helper.sh"
+
   setup_cold() {
+    mock.infra.setup
     COLD_DIR="$(mktemp -d)"
     # Intentionally no `git init` here -- the planner must survive a
     # workspace that isn't a git repo at all (e.g. an archive extract).
@@ -23,6 +26,7 @@ Describe "brik plan cold-start safety net"
     unset BRIK_CHANGES_FROM BRIK_CHANGES_TO
   }
   cleanup_cold() {
+    mock.infra.teardown
     rm -rf "$COLD_DIR"
   }
   Before 'setup_cold'

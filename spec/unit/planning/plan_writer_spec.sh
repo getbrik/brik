@@ -1,7 +1,10 @@
 Describe "planning/plan_writer.sh"
   Include "$BRIK_HOME/lib/planning/plan_writer.sh"
+  Include "$BRIK_HOME/spec/support/mock_helper.sh"
 
   Describe "plan_writer.write (end-to-end)"
+    Before 'mock.infra.setup'
+    After 'mock.infra.teardown'
     It "emits a JSON object with the expected top-level keys"
       When call plan_writer.write -- --workspace /tmp --mode safe
       The status should be success
@@ -57,6 +60,16 @@ Describe "planning/plan_writer.sh"
       fp=$(plan_writer.write -- --workspace /tmp --mode safe | jq -r '.fingerprint')
       When call test "${#fp}" -eq 64
       The status should be success
+    End
+
+    It "stamps the referential fingerprint into the infra block"
+      infra_fp() {
+        plan_writer.write -- --workspace /tmp --mode safe \
+          | jq -r '.infra.fingerprint'
+      }
+      When call infra_fp
+      The status should be success
+      The output should equal "$(infra.fingerprint "$BRIK_INFRA_DIR")"
     End
 
     It "passes JSON Schema validation via jv when available"

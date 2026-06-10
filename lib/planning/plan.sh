@@ -17,6 +17,8 @@ _BRIK_PLANNING_PLAN_LOADED=1
 . "${BASH_SOURCE[0]%/*}/../transverse/changes.sh"
 # shellcheck source=../transverse/release.sh
 . "${BASH_SOURCE[0]%/*}/../transverse/release.sh"
+# shellcheck source=../transverse/infra.sh
+. "${BASH_SOURCE[0]%/*}/../transverse/infra.sh"
 
 # Echo the canonical stage order (registry topological sort).
 plan.stages.ordered() {
@@ -183,6 +185,14 @@ plan.compute() {
         [[ -n "${BRIK_COMMIT_TAG:-}" ]] && context="release"
     fi
 
+    # The infrastructure referential is mandatory: the plan pins the
+    # environment declaration it was derived against, so an unconfigured
+    # referential fails the derivation closed instead of producing a plan
+    # that silently ignores the platform's declared endpoints.
+    local _infra_root _infra_fingerprint
+    _infra_root="$(infra.root)" || return "$?"
+    _infra_fingerprint="$(infra.fingerprint "$_infra_root")" || return "$?"
+
     local stack_id=""
     stack_id="$(registry.stack.detect "$workspace" 2>/dev/null || true)"
 
@@ -231,6 +241,7 @@ plan.compute() {
     printf '# release_profile=%s\n' "$_release_profile"
     printf '# release_version=%s\n' "$_release_version"
     printf '# is_candidate=%s\n' "$_is_candidate"
+    printf '# infra_fingerprint=%s\n' "$_infra_fingerprint"
     # plan_type is always emitted; the writer only surfaces planType/deploy in
     # plan.json when it is "deploy", so ci plans stay byte-identical.
     printf '# plan_type=%s\n' "$plan_type"

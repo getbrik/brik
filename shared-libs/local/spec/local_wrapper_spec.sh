@@ -360,6 +360,11 @@ Describe "local-wrapper.sh"
     Include "$BRIK_HOME/shared-libs/local/scripts/local-wrapper.sh"
 
     setup_stage_env() {
+      # The init stage validates the mandatory infrastructure referential.
+      INFRA_FIXTURE_DIR="$(mktemp -d)"
+      printf 'apiVersion: brik.dev/referential/v1\nkind: Referential\nprofile: p-lab\n' \
+        > "${INFRA_FIXTURE_DIR}/referential.yml"
+      export BRIK_INFRA_DIR="$INFRA_FIXTURE_DIR"
       export BRIK_CONFIG_FILE
       BRIK_CONFIG_FILE="$(mktemp)"
       printf "version: 1\nproject:\n  name: test-project\n  stack: node\n" > "$BRIK_CONFIG_FILE"
@@ -382,6 +387,7 @@ Describe "local-wrapper.sh"
       brik.local.setup >/dev/null 2>&1 || true
     }
     cleanup_stage_env() {
+      rm -rf \"$INFRA_FIXTURE_DIR\"; unset BRIK_INFRA_DIR
       export PATH="$ORIG_PATH_STAGE"
       rm -f "$BRIK_CONFIG_FILE"
       rm -rf "$BRIK_LOG_DIR" "$BRIK_WORKSPACE" "$MOCK_SEC_BIN"
@@ -507,6 +513,11 @@ Describe "local-wrapper.sh"
     Include "$BRIK_HOME/shared-libs/local/scripts/local-wrapper.sh"
 
     setup_pipeline_env() {
+      # The init stage validates the mandatory infrastructure referential.
+      INFRA_FIXTURE_DIR="$(mktemp -d)"
+      printf 'apiVersion: brik.dev/referential/v1\nkind: Referential\nprofile: p-lab\n' \
+        > "${INFRA_FIXTURE_DIR}/referential.yml"
+      export BRIK_INFRA_DIR="$INFRA_FIXTURE_DIR"
       export BRIK_CONFIG_FILE
       BRIK_CONFIG_FILE="$(mktemp)"
       printf "version: 1\nproject:\n  name: pipeline-test\n  stack: node\ntest:\n  framework: npm\n" > "$BRIK_CONFIG_FILE"
@@ -546,6 +557,7 @@ MOCKEOF
       brik.local.setup >/dev/null 2>&1 || true
     }
     cleanup_pipeline_env() {
+      rm -rf "$INFRA_FIXTURE_DIR"; unset BRIK_INFRA_DIR
       rm -f "$BRIK_CONFIG_FILE"
       rm -rf "$BRIK_LOG_DIR" "$BRIK_WORKSPACE" "$MOCK_BIN"
     }
@@ -656,6 +668,11 @@ MOCKEOF
     Include "$BRIK_HOME/shared-libs/local/scripts/local-wrapper.sh"
 
     setup_pipeline_release() {
+      # The init stage validates the mandatory infrastructure referential.
+      INFRA_FIXTURE_DIR="$(mktemp -d)"
+      printf 'apiVersion: brik.dev/referential/v1\nkind: Referential\nprofile: p-lab\n' \
+        > "${INFRA_FIXTURE_DIR}/referential.yml"
+      export BRIK_INFRA_DIR="$INFRA_FIXTURE_DIR"
       export BRIK_CONFIG_FILE
       BRIK_CONFIG_FILE="$(mktemp)"
       printf "version: 1\nproject:\n  name: pipeline-test\n  stack: node\ntest:\n  framework: npm\n" > "$BRIK_CONFIG_FILE"
@@ -694,6 +711,7 @@ MOCKEOF
       brik.local.setup >/dev/null 2>&1 || true
     }
     cleanup_pipeline_release() {
+      rm -rf "$INFRA_FIXTURE_DIR"; unset BRIK_INFRA_DIR
       export PATH="$ORIG_PATH_PIPELINE_RELEASE"
       rm -f "$BRIK_CONFIG_FILE"
       rm -rf "$BRIK_LOG_DIR" "$BRIK_WORKSPACE" "$MOCK_BIN"

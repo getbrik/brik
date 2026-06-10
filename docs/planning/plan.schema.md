@@ -16,6 +16,7 @@ adapter author can read the contract without parsing JSON Schema.
 | `workspace` | string | no | non-empty | Absolute path to the workspace root the plan was computed against. Informational. |
 | `changes` | object | no | see [Changes block](#changes-block) | Snapshot of the changed-files set used by the planner. |
 | `release` | object | yes | see [Release block](#release-block) | Release state: profile + project version + candidate flag. |
+| `infra` | object | yes | see [Infra block](#infra-block) | Fingerprint of the infrastructure referential the plan was derived against. |
 | `stages` | array | yes | min 1, unique | Per-stage plan entries in topological order. See [Stage entries](#stage-entries). |
 | `dag` | object | yes | see [DAG block](#dag-block) | Adjacency list resolved from `spec.placement.{after,before}`. |
 | `fingerprint` | string | yes | 64-hex sha256 | `sha256` of the canonical JSON with `fingerprint=""`. Lets adapters cache / short-circuit unchanged plans. |
@@ -44,6 +45,23 @@ When `source=none`, every blocking stage must be marked `run` by
 construction (the planner's cold-start safety net). Adapters that
 re-derive selection from `changes` alone must respect this -- skipping
 blocking stages on a cold start would defeat the conservative default.
+
+## Infra block
+
+The infrastructure referential (`BRIK_INFRA_DIR` / `BRIK_INFRA_REPO`) is
+mandatory: plan derivation fails closed when none is configured. The block
+pins the environment declaration the plan was computed against, extending
+plan reproducibility to the declared infrastructure.
+
+```json
+"infra": {
+  "fingerprint": "9f2c...64-hex"
+}
+```
+
+| Field | Type | Required | Constraint | Meaning |
+|---|---|---|---|---|
+| `fingerprint` | string | yes | 64-hex sha256 | `sha256` over the relative paths and contents of the referential instance (location-independent). Two plans derived against the same instance carry the same value. |
 
 ## Release block
 

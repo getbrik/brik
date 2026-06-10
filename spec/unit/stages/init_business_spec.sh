@@ -4,6 +4,7 @@ Describe "stages.init business section"
   Include "$BRIK_HOME/lib/pipeline/report.sh"
   Include "$BRIK_HOME/lib/pipeline/pipeline-env.sh"
   Include "$BRIK_HOME/lib/transverse/config.sh"
+  Include "$BRIK_HOME/lib/transverse/infra.sh"
   Include "$BRIK_HOME/lib/stages/init.sh"
   Include "$BRIK_HOME/spec/support/mock_helper.sh"
 
@@ -13,6 +14,7 @@ Describe "stages.init business section"
     export BRIK_CONFIG_FILE="$BRIK_CONFIG_DIR/brik.yml"
     printf 'version: 1\nproject:\n  name: test-project\n  stack: node\n' > "$BRIK_CONFIG_FILE"
     mock.workspace.setup
+    mock.infra.setup
     export BRIK_LOG_DIR
     BRIK_LOG_DIR="$(mktemp -d)"
     export BRIK_PROJECT_DIR="$BRIK_WORKSPACE"
@@ -27,6 +29,7 @@ Describe "stages.init business section"
   cleanup_env() {
     rm -rf "$BRIK_CONFIG_DIR" "$BRIK_LOG_DIR"
     mock.workspace.teardown
+    mock.infra.teardown
     unset BRIK_RUN_ID BRIK_PIPELINE_ENV BRIK_CONFIG_DIR 2>/dev/null || true
   }
 

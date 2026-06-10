@@ -11,7 +11,10 @@ Describe "L.3 - local plan-driven pipeline (brik integrate --auto-select)"
   # the local box may lack -- only that the orchestrator honored the
   # plan. This mirrors what GitLab/Jenkins would do on the same commit.
 
+  Include "$BRIK_HOME/spec/support/mock_helper.sh"
+
   setup_repo() {
+    mock.infra.setup
     L3_WS="$(mktemp -d)"
     # Pin the log dir to the workspace so --auto-select writes plan.json
     # to a path the assertions can predict (otherwise a BRIK_LOG_DIR
@@ -49,6 +52,7 @@ JSON
     )
   }
   cleanup_repo() {
+    mock.infra.teardown
     rm -rf "$L3_WS"
     unset BRIK_LOG_DIR
   }

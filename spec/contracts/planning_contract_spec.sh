@@ -50,12 +50,12 @@ Describe "schemas/plan/v1/plan.schema.json"
       The status should be success
     End
 
-    It "requires the 8 v1 top-level fields"
+    It "requires the 9 v1 top-level fields"
       check_required() {
         jq -r '.required | sort | join(",")' "$PLAN_V1_SCHEMA"
       }
       When call check_required
-      The output should equal "brikVersion,context,dag,fingerprint,mode,release,schemaVersion,stages"
+      The output should equal "brikVersion,context,dag,fingerprint,infra,mode,release,schemaVersion,stages"
       The status should be success
     End
   End
@@ -173,6 +173,12 @@ Describe "schemas/plan/v1/plan.schema.json"
     It "rejects plan-08-release-version-not-semver.json (release.version does not match semver pattern)"
       Skip if "jv not installed" jv_missing
       When call validate_sample "${SAMPLES_DIR}/invalid/plan-08-release-version-not-semver.json"
+      The status should not equal 0
+    End
+
+    It "rejects plan-09-missing-infra.json (referential fingerprint block absent)"
+      Skip if "jv not installed" jv_missing
+      When call validate_sample "${SAMPLES_DIR}/invalid/plan-09-missing-infra.json"
       The status should not equal 0
     End
   End

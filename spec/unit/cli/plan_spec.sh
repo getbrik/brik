@@ -2,8 +2,10 @@ Describe "brik plan (CLI surface)"
   # Covers the cli.plan.run forms not exercised by plan_gate_spec.sh:
   # default compute + --out, --explain, --validate-only, and the
   # --format rejection path.
+  Include "$BRIK_HOME/spec/support/mock_helper.sh"
 
   setup_ws() {
+    mock.infra.setup
     PLAN_WS="$(mktemp -d)"
     ( cd "$PLAN_WS" && git init -q && git config user.email t@t \
         && git config user.name t && : > marker && git add -A \
@@ -11,6 +13,7 @@ Describe "brik plan (CLI surface)"
   }
   cleanup_ws() {
     rm -rf "$PLAN_WS"
+    mock.infra.teardown
   }
   Before 'setup_ws'
   After 'cleanup_ws'

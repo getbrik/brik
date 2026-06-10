@@ -1,5 +1,8 @@
 Describe "planning/plan.sh"
+  Include "$BRIK_HOME/lib/pipeline/logging.sh"
+  Include "$BRIK_HOME/lib/pipeline/loader.sh"
   Include "$BRIK_HOME/lib/planning/plan.sh"
+  Include "$BRIK_HOME/spec/support/mock_helper.sh"
 
   Describe "plan.stages.ordered"
     It "echoes the canonical registry order"
@@ -100,12 +103,31 @@ Describe "planning/plan.sh"
       The stderr should include "invalid mode"
     End
 
-    It "emits header lines and stage records in safe mode"
+    Describe "with a configured referential"
+      Before 'mock.infra.setup'
+      After 'mock.infra.teardown'
+
+      It "emits header lines and stage records in safe mode"
+        When call plan.compute --workspace /tmp --mode safe
+        The status should be success
+        The output should include "# mode=safe"
+        The output should include "# changes_source=none"
+        The output should include $'init\trun\tcontext-match'
+      End
+
+      It "stamps the referential fingerprint into the stream"
+        When call plan.compute --workspace /tmp --mode safe
+        The status should be success
+        The output should match pattern "*# infra_fingerprint=*"
+        The output should include "# infra_fingerprint=$(infra.fingerprint "$BRIK_INFRA_DIR")"
+      End
+    End
+
+    It "fails closed when no referential is configured"
+      unset BRIK_INFRA_DIR BRIK_INFRA_REPO
       When call plan.compute --workspace /tmp --mode safe
-      The status should be success
-      The output should include "# mode=safe"
-      The output should include "# changes_source=none"
-      The output should include $'init\trun\tcontext-match'
+      The status should equal "$BRIK_EXIT_INVALID_ENV"
+      The stderr should include "no infrastructure referential configured"
     End
   End
 End

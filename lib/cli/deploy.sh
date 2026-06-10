@@ -129,6 +129,14 @@ cli.deploy.run() {
         return "$rc"
     fi
 
+    # CD init gate: the referential is mandatory and validated eagerly, so a
+    # broken environment declaration refuses the deploy before any channel
+    # resolution or target action consumes it piecemeal.
+    brik.use transverse.infra
+    local infra_root
+    infra_root="$(infra.root)" || return $?
+    infra.validate "$infra_root" || return $?
+
     brik.use transverse.env
 
     local upper_env

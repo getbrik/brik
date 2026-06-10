@@ -13,6 +13,7 @@ Describe "stages.init env publishing"
     export BRIK_CONFIG_FILE="$BRIK_CONFIG_DIR/brik.yml"
     printf 'version: 1\nproject:\n  name: test-project\n  stack: node\n' > "$BRIK_CONFIG_FILE"
     mock.workspace.setup
+    mock.infra.setup
     export BRIK_LOG_DIR
     BRIK_LOG_DIR="$(mktemp -d)"
     export BRIK_PROJECT_DIR="$BRIK_WORKSPACE"
@@ -27,6 +28,7 @@ Describe "stages.init env publishing"
   cleanup_env() {
     rm -rf "$BRIK_CONFIG_DIR" "$BRIK_LOG_DIR"
     mock.workspace.teardown
+    mock.infra.teardown
     unset BRIK_RUN_ID BRIK_PIPELINE_ENV BRIK_CONFIG_DIR 2>/dev/null || true
   }
   Before 'setup_env'

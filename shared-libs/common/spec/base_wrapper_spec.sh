@@ -307,6 +307,11 @@ Describe "base-wrapper.sh"
     Include "$BRIK_HOME/shared-libs/common/scripts/base-wrapper.sh"
 
     setup_run_stage() {
+      # The init stage validates the mandatory infrastructure referential.
+      INFRA_FIXTURE_DIR="$(mktemp -d)"
+      printf 'apiVersion: brik.dev/referential/v1\nkind: Referential\nprofile: p-lab\n' \
+        > "${INFRA_FIXTURE_DIR}/referential.yml"
+      export BRIK_INFRA_DIR="$INFRA_FIXTURE_DIR"
       export BRIK_CONFIG_FILE
       BRIK_CONFIG_FILE="$(mktemp)"
       printf "version: 1\nproject:\n  name: test-project\n  stack: node\n" > "$BRIK_CONFIG_FILE"
@@ -332,6 +337,7 @@ Describe "base-wrapper.sh"
       brik.wrapper.load_config 2>/dev/null || true
     }
     cleanup_run_stage() {
+      rm -rf "$INFRA_FIXTURE_DIR"; unset BRIK_INFRA_DIR
       export PATH="$ORIG_PATH_BASE"
       rm -f "$BRIK_CONFIG_FILE"
       rm -rf "$BRIK_LOG_DIR" "$BRIK_WORKSPACE" "$MOCK_SEC_BIN"

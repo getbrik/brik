@@ -16,8 +16,10 @@ Describe "cli.plan.run - writer + validate-only branches"
   Include "$BRIK_PIPELINE_LIB/loader.sh"
   Include "$BRIK_CLI_LIB/helpers.sh"
   Include "$BRIK_CLI_LIB/plan.sh"
+  Include "$BRIK_HOME/spec/support/mock_helper.sh"
 
   setup_ws() {
+    mock.infra.setup
     PLAN_WS="$(mktemp -d)"
     ( cd "$PLAN_WS" && git init -q && git config user.email t@t \
         && git config user.name t && : > marker && git add -A \
@@ -25,6 +27,7 @@ Describe "cli.plan.run - writer + validate-only branches"
   }
   cleanup_ws() {
     rm -rf "$PLAN_WS"
+    mock.infra.teardown
   }
   Before 'setup_ws'
   After 'cleanup_ws'

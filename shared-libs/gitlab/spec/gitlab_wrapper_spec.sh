@@ -309,6 +309,11 @@ Describe "gitlab-wrapper.sh"
     Include "$BRIK_HOME/shared-libs/gitlab/scripts/gitlab-wrapper.sh"
 
     setup_stage_env() {
+      # The init stage validates the mandatory infrastructure referential.
+      INFRA_FIXTURE_DIR="$(mktemp -d)"
+      printf 'apiVersion: brik.dev/referential/v1\nkind: Referential\nprofile: p-lab\n' \
+        > "${INFRA_FIXTURE_DIR}/referential.yml"
+      export BRIK_INFRA_DIR="$INFRA_FIXTURE_DIR"
       export BRIK_CONFIG_FILE
       BRIK_CONFIG_FILE="$(mktemp)"
       printf "version: 1\nproject:\n  name: test-project\n  stack: node\n" > "$BRIK_CONFIG_FILE"
@@ -337,6 +342,7 @@ Describe "gitlab-wrapper.sh"
       brik.gitlab.setup "$BRIK_HOME" >/dev/null 2>&1 || true
     }
     cleanup_stage_env() {
+      rm -rf \"$INFRA_FIXTURE_DIR\"; unset BRIK_INFRA_DIR
       export PATH="$ORIG_PATH_STAGE"
       rm -f "$BRIK_CONFIG_FILE"
       rm -rf "$BRIK_LOG_DIR" "$BRIK_WORKSPACE" "$MOCK_SEC_BIN"

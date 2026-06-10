@@ -10,6 +10,7 @@ Describe "brik integrate - integration"
 
     setup() {
       mock.setup
+      mock.infra.setup
       mock.create_script "npm" 'echo "mock npm: $*"'
       mock.create_exit "node" 0
       mock.create_script "npx" 'echo "mock npx: $*"'
@@ -29,6 +30,7 @@ Describe "brik integrate - integration"
     }
     cleanup() {
       mock.cleanup
+      mock.infra.teardown
       rm -rf "$WORKSPACE"
     }
     Before 'setup'
@@ -59,6 +61,7 @@ Describe "brik integrate - integration"
 
     setup() {
       mock.setup
+      mock.infra.setup
       mock.create_script "npm" 'echo "mock npm: $*"'
       mock.create_exit "node" 0
       mock.create_script "npx" 'echo "mock npx: $*"'
@@ -79,6 +82,7 @@ Describe "brik integrate - integration"
     }
     cleanup() {
       mock.cleanup
+      mock.infra.teardown
       rm -rf "$WORKSPACE"
       unset BRIK_LOG_DIR
     }

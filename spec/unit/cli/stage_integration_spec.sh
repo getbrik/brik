@@ -80,13 +80,16 @@ Describe "brik stage - integration"
   End
 
   Describe "brik stage init"
+    Include "$BRIK_HOME/spec/support/mock_helper.sh"
+
     setup() {
+      mock.infra.setup
       WORKSPACE="$(mktemp -d)"
       printf '{"name":"cli-test","version":"1.0.0"}\n' > "${WORKSPACE}/package.json"
       CONFIG="$(mktemp)"
       printf 'version: 1\nproject:\n  name: cli-test\n  stack: node\ntest:\n  framework: npm\n' > "$CONFIG"
     }
-    cleanup() { rm -rf "$WORKSPACE" "$CONFIG"; }
+    cleanup() { rm -rf "$WORKSPACE" "$CONFIG"; mock.infra.teardown; }
     Before 'setup'
     After 'cleanup'
 

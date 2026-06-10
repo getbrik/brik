@@ -22,6 +22,25 @@ stages.init() {
     # Validate brik.yml against the JSON Schema (graceful skip if jv absent).
     config.validate_schema || return $?
 
+    # Verify required tools before anything that consumes them (the
+    # referential validation below parses YAML documents with yq).
+    if ! command -v yq >/dev/null 2>&1; then
+        log.error "yq is required but not available"
+        return "$BRIK_EXIT_MISSING_DEP"
+    fi
+
+    # The infrastructure referential is mandatory: validate it eagerly
+    # (schemas, binding references) and record its fingerprint so the run's
+    # evidence pins the environment declaration it executed against. The
+    # same fingerprint is stamped into plan.json by the planner.
+    brik.use transverse.infra
+    local infra_root infra_fingerprint
+    infra_root="$(infra.root)" || return $?
+    infra.validate "$infra_root" || return $?
+    infra_fingerprint="$(infra.fingerprint "$infra_root")" || return $?
+    log.info "infrastructure referential: ${infra_root} (${infra_fingerprint:0:12})"
+    report.record "init" "tech" "infra_fingerprint" "$infra_fingerprint" 2>/dev/null || true
+
     # Detect or read stack
     local stack
     stack="$(config.get '.project.stack' 'auto')"
@@ -107,12 +126,6 @@ stages.init() {
     fi
     if [[ -n "${BRIK_TRIGGERED_BY:-}" ]]; then
         report.record "init" "business" "triggered_by" "$BRIK_TRIGGERED_BY" 2>/dev/null || true
-    fi
-
-    # Verify required tools
-    if ! command -v yq >/dev/null 2>&1; then
-        log.error "yq is required but not available"
-        return "$BRIK_EXIT_MISSING_DEP"
     fi
 
     _stages.init._resolve_git_identity

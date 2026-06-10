@@ -41,6 +41,10 @@ Describe "no field drift in schemas/plan/v1/plan.schema.json"
   #     parameterized by (version, environment); channel/digest record what
   #     was resolved. None is derivable from the others. See
   #     20260606_cicd-decoupling-implementation-plan.md (T3).
+  #   - infra {fingerprint}: pins the infrastructure referential the plan
+  #     was derived against (the referential is mandatory; reproducibility
+  #     extends to the declared environment). Not derivable: the referential
+  #     lives outside the workspace, so neither HEAD nor brik.yml covers it.
   allowlist() {
     cat <<'EOF'
 brikVersion
@@ -77,6 +81,7 @@ deploy
 environment
 channel
 digest
+infra
 EOF
   }
 

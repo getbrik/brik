@@ -296,3 +296,25 @@ mock.workspace.teardown() {
   fi
   unset _MOCK_WS_OWNED _MOCK_WS_HAD_VALUE _MOCK_WS_SAVED _MOCK_WS_PATH 2>/dev/null || true
 }
+
+# -- Infrastructure referential helpers ------------------------------------
+
+# Scaffold a minimal valid referential instance in a temp dir and export it
+# as BRIK_INFRA_DIR. The referential is mandatory at plan/init time, so any
+# spec that derives a plan or runs the init stage needs an instance. Specs
+# that exercise specific endpoints write their own richer instance instead.
+#
+# Usage: mock.infra.setup
+mock.infra.setup() {
+  _MOCK_INFRA_DIR="$(mktemp -d)"
+  printf 'apiVersion: brik.dev/referential/v1\nkind: Referential\nprofile: p-lab\n' \
+    > "$_MOCK_INFRA_DIR/referential.yml"
+  export BRIK_INFRA_DIR="$_MOCK_INFRA_DIR"
+}
+
+# Remove the scaffolded instance and unset BRIK_INFRA_DIR.
+# Idempotent and safe to call when setup was never invoked.
+mock.infra.teardown() {
+  [[ -n "${_MOCK_INFRA_DIR:-}" ]] && rm -rf "$_MOCK_INFRA_DIR"
+  unset BRIK_INFRA_DIR _MOCK_INFRA_DIR 2>/dev/null || true
+}

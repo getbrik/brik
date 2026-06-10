@@ -9,7 +9,10 @@
 # GitLab and Jenkins in parallel.
 
 Describe "L2 execution-env -> stages: --with-deploy propagation (D1)"
+  Include "$BRIK_HOME/spec/support/mock_helper.sh"
+
   setup_ws() {
+    mock.infra.setup
     WS="$(mktemp -d)"
     export BRIK_WORKSPACE="$WS"
     export BRIK_LOG_DIR="$WS/.brik-logs"
@@ -26,6 +29,7 @@ Describe "L2 execution-env -> stages: --with-deploy propagation (D1)"
     )
   }
   cleanup_ws() {
+    mock.infra.teardown
     rm -rf "$WS"
     unset BRIK_WORKSPACE BRIK_LOG_DIR
   }

@@ -1,5 +1,9 @@
 Describe "planning/plan.sh (deploy plan-kind)"
   Include "$BRIK_HOME/lib/planning/plan_writer.sh"
+  Include "$BRIK_HOME/spec/support/mock_helper.sh"
+
+  BeforeAll 'mock.infra.setup'
+  AfterAll 'mock.infra.teardown'
 
   # A deploy plan parameterized by (version, environment). /tmp has no
   # brik.yml and no tags, so only the plan-kind logic is under test.

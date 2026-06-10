@@ -1,14 +1,17 @@
 Describe "planning/plan_reader.sh"
   Include "$BRIK_HOME/lib/planning/plan_writer.sh"
   Include "$BRIK_HOME/lib/planning/plan_reader.sh"
+  Include "$BRIK_HOME/spec/support/mock_helper.sh"
 
   setup_plan() {
+    mock.infra.setup
     PLAN_FILE="$(mktemp)"
     plan_writer.write -- --workspace /tmp --mode safe > "$PLAN_FILE"
     export PLAN_FILE
   }
   teardown_plan() {
     rm -f "$PLAN_FILE"
+    mock.infra.teardown
   }
   BeforeAll setup_plan
   AfterAll teardown_plan

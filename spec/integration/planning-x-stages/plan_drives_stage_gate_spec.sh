@@ -7,7 +7,10 @@
 # per-function unit specs do not assert as one integrated flow.
 
 Describe "L2 planning -> stages: plan.json drives the stage gate"
+  Include "$BRIK_HOME/spec/support/mock_helper.sh"
+
   setup_ws() {
+    mock.infra.setup
     WS="$(mktemp -d)"
     export BRIK_WORKSPACE="$WS"
     export BRIK_LOG_DIR="$WS/.brik-logs"
@@ -27,6 +30,7 @@ Describe "L2 planning -> stages: plan.json drives the stage gate"
       --out "$BRIK_LOG_DIR/plan.json" >/dev/null 2>&1
   }
   cleanup_ws() {
+    mock.infra.teardown
     rm -rf "$WS"
     unset BRIK_WORKSPACE BRIK_LOG_DIR
   }

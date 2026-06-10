@@ -5,7 +5,10 @@ Describe "brik plan reproducibility (L.6)"
   # timestamps -- but we still wait a beat between runs so a regression
   # that pulls in EPOCHREALTIME or `date` shows up immediately.
 
+  Include "$BRIK_HOME/spec/support/mock_helper.sh"
+
   setup_repo() {
+    mock.infra.setup
     REPO="$(mktemp -d)"
     (
       cd "$REPO"
@@ -34,6 +37,7 @@ JSON
     )
   }
   cleanup_repo() {
+    mock.infra.teardown
     rm -rf "$REPO"
   }
   Before 'setup_repo'

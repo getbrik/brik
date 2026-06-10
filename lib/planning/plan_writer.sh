@@ -28,6 +28,7 @@ plan_writer.from_stream() {
     local source="none" from="" to=""
     local release_profile="none" release_version="0.0.0" is_candidate="0"
     local plan_type="ci" deploy_version="" deploy_environment=""
+    local infra_fingerprint=""
     local -a stage_rows=()
     local -a changes_files_rows=()
 
@@ -48,6 +49,7 @@ plan_writer.from_stream() {
             "# plan_type="*)         plan_type="${line#\# plan_type=}" ;;
             "# deploy_version="*)    deploy_version="${line#\# deploy_version=}" ;;
             "# deploy_environment="*) deploy_environment="${line#\# deploy_environment=}" ;;
+            "# infra_fingerprint="*) infra_fingerprint="${line#\# infra_fingerprint=}" ;;
             "#"*)                    : ;;
             "")                      : ;;
             *)                       stage_rows+=("$line") ;;
@@ -157,6 +159,7 @@ plan_writer.from_stream() {
         --argjson edges   "$edges_json" \
         --argjson chg     "$changes_obj" \
         --argjson release "$release_obj" \
+        --arg ifp "$infra_fingerprint" \
         --argjson deploy_extra "$deploy_obj" \
         '
         # KCOV_EXCL_START -- inline jq object literal, not bash code
@@ -168,6 +171,7 @@ plan_writer.from_stream() {
             workspace:     $ws,
             changes:       $chg,
             release:       $release,
+            infra:         { fingerprint: $ifp },
             stages:        $stages,
             dag:           { edges: $edges },
             fingerprint:   ""

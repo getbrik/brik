@@ -3,7 +3,10 @@ Describe "extension stack go (L.4 OCP smoke)"
   # brik core. Mirrors the chantier success criterion: "a new committer
   # Go can do all of this in < 1h following the extension author guide".
 
+  Include "$BRIK_HOME/spec/support/mock_helper.sh"
+
   setup() {
+    mock.infra.setup
     EXT="$(mktemp -d)/.brik-extensions/go"
     OUT="$(mktemp)"
     mkdir -p "$EXT/stacks" "$EXT/lib/stacks"
@@ -66,6 +69,7 @@ stacks.go.test() {
 SH
   }
   cleanup() {
+    mock.infra.teardown
     rm -rf "$(dirname "$EXT")" "$OUT"
   }
   Before 'setup'
