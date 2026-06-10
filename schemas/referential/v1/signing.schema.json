@@ -11,6 +11,11 @@
     "backend": { "enum": ["keyless", "key", "kms"] },
     "transparency": { "enum": ["rekor-public", "rekor-private", "none"] },
     "key": { "type": "string", "pattern": "^(env|file|bao)://.+" },
+    "verification_key": {
+      "type": "string",
+      "pattern": "^(env|file|bao)://.+",
+      "description": "Public-key reference used on verify when backend=key. cosign rejects private keys at verification, so a verify-only environment declares this instead of receiving the signing key. Absent, 'key' serves both operations."
+    },
     "kms_uri": { "type": "string", "pattern": "^(openbao|hashivault)://.+" },
     "fulcio_url": { "type": "string", "pattern": "^https://.+" },
     "rekor_url": { "type": "string", "pattern": "^https://.+" },

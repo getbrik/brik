@@ -358,6 +358,7 @@ kind: Signing
 name: signing
 backend: key
 key: file://trust/cosign.key
+verification_key: file://trust/cosign.pub
 transparency: none
 YAML
 

@@ -137,8 +137,18 @@ _attest._backend_args() {
     case "$_backend" in
         keyless) ;;
         key)
-            local _key
-            _key="$(_attest._key_arg "$(printf '%s' "$_sig" | jq -r '.key')")" || return "$?"
+            # cosign only accepts a PUBLIC key on verify: a verifying
+            # environment declares verification_key so the private key
+            # never has to reach it. Absent, the single key reference
+            # serves both operations (it must then point at a public key
+            # wherever only verification happens).
+            local _key_ref _key
+            if [[ "$_op" == "verify" ]]; then
+                _key_ref="$(printf '%s' "$_sig" | jq -r '.verification_key // .key')"
+            else
+                _key_ref="$(printf '%s' "$_sig" | jq -r '.key')"
+            fi
+            _key="$(_attest._key_arg "$_key_ref")" || return "$?"
             _bargv+=(--key "$_key")
             ;;
         kms)

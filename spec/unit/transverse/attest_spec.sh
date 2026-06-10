@@ -282,6 +282,31 @@ YAML
       The contents of file "$COSIGN_ARGS_FILE" should include "--insecure-ignore-tlog=true"
     End
 
+    It "key backend: prefers the declared verification_key on verify (cosign rejects private keys)"
+      verify_pub() {
+        use_key_backend
+        printf 'verification_key: env://COSIGN_PUBLIC_KEY\n' \
+          >> "$ATTEST_INFRA/endpoints/signing.yml"
+        attest.verify "$REF"
+      }
+      When call verify_pub
+      The status should be success
+      The contents of file "$COSIGN_ARGS_FILE" should include "--key env://COSIGN_PUBLIC_KEY"
+      The contents of file "$COSIGN_ARGS_FILE" should not include "--key env://COSIGN_PRIVATE_KEY"
+    End
+
+    It "key backend: still signs with the private key when verification_key is declared"
+      sign_with_pub() {
+        use_key_backend
+        printf 'verification_key: env://COSIGN_PUBLIC_KEY\n' \
+          >> "$ATTEST_INFRA/endpoints/signing.yml"
+        attest.sign "$REF" --sbom "${SHELLSPEC_TMPBASE}/sbom.json"
+      }
+      When call sign_with_pub
+      The status should be success
+      The contents of file "$COSIGN_ARGS_FILE" should include "--key env://COSIGN_PRIVATE_KEY"
+    End
+
     It "propagates a cosign verification failure (fail-closed)"
       cosign() { return 1; }
       When call attest.verify "$REF" --identity 'x' --issuer 'y'
