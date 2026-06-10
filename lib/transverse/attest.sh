@@ -130,6 +130,12 @@ _attest._kms_env() {
 _attest._backend_args() {
     local -n _bargv="$1"
     local _sig="$2" _op="$3"
+
+    # Loaded here, in the CALLING shell: the helpers that resolved the
+    # signing endpoint ran in command substitutions, whose brik.use loads
+    # the infra module in a subshell only. The file:// and trusted_root
+    # branches below resolve paths against infra.root in this shell.
+    brik.use transverse.infra
     local _backend _transparency
     _backend="$(printf '%s' "$_sig" | jq -r '.backend')"
     _transparency="$(printf '%s' "$_sig" | jq -r '.transparency')"

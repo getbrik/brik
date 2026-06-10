@@ -295,6 +295,28 @@ YAML
       The contents of file "$COSIGN_ARGS_FILE" should not include "--key env://COSIGN_PRIVATE_KEY"
     End
 
+    It "key backend: file:// key resolves even when only subshells loaded the infra module"
+      sign_fresh_shell() {
+        use_key_backend
+        printf 'apiVersion: brik.dev/referential/v1\nkind: Signing\nname: signing\nbackend: key\nkey: file://trust/cosign.key\ntransparency: none\n' \
+          > "$ATTEST_INFRA/endpoints/signing.yml"
+        mkdir -p "$ATTEST_INFRA/trust" && : > "$ATTEST_INFRA/trust/cosign.key"
+        # Simulate the runtime: attest.sh sourced, infra.* NOT yet loaded in
+        # the calling shell (its first load happened inside a command
+        # substitution). brik.use must bring it back in THIS shell.
+        (
+          while IFS= read -r _fn; do unset -f "$_fn"; done \
+            < <(declare -F | awk '$3 ~ /^_?infra\./ {print $3}')
+          unset _BRIK_MODULE_TRANSVERSE_INFRA_LOADED
+          brik.use() { . "${BRIK_HOME}/lib/transverse/${1#transverse.}.sh"; }
+          attest.sign "$REF" --sbom "${SHELLSPEC_TMPBASE}/sbom.json"
+        )
+      }
+      When call sign_fresh_shell
+      The status should be success
+      The contents of file "$COSIGN_ARGS_FILE" should include "--key $ATTEST_INFRA/trust/cosign.key"
+    End
+
     It "key backend: still signs with the private key when verification_key is declared"
       sign_with_pub() {
         use_key_backend
