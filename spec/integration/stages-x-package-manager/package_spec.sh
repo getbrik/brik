@@ -159,6 +159,51 @@ YAML
       The output should equal "sha256:abc123def4567890abc123def4567890abc123def4567890abc123def4567890"
     End
 
+    It "records package.tech.image_pushed and the post-push digest after a docker publish"
+      run_pkg_pushed() {
+        brik.use() { :; }
+        stacks.docker.build() { return 0; }
+        pkg.docker.publish() { return 0; }
+        transverse.env.resolve_indirect() { eval "printf '%s' \"\${$1:-}\""; }
+        export BRIK_PUBLISH_DOCKER_ENABLED="true"
+        docker() {
+          if [[ "$1" == "inspect" ]]; then
+            printf 'registry.example.com/myapp@sha256:abc123def4567890abc123def4567890abc123def4567890abc123def4567890\n'
+            return 0
+          fi
+          return 0
+        }
+        export -f docker
+        local ctx
+        ctx="$(context.create "package")" 2>/dev/null || ctx="$(mktemp)"
+        stages.package "$ctx" >/dev/null 2>&1
+        unset -f docker
+        unset BRIK_PUBLISH_DOCKER_ENABLED
+        jq -r '.stages[] | select(.stage == "package")
+               | "\(.tech.image_pushed // "<missing>")|\(.business.image.digest // "<missing>")"' \
+          "$BRIK_LOG_DIR/aggregate-report.json"
+      }
+      When call run_pkg_pushed
+      The output should equal "true|sha256:abc123def4567890abc123def4567890abc123def4567890abc123def4567890"
+    End
+
+    It "omits package.tech.image_pushed when no publish target is configured"
+      run_pkg_not_pushed() {
+        brik.use() { :; }
+        stacks.docker.build() { return 0; }
+        docker() { return 0; }
+        export -f docker
+        local ctx
+        ctx="$(context.create "package")" 2>/dev/null || ctx="$(mktemp)"
+        stages.package "$ctx" >/dev/null 2>&1
+        unset -f docker
+        jq -r '.stages[] | select(.stage == "package") | .tech | has("image_pushed")' \
+          "$BRIK_LOG_DIR/aggregate-report.json"
+      }
+      When call run_pkg_not_pushed
+      The output should equal "false"
+    End
+
     It "omits package.business.image.digest when docker inspect has no RepoDigests"
       run_pkg_no_digest() {
         brik.use() { :; }

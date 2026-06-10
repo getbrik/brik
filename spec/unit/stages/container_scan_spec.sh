@@ -227,6 +227,66 @@ JSON
         The output should equal "false"
       End
 
+      It "does not attempt evidence signing when the image was not pushed"
+        invoke_unpushed() {
+          mkdir -p "$BRIK_WORKSPACE/brik-artifacts/package" && cat > "$BRIK_WORKSPACE/brik-artifacts/package/package.json" <<'JSON'
+{
+  "schema_version": "1.0",
+  "stage": "package",
+  "tech": {
+    "image_built": "true",
+    "image_ref": "myapp:1.0.0"
+  },
+  "business": {
+    "image": {
+      "name": "myapp",
+      "tag": "1.0.0",
+      "full_name": "myapp:1.0.0",
+      "digest": "sha256:fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210"
+    }
+  }
+}
+JSON
+          # A stale daemon digest without a push this run must not be
+          # attested: the stub fails loudly if the gate lets it through.
+          _stages.container_scan._sign_evidence() { return 5; }
+          stages.container_scan "$CTX_FILE" >/dev/null 2>&1
+        }
+        When call invoke_unpushed
+        The status should be success
+      End
+
+      It "attempts evidence signing when the fragment marks the image as pushed"
+        invoke_pushed() {
+          mkdir -p "$BRIK_WORKSPACE/brik-artifacts/package" && cat > "$BRIK_WORKSPACE/brik-artifacts/package/package.json" <<'JSON'
+{
+  "schema_version": "1.0",
+  "stage": "package",
+  "tech": {
+    "image_built": "true",
+    "image_ref": "myapp:1.0.0",
+    "image_pushed": "true"
+  },
+  "business": {
+    "image": {
+      "name": "myapp",
+      "tag": "1.0.0",
+      "full_name": "myapp:1.0.0",
+      "digest": "sha256:fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210"
+    }
+  }
+}
+JSON
+          local signed=""
+          _stages.container_scan._sign_evidence() { signed="$1"; return 0; }
+          stages.container_scan "$CTX_FILE" >/dev/null 2>&1 || return $?
+          printf '%s' "$signed"
+        }
+        When call invoke_pushed
+        The status should be success
+        The output should equal "myapp@sha256:fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210"
+      End
+
       It "records container-scan.tech.scan_duration_ms"
         invoke_scan_duration() {
           stages.container_scan "$CTX_FILE" >/dev/null 2>&1

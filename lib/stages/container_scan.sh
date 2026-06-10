@@ -33,7 +33,7 @@ stages.container_scan() {
     # it actually produced a Docker image (lib/stages/package.sh). When
     # absent or false, container-scan does not apply (silent skip, no
     # fragment, no warning).
-    local image_built="false" image_ref="" image_digest=""
+    local image_built="false" image_ref="" image_digest="" image_pushed="false"
     if command -v jq >/dev/null 2>&1; then
         # Read the package stage fragment directly. On GitLab each job has
         # an isolated backend, but brik-artifacts/package/package.json travels as
@@ -45,6 +45,7 @@ stages.container_scan() {
             image_built="$(jq -r '.tech.image_built // "false"' "$_pkg_fragment" 2>/dev/null || printf 'false')"
             image_ref="$(jq -r '.tech.image_ref // ""' "$_pkg_fragment" 2>/dev/null || printf '')"
             image_digest="$(jq -r '.business.image.digest // ""' "$_pkg_fragment" 2>/dev/null || printf '')"
+            image_pushed="$(jq -r '.tech.image_pushed // "false"' "$_pkg_fragment" 2>/dev/null || printf 'false')"
         fi
     fi
 
@@ -104,11 +105,15 @@ stages.container_scan() {
     # failure when cosign is present is a real integrity gap and fails the
     # stage; a missing cosign is a silent skip (the deploy verifies fail-closed
     # and refuses an unsigned image there).
-    if [[ -n "$image_digest" ]]; then
+    if [[ -n "$image_digest" && "$image_pushed" == "true" ]]; then
         local _ref="${image%:*}@${image_digest}"
         if ! _stages.container_scan._sign_evidence "$_ref" && [[ "$_scan_rc" -eq 0 ]]; then
             _scan_rc="$BRIK_EXIT_EXTERNAL_FAIL"
         fi
+    elif [[ -n "$image_digest" ]]; then
+        # A digest without a push this run is daemon residue (byte-identical
+        # rebuild): there is nothing in the registry to attach evidence to.
+        log.info "image not published this run - skipping evidence signing"
     fi
     return "$_scan_rc"
 }

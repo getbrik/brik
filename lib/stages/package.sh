@@ -163,10 +163,39 @@ stages.package() {
                 if [[ $rc -ne 0 ]]; then
                     return "$rc"
                 fi
+                if [[ "$_target" == "docker" ]]; then
+                    _stages.package._record_pushed_image \
+                        "${BRIK_PACKAGE_DOCKER_IMAGE:-}" "${_app_tag:-}"
+                fi
             fi
         done
     fi
 
+    return 0
+}
+
+# After a successful docker publish, RepoDigests reflects THIS push: record
+# the pushed flag and re-capture the manifest digest. The pre-publish capture
+# above can carry a stale digest from a byte-identical previous run (shared
+# daemon); evidence signing gates on image_pushed so only artifacts that
+# actually reached the registry are attested.
+_stages.package._record_pushed_image() {
+    local image="$1" tag="$2"
+    [[ -z "$image" || -z "$tag" ]] && return 0
+    report.record "package" "tech" "image_pushed" "true" 2>/dev/null || true
+    local _digest_raw _digest
+    _digest_raw="$(docker inspect --format='{{index .RepoDigests 0}}' \
+                    "${image}:${tag}" 2>/dev/null || true)"
+    _digest="${_digest_raw##*@}"
+    if [[ "$_digest" =~ ^sha256: ]] && command -v jq >/dev/null 2>&1; then
+        local _img
+        _img="$(jq -nc \
+            --arg name   "$image" \
+            --arg tag    "$tag" \
+            --arg digest "$_digest" \
+            '{name: $name, tag: $tag, full_name: ($name + ":" + $tag), digest: $digest}')"
+        report.record_object "package" "business" "image" "$_img" 2>/dev/null || true
+    fi
     return 0
 }
 
