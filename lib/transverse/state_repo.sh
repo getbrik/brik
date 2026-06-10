@@ -301,6 +301,131 @@ transverse.state_repo.verify_head() {
     return 0
 }
 
+# _transverse.state_repo._repo_path - strip scheme, userinfo, host and the
+# .git suffix from an http(s) repo URL, leaving the host-side project path
+# (owner/repo, possibly nested on GitLab).
+_transverse.state_repo._repo_path() {
+    local url="$1" path
+    path="${url#*://}"
+    path="${path#*@}"
+    case "$path" in
+        */*) path="${path#*/}" ;;
+        *)
+            log.error "state-repo URL carries no project path: ${url}"
+            return "$BRIK_EXIT_INVALID_INPUT"
+            ;;
+    esac
+    printf '%s' "${path%.git}"
+}
+
+# Ask the GitHost API whether <branch> of the state repo is protected. The
+# append-only guarantee of the evidence store rests on host-side write-ACL /
+# branch-protection, so CD init checks it. Gitea/GitLab rules are matched by
+# exact name (glob rules are not evaluated); GitHub answers on the protection
+# endpoint itself. Until the referential's Policy kind sets the gate
+# semantics per profile, callers treat "unprotected" as a loud warning.
+# Usage: transverse.state_repo.check_protection <repo_url> <branch>
+#        --environment <env>
+# Returns: 0 protected; 10 unprotected; 7 referential gaps (no GitHost, no
+#          bound credential); 5 API failure; 2 invalid input.
+transverse.state_repo.check_protection() {
+    local repo_url="${1:-}" branch="${2:-}"
+    [[ $# -ge 1 ]] && shift
+    [[ $# -ge 1 ]] && shift
+    local environment=""
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --environment) environment="$2"; shift 2 ;;
+            *) log.error "unknown option: $1"; return "$BRIK_EXIT_INVALID_INPUT" ;;
+        esac
+    done
+
+    if [[ -z "$repo_url" || -z "$branch" || -z "$environment" ]]; then
+        log.error "check_protection: <repo_url>, <branch> and --environment are required"
+        return "$BRIK_EXIT_INVALID_INPUT"
+    fi
+
+    brik.use transverse.infra
+
+    local githost product api_url gh_name
+    githost="$(infra.endpoint_of_kind GitHost)" || return "$?"
+    product="$(printf '%s' "$githost" | jq -r '.product')"
+    api_url="$(printf '%s' "$githost" | jq -r '.api_url')"
+    gh_name="$(printf '%s' "$githost" | jq -r '.name')"
+
+    local cred token
+    cred="$(infra.credential_for "$environment" "$gh_name")" || return "$?"
+    if [[ "$(printf '%s' "$cred" | jq -r '.method')" != "token" ]]; then
+        log.error "check_protection: the '${gh_name}' credential must be a token to call the host API"
+        return "$BRIK_EXIT_CONFIG_ERROR"
+    fi
+    token="$(infra.resolve_ref "$(printf '%s' "$cred" | jq -r '.token')")" || return "$?"
+
+    local path
+    path="$(_transverse.state_repo._repo_path "$repo_url")" || return "$?"
+
+    local -a curl_args=(-sS --max-time 30)
+    [[ "$(printf '%s' "$githost" | jq -r '.tls.trust // ""')" == "insecure" ]] && curl_args+=(-k)
+
+    local body code matched
+    body="$(mktemp)" || return "$BRIK_EXIT_IO_FAILURE"
+
+    case "$product" in
+        gitea)
+            code="$(curl "${curl_args[@]}" -o "$body" -w '%{http_code}' \
+                -H "Authorization: token ${token}" \
+                "${api_url}/api/v1/repos/${path}/branch_protections")" || { rm -f "$body"; return "$BRIK_EXIT_EXTERNAL_FAIL"; }
+            if [[ "$code" != "200" ]]; then
+                log.error "check_protection: ${product} API answered ${code} for ${path}"
+                rm -f "$body"
+                return "$BRIK_EXIT_EXTERNAL_FAIL"
+            fi
+            matched="$(jq -e --arg b "$branch" 'any(.[]; (.branch_name // .rule_name // "") == $b)' "$body" 2>/dev/null)" || matched="false"
+            ;;
+        gitlab)
+            local path_enc
+            path_enc="$(jq -rn --arg p "$path" '$p|@uri')"
+            code="$(curl "${curl_args[@]}" -o "$body" -w '%{http_code}' \
+                -H "PRIVATE-TOKEN: ${token}" \
+                "${api_url}/api/v4/projects/${path_enc}/protected_branches")" || { rm -f "$body"; return "$BRIK_EXIT_EXTERNAL_FAIL"; }
+            if [[ "$code" != "200" ]]; then
+                log.error "check_protection: ${product} API answered ${code} for ${path}"
+                rm -f "$body"
+                return "$BRIK_EXIT_EXTERNAL_FAIL"
+            fi
+            matched="$(jq -e --arg b "$branch" 'any(.[]; .name == $b)' "$body" 2>/dev/null)" || matched="false"
+            ;;
+        github)
+            code="$(curl "${curl_args[@]}" -o "$body" -w '%{http_code}' \
+                -H "Authorization: Bearer ${token}" \
+                "${api_url}/repos/${path}/branches/${branch}/protection")" || { rm -f "$body"; return "$BRIK_EXIT_EXTERNAL_FAIL"; }
+            case "$code" in
+                200) matched="true" ;;
+                404) matched="false" ;;
+                *)
+                    log.error "check_protection: ${product} API answered ${code} for ${path}"
+                    rm -f "$body"
+                    return "$BRIK_EXIT_EXTERNAL_FAIL"
+                    ;;
+            esac
+            ;;
+        *)
+            log.error "check_protection: unsupported git host product '${product}'"
+            rm -f "$body"
+            return "$BRIK_EXIT_CONFIG_ERROR"
+            ;;
+    esac
+    rm -f "$body"
+
+    if [[ "$matched" == "true" ]]; then
+        log.info "state-repo branch '${branch}' is protected on ${gh_name} (${product})"
+        return 0
+    fi
+    log.warn "state-repo branch '${branch}' is NOT protected on ${gh_name} (${product}): the append-only guarantee relies on it"
+    return "$BRIK_EXIT_CHECK_FAILED"
+}
+
 # Push the current HEAD of a state-repo working tree to its upstream.
 # Always sets GIT_TERMINAL_PROMPT=0; credentials embedded in the remote URL are
 # redacted from error logs.

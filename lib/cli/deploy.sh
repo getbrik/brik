@@ -141,6 +141,27 @@ cli.deploy.run() {
         return "${BRIK_EXIT_CONFIG_ERROR}"
     fi
 
+    # The append-only guarantee of the evidence store rests on host-side
+    # branch protection: check it before consuming evidence. Until the
+    # referential's Policy kind sets the gate semantics per profile, an
+    # unprotected or unverifiable branch is a loud warning, not a refusal
+    # (the lab carries no protection before its first hardening tier).
+    if [[ "$dry_run" != "true" ]]; then
+        brik.use transverse.config
+        local ev_repo
+        ev_repo="$(config.get '.artifacts.evidence.repo' '' 2>/dev/null || printf '')"
+        if [[ -n "$ev_repo" ]]; then
+            brik.use transverse.state_repo
+            local ev_branch prot_rc=0
+            ev_branch="$(config.get '.artifacts.evidence.branch' '' 2>/dev/null || printf '')"
+            transverse.state_repo.check_protection "$ev_repo" "${ev_branch:-main}" \
+                --environment "$environment" || prot_rc=$?
+            if [[ "$prot_rc" -ne 0 && "$prot_rc" -ne 10 ]]; then
+                log.warn "state-repo branch protection could not be verified (rc=${prot_rc})"
+            fi
+        fi
+    fi
+
     # Resolve the version to a digest-pinned ref in the channel this env
     # accepts, then enforce the require_digest gate fail-closed.
     local channel require_digest pinned=""

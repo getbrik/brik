@@ -545,4 +545,129 @@ YAML
       The stderr should include "allowed_signers"
     End
   End
+
+  # =========================================================================
+  # branch-protection check against the GitHost API (CD init)
+  # =========================================================================
+  Describe "transverse.state_repo.check_protection"
+    Include "$BRIK_TRANSVERSE_LIB/config.sh"
+    Include "$BRIK_TRANSVERSE_LIB/infra.sh"
+
+    setup_protection() {
+      PROT_DIR="$(mktemp -d)"
+      INFRA_DIR="$PROT_DIR/infra"
+      MOCK_BIN_DIR="$PROT_DIR/bin"
+      mkdir -p "$INFRA_DIR/endpoints" "$INFRA_DIR/credentials" "$INFRA_DIR/bindings" "$MOCK_BIN_DIR"
+      printf 'apiVersion: brik.dev/referential/v1\nkind: Referential\nprofile: p-lab\n' \
+        > "$INFRA_DIR/referential.yml"
+      write_githost gitea
+      cat > "$INFRA_DIR/credentials/git-api.yml" <<'YAML'
+apiVersion: brik.dev/referential/v1
+kind: Credential
+name: git-api
+method: token
+token: env://PROT_SPEC_TOKEN
+YAML
+      cat > "$INFRA_DIR/bindings/prod.yml" <<'YAML'
+apiVersion: brik.dev/referential/v1
+kind: Binding
+name: prod
+endpoints:
+  git-host: git-api
+YAML
+      export BRIK_INFRA_DIR="$INFRA_DIR" PROT_SPEC_TOKEN="t0ken"
+    }
+    cleanup_protection() {
+      rm -rf "$PROT_DIR"
+      unset BRIK_INFRA_DIR PROT_SPEC_TOKEN PROT_DIR INFRA_DIR MOCK_BIN_DIR
+    }
+    Before 'setup_protection'
+    After 'cleanup_protection'
+
+    write_githost() {
+      cat > "$INFRA_DIR/endpoints/git-host.yml" <<YAML
+apiVersion: brik.dev/referential/v1
+kind: GitHost
+name: git-host
+product: $1
+api_url: http://git.lab:3000
+tls:
+  trust: insecure
+YAML
+    }
+
+    # A curl mock that honours -o (writes the canned body there) and prints
+    # the canned HTTP code, the way the implementation invokes curl.
+    mock_api() {
+      local body="$1" code="$2"
+      cat > "$MOCK_BIN_DIR/curl" <<EOF
+#!/bin/sh
+out=""
+prev=""
+for a in "\$@"; do
+  [ "\$prev" = "-o" ] && out="\$a"
+  prev="\$a"
+done
+[ -n "\$out" ] && printf '%s' '$body' > "\$out"
+printf '%s' '$code'
+EOF
+      chmod +x "$MOCK_BIN_DIR/curl"
+    }
+
+    check() {
+      PATH="$MOCK_BIN_DIR:$PATH" transverse.state_repo.check_protection \
+        "http://git.lab:3000/brik/config-deploy.git" main --environment prod
+    }
+
+    It "confirms a protected branch on gitea"
+      gitea_protected() { mock_api '[{"branch_name":"main"}]' 200; check; }
+      When call gitea_protected
+      The status should be success
+      The stderr should include "protected"
+    End
+
+    It "reports (10) an unprotected branch on gitea"
+      gitea_unprotected() { mock_api '[]' 200; check 2>/dev/null; }
+      When call gitea_unprotected
+      The status should equal 10
+    End
+
+    It "confirms a protected branch on gitlab"
+      gitlab_protected() { write_githost gitlab; mock_api '[{"name":"main"}]' 200; check; }
+      When call gitlab_protected
+      The status should be success
+      The stderr should include "protected"
+    End
+
+    It "confirms a protected branch on github (200 on the protection endpoint)"
+      github_protected() { write_githost github; mock_api '{}' 200; check; }
+      When call github_protected
+      The status should be success
+      The stderr should include "protected"
+    End
+
+    It "reports (10) an unprotected branch on github (404)"
+      github_unprotected() { write_githost github; mock_api '{"message":"Branch not protected"}' 404; check 2>/dev/null; }
+      When call github_unprotected
+      The status should equal 10
+    End
+
+    It "fails (5) when the GitHost API errors"
+      api_error() { mock_api '' 500; check 2>/dev/null; }
+      When call api_error
+      The status should equal 5
+    End
+
+    It "fails closed (7) when no GitHost endpoint is declared"
+      no_githost() { rm "$INFRA_DIR/endpoints/git-host.yml"; check 2>/dev/null; }
+      When call no_githost
+      The status should equal 7
+    End
+
+    It "fails closed (7) when the environment binds no credential for the git host"
+      unbound() { rm "$INFRA_DIR/bindings/prod.yml"; check 2>/dev/null; }
+      When call unbound
+      The status should equal 7
+    End
+  End
 End
