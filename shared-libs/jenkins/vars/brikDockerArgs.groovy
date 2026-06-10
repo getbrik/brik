@@ -57,6 +57,17 @@ def call(Map config = [:]) {
     ).trim()
     def policyArg = policyHost ? "-v ${policyHost}:/etc/brik/policy:ro" : ''
 
+    // Same discovery for the infrastructure referential mounted at
+    // /etc/brik/infra: stage containers need it because brik validates the
+    // referential at init (BRIK_INFRA_DIR travels through the env-file).
+    def infraHost = sh(
+        script: '''CID=$(grep -oP 'containers/\\K[a-f0-9]+' /proc/self/mountinfo 2>/dev/null | head -1)
+            [ -n "$CID" ] && docker inspect "$CID" --format '{{range .Mounts}}{{if eq .Destination "/etc/brik/infra"}}{{.Source}}{{end}}{{end}}' 2>/dev/null | head -1 || echo ''
+        ''',
+        returnStdout: true
+    ).trim()
+    def infraArg = infraHost ? "-v ${infraHost}:/etc/brik/infra:ro" : ''
+
     // Scope credentials by phase rather than injecting every prefix into every
     // container. Deploy credentials (ARGOCD_, SSH_) are more privileged than
     // build credentials and must not reach CI stage containers; the
@@ -84,8 +95,8 @@ def call(Map config = [:]) {
 
     def javaEnvArgs = "-e MAVEN_OPTS=\"-Dmaven.repo.local=${env.WORKSPACE}/.m2/repository\" -e GRADLE_USER_HOME=${env.WORKSPACE}/.gradle"
     def baseArgs = "-e HOME=${env.WORKSPACE} ${javaEnvArgs} --memory=4g -v /var/run/docker.sock:/var/run/docker.sock ${networkArg}"
-    def dockerArgs       = "${baseArgs} ${envFileArg} ${policyArg}"
-    def deployDockerArgs = "-u 0:0 ${baseArgs} ${deployEnvFileArg} ${policyArg}"
+    def dockerArgs       = "${baseArgs} ${envFileArg} ${policyArg} ${infraArg}"
+    def deployDockerArgs = "-u 0:0 ${baseArgs} ${deployEnvFileArg} ${policyArg} ${infraArg}"
 
     return [
         dockerArgs:       dockerArgs,

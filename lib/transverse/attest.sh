@@ -262,7 +262,7 @@ attest.provenance_predicate() {
 # Attach a signed attestation to the image digest. The SBOM is required; an
 # optional provenance predicate is attached as a second attestation. In keyless
 # mode cosign signs with a Fulcio cert from the ambient OIDC token; in key mode
-# it signs with BRIK_COSIGN_KEY.
+# it signs with the key the referential's Signing endpoint references.
 # Usage: attest.sign <ref> --sbom <file> [--provenance <file>]
 #        [--sbom-type <t>] [--dry-run]
 attest.sign() {
@@ -335,7 +335,7 @@ attest.sign() {
 # Verify the signed attestations on an image digest. Fail-closed: any missing
 # or unverifiable attestation returns non-zero so the caller refuses the deploy.
 # Keyless verification pins the expected signer identity and OIDC issuer; key
-# verification uses BRIK_COSIGN_KEY.
+# verification uses the Signing endpoint's verification_key (or key).
 # Usage: attest.verify <ref> [--type <t>] [--identity <re>] [--issuer <re>]
 #        [--dry-run]
 attest.verify() {

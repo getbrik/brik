@@ -22,7 +22,7 @@ Brik runs a layered policy hierarchy on every finding:
 otherwise                         -> failing
 ```
 
-The org policy lives at one URL (`BRIK_POLICY_URL`); every Brik runner
+The org policy lives at one URL (the referential's `Policy` document); every Brik runner
 fetches, validates, compiles and caches it once at the **init** stage.
 
 ## Schema
@@ -54,7 +54,8 @@ Wildcards in `projects[]` are not supported in v1 -- use exact matches.
 
 ## Distribution
 
-`BRIK_POLICY_URL` points the runner at the policy file. Three common
+The `url` of the referential's `Policy` document points the runner at the
+policy file. Three common
 deployments:
 
 | Use case          | URL example                              | Notes |

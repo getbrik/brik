@@ -95,7 +95,7 @@ path entries) plus the discipline below.
 
 ## Where these entries surface
 
-Once `BRIK_POLICY_URL` points at your policy file, every pipeline that
+Once the referential's `Policy` document points at your policy file, every pipeline that
 runs through Brik consumes it. The aggregate-report (Markdown / JSON)
 that lands on every pipeline summarises both **Failing findings** and
 **Ignored findings** with the per-source breakdown:

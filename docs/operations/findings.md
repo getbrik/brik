@@ -171,14 +171,14 @@ brik-artifacts/
 | Variable | Default | Effect |
 |----------|---------|--------|
 | `quality.findings.policy` | `pragmatic` | Active built-in preset |
-| `BRIK_POLICY_URL` | unset | Fetches the org policy at init; fail-closed when unreachable |
+| referential `Policy` document | none | Fetches the org policy at init; fail-closed when unreachable |
 | `BRIK_SECURITY_SEVERITY_THRESHOLD` | `high` | Severity floor used by `apply_policy` |
 | `BRIK_FINDINGS_EXPIRING_SOON_DAYS` | `30` | Window for `findings.expiring_soon` warnings at init |
 | `BRIK_POLICY_CACHE_PATH` | `${BRIK_WORKSPACE}/brik-artifacts/.policy.cache.json` | Compiled-policy cache location |
 
 ## Expiring-soon notice
 
-When `BRIK_POLICY_URL` is set, the Init stage calls `findings.expiring_soon` and
+When the referential declares a `Policy` document, the Init stage calls `findings.expiring_soon` and
 surfaces every allowlist entry whose `expires` falls within
 `BRIK_FINDINGS_EXPIRING_SOON_DAYS`. The notice is visible (logged and recorded
 under `business.policy_expiring_soon`) but non-blocking, so the DSI sees upcoming

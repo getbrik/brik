@@ -143,7 +143,10 @@ The `ssh` and `compose` (remote) targets use SSH to connect to the deployment ho
 | CI variable | Description |
 |-------------|-------------|
 | `SSH_PRIVATE_KEY` | SSH private key content or file path (see note below) |
-| `BRIK_SSH_STRICT_HOST_KEY` | Set to `no` to disable strict host key checking (default: `yes`) |
+
+Host key policy comes from the infrastructure referential: the `SshTarget`
+endpoint declaring the host carries the `known_hosts` reference, or an
+explicit `strict_host_key: false` opt-out. An undeclared host fails closed.
 
 **Note on SSH_PRIVATE_KEY format:** This variable can contain either the key content
 directly (inline) or a file path. GitLab CI "File" type variables automatically write
@@ -155,14 +158,18 @@ both cases transparently.
 | CI variable | Description |
 |-------------|-------------|
 | `KUBECONFIG` | Path to the kubeconfig file. On GitLab, use a "File" type variable. |
-| `BRIK_KUBECTL_OPTS` | Extra options appended to every `kubectl` command (e.g. `--insecure-skip-tls-verify`) |
+
+Cluster trust (CA material or `insecure-skip-tls-verify`) lives inside the
+kubeconfig itself; there is no kubectl flag passthrough.
 
 ### ArgoCD (gitops target with controller: argocd)
 
 | CI variable | Description |
 |-------------|-------------|
-| `ARGOCD_SERVER` | ArgoCD server address (e.g. `argocd.example.com:443`) |
 | `ARGOCD_AUTH_TOKEN` | ArgoCD authentication token |
+
+The server address and TLS posture come from the referential's `ArgoCD`
+endpoint (an explicit `--server` flag still wins when a caller passes one).
 
 ### GitOps config repo (gitops target)
 
