@@ -423,4 +423,126 @@ SCRIPT
       The output should equal "ok"
     End
   End
+
+  # =========================================================================
+  # ssh-signed evidence commits (evidence-commit-signing provider)
+  # =========================================================================
+  Describe "commit --sign and verify_head (ssh-signing)"
+    Include "$BRIK_TRANSVERSE_LIB/config.sh"
+    Include "$BRIK_TRANSVERSE_LIB/infra.sh"
+
+    setup_signing() {
+      SIGN_DIR="$(mktemp -d)"
+
+      REPO_DIR="$SIGN_DIR/repo"
+      mkdir -p "$REPO_DIR"
+      git -C "$REPO_DIR" init -q -b main
+      printf '{}\n' > "$REPO_DIR/event.json"
+
+      ssh-keygen -t ed25519 -N "" -q -f "$SIGN_DIR/id_ed25519"
+
+      INFRA_DIR="$SIGN_DIR/infra"
+      mkdir -p "$INFRA_DIR/credentials" "$INFRA_DIR/trust"
+      printf 'apiVersion: brik.dev/referential/v1\nkind: Referential\nprofile: p-lab\n' \
+        > "$INFRA_DIR/referential.yml"
+      cat > "$INFRA_DIR/credentials/evidence-signing.yml" <<YAML
+apiVersion: brik.dev/referential/v1
+kind: Credential
+name: evidence-signing
+method: ssh-key
+private_key: file://$SIGN_DIR/id_ed25519
+YAML
+      # Principals are verified in the 'git' namespace (commits AND tags);
+      # a 'git-commit' namespace entry fails with "key is not permitted".
+      printf 'brik-ci@noreply namespaces="git" %s\n' "$(cat "$SIGN_DIR/id_ed25519.pub")" \
+        > "$INFRA_DIR/trust/allowed_signers"
+
+      export BRIK_INFRA_DIR="$INFRA_DIR"
+    }
+    cleanup_signing() {
+      rm -rf "$SIGN_DIR"
+      unset BRIK_INFRA_DIR SIGN_DIR REPO_DIR INFRA_DIR
+    }
+    Before 'setup_signing'
+    After 'cleanup_signing'
+
+    It "signs with the referential's key and verify_head accepts the signature"
+      sign_roundtrip() {
+        transverse.state_repo.commit "$REPO_DIR" "evidence: spec" --sign || return $?
+        transverse.state_repo.verify_head "$REPO_DIR"
+      }
+      When call sign_roundtrip
+      The status should be success
+      The stderr should include 'Good "git" signature'
+    End
+
+    It "materializes an env:// key into a transient file and signs with it"
+      sign_env_key() {
+        SIGN_SPEC_KEY="$(cat "$SIGN_DIR/id_ed25519")"
+        export SIGN_SPEC_KEY
+        yq -i '.private_key = "env://SIGN_SPEC_KEY"' "$INFRA_DIR/credentials/evidence-signing.yml"
+        transverse.state_repo.commit "$REPO_DIR" "evidence: spec" --sign || return $?
+        transverse.state_repo.verify_head "$REPO_DIR"
+      }
+      When call sign_env_key
+      The status should be success
+      The stderr should include 'Good "git" signature'
+    End
+
+    It "fails closed (7) on --sign without an evidence-signing credential"
+      sign_no_cred() {
+        rm "$INFRA_DIR/credentials/evidence-signing.yml"
+        transverse.state_repo.commit "$REPO_DIR" "evidence: spec" --sign
+      }
+      When call sign_no_cred
+      The status should equal 7
+      The stderr should include "evidence-signing"
+    End
+
+    It "fails closed (7) when the evidence-signing credential is not an ssh-key"
+      sign_wrong_method() {
+        cat > "$INFRA_DIR/credentials/evidence-signing.yml" <<'YAML'
+apiVersion: brik.dev/referential/v1
+kind: Credential
+name: evidence-signing
+method: token
+token: env://SOME_TOKEN
+YAML
+        transverse.state_repo.commit "$REPO_DIR" "evidence: spec" --sign
+      }
+      When call sign_wrong_method
+      The status should equal 7
+      The stderr should include "ssh-key"
+    End
+
+    It "verify_head rejects (5) a signer absent from allowed_signers"
+      verify_unknown_signer() {
+        transverse.state_repo.commit "$REPO_DIR" "evidence: spec" --sign || return $?
+        : > "$INFRA_DIR/trust/allowed_signers"
+        transverse.state_repo.verify_head "$REPO_DIR" 2>/dev/null
+      }
+      When call verify_unknown_signer
+      The status should equal 5
+    End
+
+    It "verify_head rejects (5) an unsigned HEAD"
+      verify_unsigned() {
+        transverse.state_repo.commit "$REPO_DIR" "evidence: spec" || return $?
+        transverse.state_repo.verify_head "$REPO_DIR" 2>/dev/null
+      }
+      When call verify_unsigned
+      The status should equal 5
+    End
+
+    It "verify_head fails closed (7) when the referential has no allowed_signers"
+      verify_no_trust() {
+        transverse.state_repo.commit "$REPO_DIR" "evidence: spec" --sign || return $?
+        rm "$INFRA_DIR/trust/allowed_signers"
+        transverse.state_repo.verify_head "$REPO_DIR"
+      }
+      When call verify_no_trust
+      The status should equal 7
+      The stderr should include "allowed_signers"
+    End
+  End
 End

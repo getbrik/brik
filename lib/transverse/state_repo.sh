@@ -10,15 +10,18 @@
 # promotion journal and the deployment journal; deployments/gitops.sh is its
 # first consumer.
 #
-# Integrity: commits may be signed (--sign) and the host enforces write-ACL /
-# branch-protection. This module never writes a self-hash back into the file it
-# describes; tamper-evidence comes from the signature plus the append-only git
-# commit chain, not from an embedded digest.
+# Integrity: commits may be ssh-signed (--sign, the evidence-commit-signing
+# provider) with the key the referential's 'evidence-signing' credential
+# references, and verified against the referential's trust/allowed_signers;
+# the host enforces write-ACL / branch-protection. This module never writes a
+# self-hash back into the file it describes; tamper-evidence comes from the
+# signature plus the append-only git commit chain, not from an embedded digest.
 #
 # Functions:
 #   transverse.state_repo.clone  - inject an indirect token, clone a branch shallow
 #   transverse.state_repo.append - write an append-only event file (refuses overwrite)
-#   transverse.state_repo.commit - stage all and commit (idempotent, optional -S sign)
+#   transverse.state_repo.commit - stage all and commit (idempotent, optional ssh --sign)
+#   transverse.state_repo.verify_head - verify HEAD's ssh signature (fail-closed)
 #   transverse.state_repo.push   - push HEAD, credentials redacted from errors
 
 # Guard against double-sourcing
@@ -146,8 +149,63 @@ transverse.state_repo.append() {
     return 0
 }
 
+# _transverse.state_repo._signing_key - resolve the private key of the
+# referential's 'evidence-signing' credential (method ssh-key) into a path
+# usable as git user.signingKey. file:// references resolve in place
+# (relative to the referential root); other references (env://, later bao://)
+# are materialized into a 0600 transient file the caller removes after the
+# commit. Writes the path into <path_var> and the transient file (when one
+# was created) into <tmp_var> -- namerefs, so no subshell loses the state.
+# Usage: _transverse.state_repo._signing_key <path_var> <tmp_var>
+_transverse.state_repo._signing_key() {
+    local -n _key_path="$1" _key_tmp="$2"
+
+    brik.use transverse.infra
+
+    local cred method
+    if ! cred="$(infra.credential evidence-signing 2>/dev/null)"; then
+        log.error "commit signing requires an 'evidence-signing' credential (method: ssh-key) in the referential"
+        return "$BRIK_EXIT_CONFIG_ERROR"
+    fi
+    method="$(printf '%s' "$cred" | jq -r '.method')"
+    if [[ "$method" != "ssh-key" ]]; then
+        log.error "credential 'evidence-signing' has method '${method}' (expected ssh-key)"
+        return "$BRIK_EXIT_CONFIG_ERROR"
+    fi
+
+    local ref
+    ref="$(printf '%s' "$cred" | jq -r '.private_key')"
+    case "$ref" in
+        file://*)
+            local path="${ref#file://}"
+            if [[ "$path" != /* ]]; then
+                local root
+                root="$(infra.root)" || return "$?"
+                path="${root}/${path}"
+            fi
+            if [[ ! -r "$path" ]]; then
+                log.error "evidence-signing key not readable: ${path}"
+                return "$BRIK_EXIT_IO_FAILURE"
+            fi
+            _key_path="$path"
+            ;;
+        *)
+            local value tmp
+            value="$(infra.resolve_ref "$ref")" || return "$?"
+            tmp="$(mktemp)" || return "$BRIK_EXIT_IO_FAILURE"
+            chmod 600 "$tmp"
+            printf '%s\n' "$value" > "$tmp"
+            _key_path="$tmp"
+            _key_tmp="$tmp"
+            ;;
+    esac
+    return 0
+}
+
 # Stage all changes and commit. Idempotent: a clean tree returns 0 with a log
-# message unless --fail-if-empty is set. Optionally signs the commit (--sign).
+# message unless --fail-if-empty is set. --sign produces an ssh-signed commit
+# (gpg.format=ssh) with the key the referential's 'evidence-signing'
+# credential references; no referential or no usable key fails closed.
 # The default committer identity is the brik-ci robot.
 # The clean-tree case is detected via `git status --porcelain` so real commit
 # failures surface cleanly rather than being guessed from exit codes.
@@ -194,14 +252,50 @@ transverse.state_repo.commit() {
         return 0
     fi
 
-    local commit_cmd=("${git_base[@]}" -c "user.email=${email}" -c "user.name=${name}" commit -q)
+    local commit_cmd=("${git_base[@]}" -c "user.email=${email}" -c "user.name=${name}")
+    local key_path="" key_tmp=""
+    if [[ "$sign" == "true" ]]; then
+        _transverse.state_repo._signing_key key_path key_tmp || return "$?"
+        commit_cmd+=(-c gpg.format=ssh -c "user.signingKey=${key_path}")
+    fi
+    commit_cmd+=(commit -q)
     [[ "$sign" == "true" ]] && commit_cmd+=(-S)
     commit_cmd+=(-m "$message")
 
     local commit_err rc=0
     commit_err="$("${commit_cmd[@]}" 2>&1 >/dev/null)" || rc=$?
+    [[ -n "$key_tmp" ]] && rm -f "$key_tmp"
     if [[ "$rc" -ne 0 ]]; then
         log.error "git commit failed: ${commit_err}"
+        return "$BRIK_EXIT_EXTERNAL_FAIL"
+    fi
+    return 0
+}
+
+# Verify the ssh signature on a state-repo HEAD against the referential's
+# trust/allowed_signers. Principals are verified in the 'git' namespace (the
+# namespace git uses for commits and tags). Fail-closed: an unsigned HEAD, a
+# signer absent from allowed_signers or a missing trust file all refuse.
+# Usage: transverse.state_repo.verify_head <repo_dir>
+transverse.state_repo.verify_head() {
+    local repo_dir="${1:-}"
+    if [[ -z "$repo_dir" ]]; then
+        log.error "repo_dir is required"
+        return "$BRIK_EXIT_INVALID_INPUT"
+    fi
+
+    brik.use transverse.infra
+
+    local root allowed
+    root="$(infra.root)" || return "$?"
+    allowed="${root}/trust/allowed_signers"
+    if [[ ! -f "$allowed" ]]; then
+        log.error "no trust/allowed_signers in the referential: cannot verify evidence commits"
+        return "$BRIK_EXIT_CONFIG_ERROR"
+    fi
+
+    if ! git -C "$repo_dir" -c gpg.ssh.allowedSignersFile="$allowed" verify-commit HEAD; then
+        log.error "evidence commit signature did not verify for HEAD (fail-closed)"
         return "$BRIK_EXIT_EXTERNAL_FAIL"
     fi
     return 0

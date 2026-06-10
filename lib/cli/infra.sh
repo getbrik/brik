@@ -186,6 +186,14 @@ method: token
 token: env://BRIK_GIT_TOKEN
 YAML
 
+    cat > "${dir}/credentials/evidence-signing.yml" <<'YAML'
+apiVersion: brik.dev/referential/v1
+kind: Credential
+name: evidence-signing
+method: ssh-key
+private_key: env://BRIK_EVIDENCE_SIGNING_KEY
+YAML
+
     cat > "${dir}/bindings/default.yml" <<'YAML'
 apiVersion: brik.dev/referential/v1
 kind: Binding
@@ -281,6 +289,14 @@ method: token
 token: bao://secret/ci/git#token
 YAML
 
+    cat > "${dir}/credentials/evidence-signing.yml" <<'YAML'
+apiVersion: brik.dev/referential/v1
+kind: Credential
+name: evidence-signing
+method: ssh-key
+private_key: bao://secret/ci/evidence#ssh_key
+YAML
+
     cat > "${dir}/bindings/production.yml" <<'YAML'
 apiVersion: brik.dev/referential/v1
 kind: Binding
@@ -360,6 +376,14 @@ kind: Credential
 name: git-api
 method: token
 token: env://BRIK_GIT_TOKEN
+YAML
+
+    cat > "${dir}/credentials/evidence-signing.yml" <<'YAML'
+apiVersion: brik.dev/referential/v1
+kind: Credential
+name: evidence-signing
+method: ssh-key
+private_key: file://trust/evidence_signing_key
 YAML
 
     cat > "${dir}/bindings/e2e.yml" <<'YAML'
