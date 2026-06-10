@@ -156,10 +156,13 @@ _channel._fetch_digest() {
 # _channel._registry_digest - resolve a tag to its sha256 digest via the OCI
 # distribution API (curl). Isolated from the public entrypoint so the resolver
 # strategy can evolve without touching it. The registry endpoint must be
-# <host>/<repository>. HTTPS is tried first, then HTTP, so internal/air-gapped
-# registries served over plain HTTP resolve without a flag. Echoes the bare
+# <host>/<repository>. The URL scheme comes from the Registry endpoint the
+# referential declares for the host: http:// is a declaration, never a
+# fallback, and an undeclared host fails closed. Echoes the bare
 # "sha256:<hex>" on success.
-# Returns: 3 if curl is not on PATH; 5 if the resolution fails.
+# Returns: 3 if curl is not on PATH; 7 when the host is not declared in the
+#          referential; 4 when no referential is configured; 5 if the
+#          resolution fails.
 _channel._registry_digest() {
     local registry="$1" version="$2"
     if ! command -v curl >/dev/null 2>&1; then
@@ -173,15 +176,18 @@ _channel._registry_digest() {
         return "$BRIK_EXIT_EXTERNAL_FAIL"
     fi
 
-    local scheme digest
-    for scheme in https http; do
-        if digest="$(_channel._fetch_digest "$scheme" "$host" "$name" "$version")"; then
-            printf '%s' "$digest"
-            return 0
-        fi
-    done
-    log.error "failed to resolve digest for ${registry}:${version}"
-    return "$BRIK_EXIT_EXTERNAL_FAIL"
+    brik.use transverse.infra
+    local endpoint url scheme
+    endpoint="$(infra.registry_for "$host")" || return "$?"
+    url="$(printf '%s' "$endpoint" | jq -r '.url')"
+    scheme="${url%%://*}"
+
+    local digest
+    if ! digest="$(_channel._fetch_digest "$scheme" "$host" "$name" "$version")"; then
+        log.error "failed to resolve digest for ${registry}:${version} (over ${scheme})"
+        return "$BRIK_EXIT_EXTERNAL_FAIL"
+    fi
+    printf '%s' "$digest"
 }
 
 # channel.resolve_digest - resolve a version to a digest-pinned image ref

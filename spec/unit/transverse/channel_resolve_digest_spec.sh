@@ -3,6 +3,7 @@ Describe "transverse/channel.sh"
   Include "$BRIK_PIPELINE_LIB/loader.sh"
   Include "$BRIK_TRANSVERSE_LIB/env.sh"
   Include "$BRIK_TRANSVERSE_LIB/config.sh"
+  Include "$BRIK_TRANSVERSE_LIB/infra.sh"
   Include "$BRIK_TRANSVERSE_LIB/channel.sh"
   Include "$BRIK_HOME/spec/support/mock_helper.sh"
 
@@ -20,10 +21,35 @@ artifacts:
       registry: registry.release/app
 YAML
     export BRIK_CONFIG_FILE="$CHAN_CFG"
+
+    # The transport to a registry comes from its declared Registry endpoint
+    # in the infrastructure referential, never from a fallback.
+    CHAN_INFRA="$(mktemp -d)"
+    mkdir -p "$CHAN_INFRA/endpoints"
+    printf 'apiVersion: brik.dev/referential/v1\nkind: Referential\nprofile: p-lab\n' \
+      > "$CHAN_INFRA/referential.yml"
+    cat > "$CHAN_INFRA/endpoints/registry-internal.yml" <<'YAML'
+apiVersion: brik.dev/referential/v1
+kind: Registry
+name: registry-internal
+url: https://registry.internal
+tls:
+  trust: system
+YAML
+    cat > "$CHAN_INFRA/endpoints/registry-release.yml" <<'YAML'
+apiVersion: brik.dev/referential/v1
+kind: Registry
+name: registry-release
+url: https://registry.release
+tls:
+  trust: system
+YAML
+    export BRIK_INFRA_DIR="$CHAN_INFRA"
   }
   cleanup_config() {
     rm -f "$CHAN_CFG"
-    unset BRIK_CONFIG_FILE
+    rm -rf "$CHAN_INFRA"
+    unset BRIK_CONFIG_FILE BRIK_INFRA_DIR CHAN_INFRA
   }
   Before 'write_config'
   After 'cleanup_config'
@@ -59,10 +85,21 @@ YAML
 
     # The resolver talks the OCI distribution API over curl: a manifest GET
     # returns the immutable digest in the Docker-Content-Digest response
-    # header. The curl mock emits a canned header block regardless of args
-    # (the https attempt succeeds, so the http fallback is never reached).
+    # header. The curl mock emits a canned header block regardless of args;
+    # the scheme it is called with comes from the declared Registry endpoint.
     ok_headers() {
       printf 'HTTP/1.1 200 OK\r\nDocker-Content-Digest: %s\r\nContent-Type: application/vnd.oci.image.manifest.v1+json\r\n\r\n' "$1"
+    }
+
+    # A curl mock that records its argv to MOCK_LOG and answers 200 + digest,
+    # so a test can assert WHICH URL scheme the resolver used.
+    recording_curl() {
+      cat > "${MOCK_BIN}/curl" <<EOF
+#!/bin/sh
+echo "curl \$*" >> "${MOCK_LOG}"
+printf 'HTTP/1.1 200 OK\r\nDocker-Content-Digest: ${VALID_DIGEST}\r\n\r\n'
+EOF
+      chmod +x "${MOCK_BIN}/curl"
     }
 
     It "resolves a known version to a digest-pinned ref"
@@ -102,6 +139,54 @@ YAML
       When call channel.resolve_digest v1.2.3 ghost
       The status should equal 7
       The stderr should include "ghost"
+    End
+
+    It "resolves over https when the endpoint declares https://"
+      resolve_declared_https() {
+        recording_curl
+        mock.activate
+        channel.resolve_digest v1.2.3 release >/dev/null || return $?
+        mock.call_args curl
+      }
+      When call resolve_declared_https
+      The output should include "https://registry.release/v2/app/manifests/v1.2.3"
+    End
+
+    It "resolves over http when the endpoint declares http:// (no fallback, a declaration)"
+      resolve_declared_http() {
+        yq -i '.url = "http://registry.release"' "$CHAN_INFRA/endpoints/registry-release.yml"
+        recording_curl
+        mock.activate
+        channel.resolve_digest v1.2.3 release >/dev/null || return $?
+        mock.call_args curl
+      }
+      When call resolve_declared_http
+      The output should include "http://registry.release/v2/app/manifests/v1.2.3"
+      The stderr should include "plain http"
+    End
+
+    It "fails closed (7) when the registry host is not declared in the referential"
+      resolve_undeclared() {
+        rm "$CHAN_INFRA/endpoints/registry-release.yml"
+        mock.create_output "curl" "$(ok_headers "$VALID_DIGEST")" 0
+        mock.activate
+        channel.resolve_digest v1.2.3 release
+      }
+      When call resolve_undeclared
+      The status should equal 7
+      The stderr should include "registry.release"
+    End
+
+    It "fails closed (4) when no referential is configured at all"
+      resolve_no_infra() {
+        unset BRIK_INFRA_DIR
+        mock.create_output "curl" "$(ok_headers "$VALID_DIGEST")" 0
+        mock.activate
+        channel.resolve_digest v1.2.3 release
+      }
+      When call resolve_no_infra
+      The status should equal 4
+      The stderr should include "brik infra init"
     End
 
     It "fails missing_dep (3) when no digest resolver is on PATH"

@@ -52,8 +52,21 @@ YAML
     chmod +x "${MOCKBIN}/kubectl"
     printf '#!/bin/sh\nprintf "HTTP/1.1 200 OK\\r\\nDocker-Content-Digest: %s\\r\\n\\r\\n"\nexit 0\n' "$DIGEST" > "${MOCKBIN}/curl"
     chmod +x "${MOCKBIN}/curl"
+    # The channel's registry host must be declared in the referential.
+    INFRA="$(mktemp -d)"
+    mkdir -p "$INFRA/endpoints"
+    printf 'apiVersion: brik.dev/referential/v1\nkind: Referential\nprofile: p-lab\n' > "$INFRA/referential.yml"
+    cat > "$INFRA/endpoints/registry-release.yml" <<'YAML'
+apiVersion: brik.dev/referential/v1
+kind: Registry
+name: registry-release
+url: https://registry.release
+tls:
+  trust: system
+YAML
+    export BRIK_INFRA_DIR="$INFRA"
   }
-  cleanup_repo() { rm -rf "$REPO" "$MOCKBIN"; }
+  cleanup_repo() { rm -rf "$REPO" "$MOCKBIN" "$INFRA"; unset BRIK_INFRA_DIR; }
   Before 'setup_repo'
   After 'cleanup_repo'
 

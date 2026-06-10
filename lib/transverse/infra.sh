@@ -287,6 +287,43 @@ infra.credential_for() {
     infra.credential "$cred"
 }
 
+# infra.registry_for - echo (as JSON) the Registry endpoint whose URL
+# authority matches <host> (host[:port]). The declared scheme and TLS trust
+# govern how every registry consumer (digest resolution, cosign referrers)
+# reaches the service: http:// and tls.trust: insecure are legal but noisy,
+# an undeclared host fails closed.
+# Usage: infra.registry_for <host>
+# Returns: 2 no host; 7 undeclared; infra.root codes when unconfigured.
+infra.registry_for() {
+    local host="$1"
+    if [[ -z "$host" ]]; then
+        log.error "infra.registry_for: a registry host is required"
+        return "$BRIK_EXIT_INVALID_INPUT"
+    fi
+
+    local root file url authority
+    root="$(infra.root)" || return "$?"
+    for file in "${root}/endpoints"/*.yml "${root}/endpoints"/*.yaml; do
+        [[ -f "$file" ]] || continue
+        [[ "$(yq '.kind // ""' "$file")" == "Registry" ]] || continue
+        url="$(yq '.url // ""' "$file")"
+        authority="${url#*://}"
+        authority="${authority%%/*}"
+        [[ "$authority" == "$host" ]] || continue
+
+        if [[ "$url" == http://* ]]; then
+            log.warn "registry '${host}' is declared over plain http (legal but insecure)"
+        elif [[ "$(yq '.tls.trust // ""' "$file")" == "insecure" ]]; then
+            log.warn "registry '${host}' is declared with tls.trust: insecure (legal but insecure)"
+        fi
+        yq -o json '.' "$file"
+        return 0
+    done
+
+    log.error "registry host '${host}' is not declared in the referential (add a Registry endpoint)"
+    return "$BRIK_EXIT_CONFIG_ERROR"
+}
+
 # infra.resolve_ref - resolve a by-reference value. References are the only
 # way the referential carries secret material; values never appear inline.
 #   env://VAR        - environment variable (error when unset or empty)

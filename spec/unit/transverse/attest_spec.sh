@@ -18,16 +18,38 @@ Describe "transverse.attest"
   log.error() { printf 'ERROR: %s\n' "$*" >&2; }
   pipeline.require_tool() { command -v "$1" >/dev/null 2>&1; }
 
+  Include "${BRIK_HOME}/lib/transverse/infra.sh"
   Include "${BRIK_HOME}/lib/transverse/attest.sh"
 
-  # Record the argv cosign is called with for assertions.
+  # Record the argv cosign is called with for assertions, and declare the
+  # registry the test REF lives in: cosign's registry-connection flags come
+  # from the referential's Registry endpoint, fail-closed when undeclared.
   COSIGN_ARGS_FILE=""
+  ATTEST_INFRA=""
   setup_recorder() {
     COSIGN_ARGS_FILE="$(mktemp)"
     cosign() { printf '%s\n' "$*" >"$COSIGN_ARGS_FILE"; return 0; }
     oras()   { printf '%s\n' "$*"; return 0; }
+
+    ATTEST_INFRA="$(mktemp -d)"
+    mkdir -p "$ATTEST_INFRA/endpoints"
+    printf 'apiVersion: brik.dev/referential/v1\nkind: Referential\nprofile: p-lab\n' \
+      > "$ATTEST_INFRA/referential.yml"
+    cat > "$ATTEST_INFRA/endpoints/registry.yml" <<'YAML'
+apiVersion: brik.dev/referential/v1
+kind: Registry
+name: registry
+url: https://registry.example.com
+tls:
+  trust: system
+YAML
+    export BRIK_INFRA_DIR="$ATTEST_INFRA"
   }
-  cleanup_recorder() { [[ -n "$COSIGN_ARGS_FILE" ]] && rm -f "$COSIGN_ARGS_FILE"; }
+  cleanup_recorder() {
+    [[ -n "$COSIGN_ARGS_FILE" ]] && rm -f "$COSIGN_ARGS_FILE"
+    [[ -n "$ATTEST_INFRA" ]] && rm -rf "$ATTEST_INFRA"
+    unset BRIK_INFRA_DIR
+  }
   BeforeEach setup_recorder
   AfterEach cleanup_recorder
 
@@ -107,15 +129,45 @@ Describe "transverse.attest"
       The contents of file "$COSIGN_ARGS_FILE" should equal ""
     End
 
-    It "passes registry HTTP + auth flags when configured (insecure lab registry)"
+    It "derives HTTP + auth flags from a declared http:// registry endpoint"
       unset BRIK_COSIGN_KEY
-      export BRIK_COSIGN_ALLOW_HTTP=true BRIK_REGISTRY_USER=u BRIK_REGISTRY_PASSWORD=p
+      export BRIK_REGISTRY_USER=u BRIK_REGISTRY_PASSWORD=p
+      yq -i '.url = "http://registry.example.com"' "$ATTEST_INFRA/endpoints/registry.yml"
       printf '{}' >"${SHELLSPEC_TMPBASE}/sbom.json"
       When call attest.sign "$REF" --sbom "${SHELLSPEC_TMPBASE}/sbom.json"
       The status should be success
       The contents of file "$COSIGN_ARGS_FILE" should include "--allow-http-registry"
       The contents of file "$COSIGN_ARGS_FILE" should include "--registry-username u"
       The contents of file "$COSIGN_ARGS_FILE" should include "--registry-password p"
+    End
+
+    It "derives --allow-insecure-registry from a declared tls.trust: insecure https endpoint"
+      unset BRIK_COSIGN_KEY BRIK_REGISTRY_USER BRIK_REGISTRY_PASSWORD
+      yq -i '.tls.trust = "insecure"' "$ATTEST_INFRA/endpoints/registry.yml"
+      printf '{}' >"${SHELLSPEC_TMPBASE}/sbom.json"
+      When call attest.sign "$REF" --sbom "${SHELLSPEC_TMPBASE}/sbom.json"
+      The status should be success
+      The contents of file "$COSIGN_ARGS_FILE" should include "--allow-insecure-registry"
+      The contents of file "$COSIGN_ARGS_FILE" should not include "--allow-http-registry"
+    End
+
+    It "fails closed (7) when the ref's registry host is not declared"
+      unset BRIK_COSIGN_KEY
+      rm "$ATTEST_INFRA/endpoints/registry.yml"
+      printf '{}' >"${SHELLSPEC_TMPBASE}/sbom.json"
+      When call attest.sign "$REF" --sbom "${SHELLSPEC_TMPBASE}/sbom.json"
+      The status should equal 7
+      The stderr should include "registry.example.com"
+      The contents of file "$COSIGN_ARGS_FILE" should equal ""
+    End
+
+    It "fails closed (4) when no referential is configured"
+      unset BRIK_COSIGN_KEY BRIK_INFRA_DIR
+      printf '{}' >"${SHELLSPEC_TMPBASE}/sbom.json"
+      When call attest.sign "$REF" --sbom "${SHELLSPEC_TMPBASE}/sbom.json"
+      The status should equal 4
+      The stderr should include "brik infra init"
+      The contents of file "$COSIGN_ARGS_FILE" should equal ""
     End
   End
 

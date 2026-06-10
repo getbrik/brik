@@ -53,18 +53,32 @@ _attest._require_digest() {
     return 0
 }
 
-# Append cosign registry-connection flags to the named argv array. Lets cosign
-# reach the same registry brik publishes to: plain HTTP when BRIK_COSIGN_ALLOW_HTTP
-# is set (insecure registries such as a lab Nexus), and basic auth from the
-# canonical BRIK_REGISTRY_USER/PASSWORD when present (attaching a referrer is a
+# Append cosign registry-connection flags to the named argv array, derived
+# from the Registry endpoint the referential declares for the ref's host:
+# a declared http:// URL maps to --allow-http-registry, a declared
+# tls.trust: insecure maps to --allow-insecure-registry, and an undeclared
+# host fails closed. Basic auth comes from the canonical
+# BRIK_REGISTRY_USER/PASSWORD when present (attaching a referrer is a
 # registry write).
-# Usage: _attest._registry_args <array_name>
+# Usage: _attest._registry_args <array_name> <ref>
 _attest._registry_args() {
     local -n _argv="$1"
-    [[ "${BRIK_COSIGN_ALLOW_HTTP:-}" == "true" ]] && _argv+=(--allow-http-registry)
+    local _ref="$2"
+    local _host="${_ref%%/*}"
+
+    brik.use transverse.infra
+    local _endpoint _url
+    _endpoint="$(infra.registry_for "$_host")" || return "$?"
+    _url="$(printf '%s' "$_endpoint" | jq -r '.url')"
+    if [[ "$_url" == http://* ]]; then
+        _argv+=(--allow-http-registry)
+    elif [[ "$(printf '%s' "$_endpoint" | jq -r '.tls.trust')" == "insecure" ]]; then
+        _argv+=(--allow-insecure-registry)
+    fi
     if [[ -n "${BRIK_REGISTRY_USER:-}" && -n "${BRIK_REGISTRY_PASSWORD:-}" ]]; then
         _argv+=(--registry-username "$BRIK_REGISTRY_USER" --registry-password "$BRIK_REGISTRY_PASSWORD")
     fi
+    return 0
 }
 
 # Emit an in-toto SLSA provenance predicate body (the document cosign wraps as
@@ -151,7 +165,6 @@ attest.sign() {
     # transparency-log upload for the local key.
     local -a key_args=()
     [[ "$(attest.mode)" == "key" ]] && key_args=(--key "$BRIK_COSIGN_KEY" --use-signing-config=false --tlog-upload=false)
-    _attest._registry_args key_args
 
     if [[ "$dry_run" == "true" ]]; then
         log.info "[dry-run] would attest (${sbom_type}$([[ -n "$provenance" ]] && printf ' + provenance')) on ${ref} [$(attest.mode)]"
@@ -162,6 +175,8 @@ attest.sign() {
         log.error "attest.sign: SBOM file not found: ${sbom}"
         return "$BRIK_EXIT_IO_FAILURE"
     fi
+
+    _attest._registry_args key_args "$ref" || return "$?"
 
     log.info "attesting ${sbom_type} SBOM on ${ref} [$(attest.mode)]"
     if ! cosign attest "${key_args[@]}" --predicate "$sbom" --type "$sbom_type" -y "$ref"; then
@@ -227,13 +242,13 @@ attest.verify() {
         fi
         args+=(--certificate-identity-regexp "$identity" --certificate-oidc-issuer-regexp "$issuer")
     fi
-    _attest._registry_args args
-    args+=("$ref")
-
     if [[ "$dry_run" == "true" ]]; then
         log.info "[dry-run] would verify ${att_type} attestation on ${ref} [$(attest.mode)]"
         return 0
     fi
+
+    _attest._registry_args args "$ref" || return "$?"
+    args+=("$ref")
 
     log.info "verifying ${att_type} attestation on ${ref} [$(attest.mode)]"
     if ! cosign "${args[@]}"; then

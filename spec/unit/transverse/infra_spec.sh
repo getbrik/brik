@@ -309,6 +309,66 @@ YAML
   End
 
   # =========================================================================
+  # infra.registry_for
+  # =========================================================================
+  Describe "infra.registry_for"
+    Before 'make_instance'
+    After 'cleanup_instance'
+
+    It "echoes the Registry endpoint matching the host (with port)"
+      When call infra.registry_for "nexus.lab:8082"
+      The output should include '"name": "registry-candidate"'
+      The stderr should include "plain http"
+    End
+
+    It "is silent for a declared https endpoint with system trust"
+      registry_https() {
+        cat > "$INFRA_DIR/endpoints/registry-secure.yml" <<'YAML'
+apiVersion: brik.dev/referential/v1
+kind: Registry
+name: registry-secure
+url: https://harbor.internal:8443
+tls:
+  trust: system
+YAML
+        infra.registry_for "harbor.internal:8443"
+      }
+      When call registry_https
+      The output should include '"name": "registry-secure"'
+      The stderr should equal ""
+    End
+
+    It "warns when an https endpoint declares tls.trust: insecure"
+      registry_insecure_tls() {
+        cat > "$INFRA_DIR/endpoints/registry-skipverify.yml" <<'YAML'
+apiVersion: brik.dev/referential/v1
+kind: Registry
+name: registry-skipverify
+url: https://harbor.internal:8443
+tls:
+  trust: insecure
+YAML
+        infra.registry_for "harbor.internal:8443"
+      }
+      When call registry_insecure_tls
+      The output should include '"name": "registry-skipverify"'
+      The stderr should include "insecure"
+    End
+
+    It "fails closed (7) when the host is not declared"
+      When call infra.registry_for "ghost.registry:5000"
+      The status should equal 7
+      The stderr should include "ghost.registry:5000"
+    End
+
+    It "rejects (2) a missing host"
+      When call infra.registry_for ""
+      The status should equal 2
+      The stderr should include "required"
+    End
+  End
+
+  # =========================================================================
   # infra.resolve_ref
   # =========================================================================
   Describe "infra.resolve_ref"
