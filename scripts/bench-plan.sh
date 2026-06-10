@@ -58,11 +58,24 @@ else
 fi
 
 times_file=""
+infra_dir=""
 cleanup() {
     [[ "$OWNS_WORKSPACE" -eq 1 ]] && rm -rf "$WORKSPACE"
     [[ -n "$times_file" ]] && rm -f "$times_file"
+    [[ -n "$infra_dir" ]] && rm -rf "$infra_dir"
 }
 trap cleanup EXIT
+
+# brik plan resolves the mandatory infrastructure referential and stamps its
+# fingerprint into the plan: the bench provisions a minimal instance (outside
+# the workspace so the git fixture stays untouched) and measures that cost as
+# part of real plan derivation.
+if [[ -z "${BRIK_INFRA_DIR:-}" && -z "${BRIK_INFRA_REPO:-}" ]]; then
+    infra_dir="$(mktemp -d -t brik-bench-infra.XXXXXX)"
+    printf 'apiVersion: brik.dev/referential/v1\nkind: Referential\nprofile: p-lab\n' \
+        > "${infra_dir}/referential.yml"
+    export BRIK_INFRA_DIR="$infra_dir"
+fi
 
 printf '[bench-plan] workspace: %s\n' "$WORKSPACE"
 printf '[bench-plan] generating fixture (%d files, deterministic)...\n' "$FILES"
