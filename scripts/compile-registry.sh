@@ -168,6 +168,8 @@ trap 'rm -f "$tmp" "$raw"' EXIT
   _emit_kind stacks "${manifest_dirs[@]}" || exit 1
   printf '\n  },\n  "stages": {\n'
   _emit_kind stages "${manifest_dirs[@]}" || exit 1
+  printf '\n  },\n  "providers": {\n'
+  _emit_kind providers "${manifest_dirs[@]}" || exit 1
   printf '\n  }\n}\n'
 } > "$raw"
 jq -S '.' "$raw" > "$tmp"
@@ -184,14 +186,17 @@ case "$mode" in
     ;;
   compile)
     mv "$tmp" "$output"
+    rm -f "$raw"
     trap - EXIT
     size=$(wc -c < "$output")
     sha=$(sha256sum "$output" | awk '{print $1}')
     n_stacks=$(jq -r '.stacks | length' "$output")
     n_stages=$(jq -r '.stages | length' "$output")
+    n_providers=$(jq -r '.providers | length' "$output")
     printf '[compile-registry] compiled %s\n' "$output"
     printf '[compile-registry]   stacks: %s\n' "$n_stacks"
     printf '[compile-registry]   stages: %s\n' "$n_stages"
+    printf '[compile-registry]   providers: %s\n' "$n_providers"
     printf '[compile-registry]   bytes:  %s\n' "$size"
     printf '[compile-registry]   sha256: %s\n' "$sha"
     ;;

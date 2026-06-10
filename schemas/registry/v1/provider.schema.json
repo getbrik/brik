@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://brik.dev/schemas/registry/v1/provider.schema.json",
+  "title": "Brik Provider Manifest v1",
+  "description": "Declarative manifest describing a provider: one interchangeable implementation of a capability behind a testable contract. The tools list is the source the runner-image tool matrix derives from.",
+  "type": "object",
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "additionalProperties": false,
+  "properties": {
+    "apiVersion": {"type": "string", "const": "brik.dev/v1"},
+    "kind": {"type": "string", "const": "Provider"},
+    "metadata": {
+      "type": "object",
+      "required": ["id", "displayName"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z][a-z0-9-]*$"},
+        "displayName": {"type": "string", "minLength": 1},
+        "owner": {"type": "string", "minLength": 1}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "required": ["capability", "binding", "contract"],
+      "additionalProperties": false,
+      "properties": {
+        "capability": {"type": "string", "pattern": "^[a-z][a-z0-9-]*$"},
+        "binding": {
+          "description": "Which source binds this provider: the project (brik.yml), the environment (infrastructure referential) or the detected execution context (CI orchestrator).",
+          "type": "string",
+          "enum": ["project", "referential", "context"]
+        },
+        "contract": {
+          "description": "Contract id and version every provider of the capability must pass (shared spec set).",
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*/v[0-9]+$"
+        },
+        "tools": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name"],
+            "additionalProperties": false,
+            "properties": {
+              "name": {"type": "string", "minLength": 1},
+              "min_version": {"type": "string", "minLength": 1}
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -62,6 +62,7 @@ cli.extension.test() {
     local pass=0 fail=0
     local stack_schema="${BRIK_HOME}/schemas/registry/v1/stack.schema.json"
     local stage_schema="${BRIK_HOME}/schemas/registry/v1/stage.schema.json"
+    local provider_schema="${BRIK_HOME}/schemas/registry/v1/provider.schema.json"
 
     printf '[brik extension] testing %s\n' "$ext_dir"
 
@@ -104,10 +105,11 @@ cli.extension.test() {
 
     cli.extension._validate_kind stacks "$stack_schema"
     cli.extension._validate_kind stages "$stage_schema"
+    cli.extension._validate_kind providers "$provider_schema"
 
     cli.extension._check_api_required() {
         local f rel ids fn found
-        for f in "${ext_dir}/stacks"/*.yml "${ext_dir}/stages"/*.yml; do
+        for f in "${ext_dir}/stacks"/*.yml "${ext_dir}/stages"/*.yml "${ext_dir}/providers"/*.yml; do
             [[ -f "$f" ]] || continue
             rel="${f#"${ext_dir}/"}"
             ids="$(yq -r '.spec.api.required[]?' "$f" 2>/dev/null)"
@@ -195,7 +197,7 @@ cli.extension.test() {
     # contract check rather than launching a real build.
     cli.extension._check_dry_call() {
         local f rel ids fn marker
-        for f in "${ext_dir}/stacks"/*.yml "${ext_dir}/stages"/*.yml; do
+        for f in "${ext_dir}/stacks"/*.yml "${ext_dir}/stages"/*.yml "${ext_dir}/providers"/*.yml; do
             [[ -f "$f" ]] || continue
             rel="${f#"${ext_dir}/"}"
             ids="$(yq -r '.spec.api.required[]?' "$f" 2>/dev/null || true)"

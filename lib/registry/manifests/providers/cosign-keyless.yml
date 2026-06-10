@@ -1,0 +1,13 @@
+apiVersion: brik.dev/v1
+kind: Provider
+metadata:
+  id: cosign-keyless
+  displayName: Cosign keyless attestation (Fulcio + Rekor)
+  owner: getbrik
+spec:
+  capability: artifact-attestation
+  binding: referential
+  contract: artifact-attestation/v1
+  tools:
+    - name: cosign
+      min_version: "3.0.6"

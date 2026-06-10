@@ -1,0 +1,13 @@
+apiVersion: brik.dev/v1
+kind: Provider
+metadata:
+  id: ssh-signing
+  displayName: SSH commit signing
+  owner: getbrik
+spec:
+  capability: evidence-commit-signing
+  binding: referential
+  contract: evidence-commit-signing/v1
+  tools:
+    - name: ssh-keygen
+      min_version: "8.8"

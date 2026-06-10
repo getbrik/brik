@@ -341,6 +341,68 @@ registry.stage.impact_use_stack_impact() {
   printf '%s\n' "${_REGISTRY_STAGE_IMPACT_USE_STACK_IMPACT[$id]:-}"
 }
 
+# --- Provider accessors ---
+#
+# A provider is one interchangeable implementation of a capability behind a
+# testable contract (third manifest family). The binding axis says which
+# source selects it: the project (brik.yml), the environment (infrastructure
+# referential) or the detected execution context (orchestrator).
+
+registry.provider.list() {
+  _registry._load || return $?
+  local id
+  for id in "${_REGISTRY_PROVIDER_IDS[@]}"; do printf '%s\n' "$id"; done
+}
+
+registry.provider.exists() {
+  _registry._load || return $?
+  local id="$1"
+  [[ -v _REGISTRY_PROVIDER_CAPABILITY[$id] ]] && return 0
+  return "$BRIK_EXIT_INVALID_INPUT"
+}
+
+registry.provider.display_name() {
+  _registry._load || return $?
+  local id="$1"; registry.provider.exists "$id" || return $?
+  printf '%s\n' "${_REGISTRY_PROVIDER_DISPLAY_NAME[$id]}"
+}
+
+registry.provider.capability() {
+  _registry._load || return $?
+  local id="$1"; registry.provider.exists "$id" || return $?
+  printf '%s\n' "${_REGISTRY_PROVIDER_CAPABILITY[$id]}"
+}
+
+registry.provider.binding() {
+  _registry._load || return $?
+  local id="$1"; registry.provider.exists "$id" || return $?
+  printf '%s\n' "${_REGISTRY_PROVIDER_BINDING[$id]}"
+}
+
+registry.provider.contract() {
+  _registry._load || return $?
+  local id="$1"; registry.provider.exists "$id" || return $?
+  printf '%s\n' "${_REGISTRY_PROVIDER_CONTRACT[$id]}"
+}
+
+# Print the tools the provider requires, one "name[>=min_version]" per line.
+# This list is the source the runner-image tool matrix derives from.
+registry.provider.tools() {
+  _registry._load || return $?
+  local id="$1"; registry.provider.exists "$id" || return $?
+  _registry._explode "${_REGISTRY_PROVIDER_TOOLS[$id]:-}"
+}
+
+# Print the ids of every provider implementing <capability>.
+registry.provider.for_capability() {
+  _registry._load || return $?
+  local capability="$1" id
+  for id in "${_REGISTRY_PROVIDER_IDS[@]}"; do
+    [[ "${_REGISTRY_PROVIDER_CAPABILITY[$id]}" == "$capability" ]] && printf '%s\n' "$id"
+  done
+  return 0
+}
+
 # --- Runner class accessors ---
 #
 # Read lib/registry/runner_classes.yml to resolve the OCI image attached to

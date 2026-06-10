@@ -34,8 +34,8 @@ _validator._kind() {
     return $?
   }
   case "$kind" in
-    Stack|Stage) printf '%s' "$kind" ;;
-    *) _validator._fail "unknown kind in $file: $kind (expected Stack or Stage)"; return $? ;;
+    Stack|Stage|Provider) printf '%s' "$kind" ;;
+    *) _validator._fail "unknown kind in $file: $kind (expected Stack, Stage or Provider)"; return $? ;;
   esac
 }
 
@@ -43,8 +43,9 @@ _validator._schema() {
   local kind="$1"
   [[ -n "$_BRIK_REGISTRY_SCHEMA_DIR" ]] || { _validator._fail "schema dir not resolved"; return $?; }
   case "$kind" in
-    Stack) printf '%s/stack.schema.json' "$_BRIK_REGISTRY_SCHEMA_DIR" ;;
-    Stage) printf '%s/stage.schema.json' "$_BRIK_REGISTRY_SCHEMA_DIR" ;;
+    Stack)    printf '%s/stack.schema.json' "$_BRIK_REGISTRY_SCHEMA_DIR" ;;
+    Stage)    printf '%s/stage.schema.json' "$_BRIK_REGISTRY_SCHEMA_DIR" ;;
+    Provider) printf '%s/provider.schema.json' "$_BRIK_REGISTRY_SCHEMA_DIR" ;;
     *) _validator._fail "no schema for kind=$kind"; return $? ;;
   esac
 }

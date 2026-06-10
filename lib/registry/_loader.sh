@@ -52,8 +52,15 @@ declare -gA _REGISTRY_STAGE_API_REQUIRED=()
 declare -gA _REGISTRY_STAGE_IMPACT_CHANGES=()
 declare -gA _REGISTRY_STAGE_IMPACT_USE_STACK_IMPACT=()
 
+declare -gA _REGISTRY_PROVIDER_DISPLAY_NAME=()
+declare -gA _REGISTRY_PROVIDER_CAPABILITY=()
+declare -gA _REGISTRY_PROVIDER_BINDING=()
+declare -gA _REGISTRY_PROVIDER_CONTRACT=()
+declare -gA _REGISTRY_PROVIDER_TOOLS=()
+
 declare -ga _REGISTRY_STACK_IDS=()
 declare -ga _REGISTRY_STAGE_IDS=()
+declare -ga _REGISTRY_PROVIDER_IDS=()
 
 _REGISTRY_CACHE_PATH=""
 
@@ -69,6 +76,7 @@ _registry._reset() {
   _BRIK_REGISTRY_LOADED=""
   _REGISTRY_STACK_IDS=()
   _REGISTRY_STAGE_IDS=()
+  _REGISTRY_PROVIDER_IDS=()
   _REGISTRY_CACHE_PATH=""
   local var
   for var in _REGISTRY_STACK_DISPLAY_NAME _REGISTRY_STACK_MARKERS_ANY \
@@ -87,7 +95,10 @@ _registry._reset() {
              _REGISTRY_STAGE_GATE_MODE _REGISTRY_STAGE_GATE_OPT_IN_FLAG \
              _REGISTRY_STAGE_GATE_CONTEXTS _REGISTRY_STAGE_DRY_RUN_DESTRUCTIVE \
              _REGISTRY_STAGE_ALIASES _REGISTRY_STAGE_API_REQUIRED \
-             _REGISTRY_STAGE_IMPACT_CHANGES _REGISTRY_STAGE_IMPACT_USE_STACK_IMPACT; do
+             _REGISTRY_STAGE_IMPACT_CHANGES _REGISTRY_STAGE_IMPACT_USE_STACK_IMPACT \
+             _REGISTRY_PROVIDER_DISPLAY_NAME _REGISTRY_PROVIDER_CAPABILITY \
+             _REGISTRY_PROVIDER_BINDING _REGISTRY_PROVIDER_CONTRACT \
+             _REGISTRY_PROVIDER_TOOLS; do
     eval "$var=()"
   done
 }
@@ -134,6 +145,7 @@ _registry._load() {
 
   _registry._load_stacks
   _registry._load_stages
+  _registry._load_providers
 
   _BRIK_REGISTRY_LOADED=1
   return 0
@@ -184,6 +196,31 @@ _registry._load_stacks() {
       "\($id)\timpact_source\t\($s.impact.source // [] | join(":"))",
       "\($id)\timpact_test\t\($s.impact.test // [] | join(":"))",
       "\($id)\timpact_build\t\($s.impact.build // [] | join(":"))"
+    # KCOV_EXCL_STOP
+  ' "$_REGISTRY_CACHE_PATH")
+}
+
+_registry._load_providers() {
+  local id field value
+  while IFS=$'\t' read -r id field value; do
+    [[ -z "$id" ]] && continue
+    case "$field" in
+      display_name) _REGISTRY_PROVIDER_DISPLAY_NAME[$id]="$value" ;;
+      capability)   _REGISTRY_PROVIDER_CAPABILITY[$id]="$value" ;;
+      binding)      _REGISTRY_PROVIDER_BINDING[$id]="$value" ;;
+      contract)     _REGISTRY_PROVIDER_CONTRACT[$id]="$value" ;;
+      tools)        _REGISTRY_PROVIDER_TOOLS[$id]="$value" ;;
+      __id)         _REGISTRY_PROVIDER_IDS+=("$id") ;;
+    esac
+  done < <(jq -r '
+    # KCOV_EXCL_START -- inline jq script body, not bash code
+    .providers // {} | to_entries[] | .key as $id | .value as $m | $m.spec as $s |
+      "\($id)\t__id\t",
+      "\($id)\tdisplay_name\t\($m.metadata.displayName // "")",
+      "\($id)\tcapability\t\($s.capability // "")",
+      "\($id)\tbinding\t\($s.binding // "")",
+      "\($id)\tcontract\t\($s.contract // "")",
+      "\($id)\ttools\t\($s.tools // [] | map(.name + (if .min_version then ">=" + .min_version else "" end)) | join(":"))"
     # KCOV_EXCL_STOP
   ' "$_REGISTRY_CACHE_PATH")
 }

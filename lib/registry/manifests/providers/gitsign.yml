@@ -1,0 +1,12 @@
+apiVersion: brik.dev/v1
+kind: Provider
+metadata:
+  id: gitsign
+  displayName: Sigstore gitsign commit signing
+  owner: getbrik
+spec:
+  capability: evidence-commit-signing
+  binding: referential
+  contract: evidence-commit-signing/v1
+  tools:
+    - name: gitsign
