@@ -394,7 +394,11 @@ attest.verify() {
     args+=("$ref")
 
     log.info "verifying ${att_type} attestation on ${ref} [${backend}]"
-    if ! cosign "${args[@]}"; then
+    # On success cosign prints the whole verified in-toto envelope (base64
+    # SBOM, megabytes) to stdout: discard it. The registry already holds the
+    # attestation, the verification summary stays on stderr, and brik logs
+    # the business outcome itself.
+    if ! cosign "${args[@]}" >/dev/null; then
         log.error "attest.verify: attestation did not verify for ${ref} (fail-closed)"
         return "$BRIK_EXIT_EXTERNAL_FAIL"
     fi

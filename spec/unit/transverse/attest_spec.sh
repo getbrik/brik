@@ -329,6 +329,22 @@ YAML
       The contents of file "$COSIGN_ARGS_FILE" should include "--key env://COSIGN_PRIVATE_KEY"
     End
 
+    It "discards the verified attestation envelope from stdout (multi-MB payload)"
+      verify_quiet() {
+        # On success cosign prints the whole verified in-toto envelope
+        # (base64 SBOM, megabytes) to stdout; the job log must not carry it.
+        cosign() {
+          printf '%s\n' "$*" > "$COSIGN_ARGS_FILE"
+          printf '{"payload":"QkFTRTY0LXNCT00tYmxvYg=="}\n'
+          return 0
+        }
+        attest.verify "$REF" --identity 'https://x/.*' --issuer 'https://x'
+      }
+      When call verify_quiet
+      The status should be success
+      The output should equal ""
+    End
+
     It "propagates a cosign verification failure (fail-closed)"
       cosign() { return 1; }
       When call attest.verify "$REF" --identity 'x' --issuer 'y'
