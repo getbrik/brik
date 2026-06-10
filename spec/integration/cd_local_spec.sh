@@ -155,4 +155,78 @@ YAML
       The stderr should include "failing closed"
     End
   End
+
+  Describe "evidence signature read-back (artifacts.evidence.sign)"
+    # A project that declares signed evidence refuses to deploy when the
+    # store's HEAD does not carry a verifiable ssh signature from the
+    # referential's allowed_signers.
+    setup_evidence() {
+      EV_KEYDIR="$(mktemp -d)"
+      ssh-keygen -t ed25519 -N "" -q -f "$EV_KEYDIR/id_ed25519"
+      mkdir -p "$INFRA/trust"
+      printf 'brik-ci@noreply namespaces="git" %s\n' "$(cat "$EV_KEYDIR/id_ed25519.pub")" \
+        > "$INFRA/trust/allowed_signers"
+
+      EV_REPO="$(mktemp -d)"
+      (
+        cd "$EV_REPO"
+        git init -q -b main
+        git config user.email "brik-ci@noreply"
+        git config user.name "Brik CI"
+        printf '{}\n' > event.json
+        git add -A >/dev/null
+      )
+
+      EV_REPO_URL="file://$EV_REPO" yq -i \
+        '.artifacts.evidence = {"repo": strenv(EV_REPO_URL), "branch": "main", "sign": true}' \
+        "$REPO/brik.yml"
+      printf '#!/bin/sh\nprintf "HTTP/1.1 200 OK\\r\\nDocker-Content-Digest: %s\\r\\n\\r\\n"\nexit 0\n' "$DIGEST" > "${MOCKBIN}/curl"
+      chmod +x "${MOCKBIN}/curl"
+    }
+    cleanup_evidence() { rm -rf "$EV_KEYDIR" "$EV_REPO"; }
+    Before 'setup_evidence'
+    After 'cleanup_evidence'
+
+    sign_evidence_head() {
+      git -C "$EV_REPO" -c gpg.format=ssh -c user.signingKey="$EV_KEYDIR/id_ed25519" \
+        commit -q -S -m "evidence: seed"
+    }
+
+    It "verifies the signed evidence HEAD and deploys"
+      deploy_ev_ok() {
+        sign_evidence_head
+        cd "$REPO"
+        PATH="${MOCKBIN}:$PATH" "$BRIK_BIN" deploy --version v1.2.3 --environment staging
+      }
+      When call deploy_ev_ok
+      The status should equal 0
+      The output should include "@${DIGEST}"
+      The stderr should include "evidence store HEAD signature verified"
+    End
+
+    It "refuses to deploy when the evidence HEAD is unsigned (fail-closed)"
+      deploy_ev_unsigned() {
+        git -C "$EV_REPO" commit -q -m "evidence: seed"
+        cd "$REPO"
+        PATH="${MOCKBIN}:$PATH" "$BRIK_BIN" deploy --version v1.2.3 --environment staging
+      }
+      When call deploy_ev_unsigned
+      The status should equal 5
+      The stderr should include "refusing to deploy"
+    End
+
+    It "skips the verification when the project does not declare signed evidence"
+      deploy_ev_unsigned_ok() {
+        git -C "$EV_REPO" commit -q -m "evidence: seed"
+        # Flip the declaration: unsigned evidence is a legal posture.
+        yq -i '.artifacts.evidence.sign = false' "$REPO/brik.yml"
+        cd "$REPO"
+        PATH="${MOCKBIN}:$PATH" "$BRIK_BIN" deploy --version v1.2.3 --environment staging
+      }
+      When call deploy_ev_unsigned_ok
+      The status should equal 0
+      The output should include "@${DIGEST}"
+      The stderr should not include "evidence store HEAD"
+    End
+  End
 End

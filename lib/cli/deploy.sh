@@ -167,6 +167,31 @@ cli.deploy.run() {
             if [[ "$prot_rc" -ne 0 && "$prot_rc" -ne 10 ]]; then
                 log.warn "state-repo branch protection could not be verified (rc=${prot_rc})"
             fi
+
+            # Evidence-commit signature read-back. A project that declares
+            # signed evidence (.artifacts.evidence.sign) refuses to deploy
+            # when the store's HEAD does not carry a verifiable ssh signature
+            # from the referential's allowed_signers: the cosign provenance
+            # gate covers the digest, this covers the journal that vouches
+            # for it. Unsigned evidence (sign absent or false) is a declared
+            # posture and skips the check.
+            if [[ "$(config.get '.artifacts.evidence.sign' 'false' 2>/dev/null || printf 'false')" == "true" ]]; then
+                local ev_token_var ev_clone ev_rc=0
+                ev_token_var="$(config.get '.artifacts.evidence.token_var' '' 2>/dev/null || printf '')"
+                ev_clone="$(mktemp -d)" || return "${BRIK_EXIT_IO_FAILURE}"
+                local -a _ev_clone_args=("$ev_repo" "$ev_clone")
+                [[ -n "${ev_branch:-}" ]] && _ev_clone_args+=(--branch "$ev_branch")
+                [[ -n "$ev_token_var" ]]  && _ev_clone_args+=(--token-var "$ev_token_var")
+                transverse.state_repo.clone "${_ev_clone_args[@]}" >/dev/null \
+                    && transverse.state_repo.verify_head "$ev_clone" >/dev/null \
+                    || ev_rc=$?
+                rm -rf "$ev_clone"
+                if [[ "$ev_rc" -ne 0 ]]; then
+                    brik_error "evidence store HEAD signature did not verify (rc=${ev_rc}) -- refusing to deploy"
+                    return "${BRIK_EXIT_EXTERNAL_FAIL}"
+                fi
+                log.info "evidence store HEAD signature verified (${ev_branch:-main})"
+            fi
         fi
     fi
 

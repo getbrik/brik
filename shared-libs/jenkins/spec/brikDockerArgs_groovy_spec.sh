@@ -14,7 +14,9 @@ Describe "shared-libs/jenkins/vars/brikDockerArgs.groovy"
   End
 
   It "scopes the CI env-file to build and publish prefixes (no deploy creds)"
-    When run grep -qF "grep -E '^(NEXUS_|BRIK_|REGISTRY_|CARGO_)'" "$GROOVY"
+    # COSIGN_ carries the signing-key passphrase the container-scan stage
+    # needs to decrypt the referential's cosign key.
+    When run grep -qF "grep -E '^(NEXUS_|BRIK_|REGISTRY_|CARGO_|COSIGN_)'" "$GROOVY"
     The status should be success
   End
 
