@@ -3,6 +3,8 @@ Describe "brik stage - integration"
 
   Describe "brik stage build --config"
     setup() {
+      export BRIK_LOG_DIR
+      BRIK_LOG_DIR="$(mktemp -d)"
       mock.setup
       mock.create_script "npm" 'echo "mock npm: $*"'
       mock.create_exit "node" 0
@@ -14,6 +16,7 @@ Describe "brik stage - integration"
       printf 'version: 1\nproject:\n  name: cli-test\n  stack: node\ntest:\n  framework: npm\n' > "$CONFIG"
     }
     cleanup() {
+      rm -rf "$BRIK_LOG_DIR"; unset BRIK_LOG_DIR
       mock.cleanup
       rm -rf "$WORKSPACE"
     }
@@ -30,6 +33,8 @@ Describe "brik stage - integration"
 
   Describe "brik stage build"
     setup() {
+      export BRIK_LOG_DIR
+      BRIK_LOG_DIR="$(mktemp -d)"
       mock.setup
       mock.create_script "npm" 'echo "mock npm: $*"'
       mock.create_exit "node" 0
@@ -40,6 +45,7 @@ Describe "brik stage - integration"
       printf 'version: 1\nproject:\n  name: cli-test\n  stack: node\ntest:\n  framework: npm\n' > "${WORKSPACE}/brik.yml"
     }
     cleanup() {
+      rm -rf "$BRIK_LOG_DIR"; unset BRIK_LOG_DIR
       mock.cleanup
       rm -rf "$WORKSPACE"
     }
@@ -56,6 +62,8 @@ Describe "brik stage - integration"
 
   Describe "brik stage test"
     setup() {
+      export BRIK_LOG_DIR
+      BRIK_LOG_DIR="$(mktemp -d)"
       mock.setup
       mock.create_script "npx" 'echo "mock npx: $*"'
       mock.create_script "npm" 'exit 0'
@@ -65,6 +73,7 @@ Describe "brik stage - integration"
       printf 'version: 1\nproject:\n  name: cli-test\n  stack: node\ntest:\n  framework: npm\n' > "${WORKSPACE}/brik.yml"
     }
     cleanup() {
+      rm -rf "$BRIK_LOG_DIR"; unset BRIK_LOG_DIR
       mock.cleanup
       rm -rf "$WORKSPACE"
     }
@@ -83,13 +92,18 @@ Describe "brik stage - integration"
     Include "$BRIK_HOME/spec/support/mock_helper.sh"
 
     setup() {
+      export BRIK_LOG_DIR
+      BRIK_LOG_DIR="$(mktemp -d)"
       mock.infra.setup
       WORKSPACE="$(mktemp -d)"
       printf '{"name":"cli-test","version":"1.0.0"}\n' > "${WORKSPACE}/package.json"
       CONFIG="$(mktemp)"
       printf 'version: 1\nproject:\n  name: cli-test\n  stack: node\ntest:\n  framework: npm\n' > "$CONFIG"
     }
-    cleanup() { rm -rf "$WORKSPACE" "$CONFIG"; mock.infra.teardown; }
+    cleanup() {
+      rm -rf "$BRIK_LOG_DIR" "$WORKSPACE" "$CONFIG"; unset BRIK_LOG_DIR
+      mock.infra.teardown
+    }
     Before 'setup'
     After 'cleanup'
 
@@ -105,6 +119,8 @@ Describe "brik stage - integration"
     Include "$BRIK_HOME/spec/support/mock_helper.sh"
 
     setup() {
+      export BRIK_LOG_DIR
+      BRIK_LOG_DIR="$(mktemp -d)"
       mock.setup
       mock.create_script "npm" 'echo "mock npm: $*"'
       mock.create_exit "node" 0
@@ -117,6 +133,7 @@ Describe "brik stage - integration"
       printf 'version: 1\nproject:\n  name: cli-test\n  stack: node\n' > "$CONFIG"
     }
     cleanup() {
+      rm -rf "$BRIK_LOG_DIR"; unset BRIK_LOG_DIR
       mock.cleanup
       rm -rf "$WORKSPACE" "$CONFIG"
     }

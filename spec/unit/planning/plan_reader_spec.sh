@@ -28,7 +28,16 @@ Describe "planning/plan_reader.sh"
     End
 
     It "defaults to run when no plan file exists"
-      When call pipeline.plan.should_run init /nonexistent/plan.json
+      # The resolver falls back to BRIK_PLAN_FILE, BRIK_LOG_DIR and
+      # $PWD/.brik-logs: pin them all to an empty directory so residue
+      # from other spec files can never satisfy the fallback chain.
+      no_plan_run() {
+        local d; d="$(mktemp -d)"
+        ( cd "$d" && BRIK_PLAN_FILE="" BRIK_LOG_DIR="$d" BRIK_WORKSPACE="$d" \
+            pipeline.plan.should_run init /nonexistent/plan.json )
+        local rc=$?; rm -rf "$d"; return $rc
+      }
+      When call no_plan_run
       The status should be success
     End
   End
@@ -45,7 +54,13 @@ Describe "planning/plan_reader.sh"
     End
 
     It "returns empty when no plan file exists"
-      When call pipeline.plan.reason init /nonexistent/plan.json
+      no_plan_reason() {
+        local d; d="$(mktemp -d)"
+        ( cd "$d" && BRIK_PLAN_FILE="" BRIK_LOG_DIR="$d" BRIK_WORKSPACE="$d" \
+            pipeline.plan.reason init /nonexistent/plan.json )
+        local rc=$?; rm -rf "$d"; return $rc
+      }
+      When call no_plan_reason
       The output should equal ""
     End
   End
