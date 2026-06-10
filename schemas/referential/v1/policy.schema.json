@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://brik.dev/schemas/referential/v1/policy.schema.json",
+  "title": "Policy",
+  "description": "Pointer to an organization-owned policy document (brik-policy.yml: preset override plus org-wide allowlists). Lives under policies/ in the referential; the document itself stays on the org side.",
+  "type": "object",
+  "properties": {
+    "apiVersion": { "const": "brik.dev/referential/v1" },
+    "kind": { "const": "Policy" },
+    "name": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+    "url": { "type": "string", "pattern": "^(https?|file)://.+" }
+  },
+  "required": ["apiVersion", "kind", "name", "url"],
+  "additionalProperties": false
+}

@@ -21,7 +21,7 @@ _BRIK_INFRA_API_VERSION="brik.dev/referential/v1"
 
 # Kinds legal per category directory. trust/ holds raw material (CA certs,
 # allowed_signers) and schemas/ the editor copies: neither holds documents.
-_BRIK_INFRA_ENDPOINT_KINDS="Registry GitHost Signing SecretManager K8sTarget ArgoCD SshTarget"
+_BRIK_INFRA_ENDPOINT_KINDS="Registry GitHost Signing SecretManager K8sTarget ArgoCD SshTarget PackageRegistry Notification"
 
 # infra.root - resolve and echo the referential instance directory.
 # Usage: infra.root
@@ -112,10 +112,10 @@ infra.validate() {
         [[ -d "$dir" ]] || continue
         base="$(basename "$dir")"
         case "$base" in
-            endpoints|credentials|bindings|trust|schemas) ;;
+            endpoints|credentials|bindings|policies|trust|schemas) ;;
             *)
                 if compgen -G "${dir}*.yml" >/dev/null || compgen -G "${dir}*.yaml" >/dev/null; then
-                    log.error "unsupported referential category '${base}/' (supported: endpoints/, credentials/, bindings/)"
+                    log.error "unsupported referential category '${base}/' (supported: endpoints/, credentials/, bindings/, policies/)"
                     return "$BRIK_EXIT_CONFIG_ERROR"
                 fi
                 ;;
@@ -125,6 +125,7 @@ infra.validate() {
     _infra._validate_category "$root" endpoints "$_BRIK_INFRA_ENDPOINT_KINDS" || return "$?"
     _infra._validate_category "$root" credentials "Credential" || return "$?"
     _infra._validate_category "$root" bindings "Binding" || return "$?"
+    _infra._validate_category "$root" policies "Policy" || return "$?"
     _infra._validate_bindings "$root" || return "$?"
 }
 
@@ -259,6 +260,21 @@ infra.credential() { _infra._doc_json credentials "$1" "credential"; }
 
 # infra.binding - echo the binding document for environment <name> as JSON.
 infra.binding() { _infra._doc_json bindings "$1" "binding"; }
+
+# infra.policy - echo the policy document <name> as JSON.
+infra.policy() { _infra._doc_json policies "$1" "policy"; }
+
+# infra.policy_names - echo the names of the declared policy documents, one
+# per line (empty output when the instance declares none).
+infra.policy_names() {
+    local root file
+    root="$(infra.root)" || return "$?"
+    for file in "${root}/policies"/*.yml "${root}/policies"/*.yaml; do
+        [[ -f "$file" ]] || continue
+        yq '.name // ""' "$file"
+    done
+    return 0
+}
 
 # infra.credential_for - echo (as JSON) the credential an environment binds
 # for an endpoint. Unbound is an error: a deliberately anonymous endpoint

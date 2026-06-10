@@ -474,7 +474,7 @@
           }
         },
         "findings": {
-          "description": "Findings management policy. Selects the built-in preset that decides which findings fail the build vs. are ignored with reason. Org-wide exception lists are configured separately via BRIK_POLICY_URL (a DSI-owned brik-policy.yml).",
+          "description": "Findings management policy. Selects the built-in preset that decides which findings fail the build vs. are ignored with reason. Org-wide exception lists are configured separately via the referential.s Policy document (an org-owned brik-policy.yml).",
           "type": "object",
           "additionalProperties": false,
           "properties": {

@@ -103,7 +103,7 @@ allow:
 YAML
           export BRIK_POLICY_URL="file://${POLICY_YAML}"
           export BRIK_POLICY_CACHE_PATH="$CACHE"
-          org_policy.load
+          org_policy.load "$BRIK_POLICY_URL"
           test -f "$CACHE"
         }
         When call load_minimal
@@ -124,7 +124,7 @@ allow:
 YAML
           export BRIK_POLICY_URL="file://${POLICY_YAML}"
           export BRIK_POLICY_CACHE_PATH="$CACHE"
-          org_policy.load >/dev/null 2>&1
+          org_policy.load "$BRIK_POLICY_URL" >/dev/null 2>&1
           jq -c '.cve_allowlist | sort' "$CACHE"
         }
         When call load_cves
@@ -142,7 +142,7 @@ allow:
 YAML
           export BRIK_POLICY_URL="file://${POLICY_YAML}"
           export BRIK_POLICY_CACHE_PATH="$CACHE"
-          org_policy.load >/dev/null 2>&1
+          org_policy.load "$BRIK_POLICY_URL" >/dev/null 2>&1
           jq -r '.path_globs[0].regex' "$CACHE"
         }
         When call load_paths
@@ -161,7 +161,7 @@ allow:
 YAML
           export BRIK_POLICY_URL="file://${POLICY_YAML}"
           export BRIK_POLICY_CACHE_PATH="$CACHE"
-          org_policy.load >/dev/null 2>&1
+          org_policy.load "$BRIK_POLICY_URL" >/dev/null 2>&1
           jq -r '.url' "$CACHE"
         }
         When call load_meta
@@ -177,7 +177,7 @@ allow:
 YAML
           export BRIK_POLICY_URL="file://${POLICY_YAML}"
           export BRIK_POLICY_CACHE_PATH="$CACHE"
-          org_policy.load >/dev/null 2>&1
+          org_policy.load "$BRIK_POLICY_URL" >/dev/null 2>&1
           jq -r '.preset_override' "$CACHE"
         }
         When call load_preset
@@ -201,7 +201,7 @@ allow:
 YAML
           export BRIK_POLICY_URL="file://${POLICY_YAML}"
           export BRIK_POLICY_CACHE_PATH="$CACHE"
-          org_policy.load >/dev/null 2>&1
+          org_policy.load "$BRIK_POLICY_URL" >/dev/null 2>&1
           jq -c '.cve_allowlist | sort' "$CACHE"
         }
         When call load_scoped
@@ -220,7 +220,7 @@ allow:
 YAML
           export BRIK_POLICY_URL="file://${POLICY_YAML}"
           export BRIK_POLICY_CACHE_PATH="$CACHE"
-          org_policy.load >/dev/null 2>&1
+          org_policy.load "$BRIK_POLICY_URL" >/dev/null 2>&1
           jq -c '.cve_allowlist' "$CACHE"
         }
         When call load_kept
@@ -241,7 +241,7 @@ allow:
 YAML
           export BRIK_POLICY_URL="file://${POLICY_YAML}"
           export BRIK_POLICY_CACHE_PATH="$CACHE"
-          org_policy.load >/dev/null 2>&1
+          org_policy.load "$BRIK_POLICY_URL" >/dev/null 2>&1
           jq -c '.cve_allowlist' "$CACHE"
         }
         When call load_expired
@@ -254,11 +254,11 @@ YAML
         bad_url() {
           export BRIK_POLICY_URL="file:///does/not/exist/policy.yml"
           export BRIK_POLICY_CACHE_PATH="$CACHE"
-          org_policy.load
+          org_policy.load "$BRIK_POLICY_URL"
         }
         When call bad_url
         The status should equal 7
-        The error should include "BRIK_POLICY_URL"
+        The error should include "file://"
       End
 
       It "fails with BRIK_EXIT_CONFIG_ERROR when the YAML is malformed"
@@ -266,11 +266,11 @@ YAML
           printf 'preset: : invalid\n  allow: {' > "$POLICY_YAML"
           export BRIK_POLICY_URL="file://${POLICY_YAML}"
           export BRIK_POLICY_CACHE_PATH="$CACHE"
-          org_policy.load
+          org_policy.load "$BRIK_POLICY_URL"
         }
         When call bad_yaml
         The status should equal 7
-        The error should include "BRIK_POLICY_URL"
+        The error should include "file://"
       End
 
       It "fails with BRIK_EXIT_CONFIG_ERROR when the policy violates the schema"
@@ -284,7 +284,7 @@ allow:
 YAML
           export BRIK_POLICY_URL="file://${POLICY_YAML}"
           export BRIK_POLICY_CACHE_PATH="$CACHE"
-          org_policy.load
+          org_policy.load "$BRIK_POLICY_URL"
         }
         When call bad_schema
         The status should equal 7
@@ -295,7 +295,7 @@ YAML
         no_url() {
           unset BRIK_POLICY_URL
           export BRIK_POLICY_CACHE_PATH="$CACHE"
-          org_policy.load
+          org_policy.load "$BRIK_POLICY_URL"
           test ! -f "$CACHE"
         }
         When call no_url
@@ -328,7 +328,7 @@ allow:
 YAML
         export BRIK_POLICY_URL="file://${POLICY_YAML}"
         export BRIK_POLICY_CACHE_PATH="$CACHE"
-        org_policy.load >/dev/null 2>&1
+        org_policy.load "$BRIK_POLICY_URL" >/dev/null 2>&1
         org_policy.expiring_soon | jq -r '.[].id' | sort
       }
       When call seed_soon
@@ -350,7 +350,7 @@ allow:
 YAML
         export BRIK_POLICY_URL="file://${POLICY_YAML}"
         export BRIK_POLICY_CACHE_PATH="$CACHE"
-        org_policy.load >/dev/null 2>&1
+        org_policy.load "$BRIK_POLICY_URL" >/dev/null 2>&1
         # Default window 30 days excludes; bump to 90 to include.
         export BRIK_FINDINGS_EXPIRING_SOON_DAYS=90
         org_policy.expiring_soon | jq -r '.[].id'

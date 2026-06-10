@@ -509,6 +509,89 @@ YAML
   End
 
   # =========================================================================
+  # policies/ category and the PackageRegistry / Notification kinds
+  # =========================================================================
+  Describe "policies category and platform-service kinds"
+    Before 'make_instance'
+    After 'cleanup_instance'
+
+    write_policy() {
+      mkdir -p "$INFRA_DIR/policies"
+      cat > "$INFRA_DIR/policies/org.yml" <<'YAML'
+apiVersion: brik.dev/referential/v1
+kind: Policy
+name: org
+url: https://policy.internal/brik-policy.yml
+YAML
+    }
+
+    It "accepts a Policy document under policies/"
+      policy_valid() { write_policy; infra.validate; }
+      When call policy_valid
+      The status should be success
+      The stderr should equal ""
+    End
+
+    It "rejects (7) a Policy document under endpoints/"
+      policy_misplaced() {
+        cat > "$INFRA_DIR/endpoints/org.yml" <<'YAML'
+apiVersion: brik.dev/referential/v1
+kind: Policy
+name: org
+url: https://policy.internal/brik-policy.yml
+YAML
+        infra.validate
+      }
+      When call policy_misplaced
+      The status should equal 7
+      The stderr should include "Policy"
+    End
+
+    It "accepts PackageRegistry and Notification endpoints"
+      services_valid() {
+        cat > "$INFRA_DIR/endpoints/pkg-npm.yml" <<'YAML'
+apiVersion: brik.dev/referential/v1
+kind: PackageRegistry
+name: pkg-npm
+format: npm
+url: http://nexus.lab:8081/repository/npm-private
+tls:
+  trust: insecure
+YAML
+        cat > "$INFRA_DIR/endpoints/notify-slack.yml" <<'YAML'
+apiVersion: brik.dev/referential/v1
+kind: Notification
+name: notify-slack
+service: slack
+url: https://hooks.slack.example/services/T0/B0/x
+tls:
+  trust: system
+YAML
+        infra.validate
+      }
+      When call services_valid
+      The status should be success
+      The stderr should equal ""
+    End
+
+    It "infra.policy echoes the policy document and infra.policy_names lists it"
+      policy_accessors() {
+        write_policy
+        infra.policy org | grep -q '"kind": "Policy"' || return 1
+        [[ "$(infra.policy_names)" == "org" ]]
+      }
+      When call policy_accessors
+      The status should be success
+    End
+
+    It "infra.policy_names is empty (rc 0) without a policies directory"
+      When call infra.policy_names
+      The status should be success
+      The output should equal ""
+    End
+  End
+
+  # =========================================================================
   # infra.fingerprint
   # =========================================================================
   Describe "infra.fingerprint"

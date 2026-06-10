@@ -70,13 +70,13 @@ stages.init() {
     brik.use transverse.env
     transverse.env.load_project || return "$BRIK_EXIT_CONFIG_ERROR"
 
-    # Findings-management governance bootstrap (chantier 20260508 P6.C).
-    # When BRIK_POLICY_URL is set, fetch the DSI policy file, validate it,
-    # and compile a per-run cache that downstream stages (apply_policy,
-    # expiring_soon) consume. The fetch is fail-closed: an invalid or
-    # unreachable URL surfaces a CONFIG_ERROR rather than silently falling
-    # back to the built-in preset, so a project that opted into org policy
-    # never silently regresses to defaults.
+    # Findings-management governance bootstrap. When the referential
+    # declares a Policy document, fetch the org policy file it points at,
+    # validate it, and compile a per-run cache that downstream stages
+    # (apply_policy, expiring_soon) consume. The fetch is fail-closed: an
+    # invalid or unreachable policy surfaces a CONFIG_ERROR rather than
+    # silently falling back to the built-in preset, so a project governed
+    # by org policy never silently regresses to defaults.
     _stages.init._load_org_policy || return $?
     # Surface upcoming allowlist expirations as a non-blocking notice and
     # record them in business.policy.expiring_soon for the report.
@@ -426,28 +426,44 @@ _stages.init._record_env_section() {
     log.info "recorded 15 env keys for downstream stages"
 }
 
-# Fetch + compile the DSI policy file when BRIK_POLICY_URL is set.
-# Silent no-op when unset (project keeps the built-in preset); fail-closed
-# CONFIG_ERROR when the URL is set but unreachable / invalid -- a project
-# that opted into org policy must never silently regress to defaults.
+# Fetch + compile the org policy file when the referential declares a
+# Policy document. Silent no-op when no referential is configured or none
+# declares a policy (the project keeps the built-in preset); fail-closed
+# CONFIG_ERROR when a policy is declared but ambiguous, unreachable or
+# invalid -- a governed project must never silently regress to defaults.
 _stages.init._load_org_policy() {
-    [[ -n "${BRIK_POLICY_URL:-}" ]] || return 0
+    brik.use transverse.infra 2>/dev/null || return 0
 
-    # Fail-closed: when BRIK_POLICY_URL is set, the org policy module MUST
-    # be available. A stripped install or a corrupt module path silently
+    local names policy_name policy_url
+    names="$(infra.policy_names 2>/dev/null)" || return 0
+    [[ -n "$names" ]] || return 0
+
+    if [[ "$(printf '%s\n' "$names" | wc -l)" -gt 1 ]]; then
+        log.error "the referential declares several Policy documents (expected at most one): $(printf '%s' "$names" | tr '\n' ' ')"
+        return "$BRIK_EXIT_CONFIG_ERROR"
+    fi
+    policy_name="$names"
+
+    policy_url="$(infra.policy "$policy_name" | jq -r '.url')" || {
+        log.error "cannot read the '${policy_name}' Policy document from the referential"
+        return "$BRIK_EXIT_CONFIG_ERROR"
+    }
+
+    # Fail-closed: when a policy is declared, the org policy module MUST be
+    # available. A stripped install or a corrupt module path silently
     # regressing to the built-in preset would defeat the governance gate.
     if ! brik.use transverse.findings.org_policy 2>/dev/null; then
-        log.error "BRIK_POLICY_URL is set but transverse.findings.org_policy is unavailable"
+        log.error "a Policy is declared but transverse.findings.org_policy is unavailable"
         return "$BRIK_EXIT_CONFIG_ERROR"
     fi
     if ! declare -f org_policy.load >/dev/null 2>&1; then
-        log.error "BRIK_POLICY_URL is set but org_policy.load is missing from the loader module"
+        log.error "a Policy is declared but org_policy.load is missing from the loader module"
         return "$BRIK_EXIT_CONFIG_ERROR"
     fi
 
-    log.info "loading organizational policy from $BRIK_POLICY_URL"
-    if ! org_policy.load "$BRIK_POLICY_URL"; then
-        log.error "failed to load organizational policy: $BRIK_POLICY_URL"
+    log.info "loading organizational policy '${policy_name}' from ${policy_url}"
+    if ! org_policy.load "$policy_url"; then
+        log.error "failed to load organizational policy: ${policy_url}"
         return "$BRIK_EXIT_CONFIG_ERROR"
     fi
     return 0

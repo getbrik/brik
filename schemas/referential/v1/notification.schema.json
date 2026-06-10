@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://brik.dev/schemas/referential/v1/notification.schema.json",
+  "title": "Notification",
+  "description": "A notification delivery endpoint (Slack-compatible webhook, SMTP relay or plain webhook) the notify stage delivers through.",
+  "type": "object",
+  "properties": {
+    "apiVersion": { "const": "brik.dev/referential/v1" },
+    "kind": { "const": "Notification" },
+    "name": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+    "service": { "enum": ["slack", "email", "webhook"] },
+    "url": { "type": "string", "pattern": "^(https?|smtps?)://.+" },
+    "tls": {
+      "type": "object",
+      "properties": {
+        "trust": { "enum": ["system", "custom-ca", "insecure"] }
+      },
+      "required": ["trust"],
+      "additionalProperties": false
+    }
+  },
+  "required": ["apiVersion", "kind", "name", "service", "url", "tls"],
+  "additionalProperties": false
+}

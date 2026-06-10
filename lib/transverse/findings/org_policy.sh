@@ -3,8 +3,9 @@
 # @module transverse.findings.org_policy
 # @requires curl, yq, jv, jq
 # @description Organizational policy loader for the Brik findings framework.
-#   Fetches the DSI-owned brik-policy.yml from BRIK_POLICY_URL, validates it
-#   against schemas/policy/v1/brik-policy.schema.json, filters entries by
+#   Fetches the org-owned brik-policy.yml from the URL the referential's
+#   Policy document declares, validates it against
+#   schemas/policy/v1/brik-policy.schema.json, filters entries by
 #   BRIK_PROJECT_NAME and expires date, then writes a compiled cache to
 #   ${BRIK_WORKSPACE}/.brik-logs/policy.cache.json (override path via
 #   BRIK_POLICY_CACHE_PATH).
@@ -77,19 +78,22 @@ _org_policy._epoch_to_date() {
         || date -u +%Y-%m-%d
 }
 
-# Load BRIK_POLICY_URL, validate it, filter entries by BRIK_PROJECT_NAME
-# and expires, translate glob patterns to anchored regex, and write the
-# compiled cache. No-op when BRIK_POLICY_URL is unset (the project then
-# operates with built-in policy only).
+# Load the policy file at <url>, validate it, filter entries by
+# BRIK_PROJECT_NAME and expires, translate glob patterns to anchored regex,
+# and write the compiled cache. No-op when no URL is given (the project then
+# operates with built-in policy only); the caller decides whether a policy
+# applies (stages.init reads the referential's Policy document).
+# Usage: org_policy.load <url>
 #
 # Returns:
-#   0                          on success or no-op (URL unset).
+#   0                          on success or no-op (no URL given).
 #   BRIK_EXIT_MISSING_DEP(3)   when curl/yq/jq is unavailable.
 #   BRIK_EXIT_CONFIG_ERROR(7)  when the URL is unreachable, the YAML is
 #                              malformed, or the policy violates the schema.
 #   BRIK_EXIT_IO_FAILURE(6)    when the cache cannot be written.
 org_policy.load() {
-    if [[ -z "${BRIK_POLICY_URL:-}" ]]; then
+    local url="${1:-}"
+    if [[ -z "$url" ]]; then
         return 0
     fi
 
@@ -114,17 +118,17 @@ org_policy.load() {
     fi
 
     local raw rc
-    raw="$(curl -sf "$BRIK_POLICY_URL" 2>/dev/null)"
+    raw="$(curl -sf "$url" 2>/dev/null)"
     rc=$?
     if [[ $rc -ne 0 ]]; then
-        printf 'org_policy.load: cannot fetch BRIK_POLICY_URL %s (curl rc=%d)\n' \
-            "$BRIK_POLICY_URL" "$rc" >&2
+        printf 'org_policy.load: cannot fetch the policy at %s (curl rc=%d)\n' \
+            "$url" "$rc" >&2
         return "$BRIK_EXIT_CONFIG_ERROR"
     fi
 
     local json
     if ! json="$(printf '%s\n' "$raw" | yq -o json '.' 2>/dev/null)"; then
-        printf 'org_policy.load: malformed YAML at BRIK_POLICY_URL %s\n' "$BRIK_POLICY_URL" >&2
+        printf 'org_policy.load: malformed YAML at %s\n' "$url" >&2
         return "$BRIK_EXIT_CONFIG_ERROR"
     fi
 
@@ -135,8 +139,8 @@ org_policy.load() {
         # (the .json suffix concatenation breaks mktemp's safe-by-default
         # contract) and the cleanup-on-signal gap.
         if ! printf '%s\n' "$json" | jv "$schema" - >/dev/null 2>&1; then
-            printf 'org_policy.load: schema validation failed for BRIK_POLICY_URL %s\n' \
-                "$BRIK_POLICY_URL" >&2
+            printf 'org_policy.load: schema validation failed for the policy at %s\n' \
+                "$url" >&2
             return "$BRIK_EXIT_CONFIG_ERROR"
         fi
     fi
@@ -210,7 +214,7 @@ org_policy.load() {
     if ! jq -n \
         --argjson partial    "$partial" \
         --argjson path_globs "$path_globs_json" \
-        --arg     url        "$BRIK_POLICY_URL" \
+        --arg     url        "$url" \
         --arg     loaded_at  "$loaded_at" '
         {
             preset_override: $partial.preset_override,

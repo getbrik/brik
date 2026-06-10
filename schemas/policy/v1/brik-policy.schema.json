@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://brik.dev/schemas/policy/v1/brik-policy.schema.json",
   "title": "Brik organizational policy file",
-  "description": "DSI-owned policy file distributed via BRIK_POLICY_URL. Carries the optional preset override (project preset is the default) and the org-wide allowlists for CVEs and paths. Equipes projet n'editent jamais ce fichier; toute exception passe par un PR sur le repo DSI.",
+  "description": "DSI-owned policy file distributed via the referential.s Policy document. Carries the optional preset override (project preset is the default) and the org-wide allowlists for CVEs and paths. Equipes projet n'editent jamais ce fichier; toute exception passe par un PR sur le repo DSI.",
   "type": "object",
   "additionalProperties": false,
   "properties": {

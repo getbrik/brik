@@ -166,7 +166,7 @@
           }
         },
         "policy": {
-          "description": "Findings management policy snapshot for this run. preset is the active built-in (pragmatic|strict|permissive); source records who picked it: brik.yml when the project's quality.findings.policy is in effect, org-policy when BRIK_POLICY_URL provided an override (P3+).",
+          "description": "Findings management policy snapshot for this run. preset is the active built-in (pragmatic|strict|permissive); source records who picked it: brik.yml when the project's quality.findings.policy is in effect, org-policy when the referential.s Policy document provided an override.",
           "type": "object",
           "additionalProperties": true,
           "required": ["preset", "source"],
