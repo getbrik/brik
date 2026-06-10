@@ -20,7 +20,8 @@
  *                               brik-runner containers reach Nexus/Gitea/
  *                               ArgoCD by hostname
  *   - --env-file <path>         propagate NEXUS_/BRIK_/REGISTRY_/ARGOCD_/
- *                               CARGO_/SSH_ env vars into the runner. Lives
+ *                               CARGO_/COSIGN_/SSH_ env vars into the runner.
+ *                               Lives
  *                               under /tmp so secret scanners do not flag
  *                               ARGOCD_AUTH_TOKEN and friends in the
  *                               workspace
@@ -86,7 +87,7 @@ def call(Map config = [:]) {
     // not resolve and the registry override would silently fall back to the
     // bundled default.
     def envFile = "/tmp/brik-env-${env.BUILD_TAG}"
-    sh """env | grep -E '^(NEXUS_|BRIK_|REGISTRY_|CARGO_)' | grep -v '^BRIK_RUNNER_CLASSES_FILE=' > '${envFile}' 2>/dev/null || true"""
+    sh """env | grep -E '^(NEXUS_|BRIK_|REGISTRY_|CARGO_|COSIGN_)' | grep -v '^BRIK_RUNNER_CLASSES_FILE=' > '${envFile}' 2>/dev/null || true"""
     def envFileArg = fileExists(envFile) && readFile(envFile).trim() ? "--env-file ${envFile}" : ''
 
     def deployEnvFile = "/tmp/brik-deploy-env-${env.BUILD_TAG}"
