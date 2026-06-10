@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://brik.dev/schemas/referential/v1/k8starget.schema.json",
+  "title": "K8sTarget",
+  "description": "A Kubernetes deployment target. The kubeconfig carries its own cluster trust material, so no separate tls block.",
+  "type": "object",
+  "properties": {
+    "apiVersion": { "const": "brik.dev/referential/v1" },
+    "kind": { "const": "K8sTarget" },
+    "name": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+    "kubeconfig": { "type": "string", "pattern": "^(env|file|bao)://.+" },
+    "context": { "type": "string" }
+  },
+  "required": ["apiVersion", "kind", "name", "kubeconfig"],
+  "additionalProperties": false
+}

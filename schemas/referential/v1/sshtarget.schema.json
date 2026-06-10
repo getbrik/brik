@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://brik.dev/schemas/referential/v1/sshtarget.schema.json",
+  "title": "SshTarget",
+  "description": "An SSH deployment target. Host keys are declared (known_hosts) and strict checking is the default; opting out requires an explicit strict_host_key: false declaration.",
+  "type": "object",
+  "properties": {
+    "apiVersion": { "const": "brik.dev/referential/v1" },
+    "kind": { "const": "SshTarget" },
+    "name": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+    "hosts": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1
+    },
+    "user": { "type": "string" },
+    "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+    "known_hosts": { "type": "string", "pattern": "^(env|file)://.+" },
+    "strict_host_key": { "type": "boolean" }
+  },
+  "required": ["apiVersion", "kind", "name", "hosts"],
+  "additionalProperties": false,
+  "anyOf": [
+    { "required": ["known_hosts"] },
+    {
+      "properties": { "strict_host_key": { "const": false } },
+      "required": ["strict_host_key"]
+    }
+  ]
+}

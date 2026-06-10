@@ -39,6 +39,8 @@ Commands:
   run stage        Execute a single pipeline stage locally
   run pipeline     Execute the full pipeline locally
   extension test   Validate an extension manifest+module against the contract
+  infra init       Scaffold an infrastructure referential instance
+  infra validate   Validate an infrastructure referential instance
   self-update      Update brik to the latest version
   self-uninstall   Remove brik from your system
   version          Print brik version information
@@ -78,6 +80,14 @@ Options for run pipeline:
 Options for extension test:
   (positional)            Path to the extension directory (must contain
                           stacks/ or stages/ manifests, and lib/*.sh modules).
+
+Options for infra init:
+  --profile <name>        Profile to scaffold: p-open (default), p-entreprise, p-lab
+  --dir <path>            Target directory (default: current directory)
+
+Options for infra validate:
+  --dir <path>            Referential instance to validate
+                          (default: BRIK_INFRA_DIR or BRIK_INFRA_REPO)
 
 Options for self-update:
   --channel <name>        Update channel: stable (default), edge

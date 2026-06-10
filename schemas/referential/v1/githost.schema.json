@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://brik.dev/schemas/referential/v1/githost.schema.json",
+  "title": "GitHost",
+  "description": "A git hosting service endpoint (API plus git transport).",
+  "type": "object",
+  "properties": {
+    "apiVersion": { "const": "brik.dev/referential/v1" },
+    "kind": { "const": "GitHost" },
+    "name": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+    "product": { "enum": ["gitea", "gitlab", "github"] },
+    "api_url": { "type": "string", "pattern": "^https?://.+" },
+    "git_url": { "type": "string", "pattern": "^(https?|ssh)://.+" },
+    "tls": {
+      "type": "object",
+      "properties": {
+        "trust": { "enum": ["system", "custom-ca", "insecure"] }
+      },
+      "required": ["trust"],
+      "additionalProperties": false
+    }
+  },
+  "required": ["apiVersion", "kind", "name", "product", "api_url", "tls"],
+  "additionalProperties": false
+}

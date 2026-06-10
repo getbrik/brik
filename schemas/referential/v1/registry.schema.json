@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://brik.dev/schemas/referential/v1/registry.schema.json",
+  "title": "Registry",
+  "description": "An OCI registry endpoint. The URL scheme is explicit: http:// is a declaration, never a fallback. TLS trust is a separate axis from the scheme.",
+  "type": "object",
+  "properties": {
+    "apiVersion": { "const": "brik.dev/referential/v1" },
+    "kind": { "const": "Registry" },
+    "name": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+    "url": { "type": "string", "pattern": "^https?://.+" },
+    "tls": {
+      "type": "object",
+      "properties": {
+        "trust": { "enum": ["system", "custom-ca", "insecure"] }
+      },
+      "required": ["trust"],
+      "additionalProperties": false
+    },
+    "referrers": { "type": "boolean" },
+    "zone": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" }
+  },
+  "required": ["apiVersion", "kind", "name", "url", "tls"],
+  "additionalProperties": false
+}

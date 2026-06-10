@@ -4,7 +4,7 @@
 # Does NOT participate in the production CI/CD flow - shared libraries do that.
 #
 # Usage: brik <command> [options]
-# Commands: validate, doctor, init, run, self-update, self-uninstall, version, help
+# Commands: validate, doctor, init, infra, run, self-update, self-uninstall, version, help
 # shellcheck disable=SC1091
 set -euo pipefail
 
@@ -178,6 +178,14 @@ cmd_registry() {
 }
 
 # ---------------------------------------------------------------------------
+# Command: infra
+# ---------------------------------------------------------------------------
+cmd_infra() {
+    brik.use cli.infra
+    cli.infra.run "$@"
+}
+
+# ---------------------------------------------------------------------------
 # Main dispatch
 # ---------------------------------------------------------------------------
 main() {
@@ -226,6 +234,10 @@ main() {
             ;;
         registry)
             cmd_registry "$@"
+            exit "$?"
+            ;;
+        infra)
+            cmd_infra "$@"
             exit "$?"
             ;;
         self-update)

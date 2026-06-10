@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://brik.dev/schemas/referential/v1/signing.schema.json",
+  "title": "Signing",
+  "description": "Artifact-signing infrastructure: one backend (keyless, local key, or KMS) and an explicit transparency-log stance. The backend determines which extra fields are required.",
+  "type": "object",
+  "properties": {
+    "apiVersion": { "const": "brik.dev/referential/v1" },
+    "kind": { "const": "Signing" },
+    "name": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+    "backend": { "enum": ["keyless", "key", "kms"] },
+    "transparency": { "enum": ["rekor-public", "rekor-private", "none"] },
+    "key": { "type": "string", "pattern": "^(env|file|bao)://.+" },
+    "kms_uri": { "type": "string", "pattern": "^(openbao|hashivault)://.+" },
+    "fulcio_url": { "type": "string", "pattern": "^https://.+" },
+    "rekor_url": { "type": "string", "pattern": "^https://.+" },
+    "trusted_root": { "type": "string" },
+    "signing_config": { "type": "string" }
+  },
+  "required": ["apiVersion", "kind", "name", "backend", "transparency"],
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": { "properties": { "backend": { "const": "key" } } },
+      "then": { "required": ["key"] }
+    },
+    {
+      "if": { "properties": { "backend": { "const": "kms" } } },
+      "then": { "required": ["kms_uri"] }
+    },
+    {
+      "if": { "properties": { "transparency": { "const": "rekor-private" } } },
+      "then": { "required": ["rekor_url"] }
+    }
+  ]
+}

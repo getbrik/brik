@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://brik.dev/schemas/referential/v1/referential.schema.json",
+  "title": "Referential",
+  "description": "Root manifest of an infrastructure referential instance: declares the schema version and the profile the instance claims to implement.",
+  "type": "object",
+  "properties": {
+    "apiVersion": { "const": "brik.dev/referential/v1" },
+    "kind": { "const": "Referential" },
+    "profile": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+    "description": { "type": "string" }
+  },
+  "required": ["apiVersion", "kind", "profile"],
+  "additionalProperties": false
+}
