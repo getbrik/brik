@@ -25,14 +25,39 @@ _deploy.argocd._validate_app_name() {
 }
 
 # Build common argocd CLI flags for --server and --auth-token-var.
-# Populates the caller's cmd array via nameref.
+# Populates the caller's cmd array via nameref. The transport posture comes
+# from the ArgoCD endpoint the referential declares: a http:// URL maps to
+# --plaintext, tls.trust: insecure to --insecure, grpc_web to --grpc-web,
+# applied when the effective server IS the declared endpoint. Without a
+# declared endpoint there is no insecure escape hatch: the CLI verifies TLS
+# against system trust.
 _deploy.argocd._add_server_auth() {
     local -n _cmd=$1
     local server="${2:-${ARGOCD_SERVER:-}}"
     local auth_token_var="$3"
 
+    local -a transport=()
+    brik.use transverse.infra
+    local endpoint
+    if endpoint="$(infra.endpoint_of_kind ArgoCD 2>/dev/null)"; then
+        local url authority
+        url="$(printf '%s' "$endpoint" | jq -r '.url')"
+        authority="${url#*://}"
+        authority="${authority%%/*}"
+        [[ -z "$server" ]] && server="$authority"
+        if [[ "$server" == "$authority" ]]; then
+            if [[ "$url" == http://* ]]; then
+                transport+=(--plaintext)
+            elif [[ "$(printf '%s' "$endpoint" | jq -r '.tls.trust // ""')" == "insecure" ]]; then
+                transport+=(--insecure)
+            fi
+            [[ "$(printf '%s' "$endpoint" | jq -r '.grpc_web // false')" == "true" ]] && transport+=(--grpc-web)
+        fi
+    fi
+
     if [[ -n "$server" ]]; then
-        _cmd+=(--server "$server" --insecure)
+        _cmd+=(--server "$server")
+        [[ ${#transport[@]} -gt 0 ]] && _cmd+=("${transport[@]}")
     fi
     if [[ -n "$auth_token_var" ]]; then
         brik.use transverse.env

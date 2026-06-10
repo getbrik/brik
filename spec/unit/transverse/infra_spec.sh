@@ -369,6 +369,37 @@ YAML
   End
 
   # =========================================================================
+  # infra.ssh_target_for
+  # =========================================================================
+  Describe "infra.ssh_target_for"
+    Before 'make_instance'
+    After 'cleanup_instance'
+
+    It "echoes the SshTarget declaring the host"
+      ssh_target_match() {
+        cat > "$INFRA_DIR/endpoints/ssh-prod.yml" <<'YAML'
+apiVersion: brik.dev/referential/v1
+kind: SshTarget
+name: ssh-prod
+hosts:
+  - deploy.example.com
+  - deploy2.example.com
+strict_host_key: false
+YAML
+        infra.ssh_target_for "deploy2.example.com"
+      }
+      When call ssh_target_match
+      The output should include '"name": "ssh-prod"'
+    End
+
+    It "fails closed (7) for an undeclared host"
+      When call infra.ssh_target_for "ghost.example.com"
+      The status should equal 7
+      The stderr should include "ghost.example.com"
+    End
+  End
+
+  # =========================================================================
   # infra.endpoint_of_kind
   # =========================================================================
   Describe "infra.endpoint_of_kind"

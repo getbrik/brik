@@ -86,8 +86,8 @@ deploy.compose.run() {
         # Reuse SSH agent setup from transverse helper
         brik.use transverse.ssh
         transverse.ssh.setup_agent
-        local strict_host="${BRIK_SSH_STRICT_HOST_KEY:-yes}"
-        local -a ssh_opts=(-o BatchMode=yes -o "StrictHostKeyChecking=${strict_host}")
+        local -a ssh_opts=(-o BatchMode=yes)
+        transverse.ssh.host_opts ssh_opts "$host" || return "$?"
         # Remote deploy via SSH
         if [[ "$dry_run" == "true" ]]; then
             log.info "[dry-run] would scp ${compose_file} to ${host}:${remote_path}/"

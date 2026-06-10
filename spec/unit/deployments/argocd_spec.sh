@@ -2,8 +2,91 @@ Describe "deploy/argocd.sh"
   Include "$BRIK_PIPELINE_LIB/logging.sh"
   Include "$BRIK_PIPELINE_LIB/tools.sh"
   Include "$BRIK_TRANSVERSE_LIB/env.sh"
+  Include "$BRIK_TRANSVERSE_LIB/infra.sh"
   Include "$BRIK_DEPLOYMENTS_LIB/argocd.sh"
   Include "$BRIK_HOME/spec/support/mock_helper.sh"
+
+  # ---------------------------------------------------------------------------
+  # Transport posture from the declared ArgoCD endpoint
+  # ---------------------------------------------------------------------------
+  Describe "transport from the referential's ArgoCD endpoint"
+    setup_argocd_infra() {
+      mock.setup
+      TEST_WS="$(mktemp -d)"
+      MOCK_LOG="${TEST_WS}/mock_argocd.log"
+      mock.create_logging "argocd" "$MOCK_LOG"
+      mock.activate
+      unset BRIK_DRY_RUN 2>/dev/null
+
+      ARGO_INFRA="$(mktemp -d)"
+      mkdir -p "$ARGO_INFRA/endpoints"
+      printf 'apiVersion: brik.dev/referential/v1\nkind: Referential\nprofile: p-lab\n' \
+        > "$ARGO_INFRA/referential.yml"
+      export BRIK_INFRA_DIR="$ARGO_INFRA"
+    }
+    cleanup_argocd_infra() {
+      mock.cleanup
+      rm -rf "$TEST_WS" "$ARGO_INFRA"
+      unset BRIK_INFRA_DIR ARGO_INFRA TEST_WS MOCK_LOG
+    }
+    Before 'setup_argocd_infra'
+    After 'cleanup_argocd_infra'
+
+    write_argocd_endpoint() {
+      cat > "$ARGO_INFRA/endpoints/argocd.yml" <<YAML
+apiVersion: brik.dev/referential/v1
+kind: ArgoCD
+name: argocd
+url: $1
+tls:
+  trust: $2
+grpc_web: ${3:-false}
+YAML
+    }
+
+    It "defaults the server to the declared endpoint and maps http:// to --plaintext"
+      plaintext_endpoint() {
+        write_argocd_endpoint "http://argocd.lab:9080" insecure true
+        deploy.argocd.sync --app my-app 2>/dev/null || return 1
+        grep -q "\-\-server argocd.lab:9080" "$MOCK_LOG" \
+          && grep -q "\-\-plaintext" "$MOCK_LOG" \
+          && grep -q "\-\-grpc-web" "$MOCK_LOG"
+      }
+      When call plaintext_endpoint
+      The status should be success
+    End
+
+    It "maps a declared tls.trust: insecure https endpoint to --insecure"
+      insecure_endpoint() {
+        write_argocd_endpoint "https://argocd.lab:9443" insecure
+        deploy.argocd.sync --app my-app 2>/dev/null || return 1
+        grep -q "\-\-insecure" "$MOCK_LOG" && ! grep -q "\-\-plaintext" "$MOCK_LOG"
+      }
+      When call insecure_endpoint
+      The status should be success
+    End
+
+    It "adds no insecure flag for a system-trusted https endpoint"
+      secure_endpoint() {
+        write_argocd_endpoint "https://argocd.internal" system
+        deploy.argocd.sync --app my-app 2>/dev/null || return 1
+        ! grep -q "\-\-insecure" "$MOCK_LOG" && ! grep -q "\-\-plaintext" "$MOCK_LOG"
+      }
+      When call secure_endpoint
+      The status should be success
+    End
+
+    It "adds no insecure flag for an explicit server not matching the endpoint"
+      foreign_server() {
+        write_argocd_endpoint "http://argocd.lab:9080" insecure
+        deploy.argocd.sync --app my-app --server https://other.example.com 2>/dev/null || return 1
+        grep -q "\-\-server https://other.example.com" "$MOCK_LOG" \
+          && ! grep -q "\-\-plaintext" "$MOCK_LOG" && ! grep -q "\-\-insecure" "$MOCK_LOG"
+      }
+      When call foreign_server
+      The status should be success
+    End
+  End
 
   # ---------------------------------------------------------------------------
   # _deploy.argocd._validate_app_name

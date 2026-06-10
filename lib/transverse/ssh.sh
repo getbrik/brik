@@ -1,10 +1,64 @@
 #!/usr/bin/env bash
 # @module transverse.ssh
-# @description SSH agent setup helper shared between deploy targets.
+# @description SSH agent setup and per-host transport options shared between
+#   deploy targets. Host keys and the strict-host-key stance come from the
+#   SshTarget the referential declares for the host, never from an env flag.
 
 # Guard against double-sourcing.
 [[ -n "${_BRIK_MODULE_SSH_LOADED:-}" ]] && return 0
 _BRIK_MODULE_SSH_LOADED=1
+
+# transverse.ssh.host_opts - append the transport options the referential's
+# SshTarget declares for <host> to the named ssh-options array. Strict
+# host-key checking is the default; opting out requires an explicit
+# strict_host_key: false declaration (legal but noisy). A declared
+# known_hosts reference is materialized under the log dir when it is not
+# already a file. An undeclared host fails closed.
+# Usage: transverse.ssh.host_opts <array_name> <host>
+transverse.ssh.host_opts() {
+    local -n _ssh_opts="$1"
+    local host="$2"
+
+    brik.use transverse.infra
+
+    local target
+    target="$(infra.ssh_target_for "$host")" || return "$?"
+
+    # jq's // treats false as empty, so probe the opt-out with an explicit
+    # equality test instead of a default.
+    if [[ "$(printf '%s' "$target" | jq -r 'if .strict_host_key == false then "false" else "true" end')" == "false" ]]; then
+        log.warn "ssh host '${host}' is declared with strict_host_key: false (legal but insecure)"
+        _ssh_opts+=(-o StrictHostKeyChecking=no)
+        return 0
+    fi
+
+    _ssh_opts+=(-o StrictHostKeyChecking=yes)
+
+    local kh_ref
+    kh_ref="$(printf '%s' "$target" | jq -r '.known_hosts // ""')"
+    if [[ -n "$kh_ref" ]]; then
+        local kh_path
+        case "$kh_ref" in
+            file://*)
+                kh_path="${kh_ref#file://}"
+                if [[ "$kh_path" != /* ]]; then
+                    local root
+                    root="$(infra.root)" || return "$?"
+                    kh_path="${root}/${kh_path}"
+                fi
+                ;;
+            *)
+                local value
+                value="$(infra.resolve_ref "$kh_ref")" || return "$?"
+                kh_path="${BRIK_LOG_DIR:-.brik-logs}/ssh_known_hosts"
+                mkdir -p "$(dirname "$kh_path")" || return "$BRIK_EXIT_IO_FAILURE"
+                printf '%s\n' "$value" > "$kh_path"
+                ;;
+        esac
+        _ssh_opts+=(-o "UserKnownHostsFile=${kh_path}")
+    fi
+    return 0
+}
 
 # transverse.ssh.setup_agent - start ssh-agent and load SSH_PRIVATE_KEY.
 # Reads SSH_PRIVATE_KEY from the environment. The value may be either a path

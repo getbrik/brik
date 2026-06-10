@@ -355,6 +355,33 @@ infra.registry_for() {
     return "$BRIK_EXIT_CONFIG_ERROR"
 }
 
+# infra.ssh_target_for - echo (as JSON) the SshTarget endpoint declaring
+# <host> in its hosts list. Host keys and the strict-host-key stance come
+# from this declaration; an undeclared host fails closed (no env override).
+# Usage: infra.ssh_target_for <host>
+# Returns: 2 no host; 7 undeclared; infra.root codes when unconfigured.
+infra.ssh_target_for() {
+    local host="$1"
+    if [[ -z "$host" ]]; then
+        log.error "infra.ssh_target_for: a host is required"
+        return "$BRIK_EXIT_INVALID_INPUT"
+    fi
+
+    local root file
+    root="$(infra.root)" || return "$?"
+    for file in "${root}/endpoints"/*.yml "${root}/endpoints"/*.yaml; do
+        [[ -f "$file" ]] || continue
+        [[ "$(yq '.kind // ""' "$file")" == "SshTarget" ]] || continue
+        if [[ "$(yq ".hosts // [] | contains([\"${host}\"])" "$file")" == "true" ]]; then
+            yq -o json '.' "$file"
+            return 0
+        fi
+    done
+
+    log.error "ssh host '${host}' is not declared in the referential (add an SshTarget endpoint)"
+    return "$BRIK_EXIT_CONFIG_ERROR"
+}
+
 # infra.resolve_ref - resolve a by-reference value. References are the only
 # way the referential carries secret material; values never appear inline.
 #   env://VAR        - environment variable (error when unset or empty)

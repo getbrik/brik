@@ -133,8 +133,23 @@ spec:
         - name: app
           image: registry.example.com/app:oldtag
 YAML
+      # The ssh transport options come from the SshTarget the referential
+      # declares for the host.
+      SSH_INJ_INFRA="$(mktemp -d)"
+      mkdir -p "$SSH_INJ_INFRA/endpoints"
+      printf 'apiVersion: brik.dev/referential/v1\nkind: Referential\nprofile: p-lab\n' \
+        > "$SSH_INJ_INFRA/referential.yml"
+      cat > "$SSH_INJ_INFRA/endpoints/ssh-prod.yml" <<'YAML'
+apiVersion: brik.dev/referential/v1
+kind: SshTarget
+name: ssh-prod
+hosts:
+  - h
+strict_host_key: false
+YAML
+      export BRIK_INFRA_DIR="$SSH_INJ_INFRA"
     }
-    cleanup_src() { rm -rf "$SSH_SRC"; }
+    cleanup_src() { rm -rf "$SSH_SRC" "$SSH_INJ_INFRA"; unset BRIK_INFRA_DIR SSH_INJ_INFRA; }
     Before 'setup_src'
     After 'cleanup_src'
 

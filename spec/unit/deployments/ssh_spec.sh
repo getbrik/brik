@@ -1,8 +1,36 @@
 Describe "deploy/ssh.sh"
   Include "$BRIK_PIPELINE_LIB/logging.sh"
   Include "$BRIK_PIPELINE_LIB/tools.sh"
+  Include "$BRIK_PIPELINE_LIB/loader.sh"
+  Include "$BRIK_TRANSVERSE_LIB/env.sh"
+  Include "$BRIK_TRANSVERSE_LIB/config.sh"
+  Include "$BRIK_TRANSVERSE_LIB/infra.sh"
+  Include "$BRIK_TRANSVERSE_LIB/ssh.sh"
   Include "$BRIK_DEPLOYMENTS_LIB/ssh.sh"
   Include "$BRIK_HOME/spec/support/mock_helper.sh"
+
+  # The ssh transport options come from the SshTarget the referential
+  # declares for the host; every example gets an instance declaring the
+  # spec's canonical host.
+  setup_ssh_infra() {
+    SSH_INFRA="$(mktemp -d)"
+    mkdir -p "$SSH_INFRA/endpoints" "$SSH_INFRA/trust"
+    printf 'apiVersion: brik.dev/referential/v1\nkind: Referential\nprofile: p-lab\n' \
+      > "$SSH_INFRA/referential.yml"
+    printf 'deploy.example.com ssh-ed25519 AAAAfixture\n' > "$SSH_INFRA/trust/known_hosts"
+    cat > "$SSH_INFRA/endpoints/ssh-prod.yml" <<'YAML'
+apiVersion: brik.dev/referential/v1
+kind: SshTarget
+name: ssh-prod
+hosts:
+  - deploy.example.com
+known_hosts: file://trust/known_hosts
+YAML
+    export BRIK_INFRA_DIR="$SSH_INFRA"
+  }
+  cleanup_ssh_infra() { rm -rf "$SSH_INFRA"; unset BRIK_INFRA_DIR SSH_INFRA; }
+  Before 'setup_ssh_infra'
+  After 'cleanup_ssh_infra'
 
   Describe "deploy.ssh.run"
     It "returns 2 for unknown option"
@@ -247,7 +275,7 @@ Describe "deploy/ssh.sh"
       End
     End
 
-    Describe "BRIK_SSH_STRICT_HOST_KEY"
+    Describe "host-key policy from the declared SshTarget"
       setup_strict_host() {
         mock.setup
         TEST_WS="$(mktemp -d)"
@@ -255,23 +283,38 @@ Describe "deploy/ssh.sh"
         mock.create_logging "rsync" "$MOCK_LOG"
         mock.create_logging "ssh" "$MOCK_LOG"
         mock.activate
-        export BRIK_SSH_STRICT_HOST_KEY="no"
       }
       cleanup_strict_host() {
         mock.cleanup
-        unset BRIK_SSH_STRICT_HOST_KEY 2>/dev/null
         rm -rf "$TEST_WS"
       }
       Before 'setup_strict_host'
       After 'cleanup_strict_host'
 
-      It "passes StrictHostKeyChecking=no to rsync ssh options"
+      It "defaults to strict host-key checking with the declared known_hosts"
+        invoke_strict_default() {
+          deploy.ssh.run --host deploy.example.com --path /srv/app 2>/dev/null || return 1
+          grep -q "StrictHostKeyChecking=yes" "$MOCK_LOG" \
+            && grep -q "UserKnownHostsFile=${SSH_INFRA}/trust/known_hosts" "$MOCK_LOG"
+        }
+        When call invoke_strict_default
+        The status should be success
+      End
+
+      It "passes StrictHostKeyChecking=no when the SshTarget declares strict_host_key: false"
         invoke_strict_no() {
+          yq -i '.strict_host_key = false | del(.known_hosts)' "$SSH_INFRA/endpoints/ssh-prod.yml"
           deploy.ssh.run --host deploy.example.com --path /srv/app 2>/dev/null || return 1
           grep -q "StrictHostKeyChecking=no" "$MOCK_LOG"
         }
         When call invoke_strict_no
         The status should be success
+      End
+
+      It "fails closed (7) for a host the referential does not declare"
+        When call deploy.ssh.run --host ghost.example.com --path /srv/app
+        The status should equal 7
+        The stderr should include "ghost.example.com"
       End
     End
 

@@ -1,13 +1,39 @@
 Describe "deploy/compose.sh"
   Include "$BRIK_PIPELINE_LIB/logging.sh"
   Include "$BRIK_PIPELINE_LIB/tools.sh"
+  Include "$BRIK_TRANSVERSE_LIB/env.sh"
+  Include "$BRIK_TRANSVERSE_LIB/config.sh"
+  Include "$BRIK_TRANSVERSE_LIB/infra.sh"
+  Include "$BRIK_TRANSVERSE_LIB/ssh.sh"
   Include "$BRIK_DEPLOYMENTS_LIB/compose.sh"
   Include "$BRIK_DEPLOYMENTS_LIB/_image_ref.sh"
   Include "$BRIK_HOME/spec/support/mock_helper.sh"
 
-  # compose.sh lazy-loads _image_ref via brik.use; the lib is already included
-  # above, so neutralize the loader in the unit context.
+  # compose.sh lazy-loads its collaborators via brik.use; the libs are already
+  # included above, so neutralize the loader in the unit context.
   brik.use() { :; }
+
+  # The ssh transport options of a remote deploy come from the SshTarget the
+  # referential declares for the host.
+  setup_compose_infra() {
+    COMPOSE_INFRA="$(mktemp -d)"
+    mkdir -p "$COMPOSE_INFRA/endpoints" "$COMPOSE_INFRA/trust"
+    printf 'apiVersion: brik.dev/referential/v1\nkind: Referential\nprofile: p-lab\n' \
+      > "$COMPOSE_INFRA/referential.yml"
+    printf 'deploy.example.com ssh-ed25519 AAAAfixture\n' > "$COMPOSE_INFRA/trust/known_hosts"
+    cat > "$COMPOSE_INFRA/endpoints/ssh-prod.yml" <<'YAML'
+apiVersion: brik.dev/referential/v1
+kind: SshTarget
+name: ssh-prod
+hosts:
+  - deploy.example.com
+known_hosts: file://trust/known_hosts
+YAML
+    export BRIK_INFRA_DIR="$COMPOSE_INFRA"
+  }
+  cleanup_compose_infra() { rm -rf "$COMPOSE_INFRA"; unset BRIK_INFRA_DIR COMPOSE_INFRA; }
+  Before 'setup_compose_infra'
+  After 'cleanup_compose_infra'
 
   Describe "deploy.compose.run"
     It "returns 2 for unknown option"
