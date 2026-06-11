@@ -190,6 +190,141 @@ _channel._registry_digest() {
     printf '%s' "$digest"
 }
 
+# _channel._oras_side_args - append the oras flags one side (from|to) of a
+# copy requires, derived from the Registry endpoint the referential declares
+# for the host: a declared http:// URL maps to --<side>-plain-http, a
+# declared tls.trust: insecure to --<side>-insecure, and an undeclared host
+# fails closed. The canonical BRIK_REGISTRY_USER/PASSWORD credential is
+# forwarded, gated on BRIK_REGISTRY_HOST so it never reaches the other side
+# of a cross-registry copy.
+# Usage: _channel._oras_side_args <array_name> <from|to> <host>
+_channel._oras_side_args() {
+    local -n _oargv="$1"
+    local _side="$2" _host="$3"
+
+    brik.use transverse.infra
+    local _endpoint _url
+    _endpoint="$(infra.registry_for "$_host")" || return "$?"
+    _url="$(printf '%s' "$_endpoint" | jq -r '.url')"
+    if [[ "$_url" == http://* ]]; then
+        _oargv+=("--${_side}-plain-http")
+    elif [[ "$(printf '%s' "$_endpoint" | jq -r '.tls.trust')" == "insecure" ]]; then
+        _oargv+=("--${_side}-insecure")
+    fi
+
+    if [[ -n "${BRIK_REGISTRY_USER:-}" && -n "${BRIK_REGISTRY_PASSWORD:-}" \
+          && ( -z "${BRIK_REGISTRY_HOST:-}" || "${BRIK_REGISTRY_HOST}" == "$_host" ) ]]; then
+        _oargv+=("--${_side}-username" "$BRIK_REGISTRY_USER" \
+                 "--${_side}-password" "$BRIK_REGISTRY_PASSWORD")
+    fi
+    return 0
+}
+
+# channel.copy_with_referrers - promote a version from one channel to
+# another, carrying its evidence graph along, and prove the move.
+#
+# The image is copied digest-pinned with its OCI referrers (signed SBOM and
+# provenance attestations) via `oras cp -r` -- the only transport proven to
+# carry cosign v3 bundles across registries (spike H13: cosign copy recreates
+# an EMPTY referrers index at the destination, silently dropping the
+# evidence). The copy is then proven fail-closed on the destination:
+#   1. the version must resolve to the SAME digest as the source;
+#   2. attest.verify must succeed against the profile's trust material.
+# An artifact promoted without its verifiable evidence is a failure, never a
+# warning.
+#
+# The destination channel is immutable (release semantics): a version it
+# already holds at a DIFFERENT digest is an explicit failure, never an
+# overwrite; the SAME digest makes the copy an idempotent no-op whose
+# evidence is still verified.
+#
+# Usage: channel.copy_with_referrers <version> <from> <to>
+#                                    [--identity <re>] [--issuer <re>]
+# --identity/--issuer are forwarded to the keyless verification (required by
+# attest.verify in keyless mode).
+# Output: "<dst_registry>@sha256:<hex>" on stdout.
+# Returns: 2 invalid input; 3 oras missing; 7 channel/registry undeclared;
+#          10 destination holds the version at a different digest;
+#          5 copy, digest proof or evidence verification failed.
+channel.copy_with_referrers() {
+    local version="${1:-}" from="${2:-}" to="${3:-}"
+    shift $(( $# < 3 ? $# : 3 ))
+
+    local identity="" issuer=""
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --identity) identity="$2"; shift 2 ;;
+            --issuer)   issuer="$2";   shift 2 ;;
+            *) log.error "channel.copy_with_referrers: unknown option: $1"
+               return "$BRIK_EXIT_INVALID_INPUT" ;;
+        esac
+    done
+
+    if [[ -z "$version" || -z "$from" || -z "$to" ]]; then
+        log.error "channel.copy_with_referrers: <version>, <from> and <to> are required"
+        return "$BRIK_EXIT_INVALID_INPUT"
+    fi
+
+    pipeline.require_tool oras || return "$BRIK_EXIT_MISSING_DEP"
+
+    local from_registry to_registry
+    from_registry="$(channel.registry "$from")" || return "$?"
+    to_registry="$(channel.registry "$to")" || return "$?"
+
+    local src_pinned digest
+    src_pinned="$(channel.resolve_digest "$version" "$from")" || return "$?"
+    digest="${src_pinned##*@}"
+
+    # Destination immutability, checked before any byte moves: a version the
+    # destination already holds at another digest is a refusal, the same
+    # digest an idempotent no-op. An absent version (or an unreachable
+    # destination -- a real outage surfaces at the copy itself) proceeds.
+    local pre_pinned pre_digest=""
+    if pre_pinned="$(channel.resolve_digest "$version" "$to" 2>/dev/null)"; then
+        pre_digest="${pre_pinned##*@}"
+        if [[ "$pre_digest" != "$digest" ]]; then
+            log.error "channel '${to}' is immutable: it already holds ${version} at ${pre_digest}, refusing to overwrite with ${digest}"
+            return "$BRIK_EXIT_CHECK_FAILED"
+        fi
+        log.info "channel '${to}' already holds ${version} at ${digest}: copy is a no-op"
+    fi
+
+    if [[ -z "$pre_digest" ]]; then
+        local -a args=(cp -r)
+        _channel._oras_side_args args from "${from_registry%%/*}" || return "$?"
+        _channel._oras_side_args args to "${to_registry%%/*}" || return "$?"
+
+        log.info "copying ${src_pinned} -> ${to_registry}:${version} (with referrers)"
+        if ! oras "${args[@]}" "$src_pinned" "${to_registry}:${version}"; then
+            log.error "channel.copy_with_referrers: oras cp failed (${from} -> ${to})"
+            return "$BRIK_EXIT_EXTERNAL_FAIL"
+        fi
+
+        # Prove the bytes: the version in the destination channel must be
+        # the exact content the source pinned.
+        local dst_pinned dst_digest
+        dst_pinned="$(channel.resolve_digest "$version" "$to")" || return "$?"
+        dst_digest="${dst_pinned##*@}"
+        if [[ "$dst_digest" != "$digest" ]]; then
+            log.error "post-copy digest mismatch on '${to}': expected ${digest}, got ${dst_digest}"
+            return "$BRIK_EXIT_EXTERNAL_FAIL"
+        fi
+    fi
+
+    # Prove the evidence: the attestations must verify ON THE DESTINATION
+    # against the profile's trust material.
+    brik.use transverse.attest
+    local -a vargs=()
+    [[ -n "$identity" ]] && vargs+=(--identity "$identity")
+    [[ -n "$issuer" ]] && vargs+=(--issuer "$issuer")
+    if ! attest.verify "${to_registry}@${digest}" "${vargs[@]}"; then
+        log.error "channel.copy_with_referrers: '${to}' holds ${version} without verifiable evidence (fail-closed)"
+        return "$BRIK_EXIT_EXTERNAL_FAIL"
+    fi
+
+    printf '%s@%s' "$to_registry" "$digest"
+}
+
 # channel.resolve_digest - resolve a version to a digest-pinned image ref
 # within a channel's registry.
 # Usage: channel.resolve_digest <version> <channel>

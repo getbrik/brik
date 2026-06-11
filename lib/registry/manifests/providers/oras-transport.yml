@@ -1,0 +1,13 @@
+apiVersion: brik.dev/v1
+kind: Provider
+metadata:
+  id: oras-transport
+  displayName: ORAS evidence-graph transport
+  owner: getbrik
+spec:
+  capability: evidence-transport
+  binding: referential
+  contract: evidence-transport/v1
+  tools:
+    - name: oras
+      min_version: "1.2.0"

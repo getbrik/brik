@@ -9,14 +9,15 @@ Describe "registry.provider accessors"
   Include "$BRIK_HOME/lib/registry/registry.sh"
 
   Describe "registry.provider.list"
-    It "returns the 5 builtin providers"
+    It "returns the 6 builtin providers"
       When call registry.provider.list
       The status should be success
       The line 1 of stdout should equal "cosign-key"
       The line 2 of stdout should equal "cosign-keyless"
       The line 3 of stdout should equal "cosign-kms-openbao"
       The line 4 of stdout should equal "gitsign"
-      The line 5 of stdout should equal "ssh-signing"
+      The line 5 of stdout should equal "oras-transport"
+      The line 6 of stdout should equal "ssh-signing"
     End
   End
 
