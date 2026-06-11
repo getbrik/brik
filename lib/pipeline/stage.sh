@@ -200,6 +200,13 @@ _pipeline.detect_metadata() {
     fi
     _helpers.set_if_unset BRIK_COMMIT_REPO_URL "$_normalized_repo_url"
 
+    # Orchestrator base URL, the root of the builder-identity convention
+    # (builder.id = <orchestrator>/-/brik/<runner-class>): CI_SERVER_URL on
+    # GitLab, JENKINS_URL on Jenkins (trailing slash stripped). Stays empty
+    # on a local run -- the builder id then roots at https://brik.sh/local.
+    local _orch="${CI_SERVER_URL:-${JENKINS_URL:-}}"
+    _helpers.set_if_unset BRIK_ORCHESTRATOR_URL "${_orch%/}"
+
     return 0
 }
 

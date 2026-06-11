@@ -146,11 +146,23 @@ _stages.container_scan._sign_evidence() {
         return "$BRIK_EXIT_EXTERNAL_FAIL"
     fi
 
+    # Builder identity, the brik convention require_attestation verifies:
+    # <orchestrator-url>/-/brik/<runner-class>, plus the brik version as
+    # builder.version.brik. The runner class comes from the registry (the
+    # class this stage's manifest declares), never from the environment.
+    local _runner_class=""
+    brik.use registry.registry 2>/dev/null || true
+    if declare -f registry.stage.runner_class >/dev/null 2>&1; then
+        _runner_class="$(registry.stage.runner_class container-scan 2>/dev/null || printf '')"
+    fi
+    [[ -z "$_runner_class" ]] && _runner_class="unknown"
+
     if ! attest.provenance_predicate \
             --version "${BRIK_COMMIT_TAG:-${BRIK_COMMIT_SHORT_SHA:-unknown}}" \
             --commit  "${BRIK_COMMIT_SHA:-unknown}" \
             --repo    "git+${BRIK_COMMIT_REPO_URL:-unknown}" \
-            --builder "https://brik.sh/builder/${BRIK_PLATFORM:-local}" \
+            --builder "${BRIK_ORCHESTRATOR_URL:-https://brik.sh/local}/-/brik/${_runner_class}" \
+            --brik-version "${BRIK_VERSION:-unknown}" \
             --run-id  "${BRIK_RUN_ID:-${BRIK_PIPELINE_ID:-unknown}}" \
             > "$_prov"; then
         log.error "failed to build the provenance predicate for ${ref}"

@@ -230,14 +230,15 @@ _attest._registry_args() {
 # Usage: attest.provenance_predicate --version V --commit C --repo R
 #                                    --builder B --run-id ID
 attest.provenance_predicate() {
-    local version="" commit="" repo="" builder="" run_id=""
+    local version="" commit="" repo="" builder="" brik_version="" run_id=""
     while [[ $# -gt 0 ]]; do
         case "$1" in
-            --version) version="$2"; shift 2 ;;
-            --commit)  commit="$2";  shift 2 ;;
-            --repo)    repo="$2";    shift 2 ;;
-            --builder) builder="$2"; shift 2 ;;
-            --run-id)  run_id="$2";  shift 2 ;;
+            --version)      version="$2";      shift 2 ;;
+            --commit)       commit="$2";       shift 2 ;;
+            --repo)         repo="$2";         shift 2 ;;
+            --builder)      builder="$2";      shift 2 ;;
+            --brik-version) brik_version="$2"; shift 2 ;;
+            --run-id)       run_id="$2";       shift 2 ;;
             *) log.error "attest.provenance_predicate: unknown option: $1"
                return "$BRIK_EXIT_INVALID_INPUT" ;;
         esac
@@ -249,6 +250,7 @@ attest.provenance_predicate() {
         --arg commit "$commit" \
         --arg repo "$repo" \
         --arg builder "$builder" \
+        --arg brik_version "$brik_version" \
         --arg run_id "$run_id" \
         '{
           buildDefinition: {
@@ -258,7 +260,8 @@ attest.provenance_predicate() {
             resolvedDependencies: [ { uri: $repo, digest: { sha1: $commit } } ]
           },
           runDetails: {
-            builder: { id: $builder },
+            builder: ({ id: $builder }
+              + (if $brik_version != "" then { version: { brik: $brik_version } } else {} end)),
             metadata: { invocationId: $run_id }
           }
         }'

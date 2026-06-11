@@ -322,6 +322,38 @@ JSON
         The status should be success
       End
 
+      It "assembles the builder identity from the orchestrator URL and the runner class"
+        attest.available() { return 0; }
+        syft() { : >"${BRIK_LOG_DIR}/evidence/sbom.cyclonedx.json"; }
+        attest.sign() { return 0; }
+        registry.stage.runner_class() { printf 'scanner'; }
+        assemble() {
+          export BRIK_ORCHESTRATOR_URL="https://gitlab.example"
+          export BRIK_VERSION="9.9.9"
+          attest.provenance_predicate() { printf '%s\n' "$*" >"${BRIK_LOG_DIR}/pred.args"; printf '{}'; }
+          _stages.container_scan._sign_evidence "$REF" >/dev/null 2>&1 || return $?
+          cat "${BRIK_LOG_DIR}/pred.args"
+        }
+        When call assemble
+        The output should include "--builder https://gitlab.example/-/brik/scanner"
+        The output should include "--brik-version 9.9.9"
+      End
+
+      It "falls back to the brik.sh local builder root when no orchestrator is detected"
+        attest.available() { return 0; }
+        syft() { : >"${BRIK_LOG_DIR}/evidence/sbom.cyclonedx.json"; }
+        attest.sign() { return 0; }
+        registry.stage.runner_class() { printf 'scanner'; }
+        assemble() {
+          unset BRIK_ORCHESTRATOR_URL
+          attest.provenance_predicate() { printf '%s\n' "$*" >"${BRIK_LOG_DIR}/pred.args"; printf '{}'; }
+          _stages.container_scan._sign_evidence "$REF" >/dev/null 2>&1 || return $?
+          cat "${BRIK_LOG_DIR}/pred.args"
+        }
+        When call assemble
+        The output should include "--builder https://brik.sh/local/-/brik/scanner"
+      End
+
       It "signs the digest when cosign and syft are present"
         attest.available() { return 0; }
         syft() { : >"${BRIK_LOG_DIR}/evidence/sbom.cyclonedx.json"; }

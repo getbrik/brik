@@ -12,7 +12,8 @@ Describe "_pipeline.detect_metadata"
     unset BRIK_COMMIT_BRANCH BRIK_COMMIT_TAG
     unset BRIK_COMMIT_AUTHOR BRIK_COMMIT_AUTHOR_EMAIL
     unset BRIK_COMMIT_TIMESTAMP BRIK_COMMIT_MESSAGE_SUBJECT
-    unset BRIK_COMMIT_REPO_URL
+    unset BRIK_COMMIT_REPO_URL BRIK_ORCHESTRATOR_URL
+    unset CI_SERVER_URL JENKINS_URL
     unset BRIK_TRIGGERED_BY BRIK_WORKSPACE
     unset CI_PIPELINE_ID CI_PIPELINE_URL CI_COMMIT_SHA CI_COMMIT_SHORT_SHA
     unset CI_COMMIT_REF_NAME CI_COMMIT_BRANCH CI_COMMIT_TAG
@@ -107,6 +108,40 @@ Describe "_pipeline.detect_metadata"
       }
       When call check
       The output should equal "https://override.example/project"
+    End
+  End
+
+  Describe "BRIK_ORCHESTRATOR_URL resolution (builder-identity convention)"
+    Before 'reset_env'
+    After  'reset_env'
+
+    It "is set from CI_SERVER_URL on GitLab"
+      check() {
+        export CI_SERVER_URL="https://gitlab.example.com"
+        _pipeline.detect_metadata
+        printf '%s' "$BRIK_ORCHESTRATOR_URL"
+      }
+      When call check
+      The output should equal "https://gitlab.example.com"
+    End
+
+    It "is set from JENKINS_URL with the trailing slash stripped"
+      check() {
+        export JENKINS_URL="https://jenkins.example.com:8080/"
+        _pipeline.detect_metadata
+        printf '%s' "$BRIK_ORCHESTRATOR_URL"
+      }
+      When call check
+      The output should equal "https://jenkins.example.com:8080"
+    End
+
+    It "stays empty when no orchestrator is detected (local run)"
+      check() {
+        _pipeline.detect_metadata
+        printf '%s' "${BRIK_ORCHESTRATOR_URL:-}"
+      }
+      When call check
+      The output should equal ""
     End
   End
 

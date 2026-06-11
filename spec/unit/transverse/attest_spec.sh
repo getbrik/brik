@@ -156,6 +156,19 @@ YAML
       The output should include "buildDefinition"
       The output should include "run-9"
     End
+
+    It "carries the brik builder-identity convention (builder.id + builder.version.brik)"
+      convention() {
+        attest.provenance_predicate \
+          --version v1.2.3 --commit abc123 --repo git+https://x/y \
+          --builder "https://gitlab.example/-/brik/scanner" \
+          --brik-version 0.6.0 --run-id run-9 \
+          | jq -r '.runDetails.builder.id, .runDetails.builder.version.brik'
+      }
+      When call convention
+      The output should equal "https://gitlab.example/-/brik/scanner
+0.6.0"
+    End
   End
 
   Describe "attest.sign"
