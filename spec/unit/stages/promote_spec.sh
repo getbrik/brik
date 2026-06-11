@@ -276,4 +276,96 @@ SH
       The output should equal "rc=1|kind=candidate-not-found"
     End
   End
+
+  Describe "channel promotion (artifacts.channels)"
+    CHAN_DIGEST="sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+
+    # The copy primitive's own contract is channel_copy_with_referrers_spec:
+    # stub it as a function (the loader guard keeps brik.use from re-sourcing
+    # the module) so this unit covers the stage's dispatch and reporting.
+    _BRIK_MODULE_TRANSVERSE_CHANNEL_LOADED=1
+    channel.copy_with_referrers() {
+      printf 'copy_with_referrers %s\n' "$*" >> "${BRIK_LOG_DIR}/chan.log"
+      if [[ -n "${CHAN_RC:-}" && "${CHAN_RC}" != "0" ]]; then
+        return "$CHAN_RC"
+      fi
+      printf 'registry.release/app@%s' "$CHAN_DIGEST"
+    }
+
+    write_channels_config() {
+      cat > "$BRIK_CONFIG_FILE" <<'YAML'
+version: 1
+project:
+  name: promote-spec
+  stack: node
+artifacts:
+  channels:
+    candidate:
+      registry: registry.internal/app
+    release:
+      registry: registry.release/app
+YAML
+    }
+
+    It "promotes through the copy primitive and exports the digest-pinned release ref"
+      write_channels_config
+      invoke() {
+        stages.promote "$CTX_FILE" >/dev/null 2>&1
+        local rc=$?
+        printf 'rc=%s|kind=%s|rel=%s|promoted=%s|' \
+          "$rc" "$(read_kind)" \
+          "$(read_business_key release_ref)" \
+          "$(read_env_key BRIK_PROMOTED_IMAGE_REF)"
+        cat "${BRIK_LOG_DIR}/chan.log"
+      }
+      When call invoke
+      The output should equal "rc=0|kind=channel-promotion|rel=registry.release/app@${CHAN_DIGEST}|promoted=registry.release/app@${CHAN_DIGEST}|copy_with_referrers 1.2.3 candidate release"
+    End
+
+    It "honors dry-run without invoking the primitive"
+      write_channels_config
+      export BRIK_DRY_RUN=true
+      invoke() {
+        stages.promote "$CTX_FILE" >/dev/null 2>&1
+        local rc=$?
+        printf 'rc=%s|kind=%s|called=%s' \
+          "$rc" "$(read_kind)" \
+          "$([[ -f "${BRIK_LOG_DIR}/chan.log" ]] && echo yes || echo no)"
+      }
+      When call invoke
+      The output should equal "rc=0|kind=dry-run|called=no"
+    End
+
+    It "propagates the primitive's failure (immutability refusal stays a refusal)"
+      write_channels_config
+      invoke() {
+        CHAN_RC=10
+        stages.promote "$CTX_FILE" >/dev/null 2>&1
+        local rc=$?
+        printf 'rc=%s|status=%s|kind=%s' "$rc" "$(read_status)" "$(read_kind)"
+      }
+      When call invoke
+      The output should equal "rc=10|status=failure|kind=channel-promotion-failed"
+    End
+
+    It "does not opt into promotion when only one channel is declared"
+      cat > "$BRIK_CONFIG_FILE" <<'YAML'
+version: 1
+project:
+  name: promote-spec
+  stack: node
+artifacts:
+  channels:
+    candidate:
+      registry: registry.internal/app
+YAML
+      invoke() {
+        stages.promote "$CTX_FILE" 2>/dev/null
+        local rc=$?
+        printf 'rc=%s|kind=%s' "$rc" "$(read_kind)"
+      }
+      When call invoke
+      The output should equal "rc=0|kind=not-applicable"
+    End
+  End
 End

@@ -38,6 +38,59 @@ _promote.docker_login() {
     return 0
 }
 
+# _promote.channels - promote between the declared candidate and release
+# channels through channel.copy_with_referrers: digest-preserving, evidence
+# graph carried, destination immutability enforced, verification on the
+# destination fail-closed. The exported BRIK_PROMOTED_IMAGE_REF is
+# digest-pinned. In keyless signing mode the verification inside the
+# primitive requires the builder-identity expectations; until the brik
+# identity convention wires them through, a keyless referential fails the
+# promotion loudly rather than skipping the proof.
+# Args: $1 candidate registry, $2 release registry.
+_promote.channels() {
+    local candidate_registry="$1" release_registry="$2"
+    local version="${BRIK_PROJECT_VERSION:-0.0.0}"
+    if [[ "$version" == "0.0.0" ]]; then
+        log.warn "stages.promote: BRIK_PROJECT_VERSION is 0.0.0; promote on a tag push is expected"
+    fi
+
+    local candidate_ref="${candidate_registry}:${version}"
+    log.info "promoting ${candidate_ref} -> ${release_registry}:${version} (channels, evidence carried)"
+
+    if [[ "${BRIK_DRY_RUN:-false}" == "true" ]]; then
+        log.info "[dry-run] oras cp -r ${candidate_ref} ${release_registry}:${version}"
+        log.info "[dry-run] verify attestations on the destination digest"
+        report.record "promote" "tech"     "status"           "success"        || true
+        report.record "promote" "tech"     "kind"             "dry-run"        || true
+        report.record "promote" "business" "candidate_ref"    "$candidate_ref" || true
+        report.record "promote" "business" "candidate_digest" "sha256:dry-run" || true
+        report.record "promote" "business" "release_ref"      "${release_registry}:${version}" || true
+        report.record "promote" "business" "release_digest"   "sha256:dry-run" || true
+        report.record "promote" "env"      "BRIK_PROMOTED_IMAGE_REF" "${release_registry}:${version}" || true
+        return 0
+    fi
+
+    brik.use transverse.channel
+    local pinned rc=0
+    pinned="$(channel.copy_with_referrers "$version" candidate release)" || rc=$?
+    if [[ "$rc" -ne 0 ]]; then
+        log.error "stages.promote: channel promotion failed (rc=${rc})"
+        report.record "promote" "tech" "status" "failure" || true
+        report.record "promote" "tech" "kind"   "channel-promotion-failed" || true
+        return "$rc"
+    fi
+
+    local digest="${pinned##*@}"
+    report.record "promote" "tech"     "status"           "success"            || true
+    report.record "promote" "tech"     "kind"             "channel-promotion"  || true
+    report.record "promote" "business" "candidate_ref"    "$candidate_ref"     || true
+    report.record "promote" "business" "candidate_digest" "$digest"            || true
+    report.record "promote" "business" "release_ref"      "$pinned"            || true
+    report.record "promote" "business" "release_digest"   "$digest"            || true
+    report.record "promote" "env"      "BRIK_PROMOTED_IMAGE_REF" "$pinned"     || true
+    return 0
+}
+
 stages.promote() {
     brik.use transverse.config
     brik.use pipeline.report
@@ -52,6 +105,18 @@ stages.promote() {
         report.record "promote" "tech" "kind"   "not-applicable" || true
         report.record "promote" "business" "reason" "not-a-release-context" || true
         return 0
+    fi
+
+    # Channel model first: a project that declares BOTH the candidate and
+    # release channels promotes through the evidence-carrying primitive.
+    # One channel alone is the CI publish declaration, not a promotion
+    # opt-in -- fall through to the legacy 2-zone model, then to the skip.
+    local chan_candidate chan_release
+    chan_candidate="$(config.get '.artifacts.channels.candidate.registry' '')"
+    chan_release="$(config.get '.artifacts.channels.release.registry' '')"
+    if [[ -n "$chan_candidate" && -n "$chan_release" ]]; then
+        _promote.channels "$chan_candidate" "$chan_release"
+        return "$?"
     fi
 
     local candidate_registry candidate_image release_registry release_image
