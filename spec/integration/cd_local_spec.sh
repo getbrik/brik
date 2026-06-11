@@ -233,6 +233,114 @@ YAML
     End
   End
 
+  Describe "eligibility gate (requires_eligibility)"
+    # The grant lives in the PromotionJournal of the project's state-repo
+    # (file:// fixture); the gate must find every configured event type for
+    # the resolved digest and the target environment.
+    setup_eligibility() {
+      EL_REPO="$(mktemp -d)"
+      (
+        cd "$EL_REPO"
+        git init -q -b main
+        git config user.email "e2e@brik.dev"
+        git config user.name "e2e"
+        printf '{}\n' > seed.json
+        git add -A >/dev/null
+        git commit -q -m "seed"
+      )
+      EL_REPO_URL="file://$EL_REPO" yq -i \
+        '.artifacts.evidence = {"repo": strenv(EL_REPO_URL), "branch": "main", "sign": false}
+         | .deploy.environments.staging.gates.requires_eligibility = ["artifact_authorized_for"]' \
+        "$REPO/brik.yml"
+      printf '#!/bin/sh\nprintf "HTTP/1.1 200 OK\\r\\nDocker-Content-Digest: %s\\r\\n\\r\\n"\nexit 0\n' \
+        "$DIGEST" > "${MOCKBIN}/curl"
+      chmod +x "${MOCKBIN}/curl"
+    }
+    cleanup_eligibility() { rm -rf "$EL_REPO"; }
+    Before 'setup_eligibility'
+    After 'cleanup_eligibility'
+
+    seed_grant() {
+      local digest="$1" env="$2"
+      mkdir -p "$EL_REPO/promotions/2026/06/11"
+      jq -n --arg d "$digest" --arg e "$env" \
+        '{schema: "brik.promotion-event/v1", type: "artifact_authorized_for",
+          version: "v1.2.3", digest: $d, timestamp: "2026-06-11T14:30:00Z",
+          environment: $e}' \
+        > "$EL_REPO/promotions/2026/06/11/20260611T143000Z-aaaa0000aaaa0000.json"
+      git -C "$EL_REPO" add -A >/dev/null
+      git -C "$EL_REPO" commit -q -m "promotion: artifact_authorized_for v1.2.3"
+    }
+
+    It "refuses the deploy when the journal carries no grant for the environment"
+      deploy_no_grant() {
+        cd "$REPO"
+        PATH="${MOCKBIN}:$PATH" cli.deploy.run --version v1.2.3 --environment staging
+      }
+      When call deploy_no_grant
+      The status should equal 10
+      The stderr should include "refusing to deploy"
+    End
+
+    It "deploys once the digest is authorized for the environment"
+      deploy_granted() {
+        seed_grant "$DIGEST" staging
+        cd "$REPO"
+        PATH="${MOCKBIN}:$PATH" cli.deploy.run --version v1.2.3 --environment staging
+      }
+      When call deploy_granted
+      The status should equal 0
+      The stderr should include "eligibility proven"
+      The output should include "@${DIGEST}"
+    End
+
+    It "refuses a grant bound to another digest (anti-replay)"
+      deploy_wrong_digest() {
+        seed_grant "sha256:9999999999999999999999999999999999999999999999999999999999999999" staging
+        cd "$REPO"
+        PATH="${MOCKBIN}:$PATH" cli.deploy.run --version v1.2.3 --environment staging
+      }
+      When call deploy_wrong_digest
+      The status should equal 10
+      The stderr should include "refusing to deploy"
+    End
+
+    It "fails closed when the journal is unreachable"
+      deploy_unreachable() {
+        yq -i '.artifacts.evidence.repo = "file:///does/not/exist/state.git"' "$REPO/brik.yml"
+        cd "$REPO"
+        PATH="${MOCKBIN}:$PATH" cli.deploy.run --version v1.2.3 --environment staging
+      }
+      When call deploy_unreachable
+      The status should equal 5
+      The stderr should include "failing closed"
+    End
+
+    It "runs the gates in order: resolution, attestation, eligibility"
+      deploy_ordered() {
+        yq -i '.deploy.environments.staging.gates.require_attestation = true
+               | .deploy.environments.staging.gates.verify_identity = "https://ci/.*"
+               | .deploy.environments.staging.gates.verify_issuer = "https://issuer.example"' \
+          "$REPO/brik.yml"
+        jq -cn '{buildDefinition: {externalParameters: {version: "v1.2.3"},
+                                   resolvedDependencies: [{uri: "git+https://x/y"}]},
+                 runDetails: {builder: {id: "https://gitlab.example/-/brik/scanner"}}} as $pred
+                | {payloadType: "application/vnd.in-toto+json",
+                   payload: ({_type: "https://in-toto.io/Statement/v1", predicate: $pred} | tojson | @base64)}' \
+          > "${MOCKBIN}/envelope.json"
+        printf '#!/bin/sh\ncat "%s"\nexit 0\n' "${MOCKBIN}/envelope.json" > "${MOCKBIN}/cosign"
+        chmod +x "${MOCKBIN}/cosign"
+        seed_grant "$DIGEST" staging
+        cd "$REPO"
+        PATH="${MOCKBIN}:$PATH" cli.deploy.run --version v1.2.3 --environment staging
+      }
+      When call deploy_ordered
+      The status should equal 0
+      The stderr should match pattern '*resolved v1.2.3*attestation verified*eligibility proven*'
+      The output should include "@${DIGEST}"
+    End
+  End
+
   Describe "branch-protection arbitration (state_repo_protection)"
     # The protection check posture comes from the referential's Policy
     # document. The lab referential declares no GitHost, so the check itself

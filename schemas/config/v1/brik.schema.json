@@ -1044,6 +1044,16 @@
               "description": "Expected source repository (regexp) matched against the verified provenance's resolvedDependencies[0].uri. Optional.",
               "type": "string"
             },
+            "requires_eligibility": {
+              "description": "PromotionJournal event types that must ALL exist for the resolved digest and this environment before deploying (all_of semantics). The journal is read from the project's state-repo (artifacts.evidence.repo); an unreachable journal, a missing state-repo declaration or a missing grant fails closed. An attested artifact is not an eligible artifact: attestation says where it comes from, eligibility says where it may go.",
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "enum": ["artifact_validated_for", "artifact_authorized_for"]
+              }
+            },
             "verify_identity": {
               "description": "Expected signer identity (regexp) for keyless attestation verification (e.g. the CI job's certificate identity). Required when require_attestation is set and the referential's Signing backend is keyless.",
               "type": "string"

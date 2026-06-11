@@ -304,6 +304,72 @@ cli.deploy.run() {
         log.info "attestation verified for ${pinned}"
     fi
 
+    # Eligibility gate (requires_eligibility, design 6.9): every configured
+    # PromotionJournal event type must exist for the resolved digest and this
+    # environment. Attestation is not eligibility: the former travels with
+    # the artifact (where it comes from), the latter is a posterior decision
+    # recorded in the journal (where it may go). Fail-closed: no state-repo
+    # declared, unreachable journal, unverifiable signed tip or a missing
+    # grant refuse the deploy.
+    local requires_eligibility
+    requires_eligibility="$(transverse.env.resolve_indirect "BRIK_DEPLOY_${upper_env}_REQUIRES_ELIGIBILITY")"
+    if [[ -n "$requires_eligibility" ]]; then
+        if [[ -z "$pinned" ]]; then
+            brik_error "requires_eligibility: no digest-pinned ref to match grants against for '${environment}' -- failing closed"
+            return "${BRIK_EXIT_EXTERNAL_FAIL}"
+        fi
+
+        brik.use transverse.config
+        local el_repo el_branch el_token_var el_sign
+        el_repo="$(config.get '.artifacts.evidence.repo' '' 2>/dev/null || printf '')"
+        if [[ -z "$el_repo" ]]; then
+            brik_error "requires_eligibility is set for '${environment}' but no state-repo is declared (.artifacts.evidence.repo) -- failing closed"
+            return "${BRIK_EXIT_CONFIG_ERROR}"
+        fi
+        el_branch="$(config.get '.artifacts.evidence.branch' '' 2>/dev/null || printf '')"
+        el_token_var="$(config.get '.artifacts.evidence.token_var' '' 2>/dev/null || printf '')"
+        el_sign="$(config.get '.artifacts.evidence.sign' 'false' 2>/dev/null || printf 'false')"
+
+        brik.use transverse.state_repo
+        local el_clone el_rc=0
+        el_clone="$(mktemp -d)" || return "${BRIK_EXIT_IO_FAILURE}"
+        local -a _el_clone_args=("$el_repo" "$el_clone")
+        [[ -n "$el_branch" ]]    && _el_clone_args+=(--branch "$el_branch")
+        [[ -n "$el_token_var" ]] && _el_clone_args+=(--token-var "$el_token_var")
+        if ! transverse.state_repo.clone "${_el_clone_args[@]}" >/dev/null; then
+            rm -rf "$el_clone"
+            brik_error "requires_eligibility: cannot read the promotion journal at ${el_repo} -- failing closed"
+            return "${BRIK_EXIT_EXTERNAL_FAIL}"
+        fi
+        if [[ "$el_sign" == "true" ]]; then
+            if ! transverse.state_repo.verify_head "$el_clone" >/dev/null; then
+                rm -rf "$el_clone"
+                brik_error "requires_eligibility: the journal tip signature did not verify -- failing closed"
+                return "${BRIK_EXIT_EXTERNAL_FAIL}"
+            fi
+        fi
+
+        brik.use transverse.promotion_journal
+        local el_events
+        el_events="$(promotion_journal.events_for "$el_clone" \
+            --digest "${pinned##*@}" --environment "$environment")" || el_rc=$?
+        rm -rf "$el_clone"
+        if [[ "$el_rc" -ne 0 ]]; then
+            brik_error "requires_eligibility: the promotion journal could not be read fail-closed (rc=${el_rc})"
+            return "$el_rc"
+        fi
+
+        local el_type
+        for el_type in ${requires_eligibility//,/ }; do
+            if ! printf '%s' "$el_events" | jq -e --arg t "$el_type" \
+                    'any(.[]; .type == $t)' >/dev/null; then
+                brik_error "requires_eligibility: no ${el_type} grant for ${pinned##*@} on '${environment}' -- refusing to deploy"
+                return "${BRIK_EXIT_CHECK_FAILED}"
+            fi
+        done
+        log.info "eligibility proven for ${pinned} on '${environment}' (${requires_eligibility})"
+    fi
+
     # Strategy override (CLI wins over brik.yml) and single-env targeting.
     [[ -n "$strategy" ]] && export "BRIK_DEPLOY_${upper_env}_STRATEGY=$strategy"
     export BRIK_DEPLOY_ONLY_ENV="$environment"

@@ -160,6 +160,11 @@ _config._export_deploy_env_vars() {
         val="$(config.get ".deploy.environments.${env_name}.gates.expected_source" '')"
         [[ -n "$val" ]] && export "BRIK_DEPLOY_${upper_env}_EXPECTED_SOURCE=$val"
 
+        # Eligibility gate: the PromotionJournal event types that must all
+        # exist for the resolved digest and this environment (all_of).
+        val="$(config.get ".deploy.environments.${env_name}.gates.requires_eligibility | join(\",\")" '')"
+        [[ -n "$val" ]] && export "BRIK_DEPLOY_${upper_env}_REQUIRES_ELIGIBILITY=$val"
+
         val="$(config.get ".deploy.environments.${env_name}.gates.verify_identity" '')"
         [[ -n "$val" ]] && export "BRIK_DEPLOY_${upper_env}_VERIFY_IDENTITY=$val"
 
