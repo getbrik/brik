@@ -103,6 +103,22 @@ YAML
     The stderr should include "resolved v1.2.3"
   End
 
+  It "re-running the same deploy converges (idempotent re-entry, E1)"
+    deploy_twice() {
+      printf '#!/bin/sh\nprintf "HTTP/1.1 200 OK\\r\\nDocker-Content-Digest: %s\\r\\n\\r\\n"\nexit 0\n' "$DIGEST" > "${MOCKBIN}/curl"
+      chmod +x "${MOCKBIN}/curl"
+      cd "$REPO"
+      PATH="${MOCKBIN}:$PATH" cli.deploy.run --version v1.2.3 --environment staging >/dev/null || return $?
+      # The lock must have been released and the second run must pin the
+      # exact same digest: same inputs, same converged state.
+      PATH="${MOCKBIN}:$PATH" cli.deploy.run --version v1.2.3 --environment staging
+    }
+    When call deploy_twice
+    The status should equal 0
+    The output should include "@${DIGEST}"
+    The stderr should include "resolved v1.2.3"
+  End
+
   It "fails closed when require_digest is set and the digest cannot be resolved"
     deploy_failclosed() {
       # The registry has no such version: a 404 carries no digest header, so

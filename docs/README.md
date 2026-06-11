@@ -36,6 +36,7 @@ How Brik works, and why it is shaped this way.
 - [Business outcome](concepts/business-outcome.md) -- the tech/business two-axis model and the decision matrix
 - [Data layout](concepts/data-layout.md) -- the on-disk layout (`brik-artifacts/`, `.brik-logs/`) Brik produces at runtime
 - [Architecture](concepts/architecture.md) -- the 4-layer model and the design principles behind it
+- [Artifact attestation](concepts/artifact-attestation.md) -- the builder-identity convention and the three deploy gates (digest, attestation, eligibility)
 
 ## Configuration
 
