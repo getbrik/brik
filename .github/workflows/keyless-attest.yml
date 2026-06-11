@@ -1,0 +1,129 @@
+name: Keyless attestation (P-open)
+
+# Validates the one signing backend the lab cannot exercise: cosign keyless
+# against the public Sigstore (Fulcio certificate from the GitHub OIDC
+# token, rekor-public transparency). The job runs brik's real attest code
+# path - attest.sign and attest.verify from lib/transverse/attest.sh with a
+# P-open referential instance - against a throwaway local registry, then
+# proves the identity pinning refuses a wrong signer.
+#
+# The weekly run catches Sigstore-side drift (bundle format, signing-config
+# changes shipped with new cosign releases) before a release does.
+
+on:
+  push:
+    paths:
+      - 'lib/transverse/attest.sh'
+      - 'lib/transverse/infra.sh'
+      - '.github/workflows/keyless-attest.yml'
+  schedule:
+    - cron: '17 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  keyless-attest:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # the ambient OIDC token cosign trades for a Fulcio cert
+    services:
+      registry:
+        image: registry:2
+        ports:
+          - 5000:5000
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+
+      - name: Install yq
+        run: |
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+
+      - name: Install jv (JSON Schema validator)
+        run: go install github.com/santhosh-tekuri/jsonschema/cmd/jv@v0.7.0
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        with:
+          cosign-release: 'v3.1.1'
+
+      - name: Build and push a throwaway image
+        id: image
+        run: |
+          printf 'FROM scratch\nCOPY README.md /\n' > Dockerfile.keyless
+          docker build -q -f Dockerfile.keyless -t localhost:5000/keyless/test:0.1.0 .
+          docker push localhost:5000/keyless/test:0.1.0
+          ref="$(docker inspect --format='{{index .RepoDigests 0}}' localhost:5000/keyless/test:0.1.0)"
+          echo "ref=${ref}" >> "$GITHUB_OUTPUT"
+
+      - name: Generate the P-open referential instance
+        run: |
+          set -euo pipefail
+          infra="${RUNNER_TEMP}/infra"
+          mkdir -p "${infra}/endpoints"
+
+          cat > "${infra}/referential.yml" <<'YAML'
+          apiVersion: brik.dev/referential/v1
+          kind: Referential
+          profile: p-open
+          description: CI-only P-open posture - keyless signing against the public Sigstore, throwaway plain-HTTP job registry.
+          YAML
+
+          cat > "${infra}/endpoints/registry.yml" <<'YAML'
+          apiVersion: brik.dev/referential/v1
+          kind: Registry
+          name: registry
+          url: http://localhost:5000
+          tls:
+            trust: insecure
+          YAML
+
+          cat > "${infra}/endpoints/signing.yml" <<'YAML'
+          apiVersion: brik.dev/referential/v1
+          kind: Signing
+          name: signing
+          backend: keyless
+          transparency: rekor-public
+          YAML
+
+          export PATH="${PATH}:$(go env GOPATH)/bin"
+          BRIK_INFRA_DIR="${infra}" bin/brik infra validate
+
+      - name: Sign and verify through brik (keyless)
+        env:
+          BRIK_INFRA_DIR: ${{ runner.temp }}/infra
+          IMAGE_REF: ${{ steps.image.outputs.ref }}
+        run: |
+          set -euo pipefail
+          export BRIK_HOME="${GITHUB_WORKSPACE}"
+          export BRIK_LIB="" BRIK_LIB_EXTENSIONS="${BRIK_HOME}/lib/pipeline:${BRIK_HOME}/lib/transverse:${BRIK_HOME}/lib"
+          source "${BRIK_HOME}/lib/pipeline/version-info.sh"
+          source "${BRIK_HOME}/lib/pipeline/logging.sh"
+          source "${BRIK_HOME}/lib/pipeline/error.sh"
+          source "${BRIK_HOME}/lib/pipeline/tools.sh"
+          source "${BRIK_HOME}/lib/pipeline/loader.sh"
+          brik.use transverse.attest
+
+          jq -n '{bomFormat: "CycloneDX", specVersion: "1.5", version: 1, components: []}' > sbom.json
+
+          attest.sign "${IMAGE_REF}" --sbom sbom.json
+
+          # The certificate identity of a workflow-signed artifact is the
+          # workflow ref; pin it (and the GitHub issuer) on verify.
+          identity="^https://github.com/${GITHUB_REPOSITORY}/.github/workflows/keyless-attest.yml@"
+          attest.verify "${IMAGE_REF}" \
+              --identity "${identity}" \
+              --issuer '^https://token.actions.githubusercontent.com$'
+
+          # True-positive guard: a wrong signer identity must be refused,
+          # otherwise the verification accepts any Fulcio certificate.
+          if attest.verify "${IMAGE_REF}" \
+              --identity '^https://github.com/not-getbrik/other-repo/' \
+              --issuer '^https://token.actions.githubusercontent.com$'; then
+            echo "::error::verification accepted a wrong identity - keyless pinning is broken"
+            exit 1
+          fi
+          echo "keyless sign + verify + identity refusal all behaved"
