@@ -39,6 +39,9 @@ Commands:
   run stage        Execute a single pipeline stage locally
   run pipeline     Execute the full pipeline locally
   extension test   Validate an extension manifest+module against the contract
+  deploy           Deploy a version to an environment (digest-pinned CD flow)
+  promote          Promote a version between artifact channels (evidence carried)
+  authorize        Grant a version the eligibility to deploy to an environment
   infra init       Scaffold an infrastructure referential instance
   infra validate   Validate an infrastructure referential instance
   self-update      Update brik to the latest version
@@ -80,6 +83,14 @@ Options for run pipeline:
 Options for extension test:
   (positional)            Path to the extension directory (must contain
                           stacks/ or stages/ manifests, and lib/*.sh modules).
+
+Options for authorize:
+  --version <v>           Artifact version to authorize (resolved to a digest
+                          in the channel the environment accepts)
+  --for <env>             Target environment key from deploy.environments
+  --config <path>         Path to brik.yml (default: brik.yml in workspace)
+  --workspace <path>      Path to project workspace (default: current directory)
+  --dry-run               Describe the grant without journaling it
 
 Options for infra init:
   --profile <name>        Profile to scaffold: p-open (default), p-entreprise, p-lab
