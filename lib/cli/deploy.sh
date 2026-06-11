@@ -256,15 +256,18 @@ cli.deploy.run() {
         return "${BRIK_EXIT_CONFIG_ERROR}"
     fi
 
-    # Provenance gate: verify the signed attestation on the resolved digest
-    # before deploying. Fail-closed -- an environment that requires provenance
-    # but has no digest to verify, or whose attestation does not verify, is
-    # refused rather than deployed.
-    local require_provenance
-    require_provenance="$(transverse.env.resolve_indirect "BRIK_DEPLOY_${upper_env}_REQUIRE_PROVENANCE")"
-    if [[ "$require_provenance" == "true" ]]; then
+    # Attestation gate (require_attestation, design 6.9): verify the signed
+    # SBOM attestation on the resolved digest, then the SLSA provenance with
+    # the deploy expectations -- the version being deployed (a grant on a
+    # version name alone could be replayed against another artifact), the
+    # builder identity (the brik convention) and the source repository.
+    # Fail-closed: no digest to verify, a missing or unverifiable
+    # attestation, or unmet expectations refuse the deploy.
+    local require_attestation
+    require_attestation="$(transverse.env.resolve_indirect "BRIK_DEPLOY_${upper_env}_REQUIRE_ATTESTATION")"
+    if [[ "$require_attestation" == "true" ]]; then
         if [[ -z "$pinned" ]]; then
-            brik_error "require_provenance: no digest-pinned ref to verify for '${environment}' -- failing closed"
+            brik_error "require_attestation: no digest-pinned ref to verify for '${environment}' -- failing closed"
             return "${BRIK_EXIT_EXTERNAL_FAIL}"
         fi
         brik.use transverse.attest
@@ -275,10 +278,30 @@ cli.deploy.run() {
         [[ -n "$verify_identity" ]] && verify_args+=(--identity "$verify_identity")
         [[ -n "$verify_issuer" ]]   && verify_args+=(--issuer "$verify_issuer")
         if ! attest.verify "${verify_args[@]}"; then
-            brik_error "require_provenance: attestation did not verify for ${pinned} -- failing closed"
+            brik_error "require_attestation: attestation did not verify for ${pinned} -- failing closed"
             return "${BRIK_EXIT_EXTERNAL_FAIL}"
         fi
-        log.info "provenance verified for ${pinned}"
+
+        # The CI predicate stamps the version as the git tag, so accept the
+        # deploy version with or without the configured tag prefix.
+        brik.use transverse.config
+        local tag_prefix expected_builder expected_source
+        tag_prefix="$(config.get '.release.tag_prefix' 'v' 2>/dev/null || printf 'v')"
+        expected_builder="$(transverse.env.resolve_indirect "BRIK_DEPLOY_${upper_env}_EXPECTED_BUILDER")"
+        expected_source="$(transverse.env.resolve_indirect "BRIK_DEPLOY_${upper_env}_EXPECTED_SOURCE")"
+        local -a prov_args=("$pinned"
+            --expect-version "${version},${tag_prefix}${version},${version#"$tag_prefix"}")
+        [[ -n "$expected_builder" ]] && prov_args+=(--expect-builder-re "$expected_builder")
+        [[ -n "$expected_source" ]]  && prov_args+=(--expect-source-re "$expected_source")
+        [[ -n "$verify_identity" ]]  && prov_args+=(--identity "$verify_identity")
+        [[ -n "$verify_issuer" ]]    && prov_args+=(--issuer "$verify_issuer")
+        local prov_rc=0
+        attest.verify_provenance "${prov_args[@]}" || prov_rc=$?
+        if [[ "$prov_rc" -ne 0 ]]; then
+            brik_error "require_attestation: provenance did not satisfy the deploy expectations for ${pinned} -- failing closed"
+            return "$prov_rc"
+        fi
+        log.info "attestation verified for ${pinned}"
     fi
 
     # Strategy override (CLI wins over brik.yml) and single-env targeting.

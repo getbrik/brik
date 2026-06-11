@@ -1031,17 +1031,25 @@
               "type": "boolean",
               "default": false
             },
-            "require_provenance": {
-              "description": "When true, the CD flow verifies the signed SBOM/provenance attestation on the resolved digest before deploying and fails closed if it is missing or does not verify.",
+            "require_attestation": {
+              "description": "When true, the CD flow verifies the signed SBOM and SLSA provenance attestations on the resolved digest before deploying, and checks the verified provenance against the deploy expectations (version being deployed, builder identity, source repository). Fails closed when an attestation is missing, does not verify, or does not satisfy the expectations.",
               "type": "boolean",
               "default": false
             },
+            "expected_builder": {
+              "description": "Expected builder identity (regexp) matched against the verified provenance's runDetails.builder.id (the brik convention: <orchestrator-url>/-/brik/<runner-class>). Optional; absent only requires a non-empty builder id.",
+              "type": "string"
+            },
+            "expected_source": {
+              "description": "Expected source repository (regexp) matched against the verified provenance's resolvedDependencies[0].uri. Optional.",
+              "type": "string"
+            },
             "verify_identity": {
-              "description": "Expected signer identity (regexp) for keyless attestation verification (e.g. the CI job's certificate identity). Required when require_provenance is set and the referential's Signing backend is keyless.",
+              "description": "Expected signer identity (regexp) for keyless attestation verification (e.g. the CI job's certificate identity). Required when require_attestation is set and the referential's Signing backend is keyless.",
               "type": "string"
             },
             "verify_issuer": {
-              "description": "Expected OIDC issuer (regexp) for keyless attestation verification (e.g. the platform's Sigstore issuer). Required when require_provenance is set and the referential's Signing backend is keyless.",
+              "description": "Expected OIDC issuer (regexp) for keyless attestation verification (e.g. the platform's Sigstore issuer). Required when require_attestation is set and the referential's Signing backend is keyless.",
               "type": "string"
             }
           }

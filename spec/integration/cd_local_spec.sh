@@ -145,11 +145,12 @@ YAML
     The stderr should include "unknown deploy environment"
   End
 
-  Describe "provenance gate (require_provenance)"
-    # Enable keyless provenance verification on the staging environment and
-    # resolve the digest as usual; cosign is mocked to accept or reject.
-    enable_provenance() {
-      yq -i '.deploy.environments.staging.gates.require_provenance = true
+  Describe "attestation gate (require_attestation)"
+    # Enable keyless attestation verification on the staging environment and
+    # resolve the digest as usual; cosign is mocked to accept (emitting a
+    # DSSE envelope wrapping a brik provenance predicate) or reject.
+    enable_attestation() {
+      yq -i '.deploy.environments.staging.gates.require_attestation = true
              | .deploy.environments.staging.gates.verify_identity = "https://ci/job/.*"
              | .deploy.environments.staging.gates.verify_issuer = "https://issuer.example"' \
         "$REPO/brik.yml"
@@ -158,31 +159,77 @@ YAML
       chmod +x "${MOCKBIN}/curl"
     }
 
-    It "verifies the attestation and deploys when it verifies"
-      deploy_prov_ok() {
-        enable_provenance
-        printf '#!/bin/sh\nexit 0\n' > "${MOCKBIN}/cosign"
-        chmod +x "${MOCKBIN}/cosign"
+    # cosign mock: any verify call succeeds and prints the envelope whose
+    # predicate carries <version>; verify_provenance then evaluates the
+    # expectations against it for real.
+    mock_cosign_envelope() {
+      local version="$1"
+      jq -cn --arg v "$version" '
+        {
+          buildDefinition: { externalParameters: { version: $v },
+                             resolvedDependencies: [ { uri: "git+https://gitlab.example/team/app" } ] },
+          runDetails: { builder: { id: "https://gitlab.example/-/brik/scanner",
+                                   version: { brik: "0.6.0" } } }
+        } as $pred
+        | { _type: "https://in-toto.io/Statement/v1",
+            predicateType: "https://slsa.dev/provenance/v1",
+            predicate: $pred }
+        | { payloadType: "application/vnd.in-toto+json",
+            payload: (tojson | @base64) }' > "${MOCKBIN}/envelope.json"
+      printf '#!/bin/sh\ncat "%s"\nexit 0\n' "${MOCKBIN}/envelope.json" > "${MOCKBIN}/cosign"
+      chmod +x "${MOCKBIN}/cosign"
+    }
+
+    It "verifies the attestations and deploys when the expectations hold"
+      deploy_att_ok() {
+        enable_attestation
+        mock_cosign_envelope "v1.2.3"
         cd "$REPO"
         PATH="${MOCKBIN}:$PATH" cli.deploy.run --version v1.2.3 --environment staging
       }
-      When call deploy_prov_ok
+      When call deploy_att_ok
       The status should equal 0
-      The stderr should include "provenance verified"
+      The stderr should include "attestation verified"
       The output should include "@${DIGEST}"
     End
 
     It "fails closed when the attestation does not verify"
-      deploy_prov_ko() {
-        enable_provenance
+      deploy_att_ko() {
+        enable_attestation
         printf '#!/bin/sh\nexit 1\n' > "${MOCKBIN}/cosign"
         chmod +x "${MOCKBIN}/cosign"
         cd "$REPO"
         PATH="${MOCKBIN}:$PATH" cli.deploy.run --version v1.2.3 --environment staging
       }
-      When call deploy_prov_ko
+      When call deploy_att_ko
       The status should equal 5
       The stderr should include "failing closed"
+    End
+
+    It "fails closed when the provenance is for another version (anti-substitution)"
+      deploy_att_subst() {
+        enable_attestation
+        mock_cosign_envelope "v9.9.9"
+        cd "$REPO"
+        PATH="${MOCKBIN}:$PATH" cli.deploy.run --version v1.2.3 --environment staging
+      }
+      When call deploy_att_subst
+      The status should equal 10
+      The stderr should include "expectation"
+    End
+
+    It "fails closed when the builder is not the expected one"
+      deploy_att_builder() {
+        enable_attestation
+        yq -i '.deploy.environments.staging.gates.expected_builder = "^https://trusted\\.example/-/brik/"' \
+          "$REPO/brik.yml"
+        mock_cosign_envelope "v1.2.3"
+        cd "$REPO"
+        PATH="${MOCKBIN}:$PATH" cli.deploy.run --version v1.2.3 --environment staging
+      }
+      When call deploy_att_builder
+      The status should equal 10
+      The stderr should include "expectation"
     End
   End
 

@@ -271,6 +271,100 @@ YAML
     End
   End
 
+  Describe "attest.verify_provenance"
+    # cosign is stubbed to emit a DSSE envelope wrapping a brik provenance
+    # predicate, so the contract checks the expectation logic for real.
+    make_envelope() {
+      local version="$1" builder="$2" source_uri="$3"
+      jq -cn --arg v "$version" --arg b "$builder" --arg s "$source_uri" '
+        {
+          buildDefinition: { externalParameters: { version: $v },
+                             resolvedDependencies: [ { uri: $s } ] },
+          runDetails: { builder: { id: $b, version: { brik: "0.6.0" } } }
+        } as $pred
+        | { _type: "https://in-toto.io/Statement/v1",
+            predicateType: "https://slsa.dev/provenance/v1",
+            predicate: $pred }
+        | { payloadType: "application/vnd.in-toto+json",
+            payload: (tojson | @base64) }'
+    }
+    setup_envelope() {
+      ENVELOPE_FILE="$(mktemp)"
+      cosign() {
+        printf '%s\n' "$*" >"$COSIGN_ARGS_FILE"
+        cat "$ENVELOPE_FILE"
+      }
+    }
+    cleanup_envelope() { rm -f "$ENVELOPE_FILE"; }
+    BeforeEach setup_envelope
+    AfterEach cleanup_envelope
+
+    It "accepts a provenance matching the version, builder and source expectations"
+      ok() {
+        unset BRIK_COSIGN_KEY
+        make_envelope "v1.2.3" "https://gitlab.example/-/brik/scanner" "git+https://gitlab.example/team/app" >"$ENVELOPE_FILE"
+        attest.verify_provenance "$REF" \
+          --expect-version "1.2.3,v1.2.3" \
+          --expect-builder-re '^https://gitlab\.example/-/brik/' \
+          --expect-source-re 'gitlab\.example/team/app$' \
+          --identity 'https://ci/.*' --issuer 'https://issuer'
+      }
+      When call ok
+      The status should be success
+      The contents of file "$COSIGN_ARGS_FILE" should include "--type slsaprovenance"
+    End
+
+    It "fails closed when the predicate version is not the deployed version"
+      ko() {
+        unset BRIK_COSIGN_KEY
+        make_envelope "v9.9.9" "https://gitlab.example/-/brik/scanner" "git+https://x/y" >"$ENVELOPE_FILE"
+        attest.verify_provenance "$REF" --expect-version "1.2.3,v1.2.3" \
+          --identity 'https://ci/.*' --issuer 'https://issuer'
+      }
+      When call ko
+      The status should equal "$BRIK_EXIT_CHECK_FAILED"
+      The stderr should include "expectation"
+    End
+
+    It "fails closed when the builder does not match the expected convention"
+      ko() {
+        unset BRIK_COSIGN_KEY
+        make_envelope "v1.2.3" "https://evil.example/-/brik/scanner" "git+https://x/y" >"$ENVELOPE_FILE"
+        attest.verify_provenance "$REF" --expect-version "1.2.3,v1.2.3" \
+          --expect-builder-re '^https://gitlab\.example/-/brik/' \
+          --identity 'https://ci/.*' --issuer 'https://issuer'
+      }
+      When call ko
+      The status should equal "$BRIK_EXIT_CHECK_FAILED"
+      The stderr should include "expectation"
+    End
+
+    It "fails closed when the source repo does not match"
+      ko() {
+        unset BRIK_COSIGN_KEY
+        make_envelope "v1.2.3" "https://gitlab.example/-/brik/scanner" "git+https://evil/y" >"$ENVELOPE_FILE"
+        attest.verify_provenance "$REF" --expect-version "1.2.3,v1.2.3" \
+          --expect-source-re 'gitlab\.example/team/app$' \
+          --identity 'https://ci/.*' --issuer 'https://issuer'
+      }
+      When call ko
+      The status should equal "$BRIK_EXIT_CHECK_FAILED"
+      The stderr should include "expectation"
+    End
+
+    It "fails closed when verification yields no provenance payload"
+      ko() {
+        unset BRIK_COSIGN_KEY
+        : >"$ENVELOPE_FILE"
+        attest.verify_provenance "$REF" --expect-version "1.2.3" \
+          --identity 'https://ci/.*' --issuer 'https://issuer'
+      }
+      When call ko
+      The status should equal "$BRIK_EXIT_CHECK_FAILED"
+      The stderr should include "payload"
+    End
+  End
+
   Describe "attest.verify"
     It "rejects a ref without a digest (fail-closed)"
       When call attest.verify "registry.example.com/app:latest"

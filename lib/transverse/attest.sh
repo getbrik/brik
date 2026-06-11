@@ -350,13 +350,14 @@ attest.sign() {
 attest.verify() {
     local ref="${1:-}"
     [[ $# -ge 1 ]] && shift
-    local att_type="cyclonedx" identity="" issuer="" dry_run="${BRIK_DRY_RUN:-}"
+    local att_type="cyclonedx" identity="" issuer="" output="" dry_run="${BRIK_DRY_RUN:-}"
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --type)     att_type="$2"; shift 2 ;;
             --identity) identity="$2"; shift 2 ;;
             --issuer)   issuer="$2";   shift 2 ;;
+            --output)   output="$2";   shift 2 ;;
             --dry-run)  dry_run="true"; shift ;;
             *) log.error "attest.verify: unknown option: $1"
                return "$BRIK_EXIT_INVALID_INPUT" ;;
@@ -398,12 +399,95 @@ attest.verify() {
 
     log.info "verifying ${att_type} attestation on ${ref} [${backend}]"
     # On success cosign prints the whole verified in-toto envelope (base64
-    # SBOM, megabytes) to stdout: discard it. The registry already holds the
-    # attestation, the verification summary stays on stderr, and brik logs
-    # the business outcome itself.
-    if ! cosign "${args[@]}" >/dev/null; then
+    # SBOM, megabytes) to stdout: discard it unless the caller asked for it
+    # (--output, used by verify_provenance to check predicate expectations).
+    # The registry already holds the attestation, the verification summary
+    # stays on stderr, and brik logs the business outcome itself.
+    if ! cosign "${args[@]}" >"${output:-/dev/null}"; then
         log.error "attest.verify: attestation did not verify for ${ref} (fail-closed)"
         return "$BRIK_EXIT_EXTERNAL_FAIL"
     fi
+    return 0
+}
+
+# Verify the signed SLSA provenance attestation on an image digest AND check
+# the verified predicate against the deploy-time expectations: the version
+# being deployed (anti-substitution), the builder identity (the brik
+# convention, P2 require_attestation gate) and the source repository. The
+# signature check is attest.verify (same trust material and keyless pinning);
+# the expectations are evaluated on the cosign-verified payload only.
+# Fail-closed: no verified payload, or no predicate satisfying every
+# expectation, refuses the artifact.
+# Usage: attest.verify_provenance <ref> --expect-version <v1,v2,...>
+#        [--expect-builder-re <re>] [--expect-source-re <re>]
+#        [--identity <re>] [--issuer <re>] [--dry-run]
+attest.verify_provenance() {
+    local ref="${1:-}"
+    [[ $# -ge 1 ]] && shift
+    local versions="" builder_re="" source_re="" identity="" issuer=""
+    local dry_run="${BRIK_DRY_RUN:-}"
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --expect-version)    versions="$2";   shift 2 ;;
+            --expect-builder-re) builder_re="$2"; shift 2 ;;
+            --expect-source-re)  source_re="$2";  shift 2 ;;
+            --identity)          identity="$2";   shift 2 ;;
+            --issuer)            issuer="$2";     shift 2 ;;
+            --dry-run)           dry_run="true";  shift ;;
+            *) log.error "attest.verify_provenance: unknown option: $1"
+               return "$BRIK_EXIT_INVALID_INPUT" ;;
+        esac
+    done
+
+    if [[ -z "$ref" || -z "$versions" ]]; then
+        log.error "attest.verify_provenance: <ref> and --expect-version are required"
+        return "$BRIK_EXIT_INVALID_INPUT"
+    fi
+
+    local out rc=0
+    out="$(mktemp)" || return "$BRIK_EXIT_IO_FAILURE"
+
+    local -a vargs=("$ref" --type slsaprovenance --output "$out")
+    [[ -n "$identity" ]] && vargs+=(--identity "$identity")
+    [[ -n "$issuer" ]]   && vargs+=(--issuer "$issuer")
+    [[ "$dry_run" == "true" ]] && vargs+=(--dry-run)
+
+    attest.verify "${vargs[@]}" || rc=$?
+    if [[ "$rc" -ne 0 ]]; then
+        rm -f "$out"
+        return "$rc"
+    fi
+    if [[ "$dry_run" == "true" ]]; then
+        rm -f "$out"
+        return 0
+    fi
+
+    # KCOV_EXCL_START -- inline jq filter bodies, not bash code
+    local predicates
+    predicates="$(jq -cr '.payload // empty | @base64d | fromjson | .predicate // empty' "$out" 2>/dev/null)"
+    rm -f "$out"
+    if [[ -z "$predicates" ]]; then
+        log.error "attest.verify_provenance: verification yielded no provenance payload for ${ref} (fail-closed)"
+        return "$BRIK_EXIT_CHECK_FAILED"
+    fi
+
+    if ! printf '%s\n' "$predicates" | jq -es \
+            --arg versions "$versions" \
+            --arg builder_re "$builder_re" \
+            --arg source_re "$source_re" '
+        ($versions | split(",")) as $vs
+        | any(.[]; . as $p
+            | (($vs | index($p.buildDefinition.externalParameters.version // "")) != null)
+            and (($p.runDetails.builder.id // "") != "")
+            and ($builder_re == "" or (($p.runDetails.builder.id // "") | test($builder_re)))
+            and ($source_re == ""
+                 or (($p.buildDefinition.resolvedDependencies[0].uri // "") | test($source_re))))' \
+            >/dev/null; then
+        log.error "attest.verify_provenance: no verified provenance satisfies the expectations for ${ref} (version in [${versions}]${builder_re:+, builder ~ ${builder_re}}${source_re:+, source ~ ${source_re}}) -- fail-closed"
+        return "$BRIK_EXIT_CHECK_FAILED"
+    fi
+    # KCOV_EXCL_STOP
+    log.info "provenance expectations satisfied for ${ref}"
     return 0
 }

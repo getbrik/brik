@@ -146,12 +146,19 @@ _config._export_deploy_env_vars() {
         val="$(config.get ".deploy.environments.${env_name}.gates.require_digest" '')"
         [[ -n "$val" ]] && export "BRIK_DEPLOY_${upper_env}_REQUIRE_DIGEST=$val"
 
-        # Provenance gate: verify the signed attestation on the resolved digest
-        # before deploying. The identity/issuer pin the expected signer for
-        # keyless verification (the key and kms backends verify with the
+        # Attestation gate: verify the signed attestations on the resolved
+        # digest and the provenance expectations (builder identity, source
+        # repo) before deploying. The identity/issuer pin the expected signer
+        # for keyless verification (the key and kms backends verify with the
         # referential's key instead).
-        val="$(config.get ".deploy.environments.${env_name}.gates.require_provenance" '')"
-        [[ -n "$val" ]] && export "BRIK_DEPLOY_${upper_env}_REQUIRE_PROVENANCE=$val"
+        val="$(config.get ".deploy.environments.${env_name}.gates.require_attestation" '')"
+        [[ -n "$val" ]] && export "BRIK_DEPLOY_${upper_env}_REQUIRE_ATTESTATION=$val"
+
+        val="$(config.get ".deploy.environments.${env_name}.gates.expected_builder" '')"
+        [[ -n "$val" ]] && export "BRIK_DEPLOY_${upper_env}_EXPECTED_BUILDER=$val"
+
+        val="$(config.get ".deploy.environments.${env_name}.gates.expected_source" '')"
+        [[ -n "$val" ]] && export "BRIK_DEPLOY_${upper_env}_EXPECTED_SOURCE=$val"
 
         val="$(config.get ".deploy.environments.${env_name}.gates.verify_identity" '')"
         [[ -n "$val" ]] && export "BRIK_DEPLOY_${upper_env}_VERIFY_IDENTITY=$val"
