@@ -32,10 +32,18 @@ Describe "cli/promote.sh"
     fi
     printf 'registry.release/app@%s' "$PINNED_DIGEST"
   }
+  # The journal's contract is promotion_journal_spec; stub it at the same
+  # altitude as the copy primitive.
+  _BRIK_MODULE_TRANSVERSE_PROMOTION_JOURNAL_LOADED=1
+  promotion_journal.record_promotion() {
+    printf 'record_promotion %s\n' "$*" >> "${JOURNAL_LOG}"
+    return "${JOURNAL_RC:-0}"
+  }
 
   setup_workspace() {
     WS="$(mktemp -d)"
     PROMOTE_LOG="${WS}/promote.log"
+    JOURNAL_LOG="${WS}/journal.log"
     cat > "${WS}/brik.yml" <<'YAML'
 version: 1
 project:
@@ -54,7 +62,7 @@ YAML
   }
   cleanup_workspace() {
     rm -rf "$WS" "$INFRA"
-    unset BRIK_INFRA_DIR BRIK_CONFIG_FILE WS INFRA PROMOTE_LOG
+    unset BRIK_INFRA_DIR BRIK_CONFIG_FILE WS INFRA PROMOTE_LOG JOURNAL_LOG
   }
   Before 'setup_workspace'
   After 'cleanup_workspace'
@@ -109,6 +117,25 @@ YAML
     When call invoke
     The output should equal "copy_with_referrers 2.0.0 staging-chan release --identity https://ci.example/.* --issuer https://oidc.example"
     The stderr should include "promoted"
+  End
+
+  It "journals artifact_promoted with the pinned digest and the channel pair"
+    invoke() {
+      cli.promote.run --version 1.2.3 --from candidate --to release --workspace "$WS" >/dev/null || return $?
+      cat "$JOURNAL_LOG"
+    }
+    When call invoke
+    The output should equal "record_promotion --version 1.2.3 --digest ${PINNED_DIGEST} --from-channel candidate --to-channel release"
+    The stderr should include "promoted"
+  End
+
+  It "propagates a journal failure (a declared journal must record)"
+    invoke() {
+      JOURNAL_RC=5
+      cli.promote.run --version 1.2.3 --workspace "$WS" >/dev/null
+    }
+    When call invoke
+    The status should equal 5
   End
 
   It "propagates the primitive's failure code"

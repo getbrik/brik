@@ -85,6 +85,15 @@ cli.promote.run() {
 
     local pinned
     pinned="$(channel.copy_with_referrers "${copy_args[@]}")" || return "$?"
+
+    # Journal the transition in the project's state-repo (self-skips when
+    # none is declared); a declared journal that cannot record refuses the
+    # promotion outcome, as the eligibility gates read it as source of truth.
+    brik.use transverse.promotion_journal
+    promotion_journal.record_promotion \
+        --version "$version" --digest "${pinned##*@}" \
+        --from-channel "$from" --to-channel "$to" || return "$?"
+
     log.info "promoted ${version}: ${from} -> ${to}"
     brik_print "$pinned"
 }

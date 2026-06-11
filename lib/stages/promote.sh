@@ -81,6 +81,21 @@ _promote.channels() {
     fi
 
     local digest="${pinned##*@}"
+
+    # Journal the transition in the project's state-repo (self-skips when
+    # none is declared). A declared journal that cannot record fails the
+    # stage: the eligibility gates downstream read it as the source of truth.
+    brik.use transverse.promotion_journal
+    rc=0
+    promotion_journal.record_promotion \
+        --version "$version" --digest "$digest" \
+        --from-channel candidate --to-channel release || rc=$?
+    if [[ "$rc" -ne 0 ]]; then
+        report.record "promote" "tech" "status" "failure" || true
+        report.record "promote" "tech" "kind"   "journal-failed" || true
+        return "$rc"
+    fi
+
     report.record "promote" "tech"     "status"           "success"            || true
     report.record "promote" "tech"     "kind"             "channel-promotion"  || true
     report.record "promote" "business" "candidate_ref"    "$candidate_ref"     || true

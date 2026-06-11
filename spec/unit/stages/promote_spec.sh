@@ -284,6 +284,12 @@ SH
     # stub it as a function (the loader guard keeps brik.use from re-sourcing
     # the module) so this unit covers the stage's dispatch and reporting.
     _BRIK_MODULE_TRANSVERSE_CHANNEL_LOADED=1
+    # Same altitude for the journal: its contract is promotion_journal_spec.
+    _BRIK_MODULE_TRANSVERSE_PROMOTION_JOURNAL_LOADED=1
+    promotion_journal.record_promotion() {
+      printf 'record_promotion %s\n' "$*" >> "${BRIK_LOG_DIR}/journal.log"
+      return "${JOURNAL_RC:-0}"
+    }
     channel.copy_with_referrers() {
       printf 'copy_with_referrers %s\n' "$*" >> "${BRIK_LOG_DIR}/chan.log"
       if [[ -n "${CHAN_RC:-}" && "${CHAN_RC}" != "0" ]]; then
@@ -346,6 +352,28 @@ YAML
       }
       When call invoke
       The output should equal "rc=10|status=failure|kind=channel-promotion-failed"
+    End
+
+    It "journals artifact_promoted with the pinned digest after a successful copy"
+      write_channels_config
+      invoke() {
+        stages.promote "$CTX_FILE" >/dev/null 2>&1 || return $?
+        cat "${BRIK_LOG_DIR}/journal.log"
+      }
+      When call invoke
+      The output should equal "record_promotion --version 1.2.3 --digest ${CHAN_DIGEST} --from-channel candidate --to-channel release"
+    End
+
+    It "fails the stage when the declared journal cannot record the promotion"
+      write_channels_config
+      invoke() {
+        JOURNAL_RC=5
+        stages.promote "$CTX_FILE" >/dev/null 2>&1
+        local rc=$?
+        printf 'rc=%s|status=%s|kind=%s' "$rc" "$(read_status)" "$(read_kind)"
+      }
+      When call invoke
+      The output should equal "rc=5|status=failure|kind=journal-failed"
     End
 
     It "does not opt into promotion when only one channel is declared"
