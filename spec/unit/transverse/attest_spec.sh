@@ -311,7 +311,7 @@ YAML
       }
       When call ok
       The status should be success
-      The contents of file "$COSIGN_ARGS_FILE" should include "--type slsaprovenance"
+      The contents of file "$COSIGN_ARGS_FILE" should include "--type slsaprovenance1"
     End
 
     It "fails closed when the predicate version is not the deployed version"

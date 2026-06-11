@@ -225,7 +225,9 @@ _attest._registry_args() {
 }
 
 # Emit an in-toto SLSA provenance predicate body (the document cosign wraps as
-# a slsaprovenance attestation). Captures the version, source commit, builder
+# a slsaprovenance1 attestation -- the SLSA v1 predicate type: cosign's
+# legacy slsaprovenance alias serializes v0.2 and silently DROPS the v1
+# buildDefinition/runDetails fields). Captures the version, source commit, builder
 # identity and CI run id so a deploy can trace an image back to its build.
 # Usage: attest.provenance_predicate --version V --commit C --repo R
 #                                    --builder B --run-id ID
@@ -333,7 +335,7 @@ attest.sign() {
             return "$BRIK_EXIT_IO_FAILURE"
         fi
         log.info "attesting SLSA provenance on ${ref} [${backend}]"
-        if ! cosign attest "${key_args[@]}" --predicate "$provenance" --type slsaprovenance -y "$ref"; then
+        if ! cosign attest "${key_args[@]}" --predicate "$provenance" --type slsaprovenance1 -y "$ref"; then
             log.error "attest.sign: cosign failed to attach the provenance attestation"
             return "$BRIK_EXIT_EXTERNAL_FAIL"
         fi
@@ -448,7 +450,7 @@ attest.verify_provenance() {
     local out rc=0
     out="$(mktemp)" || return "$BRIK_EXIT_IO_FAILURE"
 
-    local -a vargs=("$ref" --type slsaprovenance --output "$out")
+    local -a vargs=("$ref" --type slsaprovenance1 --output "$out")
     [[ -n "$identity" ]] && vargs+=(--identity "$identity")
     [[ -n "$issuer" ]]   && vargs+=(--issuer "$issuer")
     [[ "$dry_run" == "true" ]] && vargs+=(--dry-run)
