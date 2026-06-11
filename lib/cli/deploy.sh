@@ -33,6 +33,33 @@ _cli.deploy._resolve_version_tag() {
     return 1
 }
 
+# _cli.deploy._protection_mode - echo the state-repo protection posture
+# (required|warn|off) from the referential's Policy document. No declared
+# policy means warn; a declared policy that is ambiguous or unreadable is
+# fail-closed CONFIG_ERROR -- a governed project must never silently regress
+# to a softer posture. Call after the eager referential gate (infra loaded).
+_cli.deploy._protection_mode() {
+    local names
+    names="$(infra.policy_names 2>/dev/null)" || { printf 'warn'; return 0; }
+    if [[ -z "$names" ]]; then
+        printf 'warn'
+        return 0
+    fi
+    if [[ "$(printf '%s\n' "$names" | wc -l)" -gt 1 ]]; then
+        log.error "the referential declares several Policy documents (expected at most one): $(printf '%s' "$names" | tr '\n' ' ')"
+        return "${BRIK_EXIT_CONFIG_ERROR}"
+    fi
+
+    local url
+    url="$(infra.policy "$names" | jq -r '.url')" || {
+        log.error "cannot read the '${names}' Policy document from the referential"
+        return "${BRIK_EXIT_CONFIG_ERROR}"
+    }
+
+    brik.use transverse.findings.org_policy
+    org_policy.state_repo_protection "$url"
+}
+
 # cli.deploy.run - deploy <version> to <environment>.
 # Usage: brik deploy --version <v> --environment <e> [--strategy <s>]
 #        [--config <path>] [--workspace <path>] [--dry-run]
@@ -150,22 +177,34 @@ cli.deploy.run() {
     fi
 
     # The append-only guarantee of the evidence store rests on host-side
-    # branch protection: check it before consuming evidence. Until the
-    # referential's Policy kind sets the gate semantics per profile, an
-    # unprotected or unverifiable branch is a loud warning, not a refusal
-    # (the lab carries no protection before its first hardening tier).
+    # branch protection: check it before consuming evidence. The posture is
+    # governed by the referential's Policy document (state_repo_protection):
+    # 'required' refuses an unprotected or unprovable branch (fail-closed),
+    # 'warn' logs loudly and continues, 'off' skips the check. Absent policy
+    # means warn (the lab posture before its first hardening tier).
     if [[ "$dry_run" != "true" ]]; then
         brik.use transverse.config
         local ev_repo
         ev_repo="$(config.get '.artifacts.evidence.repo' '' 2>/dev/null || printf '')"
         if [[ -n "$ev_repo" ]]; then
             brik.use transverse.state_repo
-            local ev_branch prot_rc=0
+            local ev_branch prot_mode prot_rc=0
             ev_branch="$(config.get '.artifacts.evidence.branch' '' 2>/dev/null || printf '')"
-            transverse.state_repo.check_protection "$ev_repo" "${ev_branch:-main}" \
-                --environment "$environment" || prot_rc=$?
-            if [[ "$prot_rc" -ne 0 && "$prot_rc" -ne 10 ]]; then
-                log.warn "state-repo branch protection could not be verified (rc=${prot_rc})"
+            prot_mode="$(_cli.deploy._protection_mode)" || return "$?"
+            if [[ "$prot_mode" == "off" ]]; then
+                log.info "state-repo protection check disabled by policy (state_repo_protection: off)"
+            else
+                transverse.state_repo.check_protection "$ev_repo" "${ev_branch:-main}" \
+                    --environment "$environment" || prot_rc=$?
+                if [[ "$prot_rc" -ne 0 ]]; then
+                    if [[ "$prot_mode" == "required" ]]; then
+                        brik_error "state-repo branch protection is required by policy but could not be proven (rc=${prot_rc}) -- refusing to deploy"
+                        return "${BRIK_EXIT_CHECK_FAILED}"
+                    fi
+                    if [[ "$prot_rc" -ne 10 ]]; then
+                        log.warn "state-repo branch protection could not be verified (rc=${prot_rc})"
+                    fi
+                fi
             fi
 
             # Evidence-commit signature read-back. A project that declares

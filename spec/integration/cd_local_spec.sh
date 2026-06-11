@@ -186,6 +186,90 @@ YAML
     End
   End
 
+  Describe "branch-protection arbitration (state_repo_protection)"
+    # The protection check posture comes from the referential's Policy
+    # document. The lab referential declares no GitHost, so the check itself
+    # cannot be proven (rc 7): 'required' must refuse, 'warn' must continue,
+    # 'off' must not even attempt it.
+    setup_protection() {
+      PROT_REPO="$(mktemp -d)"
+      (
+        cd "$PROT_REPO"
+        git init -q -b main
+        git config user.email "brik-ci@noreply"
+        git config user.name "Brik CI"
+        printf '{}\n' > event.json
+        git add -A >/dev/null
+        git commit -q -m "evidence: seed"
+      )
+      PROT_REPO_URL="file://$PROT_REPO" yq -i \
+        '.artifacts.evidence = {"repo": strenv(PROT_REPO_URL), "branch": "main", "sign": false}' \
+        "$REPO/brik.yml"
+      # URL-aware curl mock: the same binary serves the policy fetch
+      # (file:// -> cat) and the registry digest resolution (header blob).
+      cat > "${MOCKBIN}/curl" <<EOF
+#!/bin/sh
+for a in "\$@"; do
+  case "\$a" in
+    file://*) cat "\${a#file://}"; exit 0 ;;
+  esac
+done
+printf "HTTP/1.1 200 OK\\r\\nDocker-Content-Digest: ${DIGEST}\\r\\n\\r\\n"
+exit 0
+EOF
+      chmod +x "${MOCKBIN}/curl"
+    }
+    cleanup_protection() { rm -rf "$PROT_REPO"; }
+    Before 'setup_protection'
+    After 'cleanup_protection'
+
+    write_protection_policy() {
+      printf 'state_repo_protection: %s\n' "$1" > "$INFRA/brik-policy.yml"
+      mkdir -p "$INFRA/policies"
+      cat > "$INFRA/policies/org.yml" <<EOF
+apiVersion: brik.dev/referential/v1
+kind: Policy
+name: org
+url: file://$INFRA/brik-policy.yml
+EOF
+    }
+
+    It "refuses to deploy when policy requires a protection that cannot be proven"
+      deploy_required() {
+        write_protection_policy required
+        cd "$REPO"
+        PATH="${MOCKBIN}:$PATH" cli.deploy.run --version v1.2.3 --environment staging
+      }
+      When call deploy_required
+      The status should equal 10
+      The stderr should include "required by policy"
+    End
+
+    It "continues with a loud warning when the policy says warn"
+      deploy_warn() {
+        write_protection_policy warn
+        cd "$REPO"
+        PATH="${MOCKBIN}:$PATH" cli.deploy.run --version v1.2.3 --environment staging
+      }
+      When call deploy_warn
+      The status should equal 0
+      The output should include "@${DIGEST}"
+      The stderr should include "could not be verified"
+    End
+
+    It "skips the check entirely when the policy says off"
+      deploy_off() {
+        write_protection_policy off
+        cd "$REPO"
+        PATH="${MOCKBIN}:$PATH" cli.deploy.run --version v1.2.3 --environment staging
+      }
+      When call deploy_off
+      The status should equal 0
+      The output should include "@${DIGEST}"
+      The stderr should include "disabled by policy"
+    End
+  End
+
   Describe "evidence signature read-back (artifacts.evidence.sign)"
     # A project that declares signed evidence refuses to deploy when the
     # store's HEAD does not carry a verifiable ssh signature from the

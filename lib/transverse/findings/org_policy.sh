@@ -240,6 +240,56 @@ org_policy.load() {
     return 0
 }
 
+# Read the state-repo branch-protection posture from the policy at <url>.
+# Echoes required|warn|off; an absent field means warn. Fail-closed: an
+# unreachable or malformed policy, or a value outside the enum, is
+# CONFIG_ERROR -- a governed project must never silently regress to a softer
+# posture. The enum is enforced in bash so the guarantee holds even on a
+# host without a JSON Schema validator.
+# Usage: org_policy.state_repo_protection <url>
+org_policy.state_repo_protection() {
+    local url="${1:-}"
+    if [[ -z "$url" ]]; then
+        printf 'org_policy.state_repo_protection: <url> is required\n' >&2
+        return "$BRIK_EXIT_INVALID_INPUT"
+    fi
+
+    local dep
+    for dep in curl yq jq; do
+        if ! command -v "$dep" >/dev/null 2>&1; then
+            printf 'org_policy.state_repo_protection: %s not on PATH\n' "$dep" >&2
+            return "$BRIK_EXIT_MISSING_DEP"
+        fi
+    done
+
+    local raw rc
+    raw="$(curl -sf "$url" 2>/dev/null)"
+    rc=$?
+    if [[ $rc -ne 0 ]]; then
+        printf 'org_policy.state_repo_protection: cannot fetch the policy at %s (curl rc=%d)\n' \
+            "$url" "$rc" >&2
+        return "$BRIK_EXIT_CONFIG_ERROR"
+    fi
+
+    local json
+    if ! json="$(printf '%s\n' "$raw" | yq -o json '.' 2>/dev/null)"; then
+        printf 'org_policy.state_repo_protection: malformed YAML at %s\n' "$url" >&2
+        return "$BRIK_EXIT_CONFIG_ERROR"
+    fi
+
+    local value
+    value="$(printf '%s\n' "$json" | jq -r '.state_repo_protection // "warn"')"
+    case "$value" in
+        required|warn|off) ;;
+        *)
+            printf 'org_policy.state_repo_protection: the policy at %s violates the policy schema (state_repo_protection=%s)\n' \
+                "$url" "$value" >&2
+            return "$BRIK_EXIT_CONFIG_ERROR"
+            ;;
+    esac
+    printf '%s' "$value"
+}
+
 # Surface allowlist entries whose expires falls within
 # BRIK_FINDINGS_EXPIRING_SOON_DAYS (default 30). Returns "[]" when no cache
 # exists so call sites can integrate the expiring-soon banner unconditionally.

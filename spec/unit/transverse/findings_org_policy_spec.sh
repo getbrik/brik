@@ -304,6 +304,55 @@ YAML
     End
   End
 
+  Describe "org_policy.state_repo_protection"
+    Skip if "yq missing" yq_missing
+    Skip if "jv missing" jv_missing
+
+    write_policy() {
+      cat > "$POLICY_YAML"
+    }
+
+    It "echoes the declared posture"
+      posture() {
+        write_policy <<'YAML'
+state_repo_protection: required
+YAML
+        org_policy.state_repo_protection "file://${POLICY_YAML}"
+      }
+      When call posture
+      The output should equal "required"
+    End
+
+    It "defaults to warn when the policy does not set the field"
+      posture() {
+        write_policy <<'YAML'
+preset: strict
+YAML
+        org_policy.state_repo_protection "file://${POLICY_YAML}"
+      }
+      When call posture
+      The output should equal "warn"
+    End
+
+    It "fails closed on a value outside the enum (schema refusal)"
+      posture() {
+        write_policy <<'YAML'
+state_repo_protection: maybe
+YAML
+        org_policy.state_repo_protection "file://${POLICY_YAML}"
+      }
+      When call posture
+      The status should equal 7
+      The stderr should include "schema"
+    End
+
+    It "fails closed when the policy is unreachable (a governed project must not regress silently)"
+      When call org_policy.state_repo_protection "file:///does/not/exist/policy.yml"
+      The status should equal 7
+      The stderr should include "cannot fetch"
+    End
+  End
+
   Describe "org_policy.expiring_soon"
     Skip if "yq missing" yq_missing
     Skip if "jv missing" jv_missing

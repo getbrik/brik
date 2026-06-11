@@ -11,6 +11,11 @@
       "type": "string",
       "enum": ["pragmatic", "strict", "permissive"]
     },
+    "state_repo_protection": {
+      "description": "Posture of the state-repo branch-protection gate at deploy. 'required' refuses to deploy when the branch is unprotected or the check cannot run (fail-closed, the enterprise posture); 'warn' logs loudly and continues (the lab posture before its first hardening tier); 'off' skips the check. Absent means 'warn'.",
+      "type": "string",
+      "enum": ["required", "warn", "off"]
+    },
     "allow": {
       "description": "Org-wide allowlists. Each entry MUST carry both reason and expires; permanent allowlists are not supported by design.",
       "type": "object",
