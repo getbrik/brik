@@ -619,15 +619,17 @@ brik.local.docker.run_single_stage() {
     return "$BRIK_EXIT_OK"
 }
 
-# Run the CD verb in the deploy-class container -- the local counterpart of
-# the GitLab/Jenkins CD jobs, which also execute `brik deploy` inside a
-# deploy-class image. The seeded volume carries the full git history, so the
-# in-container verb resolves the version's definition ref exactly as in CI,
-# and every deploy gate executes in-container, unchanged (no bypass). An
+# Run a CD-side CLI verb in the deploy-class container -- the local
+# counterpart of the GitLab/Jenkins CD jobs, which also execute these verbs
+# inside a deploy-class image. The seeded volume carries the full git
+# history, so the in-container verb resolves definition refs exactly as in
+# CI, and every gate executes in-container, unchanged (no bypass). An
 # explicit --config is remapped to its in-volume path; the other arguments
 # pass through verbatim.
-# Usage: brik.local.docker.run_deploy_container [brik deploy args...]
-brik.local.docker.run_deploy_container() {
+# Usage: _brik.local.docker._run_cli_verb_container <verb> [args...]
+_brik.local.docker._run_cli_verb_container() {
+    local verb="$1"
+    shift
     local -a verb_args=()
     while [[ $# -gt 0 ]]; do
         case "$1" in
@@ -672,10 +674,10 @@ brik.local.docker.run_deploy_container() {
     local rc=0
     if brik.local.docker.seed_workspace "$run_id" "$project_dir"; then
         "$(_brik.local.docker.engine)" run "${args[@]}" "$image" \
-            "${_BRIK_LOCAL_DOCKER_BRIK_HOME}/bin/brik" deploy "${verb_args[@]}" || rc=$?
+            "${_BRIK_LOCAL_DOCKER_BRIK_HOME}/bin/brik" "$verb" "${verb_args[@]}" || rc=$?
     else
         rc="$BRIK_EXIT_FAILURE"
-        log.error "run aborted before the deploy container (seed failed)"
+        log.error "run aborted before the ${verb} container (seed failed)"
     fi
 
     brik.local.docker.extract_logs "$run_id" "$project_dir" || true
@@ -686,4 +688,14 @@ brik.local.docker.run_deploy_container() {
     fi
     brik.local.docker.destroy_volume "$run_id" || true
     return "$BRIK_EXIT_OK"
+}
+
+# Usage: brik.local.docker.run_deploy_container [brik deploy args...]
+brik.local.docker.run_deploy_container() {
+    _brik.local.docker._run_cli_verb_container deploy "$@"
+}
+
+# Usage: brik.local.docker.run_status_container [brik status args...]
+brik.local.docker.run_status_container() {
+    _brik.local.docker._run_cli_verb_container status "$@"
 }

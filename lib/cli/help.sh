@@ -42,6 +42,7 @@ Commands:
   deploy           Deploy a version to an environment (digest-pinned CD flow)
   promote          Promote a version between artifact channels (evidence carried)
   authorize        Grant a version the eligibility to deploy to an environment
+  status           Report an environment as journal + desired + live, with drift
   infra init       Scaffold an infrastructure referential instance
   infra validate   Validate an infrastructure referential instance
   self-update      Update brik to the latest version
@@ -91,6 +92,12 @@ Options for authorize:
   --config <path>         Path to brik.yml (default: brik.yml in workspace)
   --workspace <path>      Path to project workspace (default: current directory)
   --dry-run               Describe the grant without journaling it
+
+Options for status:
+  --environment <e>       Environment key from deploy.environments
+  --config <path>         Path to brik.yml (default: brik.yml in workspace)
+  --workspace <path>      Path to project workspace (default: current directory)
+  --json                  Emit the three layers as a JSON document on stdout
 
 Options for infra init:
   --profile <name>        Profile to scaffold: p-open (default), p-entreprise, p-lab

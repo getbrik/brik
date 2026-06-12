@@ -30,9 +30,10 @@ One run = one named workspace volume (`brik-run-<id>`):
 `brik stage <name>` follows the same lifecycle for a single stage; the
 stage's own opt-in flag is fed to the planner, so explicitly asking for an
 opt-in stage (package, deploy) does not plan it away -- every other gate
-applies unchanged. `brik deploy` re-execs the verb inside a deploy-class
-container: definition-ref resolution, the deploy gates and the target
-actions all run in-container, exactly as in a CI CD job.
+applies unchanged. `brik deploy` and `brik status` re-exec the verb inside
+a deploy-class container: definition-ref resolution, the deploy gates, the
+target actions and the live read-back all run in-container, exactly as in
+a CI CD job.
 
 Inside a CI job or a brik-spawned container (`BRIK_LOCAL_CONTAINER=1`),
 the verbs execute in-process: the caller is already the execution

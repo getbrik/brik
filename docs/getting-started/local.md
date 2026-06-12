@@ -110,6 +110,7 @@ credentials are resolved.
 | `brik infra` | Infrastructure referential commands (`init` scaffolds an instance, `validate` checks one) |
 | `brik authorize` | Grant an artifact version to an environment (promotion journal entry) |
 | `brik deploy` | Deploy a version to an environment with attestation verification |
+| `brik status` | Report an environment as three layers (journal, desired, live) with drift verdicts |
 | `brik extension test <dir>` | Run the contract harness against a Brik extension directory |
 | `brik self-update` | Update brik to the latest version |
 | `brik self-uninstall` | Remove brik from your system |
