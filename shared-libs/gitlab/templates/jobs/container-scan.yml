@@ -9,6 +9,15 @@ brik-container-scan:
   extends: .brik-stage
   stage: post-verify
   image: ${BRIK_IMG_SCANNER}
+  # This is the signing job (attestations are signed here), so it declares the
+  # brik/signing environment with action: prepare (no deployment record):
+  # operators scope the signing credential (e.g. the OpenBAO token) to that
+  # environment and it reaches only this job, never the build/test jobs where
+  # user-defined commands run -- the credential-isolation leg of the SLSA L2
+  # posture.
+  environment:
+    name: brik/signing
+    action: prepare
   variables:
     BRIK_STAGE_ID: container-scan
   needs:

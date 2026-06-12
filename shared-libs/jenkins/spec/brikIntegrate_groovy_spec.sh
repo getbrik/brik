@@ -196,4 +196,18 @@ Describe "shared-libs/jenkins brikIntegrate.groovy - artifact layout"
       The output should be present
     End
   End
+
+  Describe "scopes the signing credential to the container-scan container"
+    It "runs container-scan with signingDockerArgs, the other stages with dockerArgs"
+      When call grep -F "(sid == 'container-scan') ? signingDockerArgs : dockerArgs" "$GROOVY"
+      The status should be success
+      The output should be present
+    End
+
+    It "cleans up the signing env-file with the others"
+      When call grep -F "rm -f '\${envFile}' '\${deployEnvFile}' '\${signingEnvFile}'" "$GROOVY"
+      The status should be success
+      The output should be present
+    End
+  End
 End

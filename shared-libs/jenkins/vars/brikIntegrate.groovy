@@ -225,10 +225,14 @@ def call(Map params = [:]) {
             }
 
             def args = brikDockerArgs(networkOverride: params.dockerNetwork)
-            def dockerArgs       = args.dockerArgs
-            def deployDockerArgs = args.deployDockerArgs
-            def envFile          = args.envFile
-            def deployEnvFile    = args.deployEnvFile
+            def dockerArgs        = args.dockerArgs
+            def deployDockerArgs  = args.deployDockerArgs
+            // container-scan signs the attestations, so it alone receives the
+            // signing env-file (BRIK_SIGNING_/COSIGN_) on top of the CI args.
+            def signingDockerArgs = args.signingDockerArgs
+            def envFile           = args.envFile
+            def deployEnvFile     = args.deployEnvFile
+            def signingEnvFile    = args.signingEnvFile
 
             // Stash each stage's brik-artifacts/ subdirectory so the Notify
             // stage can unstash and aggregate them via report.aggregate_fragments.
@@ -458,7 +462,8 @@ def call(Map params = [:]) {
                             runInDeploy(sid)
                         } else {
                             def image = brikDriver.resolveImage(s.runner_class, resolvedImage)
-                            brikRunStage(image: image, stageName: sid, brikHome: brikHome, dockerArgs: dockerArgs)
+                            def stageArgs = (sid == 'container-scan') ? signingDockerArgs : dockerArgs
+                            brikRunStage(image: image, stageName: sid, brikHome: brikHome, dockerArgs: stageArgs)
                         }
                         stashBrikArtifacts(sid)
                     }
@@ -556,7 +561,7 @@ def call(Map params = [:]) {
                         echo "[brik] stage Notify failed: ${e.message}"
                     }
                 }
-                sh """rm -f '${envFile}' '${deployEnvFile}' 2>/dev/null || true"""
+                sh """rm -f '${envFile}' '${deployEnvFile}' '${signingEnvFile}' 2>/dev/null || true"""
             }
 
             } // withEnv(scmEnv)

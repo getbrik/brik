@@ -460,6 +460,33 @@ YAML
       The contents of file "$COSIGN_ARGS_FILE" should include "--key env://COSIGN_PRIVATE_KEY"
     End
 
+    It "kms backend: prefers the declared verification_key on verify (no KMS round-trip, no token)"
+      verify_kms_pub() {
+        use_kms_backend
+        printf 'verification_key: env://COSIGN_PUBLIC_KEY\n' \
+          >> "$ATTEST_INFRA/endpoints/signing.yml"
+        attest.verify "$REF"
+      }
+      When call verify_kms_pub
+      The status should be success
+      The contents of file "$COSIGN_ARGS_FILE" should include "--key env://COSIGN_PUBLIC_KEY"
+      The contents of file "$COSIGN_ARGS_FILE" should not include "openbao://brik-signing"
+      The contents of file "$COSIGN_ARGS_FILE" should not include "BAO_ADDR=http"
+    End
+
+    It "kms backend: still signs through the KMS when verification_key is declared"
+      sign_kms_pub() {
+        use_kms_backend
+        printf 'verification_key: env://COSIGN_PUBLIC_KEY\n' \
+          >> "$ATTEST_INFRA/endpoints/signing.yml"
+        attest.sign "$REF" --sbom "${SHELLSPEC_TMPBASE}/sbom.json"
+      }
+      When call sign_kms_pub
+      The status should be success
+      The contents of file "$COSIGN_ARGS_FILE" should include "--key openbao://brik-signing"
+      The contents of file "$COSIGN_ARGS_FILE" should include "BAO_ADDR=http://bao.lab:8200"
+    End
+
     It "discards the verified attestation envelope from stdout (multi-MB payload)"
       verify_quiet() {
         # On success cosign prints the whole verified in-toto envelope

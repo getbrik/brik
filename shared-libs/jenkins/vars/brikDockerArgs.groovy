@@ -73,9 +73,18 @@ def call(Map config = [:]) {
     // container. Deploy credentials (ARGOCD_, SSH_) are more privileged than
     // build credentials and must not reach CI stage containers; the
     // package-publish credentials (CARGO_) have no business in the deploy
-    // container. So we write two env-files: one for CI stages, one for the
-    // deploy stage. Registry and runtime prefixes (NEXUS_, REGISTRY_, BRIK_)
-    // are shared -- CI pushes the image, the deploy reads it back.
+    // container. So we write three env-files: one for CI stages, one for the
+    // deploy stage, one for the signing stage (container-scan). Registry and
+    // runtime prefixes (NEXUS_, REGISTRY_, BRIK_) are shared -- CI pushes the
+    // image, the deploy reads it back.
+    //
+    // Signing material (COSIGN_ key refs, BRIK_SIGNING_ secrets such as the
+    // OpenBAO token) goes ONLY to the container-scan container, where
+    // attestations are signed: user-defined commands run in the build/test
+    // containers, and isolating the signing credential from them is the
+    // credential leg of the SLSA L2 posture. A deploy that verifies with the
+    // key or kms backend declares verification_key (the public key) in the
+    // referential instead of receiving the signing material.
     //
     // BRIK_RUNNER_CLASSES_FILE is excluded from both files: brikRunStage
     // forwards it explicitly as `-e BRIK_RUNNER_CLASSES_FILE=<absolute>` (a
@@ -87,22 +96,29 @@ def call(Map config = [:]) {
     // not resolve and the registry override would silently fall back to the
     // bundled default.
     def envFile = "/tmp/brik-env-${env.BUILD_TAG}"
-    sh """env | grep -E '^(NEXUS_|BRIK_|REGISTRY_|CARGO_|COSIGN_)' | grep -v '^BRIK_RUNNER_CLASSES_FILE=' > '${envFile}' 2>/dev/null || true"""
+    sh """env | grep -E '^(NEXUS_|BRIK_|REGISTRY_|CARGO_)' | grep -vE '^(BRIK_RUNNER_CLASSES_FILE=|BRIK_SIGNING_)' > '${envFile}' 2>/dev/null || true"""
     def envFileArg = fileExists(envFile) && readFile(envFile).trim() ? "--env-file ${envFile}" : ''
 
     def deployEnvFile = "/tmp/brik-deploy-env-${env.BUILD_TAG}"
-    sh """env | grep -E '^(NEXUS_|BRIK_|REGISTRY_|ARGOCD_|SSH_)' | grep -v '^BRIK_RUNNER_CLASSES_FILE=' > '${deployEnvFile}' 2>/dev/null || true"""
+    sh """env | grep -E '^(NEXUS_|BRIK_|REGISTRY_|ARGOCD_|SSH_)' | grep -vE '^(BRIK_RUNNER_CLASSES_FILE=|BRIK_SIGNING_)' > '${deployEnvFile}' 2>/dev/null || true"""
     def deployEnvFileArg = fileExists(deployEnvFile) && readFile(deployEnvFile).trim() ? "--env-file ${deployEnvFile}" : ''
+
+    def signingEnvFile = "/tmp/brik-signing-env-${env.BUILD_TAG}"
+    sh """env | grep -E '^(BRIK_SIGNING_|COSIGN_)' > '${signingEnvFile}' 2>/dev/null || true"""
+    def signingEnvFileArg = fileExists(signingEnvFile) && readFile(signingEnvFile).trim() ? "--env-file ${signingEnvFile}" : ''
 
     def javaEnvArgs = "-e MAVEN_OPTS=\"-Dmaven.repo.local=${env.WORKSPACE}/.m2/repository\" -e GRADLE_USER_HOME=${env.WORKSPACE}/.gradle"
     def baseArgs = "-e HOME=${env.WORKSPACE} ${javaEnvArgs} --memory=4g -v /var/run/docker.sock:/var/run/docker.sock ${networkArg}"
     def dockerArgs       = "${baseArgs} ${envFileArg} ${policyArg} ${infraArg}"
     def deployDockerArgs = "-u 0:0 ${baseArgs} ${deployEnvFileArg} ${policyArg} ${infraArg}"
+    def signingDockerArgs = "${dockerArgs} ${signingEnvFileArg}".trim()
 
     return [
-        dockerArgs:       dockerArgs,
-        deployDockerArgs: deployDockerArgs,
-        envFile:          envFile,
-        deployEnvFile:    deployEnvFile,
+        dockerArgs:        dockerArgs,
+        deployDockerArgs:  deployDockerArgs,
+        signingDockerArgs: signingDockerArgs,
+        envFile:           envFile,
+        deployEnvFile:     deployEnvFile,
+        signingEnvFile:    signingEnvFile,
     ]
 }

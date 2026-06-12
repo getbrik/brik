@@ -109,3 +109,58 @@ per-environment lock serializes concurrent runs, the gates re-evaluate
 against the same digest, the apply is idempotent, and the read-back reports
 the same deployed digest. Journal and evidence writes are append-only --
 a re-run never rewrites history, it adds to it.
+
+## SLSA posture (honest claim)
+
+Brik claims **SLSA Build L1** on every profile: the provenance is generated,
+attached to the digest and verified at deploy (`require_attestation`).
+**Build L2** additionally requires the signature to be generated with a
+credential that user-defined commands cannot read. Brik provides the
+isolation mechanics; the claim holds only when the operator actually scopes
+the credential:
+
+- **The signing phase is one stage.** Attestations are signed in
+  `container-scan`; user-defined commands (build scripts, test and lint
+  commands, hooks) run in the other stages. On GitLab and Jenkins each stage
+  is a separate container, so isolating the credential is a delivery
+  problem, not a process-isolation problem.
+- **`BRIK_SIGNING_` is the reserved signing-phase scope.** Name the signing
+  credential with this prefix (e.g. `BRIK_SIGNING_BAO_TOKEN`) and it reaches
+  only the signing container:
+  - **GitLab**: the `brik-container-scan` job declares the `brik/signing`
+    environment with `action: prepare`; scope the variable to that
+    environment and GitLab delivers it to this job only -- the build/test
+    jobs never see it.
+  - **Jenkins**: the shared library writes a dedicated signing env-file
+    (`BRIK_SIGNING_*` and `COSIGN_*`) and mounts it only on the
+    container-scan container; the CI and deploy env-files exclude it.
+  - **Local runs** make no L2 claim: the credential is already in the
+    operator's shell (`builder.id` says `local`, and a verifier pins the
+    expected builder with `gates.expected_builder`).
+- **Verification never needs the signing credential.** Declare
+  `verification_key` on the Signing endpoint (the exported public key, also
+  honoured for `backend: kms`) and every verifying consumer -- the CD deploy
+  first -- checks signatures without a KMS round-trip or key access.
+- **Which backend can claim L2**: `kms` (the key never leaves the secret
+  manager; only the scoped token travels) and `keyless` (the signing job's
+  own OIDC identity; no shared secret at all). A `key` backend with a
+  `file://` private key inside the referential cannot claim L2 -- the
+  referential is mounted read-only into every stage container.
+- **L3 is out of reach self-hosted** and is never claimed.
+
+## Credential separation and lifetime
+
+Deploy credentials are more privileged than build credentials and travel
+separately (per-phase env-files on Jenkins, environment-scoped variables on
+GitLab; the CD job declares the target environment). Keep the identities
+separate at the provider too: the CI publish credential
+(`BRIK_PUBLISH_DOCKER_*`, registry write) and the CD resolution credential
+(`BRIK_REGISTRY_*`, read plus state-repo write) should map to distinct
+accounts, so revoking one does not strand the other and the production pull
+account cannot push.
+
+Token lifetime is a host/manager parameter, not brik code: brik reads every
+credential at use time through `env://` references, so rotating a
+short-lived token is invisible to it. Prefer the shortest lifetime the
+provider supports (project access tokens with expiry, scoped git-host
+tokens, secret-manager token TTLs) and rotate at the secret-manager level.

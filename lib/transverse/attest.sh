@@ -158,8 +158,22 @@ _attest._backend_args() {
             _bargv+=(--key "$_key")
             ;;
         kms)
-            _bargv+=(--key "$(printf '%s' "$_sig" | jq -r '.kms_uri')")
-            _attest._kms_env "$_sig" || return "$?"
+            # A verifying environment declares verification_key (the Transit
+            # key's exported public key) so verification never round-trips
+            # through the KMS and the KMS token stays confined to the signing
+            # phase. Absent, verify goes through the KMS like sign does.
+            local _kms_vk=""
+            if [[ "$_op" == "verify" ]]; then
+                _kms_vk="$(printf '%s' "$_sig" | jq -r '.verification_key // ""')"
+            fi
+            if [[ -n "$_kms_vk" ]]; then
+                local _vkey
+                _vkey="$(_attest._key_arg "$_kms_vk")" || return "$?"
+                _bargv+=(--key "$_vkey")
+            else
+                _bargv+=(--key "$(printf '%s' "$_sig" | jq -r '.kms_uri')")
+                _attest._kms_env "$_sig" || return "$?"
+            fi
             ;;
         *)
             log.error "attest: unknown signing backend '${_backend}' in the referential"

@@ -14,7 +14,7 @@
     "verification_key": {
       "type": "string",
       "pattern": "^(env|file|bao)://.+",
-      "description": "Public-key reference used on verify when backend=key. cosign rejects private keys at verification, so a verify-only environment declares this instead of receiving the signing key. Absent, 'key' serves both operations."
+      "description": "Public-key reference used on verify when backend=key or backend=kms. cosign rejects private keys at verification, so a verify-only environment declares this instead of receiving the signing key; with kms it is the Transit key's exported public key, so verification never round-trips through the KMS and the KMS token stays confined to the signing phase. Absent, 'key' (or the KMS) serves both operations."
     },
     "kms_uri": { "type": "string", "pattern": "^(openbao|hashivault)://.+" },
     "fulcio_url": { "type": "string", "pattern": "^https://.+" },
