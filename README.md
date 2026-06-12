@@ -74,10 +74,24 @@ From that single file, Brik produces:
 - a working Jenkins pipeline via the Brik shared library
 - a working local run via `brik integrate`
 - a release flow that triggers only on tags
+- a decoupled CD flow: `brik deploy --version <v> --environment <e>`, the same verb whether it is triggered from GitLab, Jenkins, or your laptop
 
-## Pipeline at a glance
+## Two flows, one configuration
 
-Every Brik pipeline runs the same 12 stages in the same order:
+Brik is not one pipeline. It is **two fixed flows** selected by the trigger,
+running from the same repository and the same `brik.yml`:
+
+- a **push, tag, or merge request** runs the **CI flow**, which builds and
+  publishes one immutable, signed artifact;
+- an explicit **deploy trigger** (`Run pipeline` with
+  `BRIK_DEPLOY_VERSION` + `BRIK_DEPLOY_ENVIRONMENT`, a parameterized
+  Jenkins job, or `brik deploy` on your laptop) runs the **CD flow**, which
+  takes an artifact that already exists and proves it before deploying it.
+
+The two flows are decoupled in time: build once, deploy that version to any
+environment, any number of times, days later.
+
+**The CI flow** -- produce and publish verifiable evidence:
 
 ```mermaid
 flowchart LR
@@ -93,14 +107,37 @@ flowchart LR
     test --> package
     package --> cscan["Container<br/>Scan"]
     cscan --> promote["Promote"]
-    promote --> deploy["Deploy"]
-    test --> deploy
-    deploy --> notify["Notify"]
+    promote --> notify["Notify"]
 ```
 
-Lint, SAST, dependency scan, and tests fan out in parallel after Build. The quality gate sits at Package: nothing gets packaged unless tests pass and the three security stages succeed. Container Scan produces the SBOM and attaches signed attestations. Promote copies the artifact and its evidence graph to the release channel. Deploy verifies the attestations and promotion journal before deploying. Nothing deploys without a green test and a valid attestation.
+Lint, SAST, dependency scan, and tests fan out in parallel after Build. The
+quality gate sits at Package: nothing gets packaged unless tests pass and
+the three security stages succeed. Container Scan signs and attaches the
+SBOM and SLSA provenance to the image digest. Promote copies the artifact
+**and its evidence graph** to the release channel, refusing to overwrite a
+different digest already published under the same version.
 
-That is not a convention. It is the structural shape of the pipeline. You cannot accidentally ship broken or unverified code by editing the pipeline, because there is no pipeline to edit.
+**The CD flow** -- verify, then deploy a pinned digest:
+
+```mermaid
+flowchart LR
+    resolve["Resolve<br/>version to digest"] --> gates["Gates<br/>digest, attestation,<br/>eligibility"]
+    gates --> deploy["Deploy<br/>pinned digest"]
+    deploy --> health["Rollout<br/>health"]
+    health --> readback["Read-back<br/>live state"]
+    readback --> journal["Journal<br/>validates_for"]
+    journal --> notify["Notify"]
+```
+
+The CD flow resolves the version to a digest in the channel the environment
+accepts, walks the fail-closed gates, deploys the pinned digest, checks the
+rollout health, reads the live state back, and journals the result -- a
+green deploy on staging can grant the same digest for production
+(`validates_for`).
+
+That is not a convention. It is the structural shape of both flows. You
+cannot accidentally ship broken or unverified code by editing the pipeline,
+because there is no pipeline to edit.
 
 ## What makes Brik different
 
@@ -114,6 +151,58 @@ The 12 stages are non-negotiable. The decision of which stages actually *run* on
 - A tagged release is **release context**: fail-fast, because a broken stage in a release pipeline is not a learning opportunity.
 
 The plan is one platform-agnostic JSON document. GitLab, Jenkins, and `brik integrate` consume the same plan. Same commit, same plan, same outcome, anywhere. Inspect any decision with `brik plan --explain`.
+
+### 📜 Declared end to end: schemas, manifests, parameters
+
+Brik does not hide its behavior in code. Everything that shapes a pipeline
+is a **declaration you can read, validate, and audit**:
+
+- **Your project** is `brik.yml`, validated against a published
+  [JSON Schema](schemas/config/v1/brik.schema.json). The configuration
+  reference docs are *generated* from that schema -- they cannot drift.
+- **The pipeline itself** is described by YAML manifests in a registry
+  ([lib/registry/manifests/](lib/registry/manifests/)): 12 stage manifests
+  (what runs, in which runner class, whether it needs the Docker socket),
+  6 stack manifests (how node, java, python, dotnet, rust, and docker
+  projects are detected, built, and tested), and capability **provider**
+  manifests (which signing backends exist, what each one requires).
+  The manifests compile into one registry; user-supplied extensions plug in
+  via `BRIK_REGISTRY_EXTENSIONS_DIRS` and are validated by the same
+  contract-test harness (`brik extension`).
+- **The operator surface** is one manifest:
+  [lib/registry/pipeline-params.yml](lib/registry/pipeline-params.yml)
+  declares every user-facing pipeline parameter (`BRIK_DEPLOY_VERSION`,
+  `BRIK_DRY_RUN`, ...), its type, default, and which flow it drives. A
+  blocking parity test guarantees the GitLab "Run pipeline" form and the
+  Jenkins "Build with Parameters" form expose exactly that list -- the same
+  knobs, everywhere, by construction.
+- **Your infrastructure** is a referential of declared endpoints,
+  credential references, and policies (see the next section).
+
+Every one of these declarations is enforced by a schema, fail-closed, at
+runtime. The document an auditor reads is the document the pipeline obeys.
+See [docs/concepts/schemas.md](docs/concepts/schemas.md).
+
+### 📦 Runner classes: the right image for every stage, pinned and provable
+
+Stages do not run on "whatever image the runner has". Each stage manifest
+declares a **runner class** -- `base`, `stack`, `analysis`, `scanner`, or
+`deploy` -- and a single registry
+([lib/registry/runner_classes.yml](lib/registry/runner_classes.yml)) maps
+each class to its OCI image from
+[brik-images](https://github.com/getbrik/brik-images) (multi-arch, scanned,
+rebuilt weekly for CVE fixes). The `stack` class is dynamic: Init detects
+your stack and posts the matching toolchain image to every downstream stage.
+
+Both adapters and the local containerized runner resolve images through the
+same registry, so the linter really runs in the analysis image and the
+deploy really runs in the deploy image -- on GitLab, on Jenkins, and on
+your laptop. Point `BRIK_RUNNER_CLASSES_FILE` at an alternate copy to use a
+mirror, a digest-pinned fleet, or an air-gapped registry without touching
+the bundled default. And because the actually-executed image is stamped
+into the report and into the SLSA builder identity
+(`<orchestrator-url>/-/brik/<runner-class>`), "which image ran this stage"
+is an auditable fact, not a guess.
 
 ### 🛡️ Supply-chain security built in, not bolted on
 
@@ -156,31 +245,40 @@ Brik is written in Bash. Not as a stylistic choice. Because Bash is the only lan
 - No language-version drift between local and CI.
 - Same code path locally and on every platform.
 
-Bash has limits, and Brik treats them seriously: 3635 ShellSpec tests, 80% coverage gate enforced in CI, ShellCheck on every file, end-to-end runs against real GitLab and Jenkins instances in [briklab](https://github.com/getbrik/briklab) on every release.
+Bash has limits, and Brik treats them seriously: 5100+ ShellSpec examples in the core suite plus dedicated adapter suites, an 80% coverage gate enforced in CI, ShellCheck on every file, and end-to-end runs against real GitLab and Jenkins instances in [briklab](https://github.com/getbrik/briklab).
 
 ### 💻 Same pipeline on your laptop
 
 ```bash
-brik integrate                # full CI flow locally
-brik stage test              # one stage
-brik deploy --version v1.2.3 --environment staging   # CD: deploy a built version
-brik plan --explain              # show what will run on this commit, and why
-brik validate                    # validate brik.yml against the schema
-brik doctor                      # check prerequisites
+brik integrate                                       # full CI flow locally
+brik stage test                                      # one stage
+brik deploy --version v1.2.3 --environment staging   # CD: verify and deploy a built version
+brik promote --version v1.2.3                        # copy artifact + evidence to the release channel
+brik authorize --version v1.2.3 --for production     # grant a digest for an environment
+brik plan --explain                                  # show what will run on this commit, and why
+brik validate                                        # validate brik.yml against the schema
+brik doctor                                          # check prerequisites
 ```
 
-The local runner uses the same Bash code path as the CI adapters. Reproducing a CI failure locally is `brik stage <name>`, not "clone the repo, install a 600 MB runner image, and pray".
+Each stage of a local run executes in its runner-class container, exactly
+like CI -- and the divergences that remain (no keyless signing, host
+Docker socket) are declared, not silent. See
+[docs/concepts/local-execution.md](docs/concepts/local-execution.md).
+
+The local runner uses the same Bash code path and the same runner images as the CI adapters. Reproducing a CI failure locally is `brik stage <name>` in the same container the CI job used -- not "read the runner docs and pray".
 
 ## How the layers fit
 
 | Layer | Role | Replaced when you switch platform? |
 |-------|------|------------------------------------|
 | **brik.yml** | Project configuration. The only file you write. | No |
-| **brik-lib** | CI/CD business logic in Bash. Build, test, scan, deploy, package. | No |
-| **Shared Library** | Per-platform adapter. Reads `brik.yml`, runs the fixed flow via native CI constructs. | Yes (Brik ships them) |
+| **Registry manifests** | Declarative description of stages, stacks, runner classes, capability providers, and pipeline parameters. | No |
+| **Infrastructure referential** | Declared endpoints, credential references, trust material, and policy. One instance per infrastructure. | No (one per infra, not per platform) |
+| **brik-lib** | CI/CD business logic in Bash. Build, test, scan, sign, verify, deploy, package. | No |
+| **Shared Library** | Per-platform adapter. Reads `brik.yml`, runs the fixed flows via native CI constructs. | Yes (Brik ships them) |
 | **Bash Runtime** | `stage.run`: lifecycle, logging, hooks, structured reports. | No |
 
-Three of the four layers are platform-agnostic. The platform adapter is thin by design: read config, map the fixed flow to the platform, invoke `stage.run`. No business logic in adapters. Ever.
+Everything except the thin platform adapter is platform-agnostic. The adapter reads config, maps the fixed flows to the platform, and invokes `stage.run`. No business logic in adapters. Ever.
 
 See [docs/concepts/architecture.md](docs/concepts/architecture.md) for the full design.
 
@@ -193,8 +291,9 @@ See [docs/concepts/architecture.md](docs/concepts/architecture.md) for the full 
 | **python** | `pyproject.toml` / `requirements.txt` | pip / poetry / uv / pipenv | pytest / unittest / tox | ruff |
 | **dotnet** | `*.csproj` / `*.sln` | dotnet build | dotnet test | dotnet format |
 | **rust** | `Cargo.toml` | cargo build | cargo test | clippy |
+| **docker** | `Dockerfile` / `Containerfile` | docker build | -- | -- |
 
-The stack is detected from project files when not specified. Every stack ships with a runner image: [brik-images](https://github.com/getbrik/brik-images) (Alpine or slim bases, multi-arch, rebuilt weekly for CVE fixes).
+The stack is detected from project files when not specified, and each stack is itself a declarative manifest in the registry. Every stack ships with a runner image: [brik-images](https://github.com/getbrik/brik-images) (Alpine or slim bases, multi-arch, rebuilt weekly for CVE fixes).
 
 ## Platform support
 
@@ -229,17 +328,22 @@ Full documentation: **[docs/README.md](docs/README.md)**.
 
 ## Configuration
 
-Brik follows a "declare what, not how" rule. Only `version` and `project.name` are required. Every other field has a per-stack default you can override.
+Brik follows a "declare what, not how" rule, at every level. Only `version` and `project.name` are required in `brik.yml`; every other field has a per-stack default you can override. Beneath the project file, the pipeline itself, the operator parameters, and the infrastructure are declarations too:
 
-- Configuration reference: [docs/configuration/overview.md](docs/configuration/overview.md)
-- JSON Schema (source of truth): [schemas/config/v1/brik.schema.json](schemas/config/v1/brik.schema.json)
+- Configuration reference: [docs/configuration/overview.md](docs/configuration/overview.md) -- generated from the schema, drift-gated in CI
+- JSON Schemas (the contracts, enforced fail-closed at runtime): [schemas/](schemas/) -- see [docs/concepts/schemas.md](docs/concepts/schemas.md)
+- Registry manifests (stages, stacks, runner classes, providers): [lib/registry/manifests/](lib/registry/manifests/)
+- Pipeline parameters (one manifest, parity-tested on every platform surface): [lib/registry/pipeline-params.yml](lib/registry/pipeline-params.yml)
+- Infrastructure referential (endpoints, credential references, policy): [docs/concepts/artifact-attestation.md](docs/concepts/artifact-attestation.md)
 - Working examples: [examples/](examples/) (minimal-node, java-maven, python-pytest, mono-dotnet)
 
 ## Quality, in numbers
 
-- ✅ **3635** ShellSpec tests, 0 failures
+- ✅ **5100+** ShellSpec examples in the core suite, 0 failures -- plus dedicated suites for the GitLab, Jenkins, and local adapters
 - ✅ **80%** Codecov gate on project and patch, enforced in CI
-- ✅ **~60** end-to-end scenarios on real GitLab + Jenkins instances per release
+- ✅ **22** live end-to-end scenarios against real GitLab and Jenkins instances in [briklab](https://github.com/getbrik/briklab) -- including digest-pinned CD, signed-attestation keystones, promotion-chain refusals, and channel promotion with immutability enforcement
+- ✅ **29** JSON Schemas govern every contract (config, referential, plan, journal events, reports), validated fail-closed at runtime
+- ✅ **Drift gates in CI**: the generated configuration reference must match the schema, the compiled registry cache must match the manifests, and every platform surface must match the pipeline-params manifest
 - ✅ **ShellCheck** clean on every source file
 - ✅ **shellmetrics** tracks cyclomatic complexity, function count, and LLOC on every push to `main`
 
