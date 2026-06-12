@@ -97,5 +97,43 @@ Describe "transverse.evidence"
       The status should be success
       The output should equal ""
     End
+
+    It "converges as a no-op when the same commit already evidenced the digest (re-run)"
+      pub_rerun() {
+        # A reproducible build re-runs CI on the same commit and produces the
+        # SAME digest: the store already vouches for it. Only ci_run_id
+        # differs between the two documents.
+        log.info() { printf 'INFO: %s\n' "$*" >&2; }
+        transverse.state_repo.clone() {
+          mkdir -p "$2/evidence/v1.2.3"
+          printf '{"digest":"%s","commit":"abc123","ci_run_id":"run-1"}' "$DIGEST" \
+            > "$2/evidence/v1.2.3/sha256-${DIGEST#sha256:}.json"
+          return 0
+        }
+        evidence.publish --repo https://git/state.git --version v1.2.3 --digest "$DIGEST" \
+          <<<"$(printf '{"digest":"%s","commit":"abc123","ci_run_id":"run-2"}' "$DIGEST")" || return $?
+        printf 'APPEND=[%s]' "$(cat "$APPEND_REC")"
+      }
+      When call pub_rerun
+      The status should be success
+      The output should equal "APPEND=[]"
+      The stderr should include "converged"
+    End
+
+    It "fails closed when the digest is already evidenced by another commit"
+      pub_conflict() {
+        transverse.state_repo.clone() {
+          mkdir -p "$2/evidence/v1.2.3"
+          printf '{"digest":"%s","commit":"somebody-else","ci_run_id":"run-1"}' "$DIGEST" \
+            > "$2/evidence/v1.2.3/sha256-${DIGEST#sha256:}.json"
+          return 0
+        }
+        evidence.publish --repo https://git/state.git --version v1.2.3 --digest "$DIGEST" \
+          <<<"$(printf '{"digest":"%s","commit":"abc123","ci_run_id":"run-2"}' "$DIGEST")"
+      }
+      When call pub_conflict
+      The status should equal "$BRIK_EXIT_CHECK_FAILED"
+      The stderr should include "conflict"
+    End
   End
 End

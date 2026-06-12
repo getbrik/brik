@@ -138,6 +138,26 @@ evidence.publish() {
         return "$BRIK_EXIT_EXTERNAL_FAIL"
     fi
 
+    # Idempotent re-entry: a reproducible build re-runs CI on the same commit
+    # and produces the SAME digest, so the digest-addressed record already
+    # exists -- the store already vouches for the artifact, converge as a
+    # no-op (only ci_run_id would differ). The same digest claimed by a
+    # DIFFERENT commit is a conflict surfaced fail-closed, never silently
+    # kept: append-only means history is never rewritten, not that a re-run
+    # fails.
+    if [[ -e "${dest}/${relpath}" ]]; then
+        local new_commit old_commit
+        new_commit="$(printf '%s' "$doc" | jq -r '.commit // ""' 2>/dev/null)"
+        old_commit="$(jq -r '.commit // ""' "${dest}/${relpath}" 2>/dev/null)"
+        rm -rf "$dest"
+        if [[ -n "$new_commit" && "$new_commit" == "$old_commit" ]]; then
+            log.info "evidence already recorded for ${digest} (${version}, commit ${new_commit}) -- converged"
+            return 0
+        fi
+        log.error "evidence conflict: ${relpath} already records commit '${old_commit}' but this run builds from '${new_commit}'"
+        return "$BRIK_EXIT_CHECK_FAILED"
+    fi
+
     if ! printf '%s' "$doc" | transverse.state_repo.append "$dest" "$relpath"; then
         rm -rf "$dest"
         return "$BRIK_EXIT_IO_FAILURE"
