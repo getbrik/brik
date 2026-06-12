@@ -14,6 +14,32 @@
 [[ -n "${_BRIK_MODULE_CLI_PROMOTE_LOADED:-}" ]] && return 0
 _BRIK_MODULE_CLI_PROMOTE_LOADED=1
 
+# _cli.promote._notify - best-effort webhook notification of the promotion.
+# An unreachable webhook is a warning, never a refusal: the journal entry
+# and the destination registry ARE the promotion; the notification only
+# broadcasts it. Skips silently when no webhook is configured.
+# Usage: _cli.promote._notify <version> <digest> <from> <to>
+_cli.promote._notify() {
+    local version="$1" digest="$2" from="$3" to="$4"
+
+    brik.use stages.notify
+    notify.webhook_configured || return 0
+
+    local payload
+    payload="$(jq -n \
+        --arg version "$version" \
+        --arg digest "$digest" \
+        --arg from "$from" \
+        --arg to "$to" \
+        '{event: "artifact_promoted", version: $version, digest: $digest,
+          from_channel: $from, to_channel: $to}')"
+
+    if ! notify.webhook --payload "$payload"; then
+        log.warn "promote: webhook notification failed (the promotion stands; delivery is best-effort)"
+    fi
+    return 0
+}
+
 # cli.promote.run - promote <version> from one channel to another.
 # Usage: brik promote --version <v> [--from <channel>] [--to <channel>]
 #        [--config <path>] [--workspace <path>]
@@ -93,6 +119,8 @@ cli.promote.run() {
     promotion_journal.record_promotion \
         --version "$version" --digest "${pinned##*@}" \
         --from-channel "$from" --to-channel "$to" || return "$?"
+
+    _cli.promote._notify "$version" "${pinned##*@}" "$from" "$to"
 
     log.info "promoted ${version}: ${from} -> ${to}"
     brik_print "$pinned"

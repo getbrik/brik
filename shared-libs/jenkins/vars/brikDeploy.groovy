@@ -25,6 +25,15 @@
  * lib/registry/pipeline-params.yml (single SoT) and the GitLab CD variables
  * 1:1 (spec/integration/adapter-parity/pipeline_params_parity_spec.sh).
  */
+// Pull the resolved digest out of the aggregate report for the build-page
+// projection. Plain-text regex (no JSON plugin dependency); @NonCPS keeps
+// the non-serializable Matcher out of the CPS state.
+@NonCPS
+def extractResolvedDigest(String report) {
+    def m = (report =~ /"resolved"\s*:\s*"(sha256:[0-9a-f]{64})"/)
+    return m.find() ? m.group(1) : ''
+}
+
 def call(Map params = [:]) {
     def label = params.nodeLabel ?: ''
     def timeoutMinutes = params.timeoutMin ?: 30
@@ -64,6 +73,12 @@ def call(Map params = [:]) {
             if (!version || !environment) {
                 error('[brik] brikDeploy requires both BRIK_DEPLOY_VERSION and BRIK_DEPLOY_ENVIRONMENT')
             }
+
+            // Projection (UX only, never source of truth): surface the CD
+            // inputs on the build page; the digest is appended after the
+            // deploy from the aggregate report.
+            currentBuild.displayName = "#${env.BUILD_NUMBER} ${version} -> ${environment}"
+            currentBuild.description = "brik deploy ${version} -> ${environment}"
 
             cleanWs()
             checkout scm
@@ -112,6 +127,17 @@ def call(Map params = [:]) {
                     }
                 }
             } finally {
+                // Enrich the projection with the digest the run resolved.
+                try {
+                    if (fileExists('.brik-logs/aggregate-report.json')) {
+                        def digest = extractResolvedDigest(readFile(file: '.brik-logs/aggregate-report.json'))
+                        if (digest) {
+                            currentBuild.description = "brik deploy ${version} -> ${environment} @ ${digest}"
+                        }
+                    }
+                } catch (ignored) {
+                    // Projection only: never let it change the verdict.
+                }
                 // Archive the same evidence the CI flow does: the deploy
                 // artifacts and the full log dir (plan.json + pipeline.env),
                 // minus lock/context churn.

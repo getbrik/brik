@@ -174,6 +174,28 @@ For the full gate semantics and the builder-identity convention, see
 that hides risk without recording it, which is the watermelon failure
 mode this entire framework exists to prevent.
 
+## Proof retention
+
+The proofs live in two stores, and each store owns its garbage collection:
+
+- the **registry** holds the published digests and their attestation
+  referrers;
+- the **git host** holds the state-repo (evidence files, promotion and
+  deployment journals) behind branch protection.
+
+Brik never purges anything. The org declares its retention posture in
+`brik-policy.yml` under `retention:` (`registry_days`, `state_repo_days`,
+0 = unlimited) -- the fields are **informative**: they document, in the one
+governed file audits already read, what the registry GC and the git-host
+policies are configured to do elsewhere. Two operating rules:
+
+- A proof referenced by a journal event must outlive the deployments it
+  vouches for: never let a registry GC delete a digest (or its referrers)
+  that an environment still runs or that a grant still names.
+- Journal events consumed by `requires_eligibility` are the source of truth
+  for eligibility: purging state-repo history invalidates grants. Prefer
+  unlimited retention on the state-repo; it is small, append-only text.
+
 ## References
 
 - [policy.md](policy.md) -- schema reference for `brik-policy.yml`.

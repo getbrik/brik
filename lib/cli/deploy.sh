@@ -33,6 +33,42 @@ _cli.deploy._resolve_version_tag() {
     return 1
 }
 
+# _cli.deploy._notify - best-effort webhook notification of the CD outcome
+# (environment, version, digest, enforced gates, actor, run url). An
+# unreachable webhook is a warning, never a change of the run's verdict: the
+# journal and the aggregate report are the record; the notification only
+# broadcasts it. Skips silently when no webhook is configured.
+# Usage: _cli.deploy._notify <environment> <version> <digest> <status> <gates_csv>
+_cli.deploy._notify() {
+    local environment="$1" version="$2" digest="$3" status="$4" gates_csv="$5"
+
+    brik.use stages.notify
+    notify.webhook_configured || return 0
+
+    local payload
+    # KCOV_EXCL_START -- inline jq document body, not bash code
+    payload="$(jq -n \
+        --arg environment "$environment" \
+        --arg version "$version" \
+        --arg digest "$digest" \
+        --arg status "$status" \
+        --arg gates "$gates_csv" \
+        --arg actor "${GITLAB_USER_LOGIN:-${BUILD_USER_ID:-${USER:-}}}" \
+        --arg run_url "${CI_PIPELINE_URL:-${BUILD_URL:-}}" '
+        {event: "deploy", status: $status, environment: $environment,
+         version: $version,
+         gates: ($gates | split(",") | map(select(. != "")))}
+        + (if $digest  != "" then {digest: $digest}   else {} end)
+        + (if $actor   != "" then {actor: $actor}     else {} end)
+        + (if $run_url != "" then {run_url: $run_url} else {} end)')"
+    # KCOV_EXCL_STOP
+
+    if ! notify.webhook --payload "$payload"; then
+        log.warn "deploy: webhook notification failed (the record stands; delivery is best-effort)"
+    fi
+    return 0
+}
+
 # _cli.deploy._protection_mode - echo the state-repo protection posture
 # (required|warn|off) from the referential's Policy document. No declared
 # policy means warn; a declared policy that is ambiguous or unreadable is
@@ -583,6 +619,15 @@ cli.deploy.run() {
             fi
         fi
     fi
+
+    # CD notification (F4, best-effort): broadcast the outcome of a run that
+    # reached the deploy, with the gates it enforced.
+    local _gates="" _nstatus="success"
+    [[ "$require_digest" == "true" ]]      && _gates="require_digest"
+    [[ "$require_attestation" == "true" ]] && _gates="${_gates:+${_gates},}require_attestation"
+    [[ -n "$requires_eligibility" ]]       && _gates="${_gates:+${_gates},}requires_eligibility"
+    [[ "$rc" -ne 0 ]] && _nstatus="failed"
+    _cli.deploy._notify "$environment" "$version" "${pinned##*@}" "$_nstatus" "$_gates"
 
     _cli.deploy._cleanup_worktrees
     return "$rc"

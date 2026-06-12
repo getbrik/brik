@@ -17,12 +17,15 @@ _BRIK_MODULE_CLI_AUTHORIZE_LOADED=1
 
 # Best-effort webhook notification of the grant. An unreachable webhook is a
 # warning, never a refusal: the journal entry IS the authorization; the
-# notification only broadcasts it.
+# notification only broadcasts it. Delivery goes through notify.webhook so
+# the destination and its transport posture resolve from the referential's
+# Notification endpoint; skips silently when no webhook is configured.
 # Usage: _cli.authorize._notify <version> <digest> <environment>
 _cli.authorize._notify() {
     local version="$1" digest="$2" environment="$3"
-    local url="${BRIK_NOTIFY_WEBHOOK_URL:-}"
-    [[ -z "$url" ]] && return 0
+
+    brik.use stages.notify
+    notify.webhook_configured || return 0
 
     local payload
     payload="$(jq -n \
@@ -31,8 +34,7 @@ _cli.authorize._notify() {
         --arg environment "$environment" \
         '{event: "artifact_authorized_for", version: $version, digest: $digest, environment: $environment}')"
 
-    if ! curl -sf --max-time 10 -H 'Content-Type: application/json' \
-            -d "$payload" "$url" >/dev/null 2>&1; then
+    if ! notify.webhook --payload "$payload"; then
         log.warn "authorize: webhook notification failed (the grant stands; delivery is best-effort)"
     fi
     return 0

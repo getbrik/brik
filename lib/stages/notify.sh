@@ -320,16 +320,29 @@ notify.email() {
     return 0
 }
 
+# notify.webhook_configured - succeed when a webhook destination exists
+# (variable or declared Notification endpoint). Lets verb-side callers skip
+# silently instead of warning on every run without a webhook.
+notify.webhook_configured() {
+    [[ -n "${BRIK_NOTIFY_WEBHOOK_URL:-}" ]] && return 0
+    [[ -n "$(_notify._webhook_endpoint 2>/dev/null | jq -r '.url // empty' 2>/dev/null)" ]]
+}
+
 # Send a webhook notification via HTTP POST.
-# Usage: notify.webhook --message <text> [--url-var <VAR>] [--url <URL>] [--dry-run]
+# Usage: notify.webhook --message <text> | --payload <json>
+#        [--url-var <VAR>] [--url <URL>] [--dry-run]
 # Reads default URL from BRIK_NOTIFY_WEBHOOK_URL or the variable named by --url-var.
+# --payload posts the given JSON document verbatim (the structured CD
+# notifications: deploy outcome, promotion, authorization) instead of the
+# text envelope; destination and transport posture resolve identically.
 notify.webhook() {
-    local message="" url_var="" dry_run="${BRIK_DRY_RUN:-}"
+    local message="" payload="" url_var="" dry_run="${BRIK_DRY_RUN:-}"
     local url="${BRIK_NOTIFY_WEBHOOK_URL:-}"
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --message) message="$2"; shift 2 ;;
+            --payload) payload="$2"; shift 2 ;;
             --url-var) url_var="$2"; shift 2 ;;
             --url) url="$2"; shift 2 ;;
             --dry-run) dry_run="true"; shift ;;
@@ -337,8 +350,12 @@ notify.webhook() {
         esac
     done
 
-    if [[ -z "$message" ]]; then
-        log.error "webhook message is required"
+    if [[ -z "$message" && -z "$payload" ]]; then
+        log.error "webhook message or payload is required"
+        return "$BRIK_EXIT_INVALID_INPUT"
+    fi
+    if [[ -n "$payload" ]] && ! printf '%s' "$payload" | jq -e . >/dev/null 2>&1; then
+        log.error "webhook payload is not valid JSON"
         return "$BRIK_EXIT_INVALID_INPUT"
     fi
 
@@ -380,10 +397,12 @@ notify.webhook() {
         return 0
     fi
 
-    # Escape message to prevent JSON injection.
-    local safe_message="${message//\\/\\\\}"
-    safe_message="${safe_message//\"/\\\"}"
-    local payload="{\"text\":\"${safe_message}\",\"project\":\"${BRIK_PROJECT_NAME:-unknown}\",\"platform\":\"${BRIK_PLATFORM:-unknown}\"}"
+    if [[ -z "$payload" ]]; then
+        # Escape message to prevent JSON injection.
+        local safe_message="${message//\\/\\\\}"
+        safe_message="${safe_message//\"/\\\"}"
+        payload="{\"text\":\"${safe_message}\",\"project\":\"${BRIK_PROJECT_NAME:-unknown}\",\"platform\":\"${BRIK_PLATFORM:-unknown}\"}"
+    fi
 
     if [[ "$dry_run" == "true" ]]; then
         log.info "[dry-run] webhook POST to $url"

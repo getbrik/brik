@@ -16,6 +16,23 @@
       "type": "string",
       "enum": ["required", "warn", "off"]
     },
+    "retention": {
+      "description": "Informative declaration of the proof-retention posture. Enforcement is delegated to the stores that hold the proofs (the registry's GC for digests and attestation referrers, the git host's policies for the state-repo): brik never purges anything, and a proof referenced by a journal event must outlive the deployments it vouches for. Declared here so audits read the posture from one governed place.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "registry_days": {
+          "description": "How long the registry keeps published digests and their attestation referrers, in days. 0 means unlimited.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "state_repo_days": {
+          "description": "How long the git host keeps the state-repo history (evidence files, promotion and deployment journals), in days. 0 means unlimited. Journal events consumed by eligibility gates must not be purged before the artifacts they grant.",
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
     "allow": {
       "description": "Org-wide allowlists. Each entry MUST carry both reason and expires; permanent allowlists are not supported by design.",
       "type": "object",

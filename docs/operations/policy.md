@@ -52,6 +52,21 @@ Required fields per CVE entry: `id` (CVE-XXXX-N..), `reason`, `expires`
 (YYYY-MM-DD). Required for path entries: `glob`, `reason`, `expires`.
 Wildcards in `projects[]` are not supported in v1 -- use exact matches.
 
+Beyond findings management, the file also carries two CD governance knobs:
+
+```yaml
+state_repo_protection: required   # required | warn | off (absent = warn)
+
+retention:                        # informative: documents the GC configured
+  registry_days: 730              # on the registry and the git host; brik
+  state_repo_days: 0              # never purges (0 = unlimited)
+```
+
+`state_repo_protection` gates the deploy on the state-repo branch protection
+(fail-closed when `required`). `retention` is declarative only -- see
+[proof retention](risk-management.md#proof-retention) for the operating
+rules.
+
 ## Distribution and infrastructure referential
 
 The `url` of the infrastructure referential's `Policy` document points the

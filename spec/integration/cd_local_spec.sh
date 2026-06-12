@@ -913,4 +913,57 @@ EOF
       The output should include "NO_EVENTS"
     End
   End
+
+  Describe "CD notification (webhook)"
+    # A run that reached the deploy broadcasts its outcome (environment,
+    # version, digest, enforced gates) to the configured webhook,
+    # best-effort. The URL-aware curl mock serves the registry digest
+    # resolution and records the webhook POST arguments.
+    setup_hook() {
+      HOOK_LOG="$(mktemp)"
+      cat > "${MOCKBIN}/curl" <<EOF
+#!/bin/sh
+for a in "\$@"; do
+  case "\$a" in
+    *hooks.test*) printf '%s\n' "\$@" >> "${HOOK_LOG}"; exit 0 ;;
+  esac
+done
+printf "HTTP/1.1 200 OK\\r\\nDocker-Content-Digest: ${DIGEST}\\r\\n\\r\\n"
+exit 0
+EOF
+      chmod +x "${MOCKBIN}/curl"
+      export BRIK_NOTIFY_WEBHOOK_URL="http://hooks.test/notify"
+    }
+    cleanup_hook() { rm -f "$HOOK_LOG"; unset BRIK_NOTIFY_WEBHOOK_URL; }
+    Before 'setup_hook'
+    After 'cleanup_hook'
+
+    It "broadcasts the outcome with environment, digest and gates"
+      deploy_notifies() {
+        cd "$REPO"
+        PATH="${MOCKBIN}:$PATH" cli.deploy.run --version v1.2.3 --environment staging >/dev/null 2>/dev/null || return $?
+        cat "$HOOK_LOG"
+      }
+      When call deploy_notifies
+      The status should equal 0
+      The output should include '"event": "deploy"'
+      The output should include '"status": "success"'
+      The output should include '"environment": "staging"'
+      The output should include "$DIGEST"
+      The output should include "require_digest"
+    End
+
+    It "does not notify when no webhook is configured"
+      deploy_quiet() {
+        unset BRIK_NOTIFY_WEBHOOK_URL
+        cd "$REPO"
+        PATH="${MOCKBIN}:$PATH" cli.deploy.run --version v1.2.3 --environment staging >/dev/null 2>/dev/null || return $?
+        [ -s "$HOOK_LOG" ] && return 1
+        printf 'NO_NOTIFICATION'
+      }
+      When call deploy_quiet
+      The status should equal 0
+      The output should include "NO_NOTIFICATION"
+    End
+  End
 End

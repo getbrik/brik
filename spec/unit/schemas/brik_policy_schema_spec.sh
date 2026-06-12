@@ -276,4 +276,24 @@ Describe "schemas/policy/v1/brik-policy.schema.json"
       The status should be success
     End
   End
+
+  Describe "retention (informative declaration)"
+    It "accepts the two per-store day counts"
+      Skip if "jv not installed" jv_missing
+      When call validate_policy '{"retention": {"registry_days": 730, "state_repo_days": 0}}'
+      The status should be success
+    End
+
+    It "rejects a negative day count"
+      Skip if "jv not installed" jv_missing
+      When call validate_policy '{"retention": {"registry_days": -1}}'
+      The status should be failure
+    End
+
+    It "rejects unknown retention keys"
+      Skip if "jv not installed" jv_missing
+      When call validate_policy '{"retention": {"artifact_days": 30}}'
+      The status should be failure
+    End
+  End
 End

@@ -197,10 +197,10 @@ Describe "stages/notify.sh - internals"
   End
 
   Describe "notify.webhook"
-    It "returns 2 when no message specified"
+    It "returns 2 when neither message nor payload is specified"
       When call notify.webhook
       The status should equal 2
-      The stderr should include "webhook message is required"
+      The stderr should include "webhook message or payload is required"
     End
 
     Describe "referential Notification endpoint (service webhook)"
@@ -312,6 +312,40 @@ YAML
         When call invoke_var_url
         The status should be success
       End
+
+      It "posts a structured payload verbatim with --payload"
+        invoke_payload() {
+          notify.webhook --payload '{"event":"deploy","status":"success","digest":"sha256:abc"}' 2>/dev/null || return 1
+          grep -q '"event":"deploy"' "$MOCK_LOG"
+        }
+        When call invoke_payload
+        The status should be success
+      End
+
+      It "rejects a payload that is not valid JSON"
+        When call notify.webhook --payload '{not json'
+        The status should equal 2
+        The stderr should include "not valid JSON"
+      End
+    End
+  End
+
+  Describe "notify.webhook_configured"
+    It "succeeds when the variable is set"
+      probe_configured() {
+        BRIK_NOTIFY_WEBHOOK_URL="https://hooks.example.com/x" notify.webhook_configured
+      }
+      When call probe_configured
+      The status should be success
+    End
+
+    It "fails when nothing is configured"
+      probe_unconfigured() {
+        unset BRIK_NOTIFY_WEBHOOK_URL
+        notify.webhook_configured
+      }
+      When call probe_unconfigured
+      The status should be failure
     End
   End
 
