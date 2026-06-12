@@ -45,6 +45,16 @@ Describe "shared-libs/jenkins/vars/brikDockerArgs.groovy"
     The status should be success
   End
 
+  # attest attaches the signed referrers to the digest, a registry WRITE:
+  # the signing container alone receives the write identity, remapped from
+  # BRIK_SIGNING_REGISTRY_* onto the standard names (rightmost --env-file
+  # duplicate wins on the docker run line).
+  It "remaps BRIK_SIGNING_REGISTRY_* onto BRIK_REGISTRY_* in the signing env-file"
+    remap_lines() { grep -cF "printf 'BRIK_REGISTRY_" "$GROOVY"; }
+    When call remap_lines
+    The output should equal 2
+  End
+
   It "does not put COSIGN_ signing material in the CI env-file"
     leaks_cosign() { grep -F "grep -E '^(NEXUS_|BRIK_|REGISTRY_|CARGO_|COSIGN_)'" "$GROOVY"; }
     When run leaks_cosign

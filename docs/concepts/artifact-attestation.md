@@ -134,6 +134,20 @@ the credential:
   - **Jenkins**: the shared library writes a dedicated signing env-file
     (`BRIK_SIGNING_*` and `COSIGN_*`) and mounts it only on the
     container-scan container; the CI and deploy env-files exclude it.
+    **Caveat**: `docker.inside()` re-injects the whole build environment as
+    trailing `-e` flags on every stage container, so a secret declared as a
+    CONTROLLER GLOBAL (JCasC `globalNodeProperties`) reaches every container
+    regardless of the env-files. The isolation claim holds only when the
+    signing secret is delivered per-stage -- bind it with `withCredentials`
+    around the signing stage, or keep it out of the build globals -- not as
+    a global the plugin re-broadcasts.
+    Signing also writes to the registry (the attestation referrers attach
+    to the digest), so `BRIK_SIGNING_REGISTRY_USER`/`_PASSWORD` are remapped
+    onto the standard `BRIK_REGISTRY_*` names for the signing container at
+    the `withEnv` level (where the plugin reads its `-e` values; the
+    env-file remap only wins for values that are not build globals): the
+    write identity reaches only the signing container while every other
+    container keeps the read-only account.
   - **Local runs** make no L2 claim: the credential is already in the
     operator's shell (`builder.id` says `local`, and a verifier pins the
     expected builder with `gates.expected_builder`).

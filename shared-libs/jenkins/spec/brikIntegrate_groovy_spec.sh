@@ -198,8 +198,17 @@ Describe "shared-libs/jenkins brikIntegrate.groovy - artifact layout"
   End
 
   Describe "scopes the signing credential to the container-scan container"
-    It "runs container-scan with signingDockerArgs, the other stages with dockerArgs"
-      When call grep -F "(sid == 'container-scan') ? signingDockerArgs : dockerArgs" "$GROOVY"
+    It "runs container-scan with signingDockerArgs under the write-identity withEnv"
+      When call grep -F "withEnv(signingEnv)" "$GROOVY"
+      The status should be success
+      The output should be present
+    End
+
+    # docker.inside() re-injects the whole build env as trailing -e flags,
+    # which beat any --env-file on the run line: a remap of controller
+    # globals only wins at the withEnv level.
+    It "remaps BRIK_SIGNING_REGISTRY_* at the withEnv level for container-scan"
+      When call grep -F 'signingEnv << "BRIK_REGISTRY_USER=${env.BRIK_SIGNING_REGISTRY_USER}"' "$GROOVY"
       The status should be success
       The output should be present
     End

@@ -103,8 +103,18 @@ def call(Map config = [:]) {
     sh """env | grep -E '^(NEXUS_|BRIK_|REGISTRY_|ARGOCD_|SSH_)' | grep -vE '^(BRIK_RUNNER_CLASSES_FILE=|BRIK_SIGNING_)' > '${deployEnvFile}' 2>/dev/null || true"""
     def deployEnvFileArg = fileExists(deployEnvFile) && readFile(deployEnvFile).trim() ? "--env-file ${deployEnvFile}" : ''
 
+    // The signing phase also needs the registry WRITE identity (attest
+    // attaches the signed referrers to the digest), while the other
+    // containers carry the read-only account. BRIK_SIGNING_REGISTRY_* maps
+    // onto the standard BRIK_REGISTRY_* names here: the signing env-file is
+    // appended after the CI env-file on the docker run line and the
+    // rightmost duplicate wins, so the write identity reaches only the
+    // container-scan container.
     def signingEnvFile = "/tmp/brik-signing-env-${env.BUILD_TAG}"
-    sh """env | grep -E '^(BRIK_SIGNING_|COSIGN_)' > '${signingEnvFile}' 2>/dev/null || true"""
+    sh """{ env | grep -E '^(BRIK_SIGNING_|COSIGN_)';
+            [ -n "\${BRIK_SIGNING_REGISTRY_USER:-}" ] && printf 'BRIK_REGISTRY_USER=%s\\n' "\$BRIK_SIGNING_REGISTRY_USER";
+            [ -n "\${BRIK_SIGNING_REGISTRY_PASSWORD:-}" ] && printf 'BRIK_REGISTRY_PASSWORD=%s\\n' "\$BRIK_SIGNING_REGISTRY_PASSWORD";
+            true; } > '${signingEnvFile}' 2>/dev/null || true"""
     def signingEnvFileArg = fileExists(signingEnvFile) && readFile(signingEnvFile).trim() ? "--env-file ${signingEnvFile}" : ''
 
     def javaEnvArgs = "-e MAVEN_OPTS=\"-Dmaven.repo.local=${env.WORKSPACE}/.m2/repository\" -e GRADLE_USER_HOME=${env.WORKSPACE}/.gradle"

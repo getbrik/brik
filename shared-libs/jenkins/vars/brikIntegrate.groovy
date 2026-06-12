@@ -462,8 +462,27 @@ def call(Map params = [:]) {
                             runInDeploy(sid)
                         } else {
                             def image = brikDriver.resolveImage(s.runner_class, resolvedImage)
-                            def stageArgs = (sid == 'container-scan') ? signingDockerArgs : dockerArgs
-                            brikRunStage(image: image, stageName: sid, brikHome: brikHome, dockerArgs: stageArgs)
+                            if (sid == 'container-scan') {
+                                // docker.inside() re-injects the whole build
+                                // env as trailing -e flags, which beat any
+                                // --env-file on the run line: when the write
+                                // identity comes from a controller global,
+                                // the remap must happen at the withEnv level
+                                // to actually win. The env-file remap still
+                                // covers values that are not build globals.
+                                def signingEnv = []
+                                if (env.BRIK_SIGNING_REGISTRY_USER) {
+                                    signingEnv << "BRIK_REGISTRY_USER=${env.BRIK_SIGNING_REGISTRY_USER}"
+                                }
+                                if (env.BRIK_SIGNING_REGISTRY_PASSWORD) {
+                                    signingEnv << "BRIK_REGISTRY_PASSWORD=${env.BRIK_SIGNING_REGISTRY_PASSWORD}"
+                                }
+                                withEnv(signingEnv) {
+                                    brikRunStage(image: image, stageName: sid, brikHome: brikHome, dockerArgs: signingDockerArgs)
+                                }
+                            } else {
+                                brikRunStage(image: image, stageName: sid, brikHome: brikHome, dockerArgs: dockerArgs)
+                            }
                         }
                         stashBrikArtifacts(sid)
                     }
