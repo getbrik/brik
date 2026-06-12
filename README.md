@@ -145,15 +145,18 @@ flowchart LR
     gates --> deploy["Deploy<br/>pinned digest"]
     deploy --> health["Rollout<br/>health"]
     health --> readback["Read-back<br/>live state"]
-    readback --> journal["Journal<br/>validates_for"]
+    readback --> journal["Journal<br/>deployed + validates_for"]
     journal --> notify["Notify"]
 ```
 
 The CD flow resolves the version to a digest in the channel the environment
 accepts, walks the fail-closed gates, deploys the pinned digest, checks the
 rollout health, reads the live state back, and journals the result -- a
-green deploy on staging can grant the same digest for production
-(`validates_for`).
+`deployed` event for this environment, and, when the deploy heads a chain, a
+`validates_for` grant of the same digest for the next one (a green deploy on
+staging can bless production). `brik status --environment <e>` then reports
+the environment as three layers -- the journal, the definition a deploy
+would apply now, and the live digest -- and flags any drift between them.
 
 That is not a convention. It is the structural shape of both flows. You
 cannot accidentally ship broken or unverified code by editing the pipeline,
@@ -275,6 +278,7 @@ brik stage test                                      # one stage
 brik deploy --version v1.2.3 --environment staging   # CD: verify and deploy a built version
 brik promote --version v1.2.3                        # copy artifact + evidence to the release channel
 brik authorize --version v1.2.3 --for production     # grant a digest for an environment
+brik status --environment staging                    # journal + desired + live, with drift
 brik plan --explain                                  # show what will run on this commit, and why
 brik validate                                        # validate brik.yml against the schema
 brik doctor                                          # check prerequisites

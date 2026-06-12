@@ -25,6 +25,17 @@ The Deploy stage in the 12-stage graph below stays available as an opt-in stage
 of the integrated path; the decoupled CD verb is the way to deploy a built
 version on its own cadence.
 
+Three more operator-side verbs sit around the CD flow:
+
+- **`brik promote --version <v>`** copies an artifact and its signed evidence
+  graph between channels (the on-demand counterpart of the `promote` stage);
+- **`brik authorize --version <v> --for <env>`** appends a digest-bound grant to
+  the promotion journal, which the `requires_eligibility` gate reads;
+- **`brik status --environment <e>`** reports an environment as three layers --
+  the last journaled deploy, the definition a deploy would apply now, and the
+  live digest -- and flags drift between them. It never presents the journal
+  alone as the live state. See [proof and journals](#proof-and-journals).
+
 ## The stage graph
 
 ```mermaid
@@ -139,6 +150,28 @@ The Test stage also emits a canonical `[brik] coverage: XX.XX%` log line so the
 GitLab coverage badge wires up with no per-project regex. See the
 [test reference](../configuration/reference/test.md) for the keys and
 [GitLab platform](../platforms/gitlab.md#coverage-reports) for the badge recipe.
+
+## Proof and journals
+
+When a project declares a state-repo (`.artifacts.evidence.repo`), both flows
+write to it as append-only, optionally ssh-signed git commits. brik stays
+stateless -- the authority of any record is the signed commit, never a field
+in the document. One repository per project holds three trees:
+
+| Tree | Written by | Holds |
+|------|-----------|-------|
+| evidence | Container Scan | the signed CycloneDX SBOM and SLSA provenance attached to the digest |
+| `promotions/` | `promote` / `authorize` / a chained deploy | `artifact_promoted`, `artifact_authorized_for`, `artifact_validated_for` -- the grants `requires_eligibility` reads |
+| `deployments/` | a green `deploy` | one `deployed` event per digest per environment, carrying the `definition_hash` (the drift anchor), `version_ref` and `env_config_ref` |
+
+A `deployed` event is appended only after the rollout and a live read-back that
+agrees with the pinned digest: a journal entry never vouches for a state that
+was not observed. `brik status --environment <e>` reads the last `deployed`
+event back (verifying the journal tip signature when the evidence is signed),
+re-derives the `definition_hash` of what a deploy would apply now, and reads
+the live digest -- three layers, with definition drift and live drift reported
+separately. On a gitops target the reconciler corrects live drift; on a
+push-based target it is detected but not corrected.
 
 ## See also
 
