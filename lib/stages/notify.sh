@@ -411,14 +411,18 @@ notify.webhook() {
 
     pipeline.require_tool curl || return "$BRIK_EXIT_MISSING_DEP"
 
+    local _curl_rc=0
     curl --silent --max-time 10 --connect-timeout 5 \
         ${transport[@]+"${transport[@]}"} \
         -H "Content-Type: application/json" \
         -d "$payload" \
-        "$url" >/dev/null || {
-        log.error "webhook notification failed"
+        "$url" >/dev/null || _curl_rc=$?
+    if [[ "$_curl_rc" -ne 0 ]]; then
+        # The curl exit code names the failure mode (6 dns, 7 refused,
+        # 28 timeout, 60 tls) -- without it a dead webhook is undebuggable.
+        log.error "webhook notification failed (curl rc=${_curl_rc})"
         return "$BRIK_EXIT_EXTERNAL_FAIL"
-    }
+    fi
 
     log.info "webhook notification sent"
     return 0
