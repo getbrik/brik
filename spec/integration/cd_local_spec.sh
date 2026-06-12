@@ -257,9 +257,9 @@ YAML
     # (file:// fixture); the gate must find every configured event type for
     # the resolved digest and the target environment.
     setup_eligibility() {
-      EL_REPO="$(mktemp -d)"
+      EL_SEED="$(mktemp -d)"
       (
-        cd "$EL_REPO"
+        cd "$EL_SEED"
         git init -q -b main
         git config user.email "e2e@brik.dev"
         git config user.name "e2e"
@@ -267,6 +267,10 @@ YAML
         git add -A >/dev/null
         git commit -q -m "seed"
       )
+      # The store is bare: a green deploy journals its deployed event there.
+      EL_DIR="$(mktemp -d)"
+      EL_REPO="${EL_DIR}/state.git"
+      git clone -q --bare "$EL_SEED" "$EL_REPO"
       EL_REPO_URL="file://$EL_REPO" yq -i \
         '.artifacts.evidence = {"repo": strenv(EL_REPO_URL), "branch": "main", "sign": false}
          | .deploy.environments.staging.gates.requires_eligibility = ["artifact_authorized_for"]' \
@@ -275,20 +279,21 @@ YAML
         "$DIGEST" > "${MOCKBIN}/curl"
       chmod +x "${MOCKBIN}/curl"
     }
-    cleanup_eligibility() { rm -rf "$EL_REPO"; }
+    cleanup_eligibility() { rm -rf "$EL_SEED" "$EL_DIR"; }
     Before 'setup_eligibility'
     After 'cleanup_eligibility'
 
     seed_grant() {
       local digest="$1" env="$2"
-      mkdir -p "$EL_REPO/promotions/2026/06/11"
+      mkdir -p "$EL_SEED/promotions/2026/06/11"
       jq -n --arg d "$digest" --arg e "$env" \
         '{schema: "brik.promotion-event/v1", type: "artifact_authorized_for",
           version: "v1.2.3", digest: $d, timestamp: "2026-06-11T14:30:00Z",
           environment: $e}' \
-        > "$EL_REPO/promotions/2026/06/11/20260611T143000Z-aaaa0000aaaa0000.json"
-      git -C "$EL_REPO" add -A >/dev/null
-      git -C "$EL_REPO" commit -q -m "promotion: artifact_authorized_for v1.2.3"
+        > "$EL_SEED/promotions/2026/06/11/20260611T143000Z-aaaa0000aaaa0000.json"
+      git -C "$EL_SEED" add -A >/dev/null
+      git -C "$EL_SEED" commit -q -m "promotion: artifact_authorized_for v1.2.3"
+      git -C "$EL_SEED" push -q "file://$EL_REPO" main
     }
 
     It "refuses the deploy when the journal carries no grant for the environment"
@@ -366,9 +371,9 @@ YAML
     # cannot be proven (rc 7): 'required' must refuse, 'warn' must continue,
     # 'off' must not even attempt it.
     setup_protection() {
-      PROT_REPO="$(mktemp -d)"
+      PROT_SEED="$(mktemp -d)"
       (
-        cd "$PROT_REPO"
+        cd "$PROT_SEED"
         git init -q -b main
         git config user.email "brik-ci@noreply"
         git config user.name "Brik CI"
@@ -376,6 +381,10 @@ YAML
         git add -A >/dev/null
         git commit -q -m "evidence: seed"
       )
+      # The store is bare: a green deploy journals its deployed event there.
+      PROT_DIR="$(mktemp -d)"
+      PROT_REPO="${PROT_DIR}/state.git"
+      git clone -q --bare "$PROT_SEED" "$PROT_REPO"
       PROT_REPO_URL="file://$PROT_REPO" yq -i \
         '.artifacts.evidence = {"repo": strenv(PROT_REPO_URL), "branch": "main", "sign": false}' \
         "$REPO/brik.yml"
@@ -393,7 +402,7 @@ exit 0
 EOF
       chmod +x "${MOCKBIN}/curl"
     }
-    cleanup_protection() { rm -rf "$PROT_REPO"; }
+    cleanup_protection() { rm -rf "$PROT_SEED" "$PROT_DIR"; }
     Before 'setup_protection'
     After 'cleanup_protection'
 
@@ -454,16 +463,29 @@ EOF
       mkdir -p "$INFRA/trust"
       printf 'brik-ci@noreply namespaces="git" %s\n' "$(cat "$EV_KEYDIR/id_ed25519.pub")" \
         > "$INFRA/trust/allowed_signers"
+      # A green deploy now journals a deployed event into the store with
+      # --sign: the referential must carry the evidence-signing credential
+      # and the store must be a bare repo that accepts the push.
+      mkdir -p "$INFRA/credentials"
+      cat > "$INFRA/credentials/evidence-signing.yml" <<YAML
+apiVersion: brik.dev/referential/v1
+kind: Credential
+name: evidence-signing
+method: ssh-key
+private_key: file://$EV_KEYDIR/id_ed25519
+YAML
 
-      EV_REPO="$(mktemp -d)"
+      EV_SEED="$(mktemp -d)"
       (
-        cd "$EV_REPO"
+        cd "$EV_SEED"
         git init -q -b main
         git config user.email "brik-ci@noreply"
         git config user.name "Brik CI"
         printf '{}\n' > event.json
         git add -A >/dev/null
       )
+      EV_DIR="$(mktemp -d)"
+      EV_REPO="${EV_DIR}/state.git"
 
       EV_REPO_URL="file://$EV_REPO" yq -i \
         '.artifacts.evidence = {"repo": strenv(EV_REPO_URL), "branch": "main", "sign": true}' \
@@ -471,18 +493,23 @@ EOF
       printf '#!/bin/sh\nprintf "HTTP/1.1 200 OK\\r\\nDocker-Content-Digest: %s\\r\\n\\r\\n"\nexit 0\n' "$DIGEST" > "${MOCKBIN}/curl"
       chmod +x "${MOCKBIN}/curl"
     }
-    cleanup_evidence() { rm -rf "$EV_KEYDIR" "$EV_REPO"; }
+    cleanup_evidence() { rm -rf "$EV_KEYDIR" "$EV_SEED" "$EV_DIR"; }
     Before 'setup_evidence'
     After 'cleanup_evidence'
 
-    sign_evidence_head() {
-      git -C "$EV_REPO" -c gpg.format=ssh -c user.signingKey="$EV_KEYDIR/id_ed25519" \
+    seed_evidence_signed() {
+      git -C "$EV_SEED" -c gpg.format=ssh -c user.signingKey="$EV_KEYDIR/id_ed25519" \
         commit -q -S -m "evidence: seed"
+      git clone -q --bare "$EV_SEED" "$EV_REPO"
+    }
+    seed_evidence_unsigned() {
+      git -C "$EV_SEED" commit -q -m "evidence: seed"
+      git clone -q --bare "$EV_SEED" "$EV_REPO"
     }
 
     It "verifies the signed evidence HEAD and deploys"
       deploy_ev_ok() {
-        sign_evidence_head
+        seed_evidence_signed
         cd "$REPO"
         PATH="${MOCKBIN}:$PATH" cli.deploy.run --version v1.2.3 --environment staging
       }
@@ -490,11 +517,12 @@ EOF
       The status should equal 0
       The output should include "@${DIGEST}"
       The stderr should include "evidence store HEAD signature verified"
+      The stderr should include "journaled deployed v1.2.3 (staging)"
     End
 
     It "refuses to deploy when the evidence HEAD is unsigned (fail-closed)"
       deploy_ev_unsigned() {
-        git -C "$EV_REPO" commit -q -m "evidence: seed"
+        seed_evidence_unsigned
         cd "$REPO"
         PATH="${MOCKBIN}:$PATH" cli.deploy.run --version v1.2.3 --environment staging
       }
@@ -505,7 +533,7 @@ EOF
 
     It "skips the verification when the project does not declare signed evidence"
       deploy_ev_unsigned_ok() {
-        git -C "$EV_REPO" commit -q -m "evidence: seed"
+        seed_evidence_unsigned
         # Flip the declaration: unsigned evidence is a legal posture.
         yq -i '.artifacts.evidence.sign = false' "$REPO/brik.yml"
         cd "$REPO"
@@ -576,6 +604,21 @@ EOF
       The output should include '"type": "artifact_validated_for"'
       The output should include '"environment": "production"'
       The output should include "\"digest\": \"${DIGEST}\""
+      The stderr should include "journaled artifact_validated_for"
+    End
+
+    It "appends the deployed record before the chain validation"
+      deploy_ordered() {
+        cd "$REPO"
+        PATH="${MOCKBIN}:$PATH" cli.deploy.run --version v1.2.3 --environment staging >/dev/null || return $?
+        # Newest first: the validation must sit on top of the deployed
+        # record it vouches for.
+        git --git-dir="$VAL_REPO" log --format=%s main
+      }
+      When call deploy_ordered
+      The status should equal 0
+      The line 1 of output should include "promotion: artifact_validated_for"
+      The line 2 of output should include "deployment: deployed staging"
       The stderr should include "journaled artifact_validated_for"
     End
 
@@ -712,6 +755,160 @@ EOF
         journal_events
       }
       When call deploy_dryrun
+      The status should equal 0
+      The output should include "NO_EVENTS"
+    End
+  End
+
+  Describe "deployment journal (deployed event)"
+    # A green digest-pinned deploy on a project that declares a state-repo
+    # appends a 'deployed' event for THIS environment (P3-A): digest-bound
+    # (anti-replay), carrying the definition_hash drift anchor and, when the
+    # version resolves to a tag, the Layer V version_ref. No validates_for
+    # required -- the DeploymentJournal is the deploy's own record.
+    setup_deployed() {
+      DEP_SEED="$(mktemp -d)"
+      (
+        cd "$DEP_SEED"
+        git init -q -b main
+        git config user.email "e2e@brik.dev"
+        git config user.name "e2e"
+        printf '{}\n' > seed.json
+        git add -A >/dev/null
+        git commit -q -m "seed"
+      )
+      DEP_DIR="$(mktemp -d)"
+      DEP_REPO="${DEP_DIR}/state.git"
+      git clone -q --bare "$DEP_SEED" "$DEP_REPO"
+      DEP_REPO_URL="file://$DEP_REPO" yq -i \
+        '.artifacts.evidence = {"repo": strenv(DEP_REPO_URL), "branch": "main", "sign": false}' \
+        "$REPO/brik.yml"
+      printf '#!/bin/sh\nprintf "HTTP/1.1 200 OK\\r\\nDocker-Content-Digest: %s\\r\\n\\r\\n"\nexit 0\n' \
+        "$DIGEST" > "${MOCKBIN}/curl"
+      chmod +x "${MOCKBIN}/curl"
+    }
+    cleanup_deployed() { rm -rf "$DEP_SEED" "$DEP_DIR"; }
+    Before 'setup_deployed'
+    After 'cleanup_deployed'
+
+    deployed_events() {
+      local out
+      out="$(mktemp -d)"
+      git clone -q "file://$DEP_REPO" "$out" 2>/dev/null
+      if [[ -d "$out/deployments" ]]; then
+        find "$out/deployments" -name '*.json' -exec cat {} +
+      else
+        printf 'NO_EVENTS'
+      fi
+      rm -rf "$out"
+    }
+
+    It "journals a deployed event bound to the digest after a green deploy"
+      deploy_journals() {
+        cd "$REPO"
+        PATH="${MOCKBIN}:$PATH" cli.deploy.run --version v1.2.3 --environment staging >/dev/null || return $?
+        deployed_events
+      }
+      When call deploy_journals
+      The status should equal 0
+      The output should include '"type": "deployed"'
+      The output should include '"environment": "staging"'
+      The output should include "\"digest\": \"${DIGEST}\""
+      The output should include '"definition_hash": "sha256:'
+      The stderr should include "journaled deployed v1.2.3 (staging)"
+    End
+
+    It "records the Layer V ref when the version resolves to a tag"
+      deploy_tagged() {
+        git -C "$REPO" tag v1.2.3
+        local tagsha ref
+        tagsha="$(git -C "$REPO" rev-parse "v1.2.3^{commit}")"
+        cd "$REPO"
+        PATH="${MOCKBIN}:$PATH" cli.deploy.run --version v1.2.3 --environment staging >/dev/null || return $?
+        ref="$(deployed_events | jq -r '.version_ref')"
+        [ "$ref" = "$tagsha" ] && printf 'VERSION_REF_MATCHES'
+      }
+      When call deploy_tagged
+      The status should equal 0
+      The output should include "VERSION_REF_MATCHES"
+      The stderr should include "journaled deployed v1.2.3 (staging)"
+    End
+
+    It "fails the run when the declared journal cannot record"
+      deploy_journal_broken() {
+        yq -i '.artifacts.evidence.repo = "file:///nonexistent/state.git"' "$REPO/brik.yml"
+        cd "$REPO"
+        PATH="${MOCKBIN}:$PATH" cli.deploy.run --version v1.2.3 --environment staging
+      }
+      When call deploy_journal_broken
+      The status should equal 5
+      The output should include "@${DIGEST}"
+      The stderr should include "failed to journal the deployment"
+    End
+
+    It "loudly skips journaling when the deploy resolves no digest"
+      deploy_unpinned() {
+        # Drop the channel and the digest gate: an unpinned deploy is a
+        # legal posture, but has nothing provable to journal.
+        yq -i 'del(.deploy.environments.staging.accepts_channel)
+               | del(.deploy.environments.staging.gates)' "$REPO/brik.yml"
+        cd "$REPO"
+        PATH="${MOCKBIN}:$PATH" cli.deploy.run --version v1.2.3 --environment staging >/dev/null
+        printf 'RC=%s ' "$?"
+        deployed_events
+      }
+      When call deploy_unpinned
+      The status should equal 0
+      The output should include "RC=0"
+      The output should include "NO_EVENTS"
+      The stderr should include "not journaling the deployment"
+    End
+
+    It "withholds the deployed event when the live read-back contradicts the pinned digest"
+      deploy_dep_contradicted() {
+        export BRIK_READBACK_CONVERGE_TIMEOUT=1
+        cat > "${MOCKBIN}/kubectl" <<'EOF'
+#!/bin/sh
+[ "$1" = "apply" ] && cat "$3" && exit 0
+[ "$1" = "get" ] && printf 'registry.release/app@sha256:9999999999999999999999999999999999999999999999999999999999999999' && exit 0
+exit 0
+EOF
+        chmod +x "${MOCKBIN}/kubectl"
+        cd "$REPO"
+        PATH="${MOCKBIN}:$PATH" cli.deploy.run --version v1.2.3 --environment staging >/dev/null
+        local rc=$?
+        unset BRIK_READBACK_CONVERGE_TIMEOUT
+        printf 'RC=%s ' "$rc"
+        deployed_events
+      }
+      When call deploy_dep_contradicted
+      The status should equal 0
+      The output should include "RC=10"
+      The output should include "NO_EVENTS"
+      The stderr should include "read-back"
+    End
+
+    It "does not journal when the deploy fails"
+      deploy_dep_red() {
+        printf '#!/bin/sh\nexit 1\n' > "${MOCKBIN}/kubectl"
+        chmod +x "${MOCKBIN}/kubectl"
+        cd "$REPO"
+        PATH="${MOCKBIN}:$PATH" cli.deploy.run --version v1.2.3 --environment staging >/dev/null 2>/dev/null
+        [ "$?" -eq 0 ] && return 1
+        deployed_events
+      }
+      When call deploy_dep_red
+      The status should equal 0
+      The output should include "NO_EVENTS"
+    End
+
+    It "dry-run journals nothing"
+      deploy_dep_dryrun() {
+        cd "$REPO"
+        PATH="${MOCKBIN}:$PATH" cli.deploy.run --version v1.2.3 --environment staging --dry-run >/dev/null 2>/dev/null || return $?
+        deployed_events
+      }
+      When call deploy_dep_dryrun
       The status should equal 0
       The output should include "NO_EVENTS"
     End

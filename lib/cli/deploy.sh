@@ -493,18 +493,31 @@ cli.deploy.run() {
 
     transverse.lock.release "deploy-${environment}"
 
-    # Promotion-chain producer: a green deploy validates the artifact for the
-    # next environment. The validation is withheld -- and the run failed --
-    # when the live read-back contradicts the pinned digest: a journal entry
-    # must never vouch for a state that was not observed. A reconciling
-    # controller (gitops) updates its live state asynchronously, so a
-    # contradicted snapshot gets a bounded window to converge to the pinned
-    # digest before the verdict (BRIK_READBACK_CONVERGE_TIMEOUT seconds,
-    # default 120 -- raise it for slow clusters). A target without a live
-    # query (read-back unknown/unsupported) does not block: the rollout
-    # health already gated the success. Dry-run flows through publish, which
-    # only logs. A declared chain that cannot record is a failed run.
-    if [[ "$rc" -eq 0 && -n "$validates_for" ]]; then
+    # Journal producers: a deployed event for THIS environment and the
+    # promotion-chain validation for the NEXT one (validates_for) only fire
+    # on a green run, and never vouch for a state that was not observed --
+    # when the live read-back contradicts the pinned digest the run is
+    # failed and nothing is journaled. A reconciling controller (gitops)
+    # updates its live state asynchronously, so a contradicted snapshot gets
+    # a bounded window to converge to the pinned digest before the verdict
+    # (BRIK_READBACK_CONVERGE_TIMEOUT seconds, default 120 -- raise it for
+    # slow clusters). A target without a live query (read-back
+    # unknown/unsupported) does not block: the rollout health already gated
+    # the success. Dry-run flows through publish, which only logs. A
+    # declared journal that cannot record is a failed run.
+    local journal_repo=""
+    if [[ "$rc" -eq 0 ]]; then
+        brik.use transverse.config
+        journal_repo="$(config.get '.artifacts.evidence.repo' '' 2>/dev/null || printf '')"
+        if [[ -n "$journal_repo" && -z "$pinned" ]]; then
+            # The deployed event binds to the digest (anti-replay): a deploy
+            # without a pinned ref has nothing provable to record. Loud skip,
+            # never silent -- the aggregate report still records the run.
+            log.warn "a state-repo is declared but the deploy is not digest-pinned; not journaling the deployment"
+            journal_repo=""
+        fi
+    fi
+    if [[ "$rc" -eq 0 && ( -n "$validates_for" || -n "$journal_repo" ) ]]; then
         local rb_live=""
         local _backend="${BRIK_LOG_DIR}/aggregate-report.json"
         if [[ -f "$_backend" ]] && command -v jq >/dev/null 2>&1; then
@@ -522,7 +535,7 @@ cli.deploy.run() {
             }
             if transverse.wait.until _cli.deploy._readback_converged \
                     --timeout "${BRIK_READBACK_CONVERGE_TIMEOUT:-120}" --interval 5 \
-                    --message "validates_for: waiting for the live state to converge to ${pinned##*@}"; then
+                    --message "journal: waiting for the live state to converge to ${pinned##*@}"; then
                 rb_live="${pinned##*@}"
             else
                 rb_live="$(deploy.readback.live_digest --env "$environment" \
@@ -530,14 +543,43 @@ cli.deploy.run() {
             fi
         fi
         if [[ "$rb_live" =~ ^sha256: && "$rb_live" != "${pinned##*@}" ]]; then
-            brik_error "validates_for: the live read-back (${rb_live}) contradicts the pinned digest (${pinned##*@}) -- withholding the validation for '${validates_for}'"
+            brik_error "the live read-back (${rb_live}) contradicts the pinned digest (${pinned##*@}) -- failing the run and journaling nothing"
             rc="${BRIK_EXIT_CHECK_FAILED}"
         else
-            brik.use transverse.promotion_journal
-            if ! promotion_journal.record_validation \
-                    --version "$version" --digest "${pinned##*@}" \
-                    --environment "$validates_for"; then
-                rc="${BRIK_EXIT_EXTERNAL_FAIL}"
+            # Deployed event first: it is the record the chain validation
+            # vouches for, so the validation is withheld when the append
+            # fails. run_id/run_url/actor are orchestrator traceability,
+            # informational only -- authority stays with the signed commit.
+            if [[ -n "$journal_repo" ]]; then
+                brik.use transverse.deployment_journal
+                local _def_hash
+                if ! _def_hash="$(deployment_journal.definition_hash \
+                        --workspace "$workspace" --environment "$environment" \
+                        --pinned "$pinned")"; then
+                    brik_error "cannot hash the rendered definition of '${environment}' for the deployment journal"
+                    rc="${BRIK_EXIT_EXTERNAL_FAIL}"
+                else
+                    local -a _dep_ev=(--environment "$environment" --version "$version"
+                                      --digest "${pinned##*@}" --definition-hash "$_def_hash")
+                    [[ -n "${BRIK_DEPLOY_VERSION_REF:-}" ]]    && _dep_ev+=(--version-ref "$BRIK_DEPLOY_VERSION_REF")
+                    [[ -n "${BRIK_DEPLOY_ENV_CONFIG_REF:-}" ]] && _dep_ev+=(--env-config-ref "$BRIK_DEPLOY_ENV_CONFIG_REF")
+                    local _run_id="${CI_PIPELINE_ID:-${BUILD_TAG:-${BUILD_NUMBER:-}}}"
+                    local _run_url="${CI_PIPELINE_URL:-${BUILD_URL:-}}"
+                    local _actor="${GITLAB_USER_LOGIN:-${BUILD_USER_ID:-${USER:-}}}"
+                    [[ -n "$_run_id" ]]  && _dep_ev+=(--run-id "$_run_id")
+                    [[ -n "$_run_url" ]] && _dep_ev+=(--run-url "$_run_url")
+                    [[ -n "$_actor" ]]   && _dep_ev+=(--actor "$_actor")
+                    deployment_journal.record_deployment "${_dep_ev[@]}" \
+                        || rc="${BRIK_EXIT_EXTERNAL_FAIL}"
+                fi
+            fi
+            if [[ "$rc" -eq 0 && -n "$validates_for" ]]; then
+                brik.use transverse.promotion_journal
+                if ! promotion_journal.record_validation \
+                        --version "$version" --digest "${pinned##*@}" \
+                        --environment "$validates_for"; then
+                    rc="${BRIK_EXIT_EXTERNAL_FAIL}"
+                fi
             fi
         fi
     fi
