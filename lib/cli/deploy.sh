@@ -124,13 +124,27 @@ cli.deploy.run() {
     # an older version reproduces that version's definition. When HEAD is already
     # at the tag (CI->CD immediate) or no tag matches, deploy from the current
     # tree (no checkout). An explicit --config opts out (caller pinned the file).
-    local orig_workspace="${workspace}" worktree=""
+    local orig_workspace="${workspace}" worktree="" env_worktree=""
+    _cli.deploy._cleanup_worktrees() {
+        if [[ -n "$worktree" ]]; then
+            transverse.git.worktree_remove "${orig_workspace}" "${worktree}"
+        fi
+        if [[ -n "$env_worktree" ]]; then
+            transverse.git.worktree_remove "${orig_workspace}" "${env_worktree}"
+        fi
+        return 0
+    }
     if [[ -z "$config_explicit" ]] && git -C "${workspace}" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
         brik.use transverse.git
         local _tag _head _tagsha
         if _tag="$(_cli.deploy._resolve_version_tag "${workspace}" "${version}")"; then
             _head="$(git -C "${workspace}" rev-parse HEAD 2>/dev/null || true)"
             _tagsha="$(git -C "${workspace}" rev-parse "${_tag}^{commit}" 2>/dev/null || true)"
+            if [[ -n "$_tagsha" ]]; then
+                # Layer V ref, recorded in the report alongside env_config_ref
+                # (and consumed by the P3 DeploymentJournal).
+                export BRIK_DEPLOY_VERSION_REF="${_tagsha}"
+            fi
             if [[ -n "$_tagsha" && "$_head" != "$_tagsha" ]]; then
                 worktree="$(transverse.git.worktree_at "${workspace}" "${_tagsha}")" || worktree=""
                 if [[ -n "$worktree" ]]; then
@@ -138,6 +152,39 @@ cli.deploy.run() {
                     log.info "resolving deployment definition at ${_tag} (${version})"
                 fi
             fi
+        fi
+
+        # Independent Layer E (A3): the version's definition may declare that
+        # this environment's config follows a dedicated ref (config_ref)
+        # instead of the version tag, so env config changes redeploy WITHOUT a
+        # new version. The regime declaration is read from the Layer V tree
+        # (the frozen definition states how its env config is governed); the
+        # whole definition for this env -- brik.yml and the files it
+        # references -- is then read at config_ref, while the artifact stays
+        # the digest resolved for --version. Fail-closed: a declared ref that
+        # does not resolve refuses the deploy. The origin/ candidate covers CI
+        # checkouts where branches only exist as remote-tracking refs.
+        brik.use transverse.config
+        local _cfg_ref
+        _cfg_ref="$(BRIK_CONFIG_FILE="${workspace}/${BRIK_DEFAULT_CONFIG}" \
+            config.get ".deploy.environments.${environment}.config_ref" '' 2>/dev/null || printf '')"
+        if [[ -n "$_cfg_ref" ]]; then
+            local _cand
+            for _cand in "$_cfg_ref" "origin/${_cfg_ref}"; do
+                if env_worktree="$(transverse.git.worktree_at "${orig_workspace}" "$_cand")"; then
+                    break
+                fi
+                env_worktree=""
+            done
+            if [[ -z "$env_worktree" ]]; then
+                brik_error "config_ref: cannot resolve '${_cfg_ref}' for environment '${environment}' -- failing closed"
+                _cli.deploy._cleanup_worktrees
+                return "${BRIK_EXIT_CONFIG_ERROR}"
+            fi
+            workspace="$env_worktree"
+            BRIK_DEPLOY_ENV_CONFIG_REF="$(git -C "$env_worktree" rev-parse HEAD)"
+            export BRIK_DEPLOY_ENV_CONFIG_REF
+            log.info "resolving environment config for '${environment}' at ${_cfg_ref} (${BRIK_DEPLOY_ENV_CONFIG_REF})"
         fi
     fi
 
@@ -161,7 +208,7 @@ cli.deploy.run() {
     # BRIK_DEPLOY_<ENV>_* variables (target, channel, require_digest, ...).
     local wrapper="${BRIK_HOME}/shared-libs/local/scripts/local-wrapper.sh"
     if ! pipeline.require_file "${wrapper}"; then
-        [[ -n "$worktree" ]] && transverse.git.worktree_remove "${orig_workspace}" "${worktree}"
+        _cli.deploy._cleanup_worktrees
         return "${BRIK_EXIT_IO_FAILURE}"
     fi
     # shellcheck source=/dev/null
@@ -172,7 +219,7 @@ cli.deploy.run() {
     rc=$?
     set -e
     if [[ "$rc" -ne 0 ]]; then
-        [[ -n "$worktree" ]] && transverse.git.worktree_remove "${orig_workspace}" "${worktree}"
+        _cli.deploy._cleanup_worktrees
         return "$rc"
     fi
 
@@ -434,7 +481,7 @@ cli.deploy.run() {
     # `brik deploy` runs against one env must not interleave their applies.
     brik.use transverse.lock
     if ! transverse.lock.acquire "deploy-${environment}"; then
-        [[ -n "$worktree" ]] && transverse.git.worktree_remove "${orig_workspace}" "${worktree}"
+        _cli.deploy._cleanup_worktrees
         return "${BRIK_EXIT_FAILURE}"
     fi
 
@@ -495,6 +542,6 @@ cli.deploy.run() {
         fi
     fi
 
-    [[ -n "$worktree" ]] && transverse.git.worktree_remove "${orig_workspace}" "${worktree}"
+    _cli.deploy._cleanup_worktrees
     return "$rc"
 }

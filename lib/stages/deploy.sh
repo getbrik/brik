@@ -183,13 +183,21 @@ stages.deploy() {
             local _ns_val _strat_val _env_obj
             _ns_val="$(transverse.env.resolve_indirect "$namespace_var")"
             _strat_val="$(transverse.env.resolve_indirect "BRIK_DEPLOY_${upper_env}_STRATEGY")"
+            # The two definition-layer refs resolved by the CD verb: Layer V
+            # (the version's tag) and, for an env governed by config_ref, the
+            # Layer E commit its config was read at. Recorded for audit and
+            # consumed by the P3 DeploymentJournal.
             _env_obj="$(jq -nc \
                 --arg name      "$env_name" \
                 --arg target    "$target" \
                 --arg namespace "$_ns_val" \
                 --arg strategy  "$_strat_val" \
+                --arg version_ref    "${BRIK_DEPLOY_VERSION_REF:-}" \
+                --arg env_config_ref "${BRIK_DEPLOY_ENV_CONFIG_REF:-}" \
                 '{name: $name, target: $target, namespace: ( if $namespace != "" then $namespace else null end )}
-                 + ( if $strategy != "" then { strategy: $strategy } else {} end )')"
+                 + ( if $strategy != "" then { strategy: $strategy } else {} end )
+                 + ( if $version_ref != "" then { version_ref: $version_ref } else {} end )
+                 + ( if $env_config_ref != "" then { env_config_ref: $env_config_ref } else {} end )')"
             _business_envs_json="$(jq -nc \
                 --argjson arr "$_business_envs_json" \
                 --argjson obj "$_env_obj" \
