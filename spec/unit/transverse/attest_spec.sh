@@ -251,6 +251,30 @@ YAML
       The contents of file "$COSIGN_ARGS_FILE" should not include "--allow-http-registry"
     End
 
+    It "derives --registry-cacert from a declared tls.trust: custom-ca endpoint"
+      unset BRIK_COSIGN_KEY BRIK_REGISTRY_USER BRIK_REGISTRY_PASSWORD
+      yq -i '.tls.trust = "custom-ca"' "$ATTEST_INFRA/endpoints/registry.yml"
+      reg_host="$(yq '.url' "$ATTEST_INFRA/endpoints/registry.yml")"
+      reg_host="${reg_host#*://}"; reg_host="${reg_host%%/*}"; reg_host="${reg_host%%:*}"
+      mkdir -p "$ATTEST_INFRA/trust/ca/${reg_host}"
+      printf 'PEM\n' > "$ATTEST_INFRA/trust/ca/${reg_host}/ca.crt"
+      printf '{}' >"${SHELLSPEC_TMPBASE}/sbom.json"
+      When call attest.sign "$REF" --sbom "${SHELLSPEC_TMPBASE}/sbom.json"
+      The status should be success
+      The contents of file "$COSIGN_ARGS_FILE" should include "--registry-cacert"
+      The contents of file "$COSIGN_ARGS_FILE" should include "trust/ca/${reg_host}/ca.crt"
+      The contents of file "$COSIGN_ARGS_FILE" should not include "--allow-insecure-registry"
+    End
+
+    It "fails closed (7) when custom-ca is declared without its bundle"
+      unset BRIK_COSIGN_KEY
+      yq -i '.tls.trust = "custom-ca"' "$ATTEST_INFRA/endpoints/registry.yml"
+      printf '{}' >"${SHELLSPEC_TMPBASE}/sbom.json"
+      When call attest.sign "$REF" --sbom "${SHELLSPEC_TMPBASE}/sbom.json"
+      The status should equal 7
+      The stderr should include "custom-ca"
+    End
+
     It "fails closed (7) when the ref's registry host is not declared"
       unset BRIK_COSIGN_KEY
       rm "$ATTEST_INFRA/endpoints/registry.yml"

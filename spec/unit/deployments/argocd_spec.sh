@@ -66,6 +66,30 @@ YAML
       The status should be success
     End
 
+    It "maps a declared tls.trust: custom-ca endpoint to --server-crt with the bundle"
+      customca_endpoint() {
+        write_argocd_endpoint "https://argocd.lab:9443" custom-ca
+        mkdir -p "$ARGO_INFRA/trust/ca/argocd.lab"
+        printf 'PEM\n' > "$ARGO_INFRA/trust/ca/argocd.lab/ca.crt"
+        deploy.argocd.sync --app my-app 2>/dev/null || return 1
+        grep -q "\-\-server-crt" "$MOCK_LOG" \
+          && grep -q "trust/ca/argocd.lab/ca.crt" "$MOCK_LOG" \
+          && ! grep -q "\-\-insecure" "$MOCK_LOG"
+      }
+      When call customca_endpoint
+      The status should be success
+    End
+
+    It "fails closed when custom-ca is declared without its bundle"
+      customca_missing() {
+        write_argocd_endpoint "https://argocd.lab:9443" custom-ca
+        deploy.argocd.sync --app my-app
+      }
+      When call customca_missing
+      The status should equal 7
+      The stderr should include "trust/ca/argocd.lab"
+    End
+
     It "adds no insecure flag for a system-trusted https endpoint"
       secure_endpoint() {
         write_argocd_endpoint "https://argocd.internal" system

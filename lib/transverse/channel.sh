@@ -106,7 +106,7 @@ _channel._basic_credential() {
 # token. Handles registries like ghcr / Docker Hub that gate manifest reads
 # behind a token exchange.
 _channel._bearer_token() {
-    local headers="$1" basic="$2"
+    local headers="$1" basic="$2" ca="${3:-}"
     local challenge
     challenge="$(printf '%s\n' "$headers" | tr -d '\r' | grep -i '^WWW-Authenticate:' | head -1)"
     [[ -n "$challenge" ]] || return 1
@@ -117,6 +117,7 @@ _channel._bearer_token() {
     [[ -n "$realm" ]] || return 1
     local -a auth=()
     [[ -n "$basic" ]] && auth=(-H "Authorization: Basic ${basic}")
+    [[ -n "$ca" ]] && auth+=(--cacert "$ca")
     local resp
     resp="$(curl -sS --max-time 30 "${auth[@]}" "${realm}?service=${service}&scope=${scope}" 2>/dev/null)" || return 1
     printf '%s' "$resp" | jq -r '.token // .access_token // empty' 2>/dev/null
@@ -124,11 +125,17 @@ _channel._bearer_token() {
 
 # _channel._fetch_digest - resolve <name>:<version> on one scheme. Tries an
 # anonymous (or Basic, when a credential is stored) manifest GET; on a 401
-# Bearer challenge it exchanges a token and retries. Echoes the bare
+# Bearer challenge it exchanges a token and retries. An optional CA bundle
+# (custom-ca trust) pins the TLS verification of every request of the
+# resolution, token exchange included: in a private-PKI posture the auth
+# service lives in the same PKI as the registry. Echoes the bare
 # "sha256:<hex>" on success; non-zero otherwise.
 _channel._fetch_digest() {
-    local scheme="$1" host="$2" name="$3" version="$4"
+    local scheme="$1" host="$2" name="$3" version="$4" ca="${5:-}"
     local url="${scheme}://${host}/v2/${name}/manifests/${version}"
+
+    local -a tls=()
+    [[ -n "$ca" ]] && tls=(--cacert "$ca")
 
     local basic
     basic="$(_channel._basic_credential "$host")" || basic=""
@@ -137,14 +144,14 @@ _channel._fetch_digest() {
 
     local headers
     headers="$(curl -sS -L --max-time 30 -o /dev/null -D - -X GET \
-        "${auth[@]}" -H "Accept: ${_BRIK_CHANNEL_ACCEPT}" "$url" 2>/dev/null)" || return 1
+        "${tls[@]}" "${auth[@]}" -H "Accept: ${_BRIK_CHANNEL_ACCEPT}" "$url" 2>/dev/null)" || return 1
 
     if _channel._is_401 "$headers"; then
         local token
-        token="$(_channel._bearer_token "$headers" "$basic")" || return 1
+        token="$(_channel._bearer_token "$headers" "$basic" "$ca")" || return 1
         [[ -n "$token" ]] || return 1
         headers="$(curl -sS -L --max-time 30 -o /dev/null -D - -X GET \
-            -H "Authorization: Bearer ${token}" -H "Accept: ${_BRIK_CHANNEL_ACCEPT}" "$url" 2>/dev/null)" || return 1
+            "${tls[@]}" -H "Authorization: Bearer ${token}" -H "Accept: ${_BRIK_CHANNEL_ACCEPT}" "$url" 2>/dev/null)" || return 1
     fi
 
     local digest
@@ -177,13 +184,14 @@ _channel._registry_digest() {
     fi
 
     brik.use transverse.infra
-    local endpoint url scheme
+    local endpoint url scheme ca
     endpoint="$(infra.registry_for "$host")" || return "$?"
     url="$(printf '%s' "$endpoint" | jq -r '.url')"
     scheme="${url%%://*}"
+    ca="$(infra.tls_ca "$endpoint")" || return "$?"
 
     local digest
-    if ! digest="$(_channel._fetch_digest "$scheme" "$host" "$name" "$version")"; then
+    if ! digest="$(_channel._fetch_digest "$scheme" "$host" "$name" "$version" "$ca")"; then
         log.error "failed to resolve digest for ${registry}:${version} (over ${scheme})"
         return "$BRIK_EXIT_EXTERNAL_FAIL"
     fi
@@ -203,13 +211,16 @@ _channel._oras_side_args() {
     local _side="$2" _host="$3"
 
     brik.use transverse.infra
-    local _endpoint _url
+    local _endpoint _url _ca
     _endpoint="$(infra.registry_for "$_host")" || return "$?"
     _url="$(printf '%s' "$_endpoint" | jq -r '.url')"
+    _ca="$(infra.tls_ca "$_endpoint")" || return "$?"
     if [[ "$_url" == http://* ]]; then
         _oargv+=("--${_side}-plain-http")
     elif [[ "$(printf '%s' "$_endpoint" | jq -r '.tls.trust')" == "insecure" ]]; then
         _oargv+=("--${_side}-insecure")
+    elif [[ -n "$_ca" ]]; then
+        _oargv+=("--${_side}-ca-file" "$_ca")
     fi
 
     if [[ -n "${BRIK_REGISTRY_USER:-}" && -n "${BRIK_REGISTRY_PASSWORD:-}" \

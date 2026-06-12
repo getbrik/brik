@@ -342,7 +342,20 @@ deploy.gitops.diff() {
     tmpdir="$(mktemp -d)"
 
     brik.use transverse.git
-    if ! transverse.git.clone_shallow "$clone_url" "$tmpdir" --branch "$branch"; then
+    brik.use transverse.state_repo
+    local ca ca_rc=0
+    ca="$(_transverse.state_repo._ca_for_url "$repo")" || ca_rc=$?
+    if [[ "$ca_rc" -ne 0 ]]; then
+        rm -rf "$tmpdir"
+        return "$ca_rc"
+    fi
+    local clone_rc=0
+    if [[ -n "$ca" ]]; then
+        GIT_SSL_CAINFO="$ca" transverse.git.clone_shallow "$clone_url" "$tmpdir" --branch "$branch" || clone_rc=$?
+    else
+        transverse.git.clone_shallow "$clone_url" "$tmpdir" --branch "$branch" || clone_rc=$?
+    fi
+    if [[ "$clone_rc" -ne 0 ]]; then
         rm -rf "$tmpdir"
         return "$BRIK_EXIT_EXTERNAL_FAIL"
     fi

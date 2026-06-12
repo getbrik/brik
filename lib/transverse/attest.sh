@@ -210,13 +210,16 @@ _attest._registry_args() {
     local _host="${_ref%%/*}"
 
     brik.use transverse.infra
-    local _endpoint _url
+    local _endpoint _url _ca
     _endpoint="$(infra.registry_for "$_host")" || return "$?"
     _url="$(printf '%s' "$_endpoint" | jq -r '.url')"
+    _ca="$(infra.tls_ca "$_endpoint")" || return "$?"
     if [[ "$_url" == http://* ]]; then
         _argv+=(--allow-http-registry)
     elif [[ "$(printf '%s' "$_endpoint" | jq -r '.tls.trust')" == "insecure" ]]; then
         _argv+=(--allow-insecure-registry)
+    elif [[ -n "$_ca" ]]; then
+        _argv+=(--registry-cacert "$_ca")
     fi
     if [[ -n "${BRIK_REGISTRY_USER:-}" && -n "${BRIK_REGISTRY_PASSWORD:-}" ]]; then
         _argv+=(--registry-username "$BRIK_REGISTRY_USER" --registry-password "$BRIK_REGISTRY_PASSWORD")

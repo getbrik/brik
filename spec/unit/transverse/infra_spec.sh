@@ -309,6 +309,72 @@ YAML
   End
 
   # =========================================================================
+  # infra.tls_ca
+  # =========================================================================
+  Describe "infra.tls_ca"
+    Before 'make_instance'
+    After 'cleanup_instance'
+
+    custom_ca_endpoint() {
+      jq -n '{kind: "Registry", name: "secure",
+              url: "https://nexus.lab:8443/repository/docker",
+              tls: {trust: "custom-ca"}}'
+    }
+
+    It "is empty for system trust"
+      tls_system() {
+        infra.tls_ca "$(jq -n '{url: "https://r.example", tls: {trust: "system"}}')"
+      }
+      When call tls_system
+      The status should be success
+      The output should equal ""
+    End
+
+    It "is empty for insecure trust"
+      tls_insecure() {
+        infra.tls_ca "$(jq -n '{url: "http://r.example", tls: {trust: "insecure"}}')"
+      }
+      When call tls_insecure
+      The status should be success
+      The output should equal ""
+    End
+
+    It "resolves the bundle by the trust/ca/<hostname>/ convention (port and path stripped)"
+      tls_resolved() {
+        mkdir -p "$INFRA_DIR/trust/ca/nexus.lab"
+        printf 'PEM\n' > "$INFRA_DIR/trust/ca/nexus.lab/ca.crt"
+        infra.tls_ca "$(custom_ca_endpoint)"
+      }
+      When call tls_resolved
+      The status should be success
+      The output should equal "$INFRA_DIR/trust/ca/nexus.lab/ca.crt"
+    End
+
+    It "fails closed when custom-ca is declared but the bundle is absent"
+      tls_missing() {
+        infra.tls_ca "$(custom_ca_endpoint)"
+      }
+      When call tls_missing
+      The status should equal 7
+      The stderr should include "trust/ca/nexus.lab"
+    End
+
+    It "resolves a GitHost endpoint through its api_url"
+      tls_githost() {
+        mkdir -p "$INFRA_DIR/trust/ca/gitea.lab"
+        printf 'PEM\n' > "$INFRA_DIR/trust/ca/gitea.lab/ca.crt"
+        infra.tls_ca "$(jq -n '{kind: "GitHost", name: "git",
+                                api_url: "https://gitea.lab:3443/api/v1",
+                                git_url: "https://gitea.lab:3443",
+                                tls: {trust: "custom-ca"}}')"
+      }
+      When call tls_githost
+      The status should be success
+      The output should equal "$INFRA_DIR/trust/ca/gitea.lab/ca.crt"
+    End
+  End
+
+  # =========================================================================
   # infra.registry_for
   # =========================================================================
   Describe "infra.registry_for"

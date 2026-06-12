@@ -192,6 +192,35 @@ EOF
     The stderr should include "copying"
   End
 
+  It "passes the CA bundle on the side whose endpoint declares tls.trust: custom-ca"
+    copy_customca_src() {
+      yq -i '.url = "https://registry.internal" | .tls.trust = "custom-ca"' \
+        "$CHAN_INFRA/endpoints/registry-internal.yml"
+      mkdir -p "$CHAN_INFRA/trust/ca/registry.internal"
+      printf 'PEM\n' > "$CHAN_INFRA/trust/ca/registry.internal/ca.crt"
+      mock_copy_ok
+      channel.copy_with_referrers v1.2.3 candidate release >/dev/null || return $?
+      mock.call_args oras
+    }
+    When call copy_customca_src
+    The output should include "--from-ca-file"
+    The output should include "trust/ca/registry.internal/ca.crt"
+    The output should not include "--to-ca-file"
+    The stderr should include "copying"
+  End
+
+  It "fails closed when custom-ca is declared but the bundle is absent"
+    copy_customca_missing() {
+      yq -i '.url = "https://registry.internal" | .tls.trust = "custom-ca"' \
+        "$CHAN_INFRA/endpoints/registry-internal.yml"
+      mock_copy_ok
+      channel.copy_with_referrers v1.2.3 candidate release
+    }
+    When call copy_customca_missing
+    The status should equal 7
+    The stderr should include "trust/ca/registry.internal"
+  End
+
   It "passes the canonical registry credential to both sides when unscoped"
     copy_creds() {
       export BRIK_REGISTRY_USER="admin" BRIK_REGISTRY_PASSWORD="s3cr3t"

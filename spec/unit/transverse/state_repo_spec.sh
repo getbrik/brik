@@ -64,6 +64,55 @@ Describe "transverse/state_repo.sh"
   End
 
   # =========================================================================
+  # _transverse.state_repo._ca_for_url
+  # =========================================================================
+  Describe "_transverse.state_repo._ca_for_url"
+    setup_githost_ca() {
+      CA_INFRA="$(mktemp -d)"
+      mkdir -p "$CA_INFRA/endpoints" "$CA_INFRA/trust/ca/gitea.lab"
+      printf 'apiVersion: brik.dev/referential/v1\nkind: Referential\nprofile: p-lab\n' \
+        > "$CA_INFRA/referential.yml"
+      cat > "$CA_INFRA/endpoints/git.yml" <<'YAML'
+apiVersion: brik.dev/referential/v1
+kind: GitHost
+name: git
+product: gitea
+api_url: https://gitea.lab:3443/api/v1
+git_url: https://gitea.lab:3443
+tls:
+  trust: custom-ca
+YAML
+      printf 'PEM\n' > "$CA_INFRA/trust/ca/gitea.lab/ca.crt"
+      export BRIK_INFRA_DIR="$CA_INFRA"
+    }
+    cleanup_githost_ca() { rm -rf "$CA_INFRA"; unset BRIK_INFRA_DIR CA_INFRA; }
+    Before 'setup_githost_ca'
+    After 'cleanup_githost_ca'
+
+    It "resolves the bundle for a repo URL on the declared GitHost (userinfo and port ignored)"
+      When call _transverse.state_repo._ca_for_url "https://token@gitea.lab:3443/brik/state.git"
+      The status should be success
+      The output should equal "$CA_INFRA/trust/ca/gitea.lab/ca.crt"
+    End
+
+    It "is empty for a repo URL on another host"
+      When call _transverse.state_repo._ca_for_url "https://github.com/org/repo.git"
+      The status should be success
+      The output should equal ""
+    End
+
+    It "fails closed when the GitHost declares custom-ca without its bundle"
+      ca_missing() {
+        rm "$CA_INFRA/trust/ca/gitea.lab/ca.crt"
+        _transverse.state_repo._ca_for_url "https://gitea.lab:3443/brik/state.git"
+      }
+      When call ca_missing
+      The status should equal 7
+      The stderr should include "trust/ca/gitea.lab"
+    End
+  End
+
+  # =========================================================================
   # transverse.state_repo.clone
   # =========================================================================
   Describe "transverse.state_repo.clone"

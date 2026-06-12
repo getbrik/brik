@@ -56,6 +56,26 @@ _transverse.state_repo._safe_url() {
     printf '%s' "$1" | sed 's|://[^@]*@|://***@|'
 }
 
+# Internal helper: echo the CA bundle for a repo URL when the referential's
+# GitHost declares the URL's hostname with tls.trust: custom-ca. Any other
+# posture (no referential, no GitHost, another host, system/insecure trust)
+# echoes nothing; a declared custom-ca with a missing bundle fails closed
+# (infra.tls_ca). TLS trust is per-hostname, so the port is ignored.
+# Usage: ca="$(_transverse.state_repo._ca_for_url <repo_url>)" || return $?
+_transverse.state_repo._ca_for_url() {
+    local url="$1" host ghost ghost_url ghost_host
+    host="${url#*://}"; host="${host%%/*}"; host="${host##*@}"; host="${host%%:*}"
+    [[ -n "$host" ]] || return 0
+
+    brik.use transverse.infra
+    ghost="$(infra.endpoint_of_kind GitHost 2>/dev/null)" || return 0
+    ghost_url="$(printf '%s' "$ghost" | jq -r '.git_url // .api_url // ""')"
+    ghost_host="${ghost_url#*://}"; ghost_host="${ghost_host%%/*}"; ghost_host="${ghost_host%%:*}"
+    [[ "$host" == "$ghost_host" ]] || return 0
+
+    infra.tls_ca "$ghost"
+}
+
 # Clone a state-repo branch (shallow), injecting an indirect token when given.
 # Credentials are masked in all log output.
 # Usage: transverse.state_repo.clone <repo_url> <dest>
@@ -100,9 +120,14 @@ transverse.state_repo.clone() {
 
     log.info "cloning state-repo: ${safe_url}${branch:+ (branch: ${branch})}"
     brik.use transverse.git
+    local ca
+    ca="$(_transverse.state_repo._ca_for_url "$repo")" || return "$?"
     local -a args=("$clone_url" "$dest" --depth "$depth")
     [[ -n "$branch" ]] && args+=(--branch "$branch")
-    if ! transverse.git.clone_shallow "${args[@]}"; then
+    if [[ -n "$ca" ]]; then
+        GIT_SSL_CAINFO="$ca" transverse.git.clone_shallow "${args[@]}" \
+            || return "$BRIK_EXIT_EXTERNAL_FAIL"
+    elif ! transverse.git.clone_shallow "${args[@]}"; then
         return "$BRIK_EXIT_EXTERNAL_FAIL"
     fi
     return 0
@@ -368,6 +393,9 @@ transverse.state_repo.check_protection() {
 
     local -a curl_args=(-sS --max-time 30)
     [[ "$(printf '%s' "$githost" | jq -r '.tls.trust // ""')" == "insecure" ]] && curl_args+=(-k)
+    local gh_ca
+    gh_ca="$(infra.tls_ca "$githost")" || return "$?"
+    [[ -n "$gh_ca" ]] && curl_args+=(--cacert "$gh_ca")
 
     local body code matched
     body="$(mktemp)" || return "$BRIK_EXIT_IO_FAILURE"
@@ -453,8 +481,19 @@ transverse.state_repo.push() {
         return 0
     fi
 
-    local push_err
-    if ! push_err="$(GIT_TERMINAL_PROMPT=0 git -C "$repo_dir" push 2>&1)"; then
+    # The remote may live behind the referential's custom CA: resolve the
+    # bundle from the origin URL the clone recorded.
+    local remote_url ca
+    remote_url="$(git -C "$repo_dir" remote get-url origin 2>/dev/null || printf '')"
+    ca="$(_transverse.state_repo._ca_for_url "$remote_url")" || return "$?"
+
+    local push_err rc=0
+    if [[ -n "$ca" ]]; then
+        push_err="$(GIT_TERMINAL_PROMPT=0 GIT_SSL_CAINFO="$ca" git -C "$repo_dir" push 2>&1)" || rc=$?
+    else
+        push_err="$(GIT_TERMINAL_PROMPT=0 git -C "$repo_dir" push 2>&1)" || rc=$?
+    fi
+    if [[ "$rc" -ne 0 ]]; then
         local safe_err
         safe_err="$(printf '%s' "$push_err" | sed 's|://[^@]*@|://***@|')"
         log.error "git push failed: $safe_err"

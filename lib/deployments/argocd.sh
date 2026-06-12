@@ -46,10 +46,14 @@ _deploy.argocd._add_server_auth() {
         authority="${authority%%/*}"
         [[ -z "$server" ]] && server="$authority"
         if [[ "$server" == "$authority" ]]; then
+            local ca
+            ca="$(infra.tls_ca "$endpoint")" || return "$?"
             if [[ "$url" == http://* ]]; then
                 transport+=(--plaintext)
             elif [[ "$(printf '%s' "$endpoint" | jq -r '.tls.trust // ""')" == "insecure" ]]; then
                 transport+=(--insecure)
+            elif [[ -n "$ca" ]]; then
+                transport+=(--server-crt "$ca")
             fi
             [[ "$(printf '%s' "$endpoint" | jq -r '.grpc_web // false')" == "true" ]] && transport+=(--grpc-web)
         fi

@@ -371,6 +371,37 @@ infra.registry_for() {
     return "$BRIK_EXIT_CONFIG_ERROR"
 }
 
+# infra.tls_ca - echo the CA bundle path for an endpoint (JSON document)
+# declaring tls.trust: custom-ca, resolved by the trust/ca/<hostname>/ca.crt
+# convention of the referential. Any other trust value echoes nothing. The
+# hostname comes from the endpoint's url (api_url for GitHost), port and
+# path stripped. Fail-closed: a declared custom-ca whose bundle is absent
+# is CONFIG_ERROR, never a silent fallback to the system pool.
+# Usage: ca="$(infra.tls_ca "$endpoint_json")" || return $?
+infra.tls_ca() {
+    local endpoint="$1"
+    [[ "$(printf '%s' "$endpoint" | jq -r '.tls.trust // ""')" == "custom-ca" ]] \
+        || return 0
+
+    local url host root ca
+    url="$(printf '%s' "$endpoint" | jq -r '.url // .api_url // ""')"
+    host="${url#*://}"
+    host="${host%%/*}"
+    host="${host%%:*}"
+    if [[ -z "$host" ]]; then
+        log.error "infra.tls_ca: the endpoint declares custom-ca but carries no url to derive the hostname from"
+        return "$BRIK_EXIT_CONFIG_ERROR"
+    fi
+
+    root="$(infra.root)" || return "$?"
+    ca="${root}/trust/ca/${host}/ca.crt"
+    if [[ ! -f "$ca" ]]; then
+        log.error "endpoint '${host}' declares tls.trust: custom-ca but the bundle is absent at trust/ca/${host}/ca.crt"
+        return "$BRIK_EXIT_CONFIG_ERROR"
+    fi
+    printf '%s' "$ca"
+}
+
 # infra.ssh_target_for - echo (as JSON) the SshTarget endpoint declaring
 # <host> in its hosts list. Host keys and the strict-host-key stance come
 # from this declaration; an undeclared host fails closed (no env override).
