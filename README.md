@@ -107,7 +107,9 @@ running from the same repository and the same `brik.yml`:
 The two flows are decoupled in time: build once, deploy that version to any
 environment, any number of times, days later.
 
-**The CI flow** -- produce and publish verifiable evidence:
+### The CI flow
+
+Produce and publish verifiable evidence:
 
 ```mermaid
 flowchart LR
@@ -133,7 +135,9 @@ SBOM and SLSA provenance to the image digest. Promote copies the artifact
 **and its evidence graph** to the release channel, refusing to overwrite a
 different digest already published under the same version.
 
-**The CD flow** -- verify, then deploy a pinned digest:
+### The CD flow
+
+Verify, then deploy a pinned digest:
 
 ```mermaid
 flowchart LR
