@@ -44,9 +44,10 @@ _transverse.state_repo._inject_token() {
         log.error "token variable is empty: ${token_var}"
         return "$BRIK_EXIT_INVALID_ENV"
     fi
-    # Prefix the host with the token so git authenticates (the token becomes the
-    # URL userinfo).
-    printf '%s' "$repo" | sed "s|https://|https://${token}@|"
+    # Prefix the host with the token so git authenticates (the token becomes
+    # the URL userinfo). Plain-http is injected too: whether an endpoint may
+    # be cleartext is the referential's TLS posture, not this helper's call.
+    printf '%s' "$repo" | sed -E "s|^(https?://)|\\1${token}@|"
 }
 
 # Internal helper: mask credentials in a URL for safe logging.

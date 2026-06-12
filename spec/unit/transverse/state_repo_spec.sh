@@ -49,6 +49,18 @@ Describe "transverse/state_repo.sh"
       The status should equal 4
       The stderr should include "token variable is empty"
     End
+
+    It "injects the token into a plain-http URL (declared lab posture)"
+      inject_token_http() {
+        export MY_GIT_TOKEN="secret123"
+        _transverse.state_repo._inject_token "http://gitea.lab:3000/org/repo.git" "MY_GIT_TOKEN"
+        local rc=$?
+        unset MY_GIT_TOKEN
+        return $rc
+      }
+      When call inject_token_http
+      The output should equal "http://secret123@gitea.lab:3000/org/repo.git"
+    End
   End
 
   # =========================================================================
