@@ -462,6 +462,10 @@ exit \"\${MOCK_DOCKER_RC:-0}\"
 
     It "does not add a group on a non-Linux host (Docker Desktop 0666 socket)"
       check_no_group() {
+        # Pin the host OS: on a real Linux runner the un-mocked uname would
+        # take the group-add branch and the example would test the host, not
+        # the contract.
+        mock.create_script "uname" 'echo Darwin'
         brik.local.docker.run_stage_container "123-9" "package" >/dev/null 2>&1
         mock.call_args "docker"
       }

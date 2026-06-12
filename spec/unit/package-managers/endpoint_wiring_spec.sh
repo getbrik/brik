@@ -80,6 +80,10 @@ YAML
 
   It "pypi targets the endpoint url (dry-run command carries it)"
     pypi_absorbed() {
+      # Pin the publish tool: detection probes the host PATH for
+      # poetry/uv/twine, so an unmocked run tests the host, not the contract.
+      mock.create_exit "uv" 0
+      mock.activate
       write_endpoint pypi "http://nexus.lab:8081/repository/brik-pypi/"
       BRIK_DRY_RUN=true CI="" pkg.pypi.publish
     }
