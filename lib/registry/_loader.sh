@@ -43,6 +43,7 @@ declare -gA _REGISTRY_STAGE_PLACEMENT_GROUP=()
 declare -gA _REGISTRY_STAGE_PLACEMENT_AFTER=()
 declare -gA _REGISTRY_STAGE_PLACEMENT_BEFORE=()
 declare -gA _REGISTRY_STAGE_RUNNER_CLASS=()
+declare -gA _REGISTRY_STAGE_RUNNER_DOCKER=()
 declare -gA _REGISTRY_STAGE_GATE_MODE=()
 declare -gA _REGISTRY_STAGE_GATE_OPT_IN_FLAG=()
 declare -gA _REGISTRY_STAGE_GATE_CONTEXTS=()
@@ -92,6 +93,7 @@ _registry._reset() {
              _REGISTRY_STAGE_FUNCTION _REGISTRY_STAGE_PLACEMENT_SLOT \
              _REGISTRY_STAGE_PLACEMENT_GROUP _REGISTRY_STAGE_PLACEMENT_AFTER \
              _REGISTRY_STAGE_PLACEMENT_BEFORE _REGISTRY_STAGE_RUNNER_CLASS \
+             _REGISTRY_STAGE_RUNNER_DOCKER \
              _REGISTRY_STAGE_GATE_MODE _REGISTRY_STAGE_GATE_OPT_IN_FLAG \
              _REGISTRY_STAGE_GATE_CONTEXTS _REGISTRY_STAGE_DRY_RUN_DESTRUCTIVE \
              _REGISTRY_STAGE_ALIASES _REGISTRY_STAGE_API_REQUIRED \
@@ -238,6 +240,7 @@ _registry._load_stages() {
       placement_after)     _REGISTRY_STAGE_PLACEMENT_AFTER[$id]="$value" ;;
       placement_before)    _REGISTRY_STAGE_PLACEMENT_BEFORE[$id]="$value" ;;
       runner_class)        _REGISTRY_STAGE_RUNNER_CLASS[$id]="$value" ;;
+      runner_docker)       _REGISTRY_STAGE_RUNNER_DOCKER[$id]="$value" ;;
       gate_mode)           _REGISTRY_STAGE_GATE_MODE[$id]="$value" ;;
       gate_opt_in_flag)    _REGISTRY_STAGE_GATE_OPT_IN_FLAG[$id]="$value" ;;
       gate_contexts)       _REGISTRY_STAGE_GATE_CONTEXTS[$id]="$value" ;;
@@ -288,6 +291,7 @@ _registry._load_stages() {
       "\($id)\tplacement_after\t\($s.placement.after // [] | join(":"))",
       "\($id)\tplacement_before\t\($s.placement.before // [] | join(":"))",
       "\($id)\trunner_class\t\($s.runner.class // "")",
+      "\($id)\trunner_docker\t\($s.runner.docker // false | tostring)",
       "\($id)\tgate_mode\t\($s.gate.mode // "")",
       "\($id)\tgate_opt_in_flag\t\($s.gate.opt_in_flag // "")",
       "\($id)\tgate_contexts\t\($s.gate.contexts // [] | join(":"))",

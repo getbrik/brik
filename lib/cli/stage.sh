@@ -63,6 +63,16 @@ cli.stage.run() {
     # pre-existing BRIK_DRY_RUN=true exported by the caller's shell.
     [[ "$dry_run" == "true" ]] && export BRIK_DRY_RUN="true"
 
+    # Containerized local execution: on a bare host the stage runs in its
+    # runner-class container after a fresh plan (the gate applies, no
+    # bypass). Inside a CI job or a brik container the verb executes
+    # in-process: the caller IS the execution environment.
+    if brik_host_local; then
+        cli.local_runner.setup_docker_env || return "$?"
+        cli.local_runner.runtime brik.local.docker.run_single_stage "$stage_name"
+        return "$?"
+    fi
+
     cli.local_runner.setup_env || return "$?"
 
     cli.local_runner.runtime brik.local.run_stage "$stage_name"

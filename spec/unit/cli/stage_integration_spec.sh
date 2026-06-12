@@ -3,6 +3,9 @@ Describe "brik stage - integration"
 
   Describe "brik stage build --config"
     setup() {
+      # Pin the in-process (in-container) execution path: these examples
+      # exercise the verb business logic, not the containerized engine.
+      export BRIK_LOCAL_CONTAINER=1
       export BRIK_LOG_DIR
       BRIK_LOG_DIR="$(mktemp -d)"
       mock.setup
@@ -33,6 +36,9 @@ Describe "brik stage - integration"
 
   Describe "brik stage build"
     setup() {
+      # Pin the in-process (in-container) execution path: these examples
+      # exercise the verb business logic, not the containerized engine.
+      export BRIK_LOCAL_CONTAINER=1
       export BRIK_LOG_DIR
       BRIK_LOG_DIR="$(mktemp -d)"
       mock.setup
@@ -62,6 +68,9 @@ Describe "brik stage - integration"
 
   Describe "brik stage test"
     setup() {
+      # Pin the in-process (in-container) execution path: these examples
+      # exercise the verb business logic, not the containerized engine.
+      export BRIK_LOCAL_CONTAINER=1
       export BRIK_LOG_DIR
       BRIK_LOG_DIR="$(mktemp -d)"
       mock.setup
@@ -92,6 +101,12 @@ Describe "brik stage - integration"
     Include "$BRIK_HOME/spec/support/mock_helper.sh"
 
     setup() {
+
+      # Pin the in-process (in-container) execution path: these examples
+
+      # exercise the verb business logic, not the containerized engine.
+
+      export BRIK_LOCAL_CONTAINER=1
       export BRIK_LOG_DIR
       BRIK_LOG_DIR="$(mktemp -d)"
       mock.infra.setup
@@ -119,6 +134,12 @@ Describe "brik stage - integration"
     Include "$BRIK_HOME/spec/support/mock_helper.sh"
 
     setup() {
+
+      # Pin the in-process (in-container) execution path: these examples
+
+      # exercise the verb business logic, not the containerized engine.
+
+      export BRIK_LOCAL_CONTAINER=1
       export BRIK_LOG_DIR
       BRIK_LOG_DIR="$(mktemp -d)"
       mock.setup

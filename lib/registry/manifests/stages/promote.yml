@@ -12,6 +12,7 @@ spec:
     before: [deploy]
   runner:
     class: deploy
+    docker: true
   gate:
     mode: blocking
     contexts: [release]

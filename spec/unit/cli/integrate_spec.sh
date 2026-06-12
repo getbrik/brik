@@ -2,6 +2,12 @@ Describe "brik integrate"
   Include "$BRIK_HOME/spec/support/mock_helper.sh"
 
     setup() {
+
+      # Pin the in-process (in-container) execution path: these examples
+
+      # exercise the verb business logic, not the containerized engine.
+
+      export BRIK_LOCAL_CONTAINER=1
       mock.setup
       mock.create_script "npm" 'echo "mock npm: $*"'
       mock.create_exit "node" 0

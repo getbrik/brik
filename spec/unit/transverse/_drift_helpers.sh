@@ -181,7 +181,9 @@ drift.has_consumer() {
       -e 's/\[\]/([[][0-9]*[]])?/g' \
   )"
 
-  if grep -qrE "config\.get ['\"]${path_regex}['\"]" "$lib_dir" 2>/dev/null; then
+  # The path may be followed by a jq pipe inside the same quoted argument
+  # (e.g. config.get ".x.y | join(\",\")" for array leaves).
+  if grep -qrE "config\.get ['\"]${path_regex}( \| [^'\"]+)?['\"]" "$lib_dir" 2>/dev/null; then
     return 0
   fi
 

@@ -19,6 +19,9 @@ Describe "brik deploy E2E local (CD, digest-pinned)"
   DIGEST="sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 
   setup_repo() {
+    # Pin the in-process (in-container) execution path: these examples
+    # exercise the verb business logic, not the containerized engine.
+    export BRIK_LOCAL_CONTAINER=1
     REPO="$(mktemp -d)"
     MOCKBIN="$(mktemp -d)"
     (

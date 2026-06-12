@@ -25,6 +25,17 @@ Describe "brik doctor"
       When run script "${BRIK_BIN}" doctor
       The output should include "jq"
     End
+
+    It "checks the container engine (local execution prerequisite)"
+      When run script "${BRIK_BIN}" doctor
+      The output should include "docker"
+    End
+
+    It "flags a missing container engine"
+      When run command env BRIK_CONTAINER_ENGINE=brik-no-such-engine "${BRIK_BIN}" doctor
+      The status should not eq 0
+      The output should include "[MISSING] brik-no-such-engine"
+    End
   End
 
   Describe "output format"

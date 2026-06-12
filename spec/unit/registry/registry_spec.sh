@@ -535,6 +535,51 @@ Describe "lib/registry/registry.sh"
     End
   End
 
+  Describe "registry.stage.needs_docker (runner.docker)"
+    # The manifests are the single source of truth for which stages may
+    # drive the container engine; the local containerized runner mounts the
+    # docker socket only into these (governed mounts, least privilege).
+    It "build needs the engine (docker stack builds images)"
+      When call registry.stage.needs_docker build
+      The status should be success
+    End
+
+    It "package needs the engine (image build + docker publish)"
+      When call registry.stage.needs_docker package
+      The status should be success
+    End
+
+    It "promote needs the engine (legacy two-zone docker retag)"
+      When call registry.stage.needs_docker promote
+      The status should be success
+    End
+
+    It "deploy needs the engine (compose target)"
+      When call registry.stage.needs_docker deploy
+      The status should be success
+    End
+
+    It "container-scan does NOT need the engine (registry-side scan)"
+      When call registry.stage.needs_docker container-scan
+      The status should be failure
+    End
+
+    It "init does NOT need the engine"
+      When call registry.stage.needs_docker init
+      The status should be failure
+    End
+
+    It "notify does NOT need the engine"
+      When call registry.stage.needs_docker notify
+      The status should be failure
+    End
+
+    It "fails on an unknown stage"
+      When call registry.stage.needs_docker nope
+      The status should be failure
+    End
+  End
+
   Describe "registry.stage.after (placement.after)"
     It "init has no predecessors"
       When call registry.stage.after init

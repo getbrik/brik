@@ -25,6 +25,28 @@ cli.local_runner.setup_env() {
     return "$rc"
 }
 
+# cli.local_runner.setup_docker_env - host-side bootstrap of the
+# containerized engine: the local wrapper (runtime + registry, no config
+# parsing -- that happens inside the stage containers) plus the docker
+# runner module.
+cli.local_runner.setup_docker_env() {
+    local wrapper="${BRIK_HOME}/shared-libs/local/scripts/local-wrapper.sh"
+    local runner="${BRIK_HOME}/shared-libs/local/scripts/docker-runner.sh"
+    pipeline.require_file "${wrapper}" || return "$?"
+    pipeline.require_file "${runner}" || return "$?"
+    # shellcheck source=/dev/null
+    . "${wrapper}"
+    # shellcheck source=/dev/null
+    . "${runner}"
+
+    local rc
+    set +e
+    brik.local.setup_host
+    rc=$?
+    set -e
+    return "$rc"
+}
+
 # cli.local_runner.runtime - run a command with set -e disabled; return its
 # exit code.
 cli.local_runner.runtime() {

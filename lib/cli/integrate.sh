@@ -73,15 +73,29 @@ cli.integrate.run() {
     # pre-existing BRIK_DRY_RUN=true exported by the caller's shell.
     [[ "$dry_run" == "true" ]] && export BRIK_DRY_RUN="true"
 
+    if [[ -n "$plan_file" && ! -f "$plan_file" ]]; then
+        brik_error "plan file not found: $plan_file"
+        return "${BRIK_EXIT_INVALID_INPUT}"
+    fi
+
+    # Containerized local execution (the only local mode): on a bare host the
+    # flow runs one runner-class container per stage, exactly like the CI
+    # adapters -- the planner always runs (in its own container), so
+    # --auto-select is implicit here. Inside a CI job or a brik container
+    # the verb executes in-process: the caller IS the execution environment.
+    if brik_host_local; then
+        cli.local_runner.setup_docker_env || return "$?"
+        local -a engine_flags=("${pipeline_flags[@]}")
+        [[ -n "$plan_file" ]] && engine_flags+=(--plan "$plan_file")
+        cli.local_runner.runtime brik.local.docker.run_pipeline "${engine_flags[@]}"
+        return "$?"
+    fi
+
     # Plan-driven mode (D.5a of the architecture refactor chantier).
     # --plan points pipeline.plan.gate at an existing plan.json.
     # --auto-select runs the planner first and points the gate at the
     # freshly-written file. --plan takes precedence when both are set.
     if [[ -n "$plan_file" ]]; then
-        if [[ ! -f "$plan_file" ]]; then
-            brik_error "plan file not found: $plan_file"
-            return "${BRIK_EXIT_INVALID_INPUT}"
-        fi
         export BRIK_PLAN_FILE="$plan_file"
     elif [[ "$auto_select" == "true" ]]; then
         brik.use cli.plan

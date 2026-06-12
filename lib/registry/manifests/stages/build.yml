@@ -12,6 +12,7 @@ spec:
     before: [lint, sast, scan, test]
   runner:
     class: stack
+    docker: true
   gate:
     mode: blocking
     contexts: [snapshot, release]

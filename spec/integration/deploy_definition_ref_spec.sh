@@ -6,6 +6,9 @@ Describe "brik deploy resolves the definition at the version git ref (T6)"
   Include "$BRIK_HOME/spec/support/mock_helper.sh"
 
   setup_repo() {
+    # Pin the in-process (in-container) execution path: these examples
+    # exercise the verb business logic, not the containerized engine.
+    export BRIK_LOCAL_CONTAINER=1
     mock.infra.setup
     REPO="$(mktemp -d)"
     MOCKBIN="$(mktemp -d)"

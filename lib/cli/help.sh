@@ -36,8 +36,8 @@ Commands:
   validate         Validate brik.yml against the JSON Schema
   doctor           Check prerequisites (tools, stack detection)
   init             Scaffold brik.yml and platform bootstrap file
-  run stage        Execute a single pipeline stage locally
-  run pipeline     Execute the full pipeline locally
+  run stage        Execute a single pipeline stage locally (in its runner-class container)
+  run pipeline     Execute the full pipeline locally (one container per stage)
   extension test   Validate an extension manifest+module against the contract
   deploy           Deploy a version to an environment (digest-pinned CD flow)
   promote          Promote a version between artifact channels (evidence carried)

@@ -286,6 +286,15 @@ registry.stage.runner_class() {
   printf '%s\n' "${_REGISTRY_STAGE_RUNNER_CLASS[$id]}"
 }
 
+# True when the stage's manifest declares runner.docker: the stage's code may
+# drive the container engine, so the local containerized runner mounts the
+# docker socket into it (and only into these stages).
+registry.stage.needs_docker() {
+  _registry._load || return $?
+  local id; id="$(_registry._resolve_stage_id_or_die "$1")" || return $?
+  [[ "${_REGISTRY_STAGE_RUNNER_DOCKER[$id]:-false}" == "true" ]]
+}
+
 registry.stage.gate_mode() {
   _registry._load || return $?
   local id; id="$(_registry._resolve_stage_id_or_die "$1")" || return $?

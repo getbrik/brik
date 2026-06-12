@@ -9,6 +9,12 @@ Describe "brik integrate - integration"
     Include "$BRIK_HOME/spec/support/mock_helper.sh"
 
     setup() {
+
+      # Pin the in-process (in-container) execution path: these examples
+
+      # exercise the verb business logic, not the containerized engine.
+
+      export BRIK_LOCAL_CONTAINER=1
       mock.setup
       mock.infra.setup
       mock.create_script "npm" 'echo "mock npm: $*"'
@@ -60,6 +66,12 @@ Describe "brik integrate - integration"
     Include "$BRIK_HOME/spec/support/mock_helper.sh"
 
     setup() {
+
+      # Pin the in-process (in-container) execution path: these examples
+
+      # exercise the verb business logic, not the containerized engine.
+
+      export BRIK_LOCAL_CONTAINER=1
       mock.setup
       mock.infra.setup
       mock.create_script "npm" 'echo "mock npm: $*"'

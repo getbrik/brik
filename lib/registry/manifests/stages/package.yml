@@ -12,6 +12,7 @@ spec:
     before: [container-scan]
   runner:
     class: stack
+    docker: true
   gate:
     mode: opt_in
     opt_in_flag: --with-package

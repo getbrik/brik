@@ -83,6 +83,22 @@ doctor.run() {
         fi
     done
 
+    # The container engine is the prerequisite of local execution: every
+    # local verb runs the stages in runner-class containers.
+    local engine="${BRIK_CONTAINER_ENGINE:-docker}"
+    if command -v "$engine" >/dev/null 2>&1; then
+        if "$engine" version >/dev/null 2>&1; then
+            printf '  [OK]      %s (daemon reachable)\n' "$engine"
+            passed=$((passed + 1))
+        else
+            printf '  [WARNING] %s found but the daemon is unreachable (local execution needs it)\n' "$engine"
+            warned=$((warned + 1))
+        fi
+    else
+        printf '  [MISSING] %s - required for local execution (brik integrate/stage/deploy)\n' "$engine"
+        failed=$((failed + 1))
+    fi
+
     if command -v jv >/dev/null 2>&1; then
         tool_version="$(doctor._tool_version jv)"
         printf '  [OK]      jv (%s)\n' "$tool_version"

@@ -96,6 +96,26 @@ cli.deploy.run() {
         return "${BRIK_EXIT_INVALID_INPUT}"
     fi
 
+    # Containerized local execution: on a bare host the CD verb re-execs
+    # inside the deploy-class container -- the same execution environment
+    # the GitLab/Jenkins CD jobs provide. Definition-ref resolution, the
+    # deploy gates and the target actions all run in-container, unchanged
+    # (no bypass). Inside a CI job or a brik container the verb continues
+    # below, in-process.
+    if brik_host_local; then
+        brik.use cli.local_runner
+        export BRIK_PROJECT_DIR="${workspace}"
+        [[ -n "$config_path" ]] && export BRIK_CONFIG_FILE="$config_path"
+        cli.local_runner.setup_docker_env || return "$?"
+
+        local -a verb_args=(--version "$version" --environment "$environment")
+        [[ -n "$strategy" ]]        && verb_args+=(--strategy "$strategy")
+        [[ "$dry_run" == "true" ]]  && verb_args+=(--dry-run)
+        [[ -n "$config_path" ]]     && verb_args+=(--config "$config_path")
+        cli.local_runner.runtime brik.local.docker.run_deploy_container "${verb_args[@]}"
+        return "$?"
+    fi
+
     local config_explicit=""
     [[ -n "$config_path" ]] && config_explicit="true"
 

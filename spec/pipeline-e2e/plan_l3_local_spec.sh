@@ -14,6 +14,9 @@ Describe "L.3 - local plan-driven pipeline (brik integrate --auto-select)"
   Include "$BRIK_HOME/spec/support/mock_helper.sh"
 
   setup_repo() {
+    # Pin the in-process (in-container) execution path: L3 exercises the
+    # plan->pipeline contract in-process, not the containerized engine.
+    export BRIK_LOCAL_CONTAINER=1
     mock.infra.setup
     L3_WS="$(mktemp -d)"
     # Pin the log dir to the workspace so --auto-select writes plan.json

@@ -51,7 +51,11 @@
           "required": ["class"],
           "additionalProperties": false,
           "properties": {
-            "class": {"type": "string", "enum": ["base", "stack", "scanner", "analysis", "deploy"]}
+            "class": {"type": "string", "enum": ["base", "stack", "scanner", "analysis", "deploy"]},
+            "docker": {
+              "type": "boolean",
+              "description": "The stage's code may drive the container engine (docker build/push/compose). The local containerized runner mounts the docker socket only into stages that declare this."
+            }
           }
         },
         "gate": {

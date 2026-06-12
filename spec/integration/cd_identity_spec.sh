@@ -7,6 +7,9 @@ Describe "brik deploy identity (F5) - same (version, environment) => same action
   DIGEST="sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 
   setup_repo() {
+    # Pin the in-process (in-container) execution path: these examples
+    # exercise the verb business logic, not the containerized engine.
+    export BRIK_LOCAL_CONTAINER=1
     REPO="$(mktemp -d)"
     MOCKBIN="$(mktemp -d)"
     (
@@ -92,5 +95,35 @@ YAML
     When call run_twice
     The output should include "ref_match=@${DIGEST}"
     The output should include "plan_match=yes"
+  End
+
+  It "containerized local path: two runs spawn an identical deploy container"
+    # F5 extended to the containerized engine: same (version, environment)
+    # on a bare host => the deploy-class container is launched with the same
+    # arguments, the run volume name (timestamp-pid) being the only delta.
+    run_containerized_twice() {
+      cd "$REPO"
+      # The mock consumes piped stdin like the real engine (tar seed stream);
+      # otherwise the seed pipe dies on SIGPIPE under bin/brik's pipefail.
+      printf '#!/bin/sh\necho "docker $*" >> "${DOCKER_LOG}"\ncase "$*" in *" -i "*) cat > /dev/null 2>&1 || true ;; esac\nexit 0\n' > "${MOCKBIN}/docker"
+      chmod +x "${MOCKBIN}/docker"
+      local D1 D2
+      D1="$(mktemp)"; D2="$(mktemp)"
+      BRIK_LOCAL_CONTAINER= DOCKER_LOG="$D1" PATH="${MOCKBIN}:$PATH" \
+        "$BRIK_BIN" deploy --version v1.2.3 --environment staging --dry-run >/dev/null 2>&1
+      BRIK_LOCAL_CONTAINER= DOCKER_LOG="$D2" PATH="${MOCKBIN}:$PATH" \
+        "$BRIK_BIN" deploy --version v1.2.3 --environment staging --dry-run >/dev/null 2>&1
+      local A1 A2
+      A1="$(grep "bin/brik deploy" "$D1" | sed 's/brik-run-[0-9]*-[0-9]*/brik-run-X/g')"
+      A2="$(grep "bin/brik deploy" "$D2" | sed 's/brik-run-[0-9]*-[0-9]*/brik-run-X/g')"
+      rm -f "$D1" "$D2"
+      if [ -n "$A1" ] && [ "$A1" = "$A2" ]; then
+        printf 'container_match=yes\n'
+      else
+        printf 'container_match=no\nA1=%s\nA2=%s\n' "$A1" "$A2"
+      fi
+    }
+    When call run_containerized_twice
+    The output should equal "container_match=yes"
   End
 End

@@ -38,6 +38,16 @@ brik_require_arg() {
     fi
 }
 
+# brik_host_local - true on a bare local host: no orchestrator signal
+# (GITLAB_CI, JENKINS_URL) and not already inside a brik-spawned container
+# (BRIK_LOCAL_CONTAINER, stamped by the docker runner). The local verbs use
+# it to decide between driving the containerized engine and executing
+# in-process -- inside a CI job or a brik container, the caller IS the
+# execution environment.
+brik_host_local() {
+    [[ -z "${GITLAB_CI:-}" && -z "${JENKINS_URL:-}" && -z "${BRIK_LOCAL_CONTAINER:-}" ]]
+}
+
 # _brik_detect_install_method - classify the Brik install source.
 # Used by cli.version and cli.self_update to pick display/update strategy.
 # Prints one of: brew, source, git, unknown.

@@ -37,6 +37,7 @@ _BRIK_LOCAL_DOCKER_WORK="/work"
 _BRIK_LOCAL_DOCKER_BRIK_HOME="/opt/brik"
 _BRIK_LOCAL_DOCKER_INFRA="/etc/brik/infra"
 _BRIK_LOCAL_DOCKER_HOME="/work/.brik-home"
+_BRIK_LOCAL_DOCKER_SOCKET="/var/run/docker.sock"
 
 # ---------------------------------------------------------------------------
 # Engine and identity helpers
@@ -146,6 +147,35 @@ brik.local.docker.seed_workspace() {
     return "$BRIK_EXIT_OK"
 }
 
+# Seed a caller-provided plan.json onto the run volume in place of running
+# the planner (the `brik integrate --plan` contract): the gates then execute
+# against exactly the file the caller audited. The log dir already exists
+# (created by seed_workspace).
+# Usage: brik.local.docker.seed_plan <run_id> <plan_file>
+brik.local.docker.seed_plan() {
+    local run_id="$1"
+    local plan_file="$2"
+
+    if [[ ! -f "$plan_file" ]]; then
+        log.error "seed_plan: plan file not found: ${plan_file}"
+        return "$BRIK_EXIT_INVALID_INPUT"
+    fi
+
+    local engine volume base_image
+    engine="$(_brik.local.docker.engine)"
+    volume="$(brik.local.docker.volume_name "$run_id")"
+    base_image="$(_brik.local.docker.base_image)" || return "$?"
+
+    if ! "$engine" run --rm -i --user "$(_brik.local.docker.uid_gid)" \
+        -v "${volume}:${_BRIK_LOCAL_DOCKER_WORK}" "$base_image" \
+        sh -c "cat > ${_BRIK_LOCAL_DOCKER_WORK}/.brik-logs/plan.json" < "$plan_file"; then
+        log.error "seed_plan: failed to copy ${plan_file} into ${volume}"
+        return "$BRIK_EXIT_IO_FAILURE"
+    fi
+    log.info "plan seeded into ${volume} from ${plan_file}"
+    return "$BRIK_EXIT_OK"
+}
+
 # ---------------------------------------------------------------------------
 # Image resolution
 # ---------------------------------------------------------------------------
@@ -218,6 +248,30 @@ _brik.local.docker.env_ref_vars() {
     return 0
 }
 
+# Print --add-host aliases for the referential's endpoint hosts that the
+# HOST resolves through a loopback /etc/hosts entry (the host-published
+# service pattern, e.g. a lab registry behind 127.0.0.1). Inside a
+# container, loopback points at the container itself, so those names are
+# remapped to the host gateway. Hosts with real DNS are left alone, and
+# localhost itself is never aliased (it must keep meaning the container).
+# BRIK_LOCAL_HOSTS_FILE overrides the hosts file (tests, chroots).
+_brik.local.docker.add_host_args() {
+    local infra_dir="${BRIK_INFRA_DIR:-}"
+    local hosts_file="${BRIK_LOCAL_HOSTS_FILE:-/etc/hosts}"
+    [[ -d "${infra_dir}/endpoints" && -r "$hosts_file" ]] || return 0
+
+    local host
+    while IFS= read -r host; do
+        [[ -z "$host" || "$host" == "localhost" ]] && continue
+        if grep -qE "^[[:space:]]*(127\.[0-9.]+|::1)([[:space:]][^#]*)?[[:space:]]${host}([[:space:]]|\$)" \
+            "$hosts_file" 2>/dev/null; then
+            printf '%s\n' "--add-host" "${host}:host-gateway"
+        fi
+    done < <(grep -rhoE '^[a-z_]*url: *[a-z+]+://[^/ ]+' "${infra_dir}/endpoints" 2>/dev/null \
+                | sed -E 's|^[a-z_]*url: *[a-z+]+://||; s|^[^@/ ]*@||; s|:[0-9]+$||' | sort -u)
+    return 0
+}
+
 # Map the host config path to its in-container location. The config must
 # live inside the project so the seeded volume carries it.
 _brik.local.docker.container_config_path() {
@@ -252,6 +306,7 @@ _brik.local.docker.common_run_args() {
         "-e" "HOME=${_BRIK_LOCAL_DOCKER_HOME}" \
         "-e" "BRIK_HOME=${_BRIK_LOCAL_DOCKER_BRIK_HOME}" \
         "-e" "BRIK_PLATFORM=local" \
+        "-e" "BRIK_LOCAL_CONTAINER=1" \
         "-e" "BRIK_WORKSPACE=${_BRIK_LOCAL_DOCKER_WORK}" \
         "-e" "BRIK_PROJECT_DIR=${_BRIK_LOCAL_DOCKER_WORK}" \
         "-e" "BRIK_CONFIG_FILE=${config_path}" \
@@ -272,6 +327,59 @@ _brik.local.docker.common_run_args() {
         while IFS= read -r var; do
             printf '%s\n' "-e" "$var"
         done < <(_brik.local.docker.env_ref_vars)
+        _brik.local.docker.add_host_args
+    fi
+    return 0
+}
+
+# Keyless signing needs a platform OIDC token, and a bare local host has
+# none (declared divergence of the local mode). When the wired referential
+# declares a keyless Signing endpoint, refuse the CI flow up front with a
+# cross-validation error: the binding must point at a key or kms backend
+# (or declare no Signing endpoint at all) for local execution. The CD verb
+# is NOT gated: verification is OIDC-free.
+_brik.local.docker.check_signing_backend() {
+    [[ -z "${BRIK_INFRA_DIR:-}" ]] && return 0
+
+    brik.use transverse.infra
+    local sig backend
+    # No (or ambiguous) Signing endpoint: nothing to cross-validate here,
+    # the referential validation owns those errors.
+    sig="$(infra.endpoint_of_kind Signing 2>/dev/null)" || return 0
+    backend="$(printf '%s' "$sig" | jq -r '.backend // empty' 2>/dev/null)" || backend=""
+
+    if [[ "$backend" == "keyless" ]]; then
+        log.error "the referential declares keyless signing, which is unavailable in local execution (no platform OIDC issuer): bind a key or kms backend, or remove the Signing endpoint"
+        return "$BRIK_EXIT_CONFIG_ERROR"
+    fi
+    return 0
+}
+
+# Print the engine arguments granting a container access to the host docker
+# daemon, one per line. Mounted ONLY into stages whose manifest declares
+# runner.docker (the caller gates on registry.stage.needs_docker). A unix://
+# DOCKER_HOST overrides the default socket path; a remote DOCKER_HOST is
+# forwarded as-is instead of mounting (the in-container CLI then talks to
+# the same endpoint the host uses).
+_brik.local.docker.socket_args() {
+    local docker_host="${DOCKER_HOST:-}"
+    case "$docker_host" in
+        unix://*) _brik.local.docker._socket_mount_args "${docker_host#unix://}" ;;
+        ?*)       printf '%s\n' "-e" "DOCKER_HOST" ;;
+        *)        _brik.local.docker._socket_mount_args "$_BRIK_LOCAL_DOCKER_SOCKET" ;;
+    esac
+}
+
+_brik.local.docker._socket_mount_args() {
+    local socket="$1"
+    printf '%s\n' "-v" "${socket}:${_BRIK_LOCAL_DOCKER_SOCKET}"
+    # H8: on Linux the socket is root:docker 0660, so the arbitrary-uid run
+    # user needs the socket's gid as a supplementary group. Docker Desktop
+    # (macOS/Windows) exposes a 0666 socket -- nothing to add.
+    if [[ "$(uname -s)" == "Linux" ]]; then
+        local gid
+        gid="$(stat -c %g "$socket" 2>/dev/null)" || gid=""
+        [[ -n "$gid" ]] && printf '%s\n' "--group-add" "$gid"
     fi
     return 0
 }
@@ -324,6 +432,14 @@ brik.local.docker.run_stage_container() {
     # fallback reports the stack image for every stage).
     args+=("-e" "BRIK_RUNNER_IMAGE=${image}")
 
+    # Governed socket: only the stages whose manifest declares runner.docker
+    # get access to the host engine (least privilege, H8).
+    if registry.stage.needs_docker "$stage"; then
+        local -a socket_args=()
+        mapfile -t socket_args < <(_brik.local.docker.socket_args)
+        args+=("${socket_args[@]}")
+    fi
+
     "$(_brik.local.docker.engine)" run "${args[@]}" "$image" \
         bash "${_BRIK_LOCAL_DOCKER_BRIK_HOME}/shared-libs/local/scripts/container-stage.sh" "$stage"
 }
@@ -364,15 +480,23 @@ brik.local.docker.extract_logs() {
 # On failure the volume is kept for inspection; logs are extracted to the
 # project directory in every outcome.
 # Usage: brik.local.docker.run_pipeline [--continue-on-error]
-#        [--with-release] [--with-package] [--with-deploy]
+#        [--with-release] [--with-package] [--with-deploy] [--plan <file>]
 brik.local.docker.run_pipeline() {
     local continue_on_error=false
+    local plan_file=""
     local -a plan_flags=()
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --continue-on-error) continue_on_error=true; shift ;;
             --with-release|--with-package|--with-deploy) plan_flags+=("$1"); shift ;;
+            --plan)
+                if [[ -z "${2:-}" ]]; then
+                    log.error "run_pipeline: --plan requires a path"
+                    return "$BRIK_EXIT_INVALID_INPUT"
+                fi
+                plan_file="$2"; shift 2
+                ;;
             *)
                 log.error "run_pipeline: unknown flag '$1'"
                 return "$BRIK_EXIT_INVALID_INPUT"
@@ -380,7 +504,13 @@ brik.local.docker.run_pipeline() {
         esac
     done
 
+    if [[ -n "$plan_file" && ! -f "$plan_file" ]]; then
+        log.error "run_pipeline: plan file not found: ${plan_file}"
+        return "$BRIK_EXIT_INVALID_INPUT"
+    fi
+
     brik.local.docker.check_engine || return "$?"
+    _brik.local.docker.check_signing_backend || return "$?"
 
     if ! declare -f registry.stage.list >/dev/null 2>&1; then
         log.error "run_pipeline: registry.stage.list is not loaded"
@@ -401,7 +531,11 @@ brik.local.docker.run_pipeline() {
 
     local had_failure=false
     if brik.local.docker.seed_workspace "$run_id" "$project_dir" \
-        && brik.local.docker.run_plan_container "$run_id" "${plan_flags[@]}"; then
+        && { if [[ -n "$plan_file" ]]; then
+                 brik.local.docker.seed_plan "$run_id" "$plan_file"
+             else
+                 brik.local.docker.run_plan_container "$run_id" "${plan_flags[@]}"
+             fi; }; then
         local stage rc
         for stage in "${stages[@]}"; do
             # Mirror the CI behavior after a failure: downstream jobs do not
@@ -425,6 +559,130 @@ brik.local.docker.run_pipeline() {
     if $had_failure; then
         log.warn "run volume kept for inspection: $(brik.local.docker.volume_name "$run_id")"
         return "$BRIK_EXIT_FAILURE"
+    fi
+    brik.local.docker.destroy_volume "$run_id" || true
+    return "$BRIK_EXIT_OK"
+}
+
+# Run ONE stage in its runner-class container (the `brik stage` dev verb).
+# Same lifecycle as run_pipeline: fresh volume, seed, plan, the stage's
+# container, logs extracted, volume destroyed on success / kept on failure.
+# The plan gate applies in-container exactly as in the full flow (no
+# bypass); the stage's own opt-in flag is fed to the planner so explicitly
+# asking for an opt-in stage (package, deploy, ...) does not plan it away.
+# Usage: brik.local.docker.run_single_stage <stage>
+brik.local.docker.run_single_stage() {
+    local stage="$1"
+
+    brik.local.docker.check_engine || return "$?"
+    _brik.local.docker.check_signing_backend || return "$?"
+
+    # Validate the stage id against the registry before paying any container.
+    registry.stage.runner_class "$stage" >/dev/null || return "$?"
+
+    local -a plan_flags=()
+    local opt_flag
+    opt_flag="$(registry.stage.gate_opt_in_flag "$stage" 2>/dev/null)" || opt_flag=""
+    [[ -n "$opt_flag" ]] && plan_flags+=("$opt_flag")
+
+    local project_dir="${BRIK_PROJECT_DIR:-$(pwd)}"
+    local run_id
+    run_id="$(brik.local.docker.run_id)"
+
+    brik.local.docker.create_volume "$run_id" || return "$?"
+
+    local rc=0
+    if brik.local.docker.seed_workspace "$run_id" "$project_dir" \
+        && brik.local.docker.run_plan_container "$run_id" "${plan_flags[@]}"; then
+        # Replay the CI job contract: every stage consumes init's dotenv
+        # (BRIK_CI_IMAGE for the stack class, release metadata), so init
+        # bootstraps the run before the requested stage -- the same
+        # ordering the CI adapters enforce with the init job.
+        if [[ "$stage" != "init" ]]; then
+            brik.local.docker.run_stage_container "$run_id" init || rc=$?
+        fi
+        if [[ "$rc" -eq 0 ]]; then
+            brik.local.docker.run_stage_container "$run_id" "$stage" || rc=$?
+        fi
+    else
+        rc="$BRIK_EXIT_FAILURE"
+        log.error "run aborted before the stage container (seed or plan failed)"
+    fi
+
+    brik.local.docker.extract_logs "$run_id" "$project_dir" || true
+
+    if [[ "$rc" -ne 0 ]]; then
+        log.warn "run volume kept for inspection: $(brik.local.docker.volume_name "$run_id")"
+        return "$rc"
+    fi
+    brik.local.docker.destroy_volume "$run_id" || true
+    return "$BRIK_EXIT_OK"
+}
+
+# Run the CD verb in the deploy-class container -- the local counterpart of
+# the GitLab/Jenkins CD jobs, which also execute `brik deploy` inside a
+# deploy-class image. The seeded volume carries the full git history, so the
+# in-container verb resolves the version's definition ref exactly as in CI,
+# and every deploy gate executes in-container, unchanged (no bypass). An
+# explicit --config is remapped to its in-volume path; the other arguments
+# pass through verbatim.
+# Usage: brik.local.docker.run_deploy_container [brik deploy args...]
+brik.local.docker.run_deploy_container() {
+    local -a verb_args=()
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --config)
+                if [[ -z "${2:-}" ]]; then
+                    log.error "run_deploy_container: --config requires a path"
+                    return "$BRIK_EXIT_INVALID_INPUT"
+                fi
+                local mapped
+                mapped="$(BRIK_CONFIG_FILE="$2" _brik.local.docker.container_config_path)" \
+                    || return "$?"
+                verb_args+=(--config "$mapped")
+                shift 2
+                ;;
+            *) verb_args+=("$1"); shift ;;
+        esac
+    done
+
+    brik.local.docker.check_engine || return "$?"
+
+    local image
+    image="$(registry.runner_class.image deploy)" || return "$?"
+
+    local project_dir="${BRIK_PROJECT_DIR:-$(pwd)}"
+    local run_id
+    run_id="$(brik.local.docker.run_id)"
+
+    local -a args=()
+    mapfile -t args < <(_brik.local.docker.common_run_args "$run_id") || return "$?"
+    [[ ${#args[@]} -eq 0 ]] && return "$BRIK_EXIT_INVALID_INPUT"
+    args+=("-e" "BRIK_RUNNER_IMAGE=${image}")
+    # The deploy stage's manifest governs the engine socket for the verb
+    # container too (compose targets drive docker through it).
+    if registry.stage.needs_docker deploy; then
+        local -a socket_args=()
+        mapfile -t socket_args < <(_brik.local.docker.socket_args)
+        args+=("${socket_args[@]}")
+    fi
+
+    brik.local.docker.create_volume "$run_id" || return "$?"
+
+    local rc=0
+    if brik.local.docker.seed_workspace "$run_id" "$project_dir"; then
+        "$(_brik.local.docker.engine)" run "${args[@]}" "$image" \
+            "${_BRIK_LOCAL_DOCKER_BRIK_HOME}/bin/brik" deploy "${verb_args[@]}" || rc=$?
+    else
+        rc="$BRIK_EXIT_FAILURE"
+        log.error "run aborted before the deploy container (seed failed)"
+    fi
+
+    brik.local.docker.extract_logs "$run_id" "$project_dir" || true
+
+    if [[ "$rc" -ne 0 ]]; then
+        log.warn "run volume kept for inspection: $(brik.local.docker.volume_name "$run_id")"
+        return "$rc"
     fi
     brik.local.docker.destroy_volume "$run_id" || true
     return "$BRIK_EXIT_OK"

@@ -388,6 +388,86 @@ exit \"\${MOCK_DOCKER_RC:-0}\"
       When call check_rc
       The status should equal 1
     End
+
+    It "marks the container as brik-local execution context"
+      check_marker() {
+        brik.local.docker.run_stage_container "123-9" "init" >/dev/null 2>&1
+        mock.call_args "docker"
+      }
+      When call check_marker
+      The output should include "-e BRIK_LOCAL_CONTAINER=1"
+    End
+  End
+
+  # =========================================================================
+  # Governed docker socket (manifest-scoped, H8)
+  # =========================================================================
+  Describe "docker socket scoped by the stage manifest"
+    Include "$BRIK_HOME/shared-libs/local/scripts/local-wrapper.sh"
+    Include "$BRIK_HOME/shared-libs/local/scripts/docker-runner.sh"
+    Before 'setup_runner'
+    After 'cleanup_runner'
+
+    It "mounts the host socket into a stage whose manifest declares runner.docker"
+      check_socket() {
+        brik.local.docker.run_stage_container "123-9" "package" >/dev/null 2>&1
+        mock.call_args "docker"
+      }
+      When call check_socket
+      The output should include "-v /var/run/docker.sock:/var/run/docker.sock"
+    End
+
+    It "does NOT mount the socket into a stage without the declaration"
+      check_no_socket() {
+        brik.local.docker.run_stage_container "123-9" "init" >/dev/null 2>&1
+        mock.call_args "docker"
+      }
+      When call check_no_socket
+      The output should not include "docker.sock"
+    End
+
+    It "honors a unix:// DOCKER_HOST as the socket source"
+      check_unix_host() {
+        DOCKER_HOST="unix:///tmp/custom-docker.sock" \
+          brik.local.docker.run_stage_container "123-9" "package" >/dev/null 2>&1
+        mock.call_args "docker"
+      }
+      When call check_unix_host
+      The output should include "-v /tmp/custom-docker.sock:/var/run/docker.sock"
+    End
+
+    It "forwards a remote DOCKER_HOST instead of mounting a socket"
+      check_remote_host() {
+        DOCKER_HOST="tcp://10.0.0.5:2376" \
+          brik.local.docker.run_stage_container "123-9" "package" >/dev/null 2>&1
+        mock.call_args "docker"
+      }
+      When call check_remote_host
+      The output should include "-e DOCKER_HOST"
+      The output should not include "docker.sock:"
+    End
+
+    It "adds the socket group on a Linux host (root:docker 0660 socket)"
+      check_group_add() {
+        # H8: on Linux the socket is root:docker 0660, so the arbitrary-uid
+        # container user needs the socket's gid as a supplementary group.
+        mock.create_script "uname" 'echo Linux'
+        mock.create_script "stat" 'echo 999'
+        brik.local.docker.run_stage_container "123-9" "package" >/dev/null 2>&1
+        mock.call_args "docker"
+      }
+      When call check_group_add
+      The output should include "--group-add 999"
+    End
+
+    It "does not add a group on a non-Linux host (Docker Desktop 0666 socket)"
+      check_no_group() {
+        brik.local.docker.run_stage_container "123-9" "package" >/dev/null 2>&1
+        mock.call_args "docker"
+      }
+      When call check_no_group
+      The output should not include "--group-add"
+    End
   End
 
   # =========================================================================
@@ -505,6 +585,327 @@ exit \"\${MOCK_DOCKER_RC:-0}\"
       }
       When call check_no_daemon
       The output should equal "rc=4 stage_runs=0"
+    End
+
+    It "seeds a caller-provided plan instead of running the planner (--plan)"
+      check_seeded_plan() {
+        local plan_fixture
+        plan_fixture="$(mktemp)"
+        printf '{"schema":"plan/v1"}\n' > "$plan_fixture"
+        brik.local.docker.run_pipeline --plan "$plan_fixture" >/dev/null 2>&1
+        local rc=$?
+        rm -f "$plan_fixture"
+        local planner_ran="no" seeded="no"
+        grep -q -- "--out /work/.brik-logs/plan.json" "$MOCK_LOG" && planner_ran="yes"
+        grep -q "cat > /work/.brik-logs/plan.json" "$MOCK_LOG" && seeded="yes"
+        echo "rc=$rc planner=$planner_ran seeded=$seeded"
+      }
+      When call check_seeded_plan
+      The output should equal "rc=0 planner=no seeded=yes"
+    End
+
+    It "rejects a missing --plan file"
+      When call brik.local.docker.run_pipeline --plan /nonexistent/plan.json
+      The status should equal 2
+      The error should include "plan"
+    End
+  End
+
+  # =========================================================================
+  # brik.local.docker.run_single_stage (the `brik stage` dev verb)
+  # =========================================================================
+  Describe "brik.local.docker.run_single_stage"
+    Include "$BRIK_HOME/shared-libs/local/scripts/local-wrapper.sh"
+    Include "$BRIK_HOME/shared-libs/local/scripts/docker-runner.sh"
+    Before 'setup_runner'
+    After 'cleanup_runner'
+
+    It "seeds, plans, bootstraps init, runs the one stage, destroys the volume"
+      check_single() {
+        brik.local.docker.run_single_stage build >/dev/null 2>&1
+        local rc=$?
+        local seeded="no" planned="no" init_ran="no" ran="no" others="no" removed="no"
+        grep -q "chown -R" "$MOCK_LOG" && seeded="yes"
+        grep -q -- "--out /work/.brik-logs/plan.json" "$MOCK_LOG" && planned="yes"
+        # Init bootstraps the run: every CI job consumes its dotenv
+        # (BRIK_CI_IMAGE, release metadata), the dev verb replays that.
+        grep -q "container-stage.sh init" "$MOCK_LOG" && init_ran="yes"
+        grep -q "container-stage.sh build" "$MOCK_LOG" && ran="yes"
+        grep -q "container-stage.sh lint" "$MOCK_LOG" && others="yes"
+        grep -q "volume rm" "$MOCK_LOG" && removed="yes"
+        echo "rc=$rc seed=$seeded plan=$planned init=$init_ran stage=$ran others=$others removed=$removed"
+      }
+      When call check_single
+      The output should equal "rc=0 seed=yes plan=yes init=yes stage=yes others=no removed=yes"
+    End
+
+    It "does not run init twice when init IS the requested stage"
+      check_init_once() {
+        brik.local.docker.run_single_stage init >/dev/null 2>&1
+        grep -c "container-stage.sh init" "$MOCK_LOG"
+      }
+      When call check_init_once
+      The output should equal "1"
+    End
+
+    It "feeds the stage's own opt-in flag to the planner (explicit ask)"
+      check_opt_in() {
+        brik.local.docker.run_single_stage deploy >/dev/null 2>&1
+        grep -- "--out /work/.brik-logs/plan.json" "$MOCK_LOG"
+      }
+      When call check_opt_in
+      The output should include "--with-deploy"
+    End
+
+    It "keeps the volume and extracts the logs when the stage fails"
+      check_single_failure() {
+        MOCK_DOCKER_FAIL_MATCH="container-stage.sh build" \
+          brik.local.docker.run_single_stage build >/dev/null 2>&1
+        local rc=$?
+        local removed="no" extracted="no"
+        grep -q "volume rm" "$MOCK_LOG" && removed="yes"
+        grep "tar" "$MOCK_LOG" | grep -q "brik-logs" && extracted="yes"
+        echo "rc=$rc removed=$removed extracted=$extracted"
+      }
+      When call check_single_failure
+      The output should equal "rc=1 removed=no extracted=yes"
+    End
+
+    It "fails fast on an unknown stage, before any container"
+      check_unknown() {
+        brik.local.docker.run_single_stage bogus >/dev/null 2>&1
+        local rc=$?
+        local containers
+        containers="$(grep -c "container-stage.sh" "$MOCK_LOG")" || containers=0
+        echo "rc=$rc containers=$containers"
+      }
+      When call check_unknown
+      The output should equal "rc=2 containers=0"
+    End
+  End
+
+  # =========================================================================
+  # Host-published endpoints (loopback /etc/hosts entries -> host-gateway)
+  # =========================================================================
+  Describe "host-published endpoint aliasing"
+    Include "$BRIK_HOME/shared-libs/local/scripts/local-wrapper.sh"
+    Include "$BRIK_HOME/shared-libs/local/scripts/docker-runner.sh"
+    Before 'setup_runner'
+    After 'cleanup_runner'
+
+    make_lab_infra() {
+      ALIAS_INFRA="$(mktemp -d)"
+      mkdir -p "$ALIAS_INFRA/endpoints" "$ALIAS_INFRA/credentials"
+      printf 'apiVersion: brik.dev/referential/v1\nkind: Referential\nprofile: p-lab\n' \
+        > "$ALIAS_INFRA/referential.yml"
+      cat > "$ALIAS_INFRA/endpoints/registry-release.yml" <<'YAML'
+apiVersion: brik.dev/referential/v1
+kind: Registry
+name: registry-release
+url: http://lab-registry.test:8082
+YAML
+      cat > "$ALIAS_INFRA/endpoints/git-host.yml" <<'YAML'
+apiVersion: brik.dev/referential/v1
+kind: GitHost
+name: git-host
+product: gitea
+api_url: http://lab-git.test:3000
+git_url: http://lab-git.test:3000
+YAML
+      cat > "$ALIAS_INFRA/endpoints/notify.yml" <<'YAML'
+apiVersion: brik.dev/referential/v1
+kind: Notification
+name: notify
+url: https://git.example.com
+YAML
+      ALIAS_HOSTS="$(mktemp)"
+      printf '127.0.0.1 localhost lab-registry.test lab-git.test\n::1 localhost\n' > "$ALIAS_HOSTS"
+    }
+    cleanup_lab_infra() { rm -rf "$ALIAS_INFRA" "$ALIAS_HOSTS"; }
+
+    It "aliases a loopback-published endpoint host to the host gateway"
+      check_alias() {
+        make_lab_infra
+        BRIK_INFRA_DIR="$ALIAS_INFRA" BRIK_LOCAL_HOSTS_FILE="$ALIAS_HOSTS" \
+          brik.local.docker.run_stage_container "123-9" "init" >/dev/null 2>&1
+        local args
+        args="$(mock.call_args "docker")"
+        cleanup_lab_infra
+        printf '%s\n' "$args"
+      }
+      When call check_alias
+      The output should include "--add-host lab-registry.test:host-gateway"
+      The output should include "--add-host lab-git.test:host-gateway"
+    End
+
+    It "leaves DNS-resolvable endpoint hosts alone"
+      check_dns_host() {
+        make_lab_infra
+        BRIK_INFRA_DIR="$ALIAS_INFRA" BRIK_LOCAL_HOSTS_FILE="$ALIAS_HOSTS" \
+          brik.local.docker.run_stage_container "123-9" "init" >/dev/null 2>&1
+        local args
+        args="$(mock.call_args "docker")"
+        cleanup_lab_infra
+        printf '%s\n' "$args"
+      }
+      When call check_dns_host
+      The output should not include "git.example.com"
+    End
+
+    It "never aliases localhost itself"
+      check_localhost() {
+        make_lab_infra
+        cat > "$ALIAS_INFRA/endpoints/registry-release.yml" <<'YAML'
+apiVersion: brik.dev/referential/v1
+kind: Registry
+name: registry-release
+url: http://localhost:5000
+YAML
+        BRIK_INFRA_DIR="$ALIAS_INFRA" BRIK_LOCAL_HOSTS_FILE="$ALIAS_HOSTS" \
+          brik.local.docker.run_stage_container "123-9" "init" >/dev/null 2>&1
+        local args
+        args="$(mock.call_args "docker")"
+        cleanup_lab_infra
+        printf '%s\n' "$args"
+      }
+      When call check_localhost
+      The output should not include "--add-host localhost"
+    End
+  End
+
+  # =========================================================================
+  # Keyless signing cross-validation (local has no OIDC issuer)
+  # =========================================================================
+  Describe "keyless signing cross-validation"
+    Include "$BRIK_HOME/shared-libs/local/scripts/local-wrapper.sh"
+    Include "$BRIK_HOME/shared-libs/local/scripts/docker-runner.sh"
+    Before 'setup_runner'
+    After 'cleanup_runner'
+
+    make_infra() {
+      INFRA_FIXTURE="$(mktemp -d)"
+      mkdir -p "$INFRA_FIXTURE/endpoints"
+      printf 'apiVersion: brik.dev/referential/v1\nkind: Referential\nprofile: p-lab\n' \
+        > "$INFRA_FIXTURE/referential.yml"
+      cat > "$INFRA_FIXTURE/endpoints/signing.yml" <<YAML
+apiVersion: brik.dev/referential/v1
+kind: Signing
+name: signing
+backend: $1
+YAML
+    }
+
+    It "refuses the CI flow when the referential binds keyless signing"
+      check_keyless() {
+        make_infra keyless
+        BRIK_INFRA_DIR="$INFRA_FIXTURE" brik.local.docker.run_pipeline >/dev/null 2>&1
+        local rc=$?
+        rm -rf "$INFRA_FIXTURE"
+        local containers
+        containers="$(grep -c "container-stage.sh" "$MOCK_LOG")" || containers=0
+        echo "rc=$rc containers=$containers"
+      }
+      When call check_keyless
+      The output should equal "rc=7 containers=0"
+    End
+
+    It "refuses a single stage the same way (no bypass)"
+      check_keyless_stage() {
+        make_infra keyless
+        BRIK_INFRA_DIR="$INFRA_FIXTURE" brik.local.docker.run_single_stage build >/dev/null 2>&1
+        local rc=$?
+        rm -rf "$INFRA_FIXTURE"
+        echo "rc=$rc"
+      }
+      When call check_keyless_stage
+      The output should equal "rc=7"
+    End
+
+    It "accepts a key backend"
+      check_key() {
+        make_infra key
+        BRIK_INFRA_DIR="$INFRA_FIXTURE" brik.local.docker.run_pipeline >/dev/null 2>&1
+        local rc=$?
+        rm -rf "$INFRA_FIXTURE"
+        echo "rc=$rc"
+      }
+      When call check_key
+      The output should equal "rc=0"
+    End
+
+    It "leaves the CD verb alone (verification is OIDC-free)"
+      check_deploy_keyless() {
+        make_infra keyless
+        BRIK_INFRA_DIR="$INFRA_FIXTURE" brik.local.docker.run_deploy_container \
+          --version v1.2.3 --environment staging >/dev/null 2>&1
+        local rc=$?
+        rm -rf "$INFRA_FIXTURE"
+        echo "rc=$rc"
+      }
+      When call check_deploy_keyless
+      The output should equal "rc=0"
+    End
+  End
+
+  # =========================================================================
+  # brik.local.docker.run_deploy_container (the CD verb container)
+  # =========================================================================
+  Describe "brik.local.docker.run_deploy_container"
+    Include "$BRIK_HOME/shared-libs/local/scripts/local-wrapper.sh"
+    Include "$BRIK_HOME/shared-libs/local/scripts/docker-runner.sh"
+    Before 'setup_runner'
+    After 'cleanup_runner'
+
+    It "re-execs the verb in the deploy-class image on the seeded workspace"
+      check_deploy() {
+        brik.local.docker.run_deploy_container \
+          --version v1.2.3 --environment staging >/dev/null 2>&1
+        local rc=$?
+        local seeded="no" verb="no" image="no" removed="no"
+        grep -q "chown -R" "$MOCK_LOG" && seeded="yes"
+        grep -q "bin/brik deploy --version v1.2.3 --environment staging" "$MOCK_LOG" && verb="yes"
+        grep "bin/brik deploy" "$MOCK_LOG" | grep -q "brik-runner-deploy" && image="yes"
+        grep -q "volume rm" "$MOCK_LOG" && removed="yes"
+        echo "rc=$rc seed=$seeded verb=$verb image=$image removed=$removed"
+      }
+      When call check_deploy
+      The output should equal "rc=0 seed=yes verb=yes image=yes removed=yes"
+    End
+
+    It "grants the engine socket per the deploy stage manifest"
+      check_deploy_socket() {
+        brik.local.docker.run_deploy_container \
+          --version v1.2.3 --environment staging >/dev/null 2>&1
+        grep "bin/brik deploy" "$MOCK_LOG"
+      }
+      When call check_deploy_socket
+      The output should include "docker.sock"
+    End
+
+    It "maps an explicit --config into the volume"
+      check_deploy_config() {
+        brik.local.docker.run_deploy_container \
+          --version v1.2.3 --environment staging \
+          --config "$PROJECT_DIR/brik.yml" >/dev/null 2>&1
+        grep "bin/brik deploy" "$MOCK_LOG"
+      }
+      When call check_deploy_config
+      The output should include "--config /work/brik.yml"
+    End
+
+    It "keeps the volume and extracts the logs when the deploy fails"
+      check_deploy_failure() {
+        MOCK_DOCKER_FAIL_MATCH="bin/brik deploy" \
+          brik.local.docker.run_deploy_container \
+          --version v1.2.3 --environment staging >/dev/null 2>&1
+        local rc=$?
+        local removed="no" extracted="no"
+        grep -q "volume rm" "$MOCK_LOG" && removed="yes"
+        grep "tar" "$MOCK_LOG" | grep -q "brik-logs" && extracted="yes"
+        echo "rc=$rc removed=$removed extracted=$extracted"
+      }
+      When call check_deploy_failure
+      The output should equal "rc=1 removed=no extracted=yes"
     End
   End
 End

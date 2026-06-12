@@ -10,6 +10,12 @@ Describe "cli integrate/stage - --dry-run flag"
   Include "$BRIK_CLI_LIB/stage.sh"
 
   setup() {
+
+    # Pin the in-process (in-container) execution path: these examples
+
+    # exercise the verb business logic, not the containerized engine.
+
+    export BRIK_LOCAL_CONTAINER=1
     WORKSPACE="$(mktemp -d)"
     printf 'version: 1\nproject:\n  name: dryrun-test\n  stack: node\n' > "${WORKSPACE}/brik.yml"
 

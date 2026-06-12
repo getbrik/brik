@@ -37,6 +37,7 @@ How Brik works, and why it is shaped this way.
 - [Data layout](concepts/data-layout.md) -- the on-disk layout (`brik-artifacts/`, `.brik-logs/`) Brik produces at runtime
 - [Architecture](concepts/architecture.md) -- the 4-layer model and the design principles behind it
 - [Artifact attestation](concepts/artifact-attestation.md) -- the builder-identity convention and the three deploy gates (digest, attestation, eligibility)
+- [Local execution](concepts/local-execution.md) -- the containerized local mode: one runner-class container per stage, governed mounts, declared divergences from CI
 
 ## Configuration
 

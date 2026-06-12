@@ -49,6 +49,24 @@ brik.local.setup() {
     return 0
 }
 
+# Host-side bootstrap for the containerized engine: runtime + registry only.
+# The project config is parsed INSIDE the stage containers (load_config stays
+# in brik.local.setup, the in-container path) -- the host needs log.*,
+# BRIK_EXIT_* and registry.* to resolve runner images and stage order,
+# nothing more, so a bare host without the project toolchain can drive a run.
+brik.local.setup_host() {
+    brik.wrapper.validate_home "${BRIK_HOME:-}" || return $?
+
+    export BRIK_PROJECT_DIR="${BRIK_PROJECT_DIR:-$(pwd)}"
+    export BRIK_PLATFORM="local"
+
+    brik.wrapper.set_standard_env
+    brik.wrapper.bootstrap || return $?
+
+    log.debug "brik local host setup complete (containerized engine)"
+    return 0
+}
+
 # Populate BRIK_* variables from the local Git repository.
 # Resolves the git context against BRIK_PROJECT_DIR (set by the CLI from
 # --workspace) so the host shell's cwd cannot leak in when brik runs
