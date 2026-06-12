@@ -32,6 +32,32 @@ pkg.cargo.publish() {
     pipeline.require_tool cargo || return "$BRIK_EXIT_MISSING_DEP"
     pipeline.require_file "Cargo.toml" || return "$BRIK_EXIT_IO_FAILURE"
 
+    # Referential absorption: a declared PackageRegistry endpoint of this
+    # format is the single source of truth for the index and identity; the
+    # BRIK_PUBLISH_CARGO_* variables remain the legacy path without one. The
+    # registry NAME stays a project concern (it names the Cargo.toml entry).
+    # A basic credential composes the "Basic <base64>" sparse-registry token.
+    brik.use package-managers._endpoint 2>/dev/null || true
+    local _ep=""
+    if declare -f pkg.endpoint.resolve >/dev/null 2>&1; then
+        _ep="$(pkg.endpoint.resolve cargo "$index")" || return "$?"
+    fi
+    if [[ -n "$_ep" ]]; then
+        index="$(jq -r '.url' <<<"$_ep")"
+        case "$(jq -r '.method' <<<"$_ep")" in
+            token) token_var="$(jq -r '.token_var' <<<"$_ep")" ;;
+            basic)
+                brik.use transverse.env
+                BRIK_PKG_CARGO_AUTH="Basic $(printf '%s:%s' "$(jq -r '.username' <<<"$_ep")" \
+                    "$(transverse.env.resolve_indirect "$(jq -r '.password_var' <<<"$_ep")")" \
+                    | base64 | tr -d '\n')"
+                export BRIK_PKG_CARGO_AUTH
+                token_var="BRIK_PKG_CARGO_AUTH"
+                ;;
+            none) token_var="" ;;
+        esac
+    fi
+
     # Set token via environment variable (never passed as CLI arg)
     # When a named registry is used, cargo expects CARGO_REGISTRIES_<NAME>_TOKEN
     # instead of the global CARGO_REGISTRY_TOKEN.

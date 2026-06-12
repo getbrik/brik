@@ -28,6 +28,33 @@ pkg.maven.publish() {
         esac
     done
 
+    # Referential absorption: a declared PackageRegistry endpoint of this
+    # format is the single source of truth for the destination and identity;
+    # the BRIK_PUBLISH_MAVEN_* variables remain the legacy path without one.
+    # Maven needs a username + password pair, so a token credential cannot
+    # serve it (fail closed rather than guess a split).
+    brik.use package-managers._endpoint 2>/dev/null || true
+    local _ep=""
+    if declare -f pkg.endpoint.resolve >/dev/null 2>&1; then
+        _ep="$(pkg.endpoint.resolve maven "$repository")" || return "$?"
+    fi
+    if [[ -n "$_ep" ]]; then
+        repository="$(jq -r '.url' <<<"$_ep")"
+        case "$(jq -r '.method' <<<"$_ep")" in
+            basic)
+                BRIK_PKG_MAVEN_USERNAME="$(jq -r '.username' <<<"$_ep")"
+                export BRIK_PKG_MAVEN_USERNAME
+                username_var="BRIK_PKG_MAVEN_USERNAME"
+                password_var="$(jq -r '.password_var' <<<"$_ep")"
+                ;;
+            token)
+                log.error "PackageRegistry 'maven': a token credential cannot serve maven (username + password required) -- failing closed"
+                return "$BRIK_EXIT_CONFIG_ERROR"
+                ;;
+            none) username_var=""; password_var="" ;;
+        esac
+    fi
+
     # Detect build tool
     local tool=""
     if [[ -f "pom.xml" ]]; then

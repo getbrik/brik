@@ -27,6 +27,37 @@ pkg.nuget.publish() {
 
     pipeline.require_tool dotnet || return "$BRIK_EXIT_MISSING_DEP"
 
+    # Referential absorption: a declared PackageRegistry endpoint of this
+    # format is the single source of truth for the destination, the identity
+    # AND the transport posture -- allowInsecureConnections derives from the
+    # DECLARED posture (an http:// endpoint url or tls.trust: insecure),
+    # never from sniffing the url. The BRIK_PUBLISH_NUGET_* variables remain
+    # the legacy path without an endpoint (url-sniffed, as before). A basic
+    # credential composes the user:password form the config branch splits on.
+    local insecure=""
+    brik.use package-managers._endpoint 2>/dev/null || true
+    local _ep=""
+    if declare -f pkg.endpoint.resolve >/dev/null 2>&1; then
+        _ep="$(pkg.endpoint.resolve nuget "$source")" || return "$?"
+    fi
+    if [[ -n "$_ep" ]]; then
+        source="$(jq -r '.url' <<<"$_ep")"
+        [[ "$(jq -r '.insecure' <<<"$_ep")" == "true" ]] && insecure="true"
+        case "$(jq -r '.method' <<<"$_ep")" in
+            token) token_var="$(jq -r '.token_var' <<<"$_ep")" ;;
+            basic)
+                brik.use transverse.env
+                BRIK_PKG_NUGET_AUTH="$(printf '%s:%s' "$(jq -r '.username' <<<"$_ep")" \
+                    "$(transverse.env.resolve_indirect "$(jq -r '.password_var' <<<"$_ep")")")"
+                export BRIK_PKG_NUGET_AUTH
+                token_var="BRIK_PKG_NUGET_AUTH"
+                ;;
+            none) token_var="" ;;
+        esac
+    elif [[ -n "$source" && "$source" == http://* ]]; then
+        insecure="true"
+    fi
+
     # Find .nupkg files (enable globstar for recursive search)
     local -a nupkgs
     local prev_globstar
@@ -64,11 +95,13 @@ pkg.nuget.publish() {
         export NUGET_API_KEY
     fi
 
-    # Create temporary NuGet.Config for HTTP sources (NuGet requires HTTPS by default)
-    # Also supports basic auth for Nexus/Artifactory when token is in "user:password" format
+    # Create temporary NuGet.Config for insecure sources (NuGet requires
+    # HTTPS by default; the allowance is the declared posture, see above).
+    # Also supports basic auth for Nexus/Artifactory when token is in
+    # "user:password" format.
     local tmp_nuget_config=""
     local use_config_auth=""
-    if [[ -n "$source" ]] && [[ "$source" == http://* ]]; then
+    if [[ -n "$source" && "$insecure" == "true" ]]; then
         tmp_nuget_config="$(mktemp)"
         local nuget_username="" nuget_password=""
         if [[ -n "$token_var" ]]; then

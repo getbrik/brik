@@ -213,6 +213,25 @@ YAML
       The stderr should include "name"
     End
 
+    It "rejects (7) an endpoint referencing an unknown credential"
+      dangling_cred() {
+        cat > "$INFRA_DIR/endpoints/pkg-npm.yml" <<'YAML'
+apiVersion: brik.dev/referential/v1
+kind: PackageRegistry
+name: pkg-npm
+format: npm
+url: https://nexus.lab:8443/repository/brik-npm/
+credential: no-such-credential
+tls:
+  trust: system
+YAML
+        infra.validate
+      }
+      When call dangling_cred
+      The status should equal 7
+      The stderr should include "unknown credential 'no-such-credential'"
+    End
+
     It "rejects (7) a binding referencing an unknown endpoint"
       dangling_endpoint() {
         yq -i '.endpoints = {"ghost-registry": "registry-push"}' "$INFRA_DIR/bindings/e2e.yml"

@@ -10,6 +10,11 @@
     "name": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
     "format": { "enum": ["npm", "pypi", "maven", "cargo", "nuget"] },
     "url": { "type": "string", "pattern": "^https?://.+" },
+    "credential": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$",
+      "description": "Name of the Credential document the publisher authenticates with (method token or basic, env:// references). Absent means anonymous publishing."
+    },
     "tls": {
       "type": "object",
       "properties": {

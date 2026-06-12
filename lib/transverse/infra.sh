@@ -127,6 +127,28 @@ infra.validate() {
     _infra._validate_category "$root" bindings "Binding" || return "$?"
     _infra._validate_category "$root" policies "Policy" || return "$?"
     _infra._validate_bindings "$root" || return "$?"
+    _infra._validate_endpoint_credentials "$root" || return "$?"
+}
+
+# _infra._validate_endpoint_credentials - an endpoint declaring an inline
+# credential reference (PackageRegistry.credential) must reference an
+# existing Credential document; a dangling name fails validation here, not
+# the publish that would have consumed it.
+_infra._validate_endpoint_credentials() {
+    local root="$1"
+    local dir="${root}/endpoints"
+    [[ -d "$dir" ]] || return 0
+
+    local file cred
+    for file in "$dir"/*.yml "$dir"/*.yaml; do
+        [[ -f "$file" ]] || continue
+        cred="$(yq '.credential // ""' "$file")"
+        [[ -n "$cred" ]] || continue
+        if ! _infra._find_doc "$root" credentials "$cred" >/dev/null; then
+            log.error "${file}: endpoint references unknown credential '${cred}'"
+            return "$BRIK_EXIT_CONFIG_ERROR"
+        fi
+    done
 }
 
 # _infra._validate_doc - validate one document: apiVersion, known kind within

@@ -26,6 +26,31 @@ pkg.pypi.publish() {
         esac
     done
 
+    # Referential absorption: a declared PackageRegistry endpoint of this
+    # format is the single source of truth for the destination and identity;
+    # the BRIK_PUBLISH_PYPI_* variables remain the legacy path without one.
+    # A basic credential maps to the user:password token form the twine and
+    # uv branches already split on.
+    brik.use package-managers._endpoint 2>/dev/null || true
+    local _ep=""
+    if declare -f pkg.endpoint.resolve >/dev/null 2>&1; then
+        _ep="$(pkg.endpoint.resolve pypi "$repository")" || return "$?"
+    fi
+    if [[ -n "$_ep" ]]; then
+        repository="$(jq -r '.url' <<<"$_ep")"
+        case "$(jq -r '.method' <<<"$_ep")" in
+            token) token_var="$(jq -r '.token_var' <<<"$_ep")" ;;
+            basic)
+                brik.use transverse.env
+                BRIK_PKG_PYPI_AUTH="$(printf '%s:%s' "$(jq -r '.username' <<<"$_ep")" \
+                    "$(transverse.env.resolve_indirect "$(jq -r '.password_var' <<<"$_ep")")")"
+                export BRIK_PKG_PYPI_AUTH
+                token_var="BRIK_PKG_PYPI_AUTH"
+                ;;
+            none) token_var="" ;;
+        esac
+    fi
+
     # Detect publish tool
     local tool=""
     if [[ -f "pyproject.toml" ]] && grep -q '\[tool\.poetry\]' pyproject.toml 2>/dev/null; then

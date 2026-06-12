@@ -2,6 +2,7 @@ Describe "stages/notify.sh - internals"
   Include "$BRIK_PIPELINE_LIB/logging.sh"
   Include "$BRIK_PIPELINE_LIB/tools.sh"
   Include "$BRIK_TRANSVERSE_LIB/env.sh"
+  Include "$BRIK_TRANSVERSE_LIB/infra.sh"
   Include "$BRIK_STAGES_LIB/notify.sh"
   Include "$BRIK_HOME/spec/support/mock_helper.sh"
 
@@ -200,6 +201,57 @@ Describe "stages/notify.sh - internals"
       When call notify.webhook
       The status should equal 2
       The stderr should include "webhook message is required"
+    End
+
+    Describe "referential Notification endpoint (service webhook)"
+      setup_ep() {
+        mock.setup
+        mock.infra.setup
+        mkdir -p "$BRIK_INFRA_DIR/endpoints"
+        TEST_WS="$(mktemp -d)"
+        MOCK_LOG="${TEST_WS}/mock_curl.log"
+        mock.create_logging "curl" "$MOCK_LOG"
+        mock.activate
+        cat > "$BRIK_INFRA_DIR/endpoints/notify.yml" <<'YAML'
+apiVersion: brik.dev/referential/v1
+kind: Notification
+name: notify
+service: webhook
+url: https://hooks.lab:9443/notify
+tls:
+  trust: custom-ca
+YAML
+        mkdir -p "$BRIK_INFRA_DIR/trust/ca/hooks.lab"
+        : > "$BRIK_INFRA_DIR/trust/ca/hooks.lab/ca.crt"
+      }
+      cleanup_ep() {
+        mock.cleanup
+        mock.infra.teardown
+        rm -rf "$TEST_WS"
+      }
+      Before 'setup_ep'
+      After 'cleanup_ep'
+
+      It "sends to the declared url with the declared CA bundle"
+        invoke_ep() {
+          notify.webhook --message "deploy done" || return 1
+          cat "$MOCK_LOG"
+        }
+        When call invoke_ep
+        The status should be success
+        The output should include "https://hooks.lab:9443/notify"
+        The output should include "--cacert ${BRIK_INFRA_DIR}/trust/ca/hooks.lab/ca.crt"
+        The stderr should include "webhook notification sent"
+      End
+
+      It "fails closed when the legacy variable contradicts the endpoint"
+        invoke_conflict() {
+          BRIK_NOTIFY_WEBHOOK_URL="https://elsewhere/hook" notify.webhook --message "x"
+        }
+        When call invoke_conflict
+        The status should equal 7
+        The stderr should include "contradicts"
+      End
     End
 
     It "skips when no URL configured"

@@ -32,6 +32,31 @@ pkg.npm.publish() {
     pipeline.require_tool npm || return "$BRIK_EXIT_MISSING_DEP"
     pipeline.require_file "package.json" || return "$BRIK_EXIT_IO_FAILURE"
 
+    # Referential absorption: a declared PackageRegistry endpoint of this
+    # format is the single source of truth for the destination and identity;
+    # the BRIK_PUBLISH_NPM_* variables remain the legacy path without one.
+    brik.use package-managers._endpoint 2>/dev/null || true
+    local _ep=""
+    if declare -f pkg.endpoint.resolve >/dev/null 2>&1; then
+        _ep="$(pkg.endpoint.resolve npm "$registry")" || return "$?"
+    fi
+    if [[ -n "$_ep" ]]; then
+        registry="$(jq -r '.url' <<<"$_ep")"
+        case "$(jq -r '.method' <<<"$_ep")" in
+            token) token_var="$(jq -r '.token_var' <<<"$_ep")" ;;
+            basic)
+                # npm's _auth line wants base64(user:password).
+                brik.use transverse.env
+                BRIK_PKG_NPM_AUTH="$(printf '%s:%s' "$(jq -r '.username' <<<"$_ep")" \
+                    "$(transverse.env.resolve_indirect "$(jq -r '.password_var' <<<"$_ep")")" \
+                    | base64 | tr -d '\n')"
+                export BRIK_PKG_NPM_AUTH
+                token_var="BRIK_PKG_NPM_AUTH"
+                ;;
+            none) token_var="" ;;
+        esac
+    fi
+
     # Build npm publish command
     local -a cmd=(npm publish)
     [[ -n "$registry" ]] && cmd+=(--registry "$registry")

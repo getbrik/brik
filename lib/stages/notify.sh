@@ -79,6 +79,11 @@ _notify._build_notify_metadata() {
     fi
 
     local webhook_url="${BRIK_NOTIFY_WEBHOOK_URL:-}"
+    # A declared webhook Notification endpoint configures the channel even
+    # without the legacy variable (the send path resolves it the same way).
+    if [[ -z "$webhook_url" ]]; then
+        webhook_url="$(_notify._webhook_endpoint 2>/dev/null | jq -r '.url // empty' 2>/dev/null)"
+    fi
     local webhook_on="${BRIK_NOTIFY_WEBHOOK_ON:-always}"
     local webhook_configured=false webhook_would=false
     if [[ -n "$webhook_url" ]]; then
@@ -165,6 +170,34 @@ _notify._should_send() {
     [[ "$on_condition" == *"failure"* && "$pipeline_status" == "failed" ]] && return 0
 
     return "$BRIK_EXIT_FAILURE"
+}
+
+# _notify._webhook_endpoint - echo (as JSON) the referential's Notification
+# endpoint of service webhook, or nothing when none is declared (the
+# BRIK_NOTIFY_WEBHOOK_URL variable remains the legacy path). Slack and email
+# stay variable-delivered: a Slack incoming-webhook URL embeds its token, and
+# the referential holds references, never secret values. Fail-closed when
+# several webhook endpoints are declared.
+_notify._webhook_endpoint() {
+    brik.use transverse.infra 2>/dev/null || true
+    declare -f infra.root >/dev/null 2>&1 || return 0
+
+    local root
+    root="$(infra.root 2>/dev/null)" || return 0
+
+    local file found=""
+    for file in "${root}/endpoints"/*.yml "${root}/endpoints"/*.yaml; do
+        [[ -f "$file" ]] || continue
+        [[ "$(yq '.kind // ""' "$file")" == "Notification" ]] || continue
+        [[ "$(yq '.service // ""' "$file")" == "webhook" ]] || continue
+        if [[ -n "$found" ]]; then
+            log.error "multiple webhook Notification endpoints declared in the referential (expected at most one)"
+            return "$BRIK_EXIT_CONFIG_ERROR"
+        fi
+        found="$file"
+    done
+    [[ -z "$found" ]] && return 0
+    yq -o json '.' "$found"
 }
 
 # Send a Slack notification via Incoming Webhook.
@@ -315,6 +348,33 @@ notify.webhook() {
         url="$(transverse.env.resolve_indirect "$url_var")"
     fi
 
+    # Referential absorption: a declared webhook Notification endpoint is the
+    # single source of truth for the destination and its transport posture; a
+    # variable pointing somewhere else is a contradiction, not an override.
+    local -a transport=()
+    local _ep
+    _ep="$(_notify._webhook_endpoint)" || return "$?"
+    if [[ -n "$_ep" ]]; then
+        local _ep_url _ep_trust
+        _ep_url="$(printf '%s' "$_ep" | jq -r '.url')"
+        if [[ -n "$url" && "$url" != "$_ep_url" ]]; then
+            log.error "webhook URL '${url}' contradicts the referential's Notification endpoint '${_ep_url}' -- failing closed"
+            return "$BRIK_EXIT_CONFIG_ERROR"
+        fi
+        url="$_ep_url"
+        _ep_trust="$(printf '%s' "$_ep" | jq -r '.tls.trust // "system"')"
+        if [[ "$url" == http://* ]]; then
+            log.warn "webhook endpoint is declared over plain http (legal but insecure)"
+        elif [[ "$_ep_trust" == "insecure" ]]; then
+            log.warn "webhook endpoint is declared with tls.trust: insecure (legal but insecure)"
+            transport+=(--insecure)
+        elif [[ "$_ep_trust" == "custom-ca" ]]; then
+            local _ep_ca
+            _ep_ca="$(infra.tls_ca "$_ep")" || return "$?"
+            transport+=(--cacert "$_ep_ca")
+        fi
+    fi
+
     if [[ -z "$url" ]]; then
         log.warn "no webhook URL configured, skipping"
         return 0
@@ -333,6 +393,7 @@ notify.webhook() {
     pipeline.require_tool curl || return "$BRIK_EXIT_MISSING_DEP"
 
     curl --silent --max-time 10 --connect-timeout 5 \
+        ${transport[@]+"${transport[@]}"} \
         -H "Content-Type: application/json" \
         -d "$payload" \
         "$url" >/dev/null || {
@@ -564,8 +625,13 @@ stages.notify() {
         fi
     fi
 
-    # Webhook notification.
-    if [[ -n "${BRIK_NOTIFY_WEBHOOK_URL:-}" ]]; then
+    # Webhook notification: configured by the legacy variable or by a
+    # declared webhook Notification endpoint of the referential.
+    local _webhook_dest="${BRIK_NOTIFY_WEBHOOK_URL:-}"
+    if [[ -z "$_webhook_dest" ]]; then
+        _webhook_dest="$(_notify._webhook_endpoint 2>/dev/null | jq -r '.url // empty' 2>/dev/null)"
+    fi
+    if [[ -n "$_webhook_dest" ]]; then
         local webhook_on="${BRIK_NOTIFY_WEBHOOK_ON:-always}"
         if _notify._should_send "$webhook_on" "$pipeline_status"; then
             notify.send --channel webhook --message "$summary_msg" || \
