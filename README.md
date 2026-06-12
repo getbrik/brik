@@ -53,18 +53,34 @@ test:
   coverage:
     threshold: 80
 
+artifacts:
+  channels:
+    release:                            # where CI publishes, where CD resolves
+      registry: registry.example.com/orders/orders-api
+  evidence:
+    repo: https://git.example.com/orders/evidence.git   # append-only journal
+
 deploy:
-  workflow: trunk-based
   environments:
     staging:
       target: k8s
       namespace: orders-staging
+      accepts_channel: release
+      validates_for: production         # a green staging run grants production
+      gates:
+        require_digest: true            # never deploy a mutable tag
     production:
       target: helm
       chart: ./charts/orders-api
+      accepts_channel: release
+      config_ref: main                  # env config redeploys without a new version
+      gates:
+        require_digest: true
+        require_attestation: true       # verify SBOM + SLSA provenance
+        requires_eligibility: [artifact_validated_for]   # staging vouched for it
 ```
 
-That is the entire pipeline definition. No `.gitlab-ci.yml` with 400 lines of YAML. No `Jenkinsfile` with custom Groovy. No bash glue you maintain.
+That is the entire definition -- the CI flow, the CD flow, the promotion chain between environments, and the gates that protect production. No `.gitlab-ci.yml` with 400 lines of YAML. No `Jenkinsfile` with custom Groovy. No bash glue you maintain.
 
 Only `version` and `project.name` are required -- the stack is auto-detected, every other field has a per-stack default. The rest of `brik.yml` is where you override what actually matters for *your* project: coverage thresholds, deploy targets, notification channels, registries, secrets. You configure your project. You never write pipeline logic.
 
