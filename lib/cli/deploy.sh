@@ -196,6 +196,27 @@ cli.deploy.run() {
         return "${BRIK_EXIT_CONFIG_ERROR}"
     fi
 
+    # Promotion chain (validates_for): a green deploy on this environment
+    # validates the artifact for the next environment of the chain. The
+    # declaration is checked eagerly fail-closed -- a chain that cannot
+    # deliver its validation (undeclared next env, no journal to append to)
+    # must refuse before anything is applied, not after.
+    local validates_for
+    validates_for="$(transverse.env.resolve_indirect "BRIK_DEPLOY_${upper_env}_VALIDATES_FOR")"
+    if [[ -n "$validates_for" ]]; then
+        local next_upper
+        next_upper="$(printf '%s' "$validates_for" | tr '[:lower:]-' '[:upper:]_')"
+        if [[ -z "$(transverse.env.resolve_indirect "BRIK_DEPLOY_${next_upper}_TARGET")" ]]; then
+            brik_error "validates_for: '${environment}' validates for an undeclared environment '${validates_for}'"
+            return "${BRIK_EXIT_CONFIG_ERROR}"
+        fi
+        brik.use transverse.config
+        if [[ -z "$(config.get '.artifacts.evidence.repo' '' 2>/dev/null || printf '')" ]]; then
+            brik_error "validates_for is set for '${environment}' but no state-repo is declared (.artifacts.evidence.repo) -- a validation only exists as a journal entry"
+            return "${BRIK_EXIT_CONFIG_ERROR}"
+        fi
+    fi
+
     # The append-only guarantee of the evidence store rests on host-side
     # branch protection: check it before consuming evidence. The posture is
     # governed by the referential's Policy document (state_repo_protection):
@@ -268,11 +289,17 @@ cli.deploy.run() {
         elif [[ "$require_digest" == "true" ]]; then
             brik_error "require_digest: cannot resolve '${version}' in channel '${channel}' -- failing closed"
             return "${BRIK_EXIT_EXTERNAL_FAIL}"
+        elif [[ -n "$validates_for" ]]; then
+            brik_error "validates_for: cannot resolve '${version}' in channel '${channel}' to bind the validation -- failing closed"
+            return "${BRIK_EXIT_EXTERNAL_FAIL}"
         else
             log.warn "could not resolve a digest for '${version}' in channel '${channel}'; deploying without a pinned ref"
         fi
     elif [[ "$require_digest" == "true" ]]; then
         brik_error "require_digest is set for '${environment}' but no accepts_channel is configured -- failing closed"
+        return "${BRIK_EXIT_CONFIG_ERROR}"
+    elif [[ -n "$validates_for" ]]; then
+        brik_error "validates_for is set for '${environment}' but no accepts_channel is configured -- a validation binds to the digest"
         return "${BRIK_EXIT_CONFIG_ERROR}"
     fi
 
@@ -418,6 +445,34 @@ cli.deploy.run() {
     set -e
 
     transverse.lock.release "deploy-${environment}"
+
+    # Promotion-chain producer: a green deploy validates the artifact for the
+    # next environment. The validation is withheld -- and the run failed --
+    # when the live read-back contradicts the pinned digest: a journal entry
+    # must never vouch for a state that was not observed. A target without a
+    # live query (read-back unknown/unsupported) does not block: the rollout
+    # health already gated the success. Dry-run flows through publish, which
+    # only logs. A declared chain that cannot record is a failed run.
+    if [[ "$rc" -eq 0 && -n "$validates_for" ]]; then
+        local rb_live=""
+        local _backend="${BRIK_LOG_DIR}/aggregate-report.json"
+        if [[ -f "$_backend" ]] && command -v jq >/dev/null 2>&1; then
+            rb_live="$(jq -r '[.stages[] | select(.stage == "deploy") | .tech.deployed.live // empty] | last // empty' \
+                "$_backend" 2>/dev/null)"
+        fi
+        if [[ "$rb_live" =~ ^sha256: && "$rb_live" != "${pinned##*@}" ]]; then
+            brik_error "validates_for: the live read-back (${rb_live}) contradicts the pinned digest (${pinned##*@}) -- withholding the validation for '${validates_for}'"
+            rc="${BRIK_EXIT_CHECK_FAILED}"
+        else
+            brik.use transverse.promotion_journal
+            if ! promotion_journal.record_validation \
+                    --version "$version" --digest "${pinned##*@}" \
+                    --environment "$validates_for"; then
+                rc="${BRIK_EXIT_EXTERNAL_FAIL}"
+            fi
+        fi
+    fi
+
     [[ -n "$worktree" ]] && transverse.git.worktree_remove "${orig_workspace}" "${worktree}"
     return "$rc"
 }

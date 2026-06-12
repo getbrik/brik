@@ -70,6 +70,35 @@ for the digest and the target environment. Grants are written by
 for declarative chains, by a validated deploy on the previous environment
 (`artifact_validated_for`).
 
+## Declarative promotion chains (`validates_for`)
+
+An environment declares the next link of its chain with `validates_for`;
+a green CD run on it then journals `artifact_validated_for` for that next
+environment, which typically consumes it through `requires_eligibility`:
+
+```yaml
+deploy:
+  environments:
+    staging:
+      accepts_channel: release
+      validates_for: production
+    production:
+      accepts_channel: release
+      gates:
+        requires_eligibility: [artifact_validated_for]
+```
+
+The producer is the CD run itself, after the rollout: the deploy must
+succeed (health included) and the live read-back must not contradict the
+pinned digest -- a journal entry never vouches for a state that was not
+observed. A contradicted read-back withholds the validation and fails the
+run. The declaration is fail-closed at entry: `validates_for` requires
+`accepts_channel` on the same environment (events bind to the digest), a
+declared state-repo to journal into, and the named environment must exist.
+A target without a live read-back query (e.g. ssh) does not block the
+validation: the rollout health already gated the success, and the absence
+of a read-back is a declared posture of that target.
+
 ## Re-entry semantics
 
 Re-running `brik deploy` for the same (version, environment) converges: the

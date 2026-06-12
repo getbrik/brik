@@ -143,6 +143,11 @@ _config._export_deploy_env_vars() {
         val="$(config.get ".deploy.environments.${env_name}.accepts_channel" '')"
         [[ -n "$val" ]] && export "BRIK_DEPLOY_${upper_env}_CHANNEL=$val"
 
+        # Promotion chain: a green deploy on this env validates the artifact
+        # for the named next env (artifact_validated_for producer).
+        val="$(config.get ".deploy.environments.${env_name}.validates_for" '')"
+        [[ -n "$val" ]] && export "BRIK_DEPLOY_${upper_env}_VALIDATES_FOR=$val"
+
         val="$(config.get ".deploy.environments.${env_name}.gates.require_digest" '')"
         [[ -n "$val" ]] && export "BRIK_DEPLOY_${upper_env}_REQUIRE_DIGEST=$val"
 

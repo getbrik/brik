@@ -517,4 +517,168 @@ EOF
       The stderr should not include "evidence store HEAD"
     End
   End
+
+  Describe "validation producer (validates_for)"
+    # A successful deploy to an environment that declares validates_for emits
+    # an artifact_validated_for event for the NEXT environment of the chain
+    # (decision #2: the CD run is the producer, post-rollout). The event is
+    # digest-bound and only appended when the run succeeded and the live
+    # read-back does not contradict the pinned digest.
+    setup_validation() {
+      VAL_SEED="$(mktemp -d)"
+      (
+        cd "$VAL_SEED"
+        git init -q -b main
+        git config user.email "e2e@brik.dev"
+        git config user.name "e2e"
+        printf '{}\n' > seed.json
+        git add -A >/dev/null
+        git commit -q -m "seed"
+      )
+      VAL_DIR="$(mktemp -d)"
+      VAL_REPO="${VAL_DIR}/state.git"
+      git clone -q --bare "$VAL_SEED" "$VAL_REPO"
+      VAL_REPO_URL="file://$VAL_REPO" yq -i \
+        '.artifacts.evidence = {"repo": strenv(VAL_REPO_URL), "branch": "main", "sign": false}
+         | .deploy.environments.staging.validates_for = "production"
+         | .deploy.environments.production = {
+             "target": "k8s", "manifest": "k8s/deploy.yml",
+             "namespace": "production", "accepts_channel": "release"}' \
+        "$REPO/brik.yml"
+      printf '#!/bin/sh\nprintf "HTTP/1.1 200 OK\\r\\nDocker-Content-Digest: %s\\r\\n\\r\\n"\nexit 0\n' \
+        "$DIGEST" > "${MOCKBIN}/curl"
+      chmod +x "${MOCKBIN}/curl"
+    }
+    cleanup_validation() { rm -rf "$VAL_SEED" "$VAL_DIR"; }
+    Before 'setup_validation'
+    After 'cleanup_validation'
+
+    journal_events() {
+      local out
+      out="$(mktemp -d)"
+      git clone -q "file://$VAL_REPO" "$out" 2>/dev/null
+      if [[ -d "$out/promotions" ]]; then
+        find "$out/promotions" -name '*.json' -exec cat {} +
+      else
+        printf 'NO_EVENTS'
+      fi
+      rm -rf "$out"
+    }
+
+    It "journals artifact_validated_for the next environment after a green deploy"
+      deploy_validates() {
+        cd "$REPO"
+        PATH="${MOCKBIN}:$PATH" cli.deploy.run --version v1.2.3 --environment staging >/dev/null || return $?
+        journal_events
+      }
+      When call deploy_validates
+      The status should equal 0
+      The output should include '"type": "artifact_validated_for"'
+      The output should include '"environment": "production"'
+      The output should include "\"digest\": \"${DIGEST}\""
+      The stderr should include "journaled artifact_validated_for"
+    End
+
+    It "feeds the next environment's eligibility gate (chain round-trip)"
+      deploy_chain() {
+        yq -i '.deploy.environments.production.gates.requires_eligibility = ["artifact_validated_for"]' \
+          "$REPO/brik.yml"
+        cd "$REPO"
+        PATH="${MOCKBIN}:$PATH" cli.deploy.run --version v1.2.3 --environment production >/dev/null 2>/dev/null \
+          && { echo "UNEXPECTED: production deployed without a validation"; return 1; }
+        PATH="${MOCKBIN}:$PATH" cli.deploy.run --version v1.2.3 --environment staging >/dev/null || return $?
+        PATH="${MOCKBIN}:$PATH" cli.deploy.run --version v1.2.3 --environment production
+      }
+      When call deploy_chain
+      The status should equal 0
+      The output should include "@${DIGEST}"
+      The stderr should include "eligibility proven"
+    End
+
+    It "refuses a chain that names an undeclared environment, before deploying"
+      deploy_ghost_next() {
+        yq -i '.deploy.environments.staging.validates_for = "ghost"' "$REPO/brik.yml"
+        cd "$REPO"
+        PATH="${MOCKBIN}:$PATH" cli.deploy.run --version v1.2.3 --environment staging
+      }
+      When call deploy_ghost_next
+      The status should equal 7
+      The stderr should include "validates_for"
+      The output should not include "@${DIGEST}"
+    End
+
+    It "refuses a chain without a state-repo to journal into, before deploying"
+      deploy_no_journal() {
+        yq -i 'del(.artifacts.evidence)' "$REPO/brik.yml"
+        cd "$REPO"
+        PATH="${MOCKBIN}:$PATH" cli.deploy.run --version v1.2.3 --environment staging
+      }
+      When call deploy_no_journal
+      The status should equal 7
+      The stderr should include "validates_for"
+      The output should not include "@${DIGEST}"
+    End
+
+    It "refuses a chain on an environment without a channel to bind the digest"
+      deploy_no_channel() {
+        yq -i 'del(.deploy.environments.staging.accepts_channel)
+               | del(.deploy.environments.staging.gates)' "$REPO/brik.yml"
+        cd "$REPO"
+        PATH="${MOCKBIN}:$PATH" cli.deploy.run --version v1.2.3 --environment staging
+      }
+      When call deploy_no_channel
+      The status should equal 7
+      The stderr should include "validates_for"
+      The output should not include "@${DIGEST}"
+    End
+
+    It "does not journal when the deploy fails"
+      deploy_red() {
+        printf '#!/bin/sh\nexit 1\n' > "${MOCKBIN}/kubectl"
+        chmod +x "${MOCKBIN}/kubectl"
+        cd "$REPO"
+        PATH="${MOCKBIN}:$PATH" cli.deploy.run --version v1.2.3 --environment staging >/dev/null 2>/dev/null
+        local rc=$?
+        [ "$rc" -eq 0 ] && return 1
+        journal_events
+      }
+      When call deploy_red
+      The status should equal 0
+      The output should include "NO_EVENTS"
+    End
+
+    It "withholds the validation when the live read-back contradicts the pinned digest"
+      deploy_contradicted() {
+        # kubectl: apply succeeds, but the live deployment runs ANOTHER digest.
+        cat > "${MOCKBIN}/kubectl" <<'EOF'
+#!/bin/sh
+[ "$1" = "apply" ] && cat "$3" && exit 0
+[ "$1" = "get" ] && printf 'registry.release/app@sha256:9999999999999999999999999999999999999999999999999999999999999999' && exit 0
+exit 0
+EOF
+        chmod +x "${MOCKBIN}/kubectl"
+        cd "$REPO"
+        PATH="${MOCKBIN}:$PATH" cli.deploy.run --version v1.2.3 --environment staging >/dev/null
+        local rc=$?
+        printf 'RC=%s ' "$rc"
+        journal_events
+      }
+      When call deploy_contradicted
+      The status should equal 0
+      The output should include "RC=10"
+      The output should include "NO_EVENTS"
+      The stderr should include "read-back"
+    End
+
+    It "dry-run journals nothing"
+      deploy_dryrun() {
+        cd "$REPO"
+        PATH="${MOCKBIN}:$PATH" cli.deploy.run --version v1.2.3 --environment staging --dry-run >/dev/null 2>/dev/null || return $?
+        journal_events
+      }
+      When call deploy_dryrun
+      The status should equal 0
+      The output should include "NO_EVENTS"
+    End
+  End
 End

@@ -340,6 +340,58 @@ promotion_journal.record_authorization() {
     return 0
 }
 
+# Record an artifact_validated_for event in the project's declared
+# state-repo. Emitted by the CD flow after a green deploy on an environment
+# that declares validates_for: the artifact becomes eligible for the NEXT
+# environment of the chain. Like record_authorization this does NOT
+# self-skip: a validation only exists as a journal entry, so a declared
+# chain without a state-repo has nothing to validate into -- fail closed.
+# Usage: promotion_journal.record_validation --version <v> --digest <d>
+#        --environment <e>
+promotion_journal.record_validation() {
+    local version="" digest="" environment=""
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --version)     version="$2";     shift 2 ;;
+            --digest)      digest="$2";      shift 2 ;;
+            --environment) environment="$2"; shift 2 ;;
+            *) log.error "promotion_journal.record_validation: unknown option: $1"
+               return "$BRIK_EXIT_INVALID_INPUT" ;;
+        esac
+    done
+
+    brik.use transverse.config
+
+    local repo
+    repo="$(config.get '.artifacts.evidence.repo' '' 2>/dev/null || printf '')"
+    if [[ -z "$repo" ]]; then
+        log.error "no state-repo declared (.artifacts.evidence.repo): a validation only exists as a journal entry -- refusing"
+        return "$BRIK_EXIT_CONFIG_ERROR"
+    fi
+
+    local branch token_var sign
+    branch="$(config.get '.artifacts.evidence.branch' '' 2>/dev/null || printf '')"
+    token_var="$(config.get '.artifacts.evidence.token_var' '' 2>/dev/null || printf '')"
+    sign="$(config.get '.artifacts.evidence.sign' 'false' 2>/dev/null || printf 'false')"
+
+    local -a pub=(--repo "$repo")
+    [[ -n "$branch" ]]      && pub+=(--branch "$branch")
+    [[ -n "$token_var" ]]   && pub+=(--token-var "$token_var")
+    [[ "$sign" == "true" ]] && pub+=(--sign)
+
+    if ! promotion_journal.build_event \
+            --type artifact_validated_for \
+            --version "$version" --digest "$digest" \
+            --environment "$environment" \
+            | promotion_journal.publish "${pub[@]}"; then
+        log.error "failed to journal the validation of ${version} for ${environment}"
+        return "$BRIK_EXIT_EXTERNAL_FAIL"
+    fi
+    log.info "journaled artifact_validated_for ${version} (${environment})"
+    return 0
+}
+
 # Read the journal of a cloned state-repo working tree and emit the events
 # bound to a digest as a JSON array, optionally narrowed by environment and
 # type. Every file under promotions/ is validated fail-closed first: one

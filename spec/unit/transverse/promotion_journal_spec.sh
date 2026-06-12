@@ -306,6 +306,67 @@ Describe "transverse.promotion_journal"
     End
   End
 
+  Describe "promotion_journal.record_validation"
+    setup_val() {
+      PUB_REC="$(mktemp)"
+      EVIDENCE_REPO=""
+      EVIDENCE_SIGN="false"
+      config.get() {
+        case "$1" in
+          .artifacts.evidence.repo)      printf '%s' "$EVIDENCE_REPO" ;;
+          .artifacts.evidence.branch)    printf 'main' ;;
+          .artifacts.evidence.token_var) printf 'STATE_TOKEN' ;;
+          .artifacts.evidence.sign)      printf '%s' "$EVIDENCE_SIGN" ;;
+          *) printf '%s' "${2:-}" ;;
+        esac
+      }
+      promotion_journal.publish() {
+        printf '%s\n' "$*" >"${PUB_REC}.args"
+        cat >"$PUB_REC"
+        return "${PUB_RC:-0}"
+      }
+    }
+    cleanup_val() { rm -f "$PUB_REC" "${PUB_REC}.args"; }
+    BeforeEach setup_val
+    AfterEach cleanup_val
+
+    It "refuses to validate when no state-repo is declared (no journal, no grant)"
+      When call promotion_journal.record_validation \
+        --version v1.2.3 --digest "$DIGEST" --environment production
+      The status should equal "$BRIK_EXIT_CONFIG_ERROR"
+      The stderr should include "state-repo"
+    End
+
+    It "publishes a signed artifact_validated_for event bound to digest and environment"
+      rec() {
+        EVIDENCE_REPO="https://git/state.git"
+        EVIDENCE_SIGN="true"
+        promotion_journal.record_validation \
+          --version v1.2.3 --digest "$DIGEST" --environment production || return $?
+        printf '%s||%s' "$(cat "${PUB_REC}.args")" "$(cat "$PUB_REC")"
+      }
+      When call rec
+      The status should be success
+      The output should include "--repo https://git/state.git"
+      The output should include "--sign"
+      The output should include '"type": "artifact_validated_for"'
+      The output should include '"environment": "production"'
+      The output should include '"digest": "sha256:4444444444444444444444444444444444444444444444444444444444444444"'
+    End
+
+    It "propagates a journal publish failure"
+      rec() {
+        EVIDENCE_REPO="https://git/state.git"
+        PUB_RC=5
+        promotion_journal.record_validation \
+          --version v1.2.3 --digest "$DIGEST" --environment production
+      }
+      When call rec
+      The status should equal "$BRIK_EXIT_EXTERNAL_FAIL"
+      The stderr should include "journal"
+    End
+  End
+
   Describe "promotion_journal.events_for"
     OTHER_DIGEST="sha256:5555555555555555555555555555555555555555555555555555555555555555"
 

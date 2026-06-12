@@ -1021,6 +1021,11 @@
           "type": "string",
           "minLength": 1
         },
+        "validates_for": {
+          "description": "Name of the NEXT deploy.environments.<name> in the promotion chain (e.g. staging validates_for production). A successful CD run on this environment (rollout healthy, live read-back not contradicting the pinned digest) appends an artifact_validated_for event for the named environment to the project's PromotionJournal, which the next environment's requires_eligibility gate consumes. Fail-closed: it requires accepts_channel on this environment (events bind to the digest) and a declared state-repo (artifacts.evidence.repo); the named environment must be declared.",
+          "type": "string",
+          "minLength": 1
+        },
         "gates": {
           "description": "Deployment gates enforced before this environment is deployed.",
           "type": "object",
