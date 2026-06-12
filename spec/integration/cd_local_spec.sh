@@ -649,7 +649,10 @@ EOF
 
     It "withholds the validation when the live read-back contradicts the pinned digest"
       deploy_contradicted() {
-        # kubectl: apply succeeds, but the live deployment runs ANOTHER digest.
+        # kubectl: apply succeeds, but the live deployment runs ANOTHER digest
+        # and never converges; bound the converge window so the refusal is
+        # decided quickly.
+        export BRIK_READBACK_CONVERGE_TIMEOUT=1
         cat > "${MOCKBIN}/kubectl" <<'EOF'
 #!/bin/sh
 [ "$1" = "apply" ] && cat "$3" && exit 0
@@ -660,6 +663,7 @@ EOF
         cd "$REPO"
         PATH="${MOCKBIN}:$PATH" cli.deploy.run --version v1.2.3 --environment staging >/dev/null
         local rc=$?
+        unset BRIK_READBACK_CONVERGE_TIMEOUT
         printf 'RC=%s ' "$rc"
         journal_events
       }
@@ -668,6 +672,37 @@ EOF
       The output should include "RC=10"
       The output should include "NO_EVENTS"
       The stderr should include "read-back"
+    End
+
+    It "emits once the live read-back converges to the pinned digest"
+      deploy_converges() {
+        # kubectl: the stage-side snapshot still sees the previous digest
+        # (reconciling controller); the producer's bounded re-read converges.
+        export BRIK_READBACK_CONVERGE_TIMEOUT=30
+        cat > "${MOCKBIN}/kubectl" <<EOF
+#!/bin/sh
+[ "\$1" = "apply" ] && cat "\$3" && exit 0
+if [ "\$1" = "get" ]; then
+  if [ -f "${MOCKBIN}/.rolled" ]; then
+    printf 'registry.release/app@${DIGEST}'
+  else
+    touch "${MOCKBIN}/.rolled"
+    printf 'registry.release/app@sha256:9999999999999999999999999999999999999999999999999999999999999999'
+  fi
+  exit 0
+fi
+exit 0
+EOF
+        chmod +x "${MOCKBIN}/kubectl"
+        cd "$REPO"
+        PATH="${MOCKBIN}:$PATH" cli.deploy.run --version v1.2.3 --environment staging >/dev/null || return $?
+        unset BRIK_READBACK_CONVERGE_TIMEOUT
+        journal_events
+      }
+      When call deploy_converges
+      The status should equal 0
+      The output should include '"type": "artifact_validated_for"'
+      The stderr should include "journaled artifact_validated_for"
     End
 
     It "dry-run journals nothing"

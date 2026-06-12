@@ -91,6 +91,26 @@ _deploy.readback._live() {
     esac
 }
 
+# deploy.readback.live_digest --env <name> --target <t> [--controller <c>]
+# Echo the live digest ("sha256:..." | "unknown" | "unsupported"). Public
+# query for callers that need the CURRENT live state -- the stage-side
+# record() snapshot can lag a reconciling controller; the validates_for
+# producer re-reads through this until the rollout converges.
+deploy.readback.live_digest() {
+    local env="" target="" controller=""
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --env)        env="$2";        shift 2 ;;
+            --target)     target="$2";     shift 2 ;;
+            --controller) controller="$2"; shift 2 ;;
+            *) shift ;;
+        esac
+    done
+    local upper_env
+    upper_env="$(printf '%s' "$env" | tr '[:lower:]-' '[:upper:]_')"
+    _deploy.readback._live "$target" "$controller" "$upper_env"
+}
+
 # deploy.readback.record --env <name> --target <t> [--controller <c>]
 # Records deploy.tech.digest (resolved) and deploy.tech.deployed
 # {resolved, live, match}. Always returns 0.

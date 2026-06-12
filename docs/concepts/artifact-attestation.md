@@ -91,7 +91,10 @@ deploy:
 The producer is the CD run itself, after the rollout: the deploy must
 succeed (health included) and the live read-back must not contradict the
 pinned digest -- a journal entry never vouches for a state that was not
-observed. A contradicted read-back withholds the validation and fails the
+observed. A reconciling controller updates its live state asynchronously,
+so a contradicted snapshot gets a bounded window to converge
+(`BRIK_READBACK_CONVERGE_TIMEOUT` seconds, default 120) before the verdict;
+a read-back that never converges withholds the validation and fails the
 run. The declaration is fail-closed at entry: `validates_for` requires
 `accepts_channel` on the same environment (events bind to the digest), a
 declared state-repo to journal into, and the named environment must exist.

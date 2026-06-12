@@ -449,8 +449,12 @@ cli.deploy.run() {
     # Promotion-chain producer: a green deploy validates the artifact for the
     # next environment. The validation is withheld -- and the run failed --
     # when the live read-back contradicts the pinned digest: a journal entry
-    # must never vouch for a state that was not observed. A target without a
-    # live query (read-back unknown/unsupported) does not block: the rollout
+    # must never vouch for a state that was not observed. A reconciling
+    # controller (gitops) updates its live state asynchronously, so a
+    # contradicted snapshot gets a bounded window to converge to the pinned
+    # digest before the verdict (BRIK_READBACK_CONVERGE_TIMEOUT seconds,
+    # default 120 -- raise it for slow clusters). A target without a live
+    # query (read-back unknown/unsupported) does not block: the rollout
     # health already gated the success. Dry-run flows through publish, which
     # only logs. A declared chain that cannot record is a failed run.
     if [[ "$rc" -eq 0 && -n "$validates_for" ]]; then
@@ -459,6 +463,24 @@ cli.deploy.run() {
         if [[ -f "$_backend" ]] && command -v jq >/dev/null 2>&1; then
             rb_live="$(jq -r '[.stages[] | select(.stage == "deploy") | .tech.deployed.live // empty] | last // empty' \
                 "$_backend" 2>/dev/null)"
+        fi
+        if [[ "$rb_live" =~ ^sha256: && "$rb_live" != "${pinned##*@}" ]]; then
+            brik.use deployments.readback
+            brik.use transverse.wait
+            local _rb_controller
+            _rb_controller="$(transverse.env.resolve_indirect "BRIK_DEPLOY_${upper_env}_CONTROLLER")"
+            _cli.deploy._readback_converged() {
+                [[ "$(deploy.readback.live_digest --env "$environment" \
+                    --target "$target" --controller "$_rb_controller")" == "${pinned##*@}" ]]
+            }
+            if transverse.wait.until _cli.deploy._readback_converged \
+                    --timeout "${BRIK_READBACK_CONVERGE_TIMEOUT:-120}" --interval 5 \
+                    --message "validates_for: waiting for the live state to converge to ${pinned##*@}"; then
+                rb_live="${pinned##*@}"
+            else
+                rb_live="$(deploy.readback.live_digest --env "$environment" \
+                    --target "$target" --controller "$_rb_controller")"
+            fi
         fi
         if [[ "$rb_live" =~ ^sha256: && "$rb_live" != "${pinned##*@}" ]]; then
             brik_error "validates_for: the live read-back (${rb_live}) contradicts the pinned digest (${pinned##*@}) -- withholding the validation for '${validates_for}'"
