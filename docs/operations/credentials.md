@@ -1,6 +1,8 @@
 # Credentials
 
-How to configure secrets and credentials for Brik pipelines.
+How to configure secrets and credentials for Brik pipelines. For supply-chain
+security and the infrastructure referential, see
+[artifact attestation](../concepts/artifact-attestation.md).
 
 ## Indirection principle
 
@@ -24,6 +26,79 @@ This separation means:
 - `brik.yml` can be committed safely to version control
 - Secrets are managed exclusively in the CI platform
 - The same `brik.yml` works across environments with different credentials
+
+---
+
+## Infrastructure referential
+
+The infrastructure referential (`BRIK_INFRA_DIR`) holds endpoints, credentials,
+policies, and trust material. It is **not** part of `brik.yml`; instead, it is
+a separate configuration tree mounted into every container:
+
+- **Endpoints**: registry, git host, ArgoCD, Kubernetes, state-repo
+- **Credentials**: resolved via `env://` or `file://` references (never inline values)
+- **TLS posture**: system CA, custom CA bundle, or insecure (explicit and loud)
+- **Trust material**: signing keys, cosign verification keys, allowed signers for
+  evidence commits
+- **Policy**: org-wide findings allowlist and expiration
+
+Brik validates the referential **eagerly** at init and deploy. An invalid or
+missing referential fails closed. On local execution, the referential is mounted
+read-only at `/etc/brik/infra`; on CI platforms, it is delivered as a volume or
+injected via the shared library setup.
+
+For the full structure and validation rules, see
+[artifact attestation](../concepts/artifact-attestation.md) and
+[local execution](../concepts/local-execution.md).
+
+---
+
+## Signing credentials
+
+Attestations are signed in the **Container Scan** stage. The signing credential
+must be scoped to the signing container only so it never reaches user-defined
+build, test, or lint scripts. This isolation claim is a prerequisite for
+**SLSA Build L2**.
+
+### GitLab CI
+
+Create a `brik/signing` environment in your project and scope the signing
+credential to it:
+
+1. Go to **Settings > CI/CD > Variables**
+2. Add your signing credential (e.g. `BRIK_SIGNING_BAO_TOKEN` for OpenBAO)
+3. Set its **Environment scope** to `brik/signing`
+
+The `brik-container-scan` job template already declares the `brik/signing`
+environment (with `action: prepare`, so no deployment record is created):
+GitLab delivers the scoped variable to that job only. Other jobs (build,
+test, lint) never see it.
+
+### Jenkins
+
+Signing credentials are delivered via a dedicated env-file to the
+`container-scan` container. The shared library wires them automatically:
+
+1. Create the credential in **Manage Jenkins > Credentials** (e.g.,
+   `brik-signing-bao-token` for OpenBAO)
+2. The shared library delivers the signing env-file to the signing stage only
+
+**Caveat**: If a credential is also declared as a **global Jenkins parameter**
+(JCasC `globalNodeProperties`), `docker.inside()` re-injects all globals as
+trailing `-e` flags on every container, leaking the signing secret. Keep signing
+credentials **scoped to the signing stage** via `withCredentials` or per-stage
+env-files, never as controller globals.
+
+### Key names: BRIK_SIGNING_ prefix
+
+Name all signing credentials with the `BRIK_SIGNING_` prefix so Brik can
+identify and isolate them. Examples:
+
+- `BRIK_SIGNING_COSIGN_KEY` -- cosign private key
+- `BRIK_SIGNING_BAO_TOKEN` -- OpenBAO token for signing
+- `BRIK_SIGNING_REGISTRY_USER`, `BRIK_SIGNING_REGISTRY_PASSWORD` -- registry
+  credentials for writing attestations (remapped to `BRIK_REGISTRY_*` in the
+  signing container only)
 
 ---
 
@@ -123,7 +198,14 @@ not need to set these yourself.
 ## Deploy credentials
 
 Deploy credentials are **not** configured via `brik.yml` indirection. They are
-environment variables that the Brik runtime reads directly at deploy time.
+environment variables that the Brik runtime reads directly at deploy time, and
+they are **separate from CI publish credentials** for security isolation. A CD
+job (the decoupled `brik deploy` verb) receives a distinct set of deploy
+credentials with read-only permissions on the registry and write access to the
+target platform only.
+
+This separation means revoking the CI publish account does not strand a
+deployment, and the production pull account cannot push to the registry.
 
 ### Docker Registry (compose target)
 
@@ -270,10 +352,24 @@ jobs:
 
 ## Security best practices
 
-- **Never commit secrets** to `brik.yml` or any file in version control
-- **Mask variables** in your CI platform to prevent them from appearing in job logs
+- **Never commit secrets** to `brik.yml`, the infrastructure referential, or any
+  file in version control
+- **Credentials in the referential use `env://` or `file://` references**, never
+  inline values. Brik resolves them at use time.
+- **Mask variables** in your CI platform to prevent them from appearing in job
+  logs
 - **Protect variables** so they are only available on protected branches/tags
-- **Use "File" type variables** (GitLab) for multi-line secrets like SSH keys and kubeconfig -- this avoids encoding issues
-- **Rotate credentials** regularly and after any suspected exposure
-- **Scope credentials** to the minimum required permissions (read-only tokens when possible, scoped npm tokens, etc.)
-- **Use short-lived tokens** when your CI platform supports them (e.g. OIDC tokens for cloud providers)
+- **Use "File" type variables** (GitLab) for multi-line secrets like SSH keys
+  and kubeconfig -- this avoids encoding issues
+- **Separate CI and CD credentials**. The publish account (CI) and the deploy
+  account (CD) should map to distinct identities at the provider. Revoking one
+  does not break the other.
+- **Scope signing credentials to the signing container** (GitLab `brik/signing`
+  environment, Jenkins per-stage env-files with `BRIK_SIGNING_` prefix). Never
+  declare them as controller globals.
+- **Rotate credentials** regularly and at the secret-manager level. Brik reads
+  every credential at use time, so rotation is transparent.
+- **Scope credentials** to the minimum required permissions (read-only tokens
+  for CD resolution, scoped npm tokens, etc.)
+- **Use short-lived tokens** when your provider supports them (e.g., OIDC tokens
+  for cloud providers, project access tokens with expiry on GitLab)

@@ -13,7 +13,7 @@ against [`schemas/plan/v1/plan.schema.json`](../../schemas/plan/v1/plan.schema.j
 ```json
 {
   "schemaVersion": "v1",
-  "brikVersion": "0.6.0",
+  "brikVersion": "0.7.0",
   "context": "snapshot",
   "mode": "balanced",
   "workspace": "/path/to/repo",
@@ -22,6 +22,9 @@ against [`schemas/plan/v1/plan.schema.json`](../../schemas/plan/v1/plan.schema.j
     "from_ref": "main",
     "to_ref": "HEAD",
     "files": []
+  },
+  "infra": {
+    "fingerprint": "a1b2c3d4e5f6..."
   },
   "stages": [
     {
@@ -49,6 +52,7 @@ Key fields:
 |---|---|
 | `context` | `snapshot` for tag-less commits, `release` when `BRIK_COMMIT_TAG` is set. Mirrors the `pipeline.context` concept. |
 | `mode` | `safe` (default), `balanced`, or `aggressive` (not yet implemented; currently errors). |
+| `infra.fingerprint` | sha256 of the infrastructure referential (endpoints, credentials, policies, trust material). Used for audit: every deployment can be traced to the exact policy in effect when the plan was created. |
 | `stages[].decision` | `run` or `skip`. |
 | `stages[].reason` | Machine-readable code: `context-match`, `context-mismatch`, `opt-in-flag-missing`, `no-impact`, `no-impact-declared`, `no-diff`, `impacted`. |
 | `stages[].gate.mode` | `blocking` or `opt_in`, mirroring the manifest's `spec.gate.mode`. |

@@ -67,9 +67,9 @@ selecting which stages actually run. See [plan](plan.md) for the details.
 | Scan | `lib/stages/scan.sh` | Dependency audit and secret scan. Shift-left: always runs, no opt-out. |
 | Test | `lib/stages/test.sh` | Install dependencies and run the test suite via `stacks.<stack>.test`. |
 | Package | `lib/stages/package.sh` | Build the container image (`stacks.docker.build`). Opt-in (`--with-package`) and gated by `package.trigger`. |
-| Container Scan | `lib/stages/container_scan.sh` | Scan the built image for vulnerabilities. |
-| Promote | `lib/stages/promote.sh` | Re-tag the audited image from the candidate registry to the release registry. Runs only in a release context (a tag push); self-skips when no promotion is configured. |
-| Deploy | `lib/stages/deploy.sh` | Deploy each configured environment (k8s, helm, gitops, compose, ssh). Opt-in (`--with-deploy`) and gated by `deploy.trigger`. |
+| Container Scan | `lib/stages/container_scan.sh` | Scan the built image for vulnerabilities and generate signed attestations: CycloneDX SBOM and SLSA provenance attached to the digest. Evidence is stored in the state repository (append-only journal) if configured. |
+| Promote | `lib/stages/promote.sh` | Promote the audited, attested image from the candidate registry to the release registry, carrying its evidence graph (SBOM and provenance referrers). Fail-closed post-copy verification ensures the artifact and its evidence arrived atomically. Runs only in a release context (a tag push); self-skips when no promotion is configured. |
+| Deploy | `lib/stages/deploy.sh` | Resolve the target version to its digest via the declared channel, verify the attestations and promotion journal against the infrastructure referential (three gates: `require_digest`, `require_attestation`, `requires_eligibility`), then deploy each configured environment (k8s, helm, gitops, compose, ssh). Opt-in (`--with-deploy`) and gated by `deploy.trigger`. Pinned digest is recorded in the read-back for audit. |
 | Notify | `lib/stages/notify.sh` | Assemble the pipeline report and send notifications (Slack, email, webhook). Opt-in (gated by `--with-deploy`). When the Notify stage is skipped, the aggregate report is still rendered by `pipeline.run` outside the stage loop. |
 
 Lint, SAST, and Scan are three distinct CI-visible stages. They share an

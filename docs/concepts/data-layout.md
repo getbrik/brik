@@ -28,10 +28,11 @@ External tools may pin filenames here -- the schema is versioned
 `.brik-logs/` is the **trace**: per-stage `.log` files, the
 `pipeline.env` cross-stage env file, the aggregate-report backend
 (before notify copies it to `brik-artifacts/`), the policy cache,
-mutex lock files. Format is **not contractual** -- file names and
-shapes may change between Brik versions without warning. Consumers
-who scrape these files do so at their own risk; the supported way to
-read pipeline state is through `report.read` or the JSON in
+`plan.json` (the reproducible stage-selection plan with the referential
+fingerprint for audit), and mutex lock files. Format is **not contractual**
+-- file names and shapes may change between Brik versions without warning.
+Consumers who scrape these files do so at their own risk; the supported way
+to read pipeline state is through `report.read` or the JSON in
 `brik-artifacts/aggregate-report.json`.
 
 The visibility split (`.brik-logs/` is dot-prefixed, `brik-artifacts/`

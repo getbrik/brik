@@ -52,11 +52,13 @@ Required fields per CVE entry: `id` (CVE-XXXX-N..), `reason`, `expires`
 (YYYY-MM-DD). Required for path entries: `glob`, `reason`, `expires`.
 Wildcards in `projects[]` are not supported in v1 -- use exact matches.
 
-## Distribution
+## Distribution and infrastructure referential
 
-The `url` of the referential's `Policy` document points the runner at the
-policy file. Three common
-deployments:
+The `url` of the infrastructure referential's `Policy` document points the
+runner at the policy file. The Policy document is one of several documents in
+the referential (Endpoints, Credentials, TrustMaterial, Policy); Brik validates
+the entire referential at init and deploy, and every plan carries the
+referential's fingerprint for audit. Three common deployments:
 
 | Use case          | URL example                              | Notes |
 |-------------------|------------------------------------------|-------|

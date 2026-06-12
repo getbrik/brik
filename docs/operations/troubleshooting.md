@@ -104,6 +104,45 @@ Do not paper over it with `BRIK_CONTINUE_ON_ERROR=1`. Use the supported path:
 write a `brik-policy.yml` allowlist entry with a `reason` and an `expires` date.
 See [risk management](risk-management.md) for the decision tree.
 
+## Deploy fails: infrastructure referential not found
+
+If `brik deploy` fails with a referential error, check:
+
+- Is `BRIK_INFRA_DIR` set?
+- Does the path exist and contain valid endpoint/credential/policy documents?
+- On local runs: mount the referential at the path or export `BRIK_INFRA_DIR`.
+- On GitLab: the deploy job template mounts the referential as a volume or injects
+  it via the shared library setup.
+- On Jenkins: pass `brikInfraDir` to `brikIntegrate()` and ensure the path is
+  reachable from the agent.
+
+## Deploy fails: attestation verification
+
+If the deploy stage fails to verify attestations:
+
+- The signing certificate or key was misconfigured in the referential.
+- The container image has no attached SBOM or SLSA provenance (did CI complete
+  without errors?).
+- The registry does not support referrers (OCI 1.1). Check the registry
+  documentation.
+- The deployment environment's `gates.expected_builder` or `gates.expected_source`
+  regex does not match the attested builder identity or source. Check the
+  [builder-identity convention](../concepts/artifact-attestation.md#the-builder-identity-convention).
+
+The CD trace logs each gate decision; the gates run in order (digest, attestation, eligibility) and the first refusal names its reason.
+
+## Deploy fails: promotion journal missing or unverifiable
+
+If `requires_eligibility` blocks the deploy:
+
+- Is the state-repo (`artifacts.evidence.repo`) reachable and writable?
+- Did `brik authorize --version <v> --for <env>` run to grant the version?
+- If the journal is signed, do the credentials and `allowed_signers` file match?
+- Does the journal entry bind the correct digest? Journal entries are digest-bound;
+  re-promoting with a different digest breaks eligibility.
+
+The CD trace names the missing grant type and the digest it looked for.
+
 ## See also
 
 - [GitLab platform](../platforms/gitlab.md) -- runner images, variables, requirements

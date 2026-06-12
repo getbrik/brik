@@ -187,6 +187,12 @@ Each GitLab CI job:
 | `BRIK_IMG_BASE` | `ghcr.io/getbrik/brik-runner-base:latest` | Bootstrap image for Init/Release/Notify (posted to dotenv by Init) |
 | `BRIK_CI_IMAGE` | `ghcr.io/getbrik/brik-runner-base:latest` | Stack runner image (auto-resolved by Init) |
 | `BRIK_RUNNER_CLASSES_FILE` | _(unset)_ | Path to an alternate `runner_classes.yml` to override every runner image at once |
+| `BRIK_INFRA_DIR` | _(unset)_ | Path to the infrastructure referential (endpoints, credentials, policies, trust material). Required for CD deployments with attestation verification. |
+
+**Signing credentials** (`BRIK_SIGNING_*` variables) must be scoped to the
+`brik/signing` environment with `action: prepare` so only the
+`brik-container-scan` job receives them. See
+[credentials.md](../operations/credentials.md#gitlab-ci) for setup.
 
 `BRIK_IMG_ANALYSIS` / `BRIK_IMG_SCANNER` / `BRIK_IMG_DEPLOY` are not
 declared as pipeline variables: Init posts them into the dotenv from the

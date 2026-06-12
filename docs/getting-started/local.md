@@ -81,6 +81,21 @@ brik integrate --with-deploy --dry-run
 The same behaviour can be triggered by exporting `BRIK_DRY_RUN=true` in the
 caller shell; the CLI flag is the supported way to surface it.
 
+## Infrastructure referential (for CD deployments)
+
+If you intend to use `brik deploy` with attestation verification, you need an
+infrastructure referential: a directory with endpoints, credentials, policies,
+and trust material. Point to it via `BRIK_INFRA_DIR`:
+
+```bash
+export BRIK_INFRA_DIR=/path/to/infra-referential
+brik deploy --version v1.2.3 --environment staging
+```
+
+See [artifact attestation](../concepts/artifact-attestation.md) for the
+referential structure and [credentials](../operations/credentials.md) for how
+credentials are resolved.
+
 ## CLI reference
 
 | Command | Description |
@@ -92,6 +107,9 @@ caller shell; the CLI flag is the supported way to surface it.
 | `brik integrate` | Execute the full pipeline locally |
 | `brik plan` | Compute the per-stage selection plan (`--explain`, `--mode <safe\|balanced>`, `--validate-only`, `--out`) |
 | `brik plan gate <stage>` | Decide run/skip for a stage against the active plan |
+| `brik infra` | Infrastructure referential commands (`init` scaffolds an instance, `validate` checks one) |
+| `brik authorize` | Grant an artifact version to an environment (promotion journal entry) |
+| `brik deploy` | Deploy a version to an environment with attestation verification |
 | `brik extension test <dir>` | Run the contract harness against a Brik extension directory |
 | `brik self-update` | Update brik to the latest version |
 | `brik self-uninstall` | Remove brik from your system |

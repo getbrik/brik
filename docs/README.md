@@ -30,14 +30,15 @@ Install Brik and run your first pipeline.
 
 How Brik works, and why it is shaped this way.
 
-- [Fixed flow](concepts/fixed-flow.md) -- the 12 stages, their order, the parallel verify group, the quality gate
+- [Architecture](concepts/architecture.md) -- the 4-layer model, supply-chain security architecture, and design principles
+- [Fixed flow](concepts/fixed-flow.md) -- the 12 stages, their order, the parallel verify group, the quality gate, security stages (Container Scan, Promote, Deploy)
 - [Pipeline context](concepts/pipeline-context.md) -- snapshot vs release, and how that decides fail-fast behavior
-- [Plan](concepts/plan.md) -- the reproducible per-commit plan: which stages run, why, and the safe/balanced selection modes
+- [Plan](concepts/plan.md) -- the reproducible per-commit plan: which stages run, why, the safe/balanced selection modes, and the infrastructure referential fingerprint
 - [Business outcome](concepts/business-outcome.md) -- the tech/business two-axis model and the decision matrix
 - [Data layout](concepts/data-layout.md) -- the on-disk layout (`brik-artifacts/`, `.brik-logs/`) Brik produces at runtime
-- [Architecture](concepts/architecture.md) -- the 4-layer model and the design principles behind it
-- [Artifact attestation](concepts/artifact-attestation.md) -- the builder-identity convention and the three deploy gates (digest, attestation, eligibility)
-- [Local execution](concepts/local-execution.md) -- the containerized local mode: one runner-class container per stage, governed mounts, declared divergences from CI
+- [Artifact attestation](concepts/artifact-attestation.md) -- supply-chain security gates, the builder-identity convention, signed evidence, and deployment eligibility
+- [Local execution](concepts/local-execution.md) -- the containerized local mode: one runner-class container per stage, infrastructure referential mounts, declared divergences from CI (no keyless signing)
+- [Schemas](concepts/schemas.md) -- every contract under `schemas/` is a versioned JSON Schema, enforced fail-closed at runtime and the source the reference docs are generated from
 
 ## Configuration
 
@@ -57,14 +58,14 @@ Integrating Brik with a CI platform.
 
 ## Operations
 
-Running Brik in production: secrets, policy, and the pipeline report.
+Running Brik in production: supply-chain security, credentials, policy, and the pipeline report.
 
-- [Credentials](operations/credentials.md) -- credential indirection, per-platform secret setup
-- [Policy](operations/policy.md) -- the org-wide `brik-policy.yml` (DSI / security teams)
-- [Risk management](operations/risk-management.md) -- when and how to accept a finding with traceability
+- [Credentials](operations/credentials.md) -- credential indirection, infrastructure referential, signing credential isolation (SLSA L2), per-platform secret setup
+- [Policy](operations/policy.md) -- the org-wide `brik-policy.yml` and the infrastructure referential (DSI / security teams)
+- [Risk management](operations/risk-management.md) -- when and how to accept a finding with traceability; CD deployment gates
 - [Findings](operations/findings.md) -- the SARIF pipeline, presets, severity resolution
 - [Pipeline report](operations/pipeline-report.md) -- the `aggregate-report.{json,md,html}` field contract
-- [Troubleshooting](operations/troubleshooting.md) -- common failures and their fixes
+- [Troubleshooting](operations/troubleshooting.md) -- common failures, attestation verification, promotion journal issues
 
 ## Internals
 

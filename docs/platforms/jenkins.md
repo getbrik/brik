@@ -100,6 +100,11 @@ unconditional flow (`BRIK_PLAN_FILE` unset means every gate returns true).
 | `useDockerAgent` | `true` | Run stages in `brik-runner` Docker containers |
 | `dockerNetwork` | auto-detected | Docker network for runner containers |
 
+There is no parameter for the infrastructure referential: mount it at
+`/etc/brik/infra` in the Jenkins controller container, and the shared
+library discovers the host source of that mount and forwards it read-only
+into every stage container (brik validates it eagerly at init).
+
 ```groovy
 @Library('brik') _
 brikIntegrate(useDockerAgent: false)   // run on the agent instead of containers
@@ -159,6 +164,30 @@ workspace across builds. The `cleanWs` step preserves those cache directories.
 
 Environment variables matching `NEXUS_*`, `BRIK_*`, `REGISTRY_*`, `ARGOCD_*`,
 `CARGO_*`, or `SSH_*` are forwarded into the containers via an env file.
+
+### Signing credential isolation
+
+The shared library writes three per-phase env-files (CI stages, the deploy
+stage, the signing stage) and mounts the signing one -- the `BRIK_SIGNING_*`
+and `COSIGN_*` variables -- only on the `container-scan` container, where the
+attestations are signed.
+
+Caveat for an isolation claim: `docker.inside()` re-injects the whole build
+environment as trailing `-e` flags on every stage container, which beat any
+`--env-file` on the run line. A signing secret declared as a controller
+global (JCasC `globalNodeProperties`) therefore reaches every container,
+env-files or not. To actually isolate it, deliver the secret per stage --
+for example bind it with `withCredentials` around the signing work in a
+custom pipeline -- and never as a build global.
+
+The registry write identity follows the same model: signing attaches the
+attestation referrers to the digest (a registry write), so declare
+`BRIK_SIGNING_REGISTRY_USER`/`_PASSWORD` and the shared library remaps them
+onto the standard `BRIK_REGISTRY_*` names for the container-scan stage only
+(at the `withEnv` level, where the plugin reads its `-e` values), while
+every other container keeps the read-only registry account. See
+[credentials.md](../operations/credentials.md) and
+[artifact-attestation.md](../concepts/artifact-attestation.md).
 
 ## Prerequisites
 

@@ -147,7 +147,30 @@ intent, the answer is almost always one of:
 3. Change the matrix itself -- an org-wide policy shift decided
    outside an individual project.
 
-Never disable the matrix by exporting `BRIK_CONTINUE_ON_ERROR=1` in CI;
+Never disable the matrix by exporting `BRIK_CONTINUE_ON_ERROR=1` in CI.
+
+## Gates during CD deployment
+
+The CI findings gates sit in the **Build** and **Package** stages. A separate set
+of gates runs in the **Deploy** stage, where the infrastructure referential takes
+over:
+
+- **`require_digest`** -- the deploy must pin the exact digest produced by CI.
+- **`require_attestation`** -- the SBOM and SLSA provenance attached to that
+  digest must be signed and verifiable against your trust material. The
+  `expected_builder` regex and `expected_source` regex let you enforce that the
+  builder identity matches your expectations.
+- **`requires_eligibility`** -- the digest must have a signed grant in the
+  promotion journal (`brik authorize`) or a signed validation from a prior
+  environment's successful deploy.
+
+Every gate is fail-closed: missing evidence, an unverifiable signature, or
+ineligibility refuses the deploy. This is independent of the CI findings matrix
+-- a perfectly-clean CI run cannot deploy without valid evidence and a signed
+promotion.
+
+For the full gate semantics and the builder-identity convention, see
+[artifact attestation](../concepts/artifact-attestation.md).
 that hides risk without recording it, which is the watermelon failure
 mode this entire framework exists to prevent.
 

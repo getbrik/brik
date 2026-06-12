@@ -98,7 +98,7 @@ flowchart LR
     deploy --> notify["Notify"]
 ```
 
-Lint, SAST, dependency scan, and tests fan out in parallel after Build. The quality gate sits at Package: nothing gets packaged unless tests pass and the three security stages succeed. Nothing deploys without a green test.
+Lint, SAST, dependency scan, and tests fan out in parallel after Build. The quality gate sits at Package: nothing gets packaged unless tests pass and the three security stages succeed. Container Scan produces the SBOM and attaches signed attestations. Promote copies the artifact and its evidence graph to the release channel. Deploy verifies the attestations and promotion journal before deploying. Nothing deploys without a green test and a valid attestation.
 
 That is not a convention. It is the structural shape of the pipeline. You cannot accidentally ship broken or unverified code by editing the pipeline, because there is no pipeline to edit.
 
@@ -115,7 +115,26 @@ The 12 stages are non-negotiable. The decision of which stages actually *run* on
 
 The plan is one platform-agnostic JSON document. GitLab, Jenkins, and `brik integrate` consume the same plan. Same commit, same plan, same outcome, anywhere. Inspect any decision with `brik plan --explain`.
 
-### 🛡️ Security that knows the difference between "we can fix this" and "the vendor won't"
+### 🛡️ Supply-chain security built in, not bolted on
+
+**CI produces immutable, signed evidence.** Every artifact is digest-addressed and carries signed SBOM and SLSA provenance. The attestations travel with the image; verification happens at deploy time, not later.
+
+**CD verifies before deploying.** Three gates answer three questions:
+- **Digest gate**: is this exactly the artifact you built? (registry content-addressing)
+- **Attestation gate**: who built it and where does it come from? (signed provenance verified against your trust material)
+- **Eligibility gate**: does it have the blessing for this environment? (signed promotion journal, append-only, bound to the digest)
+
+The gates run in order. Every gate is fail-closed: missing trust material, an unreachable journal, or an unverifiable signature refuses the deploy. Never a silent pass.
+
+**Infrastructure as config.** Endpoints, credentials, policies, and trust material live in a mandatory infrastructure referential. Credentials are references (`env://`, `file://`), never values. Brik validates the referential eagerly at init and deploy (fail-closed) and stamps its fingerprint into every plan, so you can trace back to the exact infrastructure declaration that gated a deployment. TLS posture is declared per endpoint -- plain HTTP and `insecure` are legal but loud, and there is no silent fallback.
+
+**Credential isolation by phase.** Signing credentials stay in the signing container only (scoped via `BRIK_SIGNING_` prefix on GitLab/Jenkins). Deploy credentials are separate from CI publish credentials, so revoking one does not strand the other. Token lifetime is a provider parameter, not Brik code -- rotate at the secret-manager level and redeploys pick up the new secret transparently.
+
+**Honest SLSA claims.** Build L1 claimed on every profile (provenance attached, verified at deploy). L2 claimable when the signing credential is scoped to the signing phase only. L3 never claimed -- self-hosted builders cannot guarantee the isolation it requires.
+
+See [`docs/concepts/artifact-attestation.md`](docs/concepts/artifact-attestation.md) for the full gates and [`docs/concepts/local-execution.md`](docs/concepts/local-execution.md) for how local runs declare divergences from CI.
+
+### 🧭 Security that knows the difference between "we can fix this" and "the vendor won't"
 
 Brik separates two axes for every stage result:
 

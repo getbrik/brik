@@ -104,6 +104,35 @@ portable Bash layer, so a fix benefits every platform at once.
 tool-agnostic. JSON Schema provides all three; `jv` and `yq` make validation a
 single command with clear error messages.
 
+## Supply-chain security architecture
+
+**Infrastructure as a first-class concern.** Endpoints, credentials, policies,
+and trust material are declared in a mandatory infrastructure referential
+(`BRIK_INFRA_DIR`), validated at init and deploy, and never embedded in
+`brik.yml`. Every plan carries the referential's fingerprint so deployments can
+be traced back to the exact policy that gated them.
+
+**Immutable, digest-pinned artifacts.** CI produces a single immutable artifact
+at a digest (content-addressed by the registry). Every subsequent step of the
+pipeline pins that digest. Promotion copies the artifact and its evidence graph
+(SBOM, SLSA provenance) from candidate to release with fail-closed post-copy
+verification. Deploy resolves a version name to the pinned digest via a declared
+channel, then verifies the attestations and promotion journal before applying.
+
+**Three deploy gates, each fail-closed.**
+- `require_digest`: is this exactly the content built? (registry addressing)
+- `require_attestation`: where does it come from, who attests it? (signed SBOM
+  and SLSA provenance, verified against trust material)
+- `requires_eligibility`: does it have the blessing for this environment?
+  (append-only, digest-bound promotion journal)
+
+See [artifact attestation](artifact-attestation.md) for the full gate semantics.
+
+**Credential isolation by phase.** Signing credentials (BRIK_SIGNING_* prefix) reach
+only the signing container; deploy credentials (resolved at deploy time) are
+separate from CI publish credentials. Token lifetime is a provider parameter --
+rotation happens at the secret-manager level, invisible to Brik code.
+
 ## See also
 
 - [Fixed flow](fixed-flow.md) -- the 12 stages and their order
