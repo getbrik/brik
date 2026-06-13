@@ -13,7 +13,12 @@ jobs:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
       - name: Install shellcheck
-        run: sudo apt-get update && sudo apt-get install -y shellcheck
+        run: |
+          # The runner preconfigures third-party apt repos (Microsoft/Azure) that
+          # intermittently 403; drop them so apt-get update does not abort the job.
+          sudo rm -f /etc/apt/sources.list.d/*microsoft* /etc/apt/sources.list.d/*azure* 2>/dev/null || true
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
 
       - name: Run shellcheck
         run: |
@@ -56,6 +61,9 @@ jobs:
 
       - name: Install dependencies
         run: |
+          # The runner preconfigures third-party apt repos (Microsoft/Azure) that
+          # intermittently 403; drop them so apt-get update does not abort the job.
+          sudo rm -f /etc/apt/sources.list.d/*microsoft* /etc/apt/sources.list.d/*azure* 2>/dev/null || true
           sudo apt-get update
           sudo apt-get install -y jq binutils-dev libcurl4-openssl-dev zlib1g-dev libdw-dev libiberty-dev cmake g++
           # Install yq
@@ -106,6 +114,9 @@ jobs:
 
       - name: Install dependencies
         run: |
+          # The runner preconfigures third-party apt repos (Microsoft/Azure) that
+          # intermittently 403; drop them so apt-get update does not abort the job.
+          sudo rm -f /etc/apt/sources.list.d/*microsoft* /etc/apt/sources.list.d/*azure* 2>/dev/null || true
           sudo apt-get update
           sudo apt-get install -y jq git
           sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
