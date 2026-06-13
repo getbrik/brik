@@ -1,9 +1,9 @@
 # Architecture
 
 This page explains how Brik is structured and why. For the directory-level map
-of the codebase see [internals/layout.md](../internals/layout.md); for what the
+of the codebase see [internals/layout.md](../contributing/layout.md); for what the
 runtime does around each stage see
-[internals/stage-lifecycle.md](../internals/stage-lifecycle.md).
+[internals/stage-lifecycle.md](../contributing/stage-lifecycle.md).
 
 ## Why Brik
 
@@ -27,7 +27,7 @@ One set of CI/CD functions. Any platform. No duplication.
 These guide every implementation decision in Brik.
 
 1. **Fixed flow, not custom pipelines.** Every pipeline follows the same stage
-   sequence (see [fixed flow](fixed-flow.md)). Users configure behavior within
+   sequence (see [fixed flow](fixed-flows.md)). Users configure behavior within
    stages; they never define pipeline structure. This buys consistency,
    auditability, and predictability.
 2. **Declarative configuration.** `brik.yml` is the only user interface. Users
@@ -44,7 +44,7 @@ These guide every implementation decision in Brik.
    `deploy.k8s.run`, `config.get`. Self-documenting, collision-free.
 6. **Test everything.** Every Bash function has a ShellSpec test, every source
    file passes ShellCheck, coverage stays at or above 80%, and end-to-end runs
-   happen on [briklab](../internals/briklab.md).
+   happen on [briklab](../contributing/briklab.md).
 
 ## The four layers
 
@@ -69,19 +69,19 @@ and context but knows nothing about any CI platform.
 
 **Layer 2 -- Shared Library** (`shared-libs/<platform>/`). Thin adapters that
 bridge a CI platform to the Bash layers. Each adapter reads `brik.yml`, extracts
-configuration, and calls `stage.run` per stage. See [GitLab](../platforms/gitlab.md)
-and [Jenkins](../platforms/jenkins.md).
+configuration, and calls `stage.run` per stage. See [GitLab](../reference/platforms/gitlab.md)
+and [Jenkins](../reference/platforms/jenkins.md).
 
 **Layer 3 -- brik.yml** (`schemas/config/v1/brik.schema.json`). The user-facing
 configuration file, validated against a JSON Schema. Only `version` and
-`project.name` are required. See [configuration](../configuration/overview.md).
+`project.name` are required. See [configuration](../reference/configuration/overview.md).
 
 ## How a run flows through the layers
 
 1. The CI platform detects a bootstrap file (`.gitlab-ci.yml`, `Jenkinsfile`).
 2. The bootstrap file loads the shared library (Layer 2).
 3. The shared library reads `brik.yml` (Layer 3).
-4. The shared library runs the [fixed flow](fixed-flow.md), one stage at a time.
+4. The shared library runs the [fixed flow](fixed-flows.md), one stage at a time.
 5. Each stage is executed via `stage.run` (Layer 0).
 6. `stage.run` calls brik-lib functions (Layer 1).
 
@@ -126,7 +126,7 @@ channel, then verifies the attestations and promotion journal before applying.
 - `requires_eligibility`: does it have the blessing for this environment?
   (append-only, digest-bound promotion journal)
 
-See [artifact attestation](artifact-attestation.md) for the full gate semantics.
+See [artifact attestation](supply-chain.md) for the full gate semantics.
 
 **Credential isolation by phase.** Signing credentials (BRIK_SIGNING_* prefix) reach
 only the signing container; deploy credentials (resolved at deploy time) are
@@ -135,8 +135,8 @@ rotation happens at the secret-manager level, invisible to Brik code.
 
 ## See also
 
-- [Fixed flow](fixed-flow.md) -- the 12 stages and their order
+- [Fixed flow](fixed-flows.md) -- the 12 stages and their order
 - [Data layout](data-layout.md) -- the runtime on-disk contract (`brik-artifacts/` vs `.brik-logs/`)
-- [Layout](../internals/layout.md) -- the domain notions and the `lib/` tree (ten domain directories)
-- [Stage lifecycle](../internals/stage-lifecycle.md) -- the `stage.run` lifecycle in detail
+- [Layout](../contributing/layout.md) -- the domain notions and the `lib/` tree (ten domain directories)
+- [Stage lifecycle](../contributing/stage-lifecycle.md) -- the `stage.run` lifecycle in detail
 - [Business outcome](business-outcome.md) -- the tech/business two-axis result model

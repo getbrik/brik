@@ -520,7 +520,7 @@ Four checkpoints to verify when upgrading from a 0.4.x install:
    need fail-fast on snapshot lanes pass `BRIK_CONTINUE_ON_ERROR=0`.
 
 See [docs/concepts/architecture.md](docs/concepts/architecture.md) and
-[docs/operations/policy.md](docs/operations/policy.md) for the model
+[docs/operations/policy.md](docs/how-to/configure-org-policy.md) for the model
 behind these changes.
 
 ## [0.4.0] - 2026-05-05

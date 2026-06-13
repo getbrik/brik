@@ -50,7 +50,7 @@ brik validate --config brik.yml
 
 Validation runs the same JSON Schema check that `stages.init` runs in CI, so a
 config that passes locally passes init in CI. See
-[configuration/overview.md](../configuration/overview.md#validation).
+[configuration/overview.md](../reference/configuration/overview.md#validation).
 
 ## Run a pipeline locally
 
@@ -66,7 +66,7 @@ Valid stages for `brik stage`: `init`, `release`, `build`, `lint`, `sast`,
 `scan`, `test`, `package`, `container-scan`, `promote`, `deploy`, `notify`.
 
 The opt-in flags (`--with-release`, `--with-package`, `--with-deploy`) enable
-the trigger-gated stages; see [fixed flow](../concepts/fixed-flow.md#opt-in-stages-and-triggers).
+the trigger-gated stages; see [fixed flow](../concepts/fixed-flows.md#opt-in-stages-and-triggers).
 `--continue-on-error` forces the pipeline to keep going past a failed stage; see
 [pipeline context](../concepts/pipeline-context.md#continue_on_error-precedence).
 `--dry-run` exports `BRIK_DRY_RUN=true` so that deploy targets, registry pushes,
@@ -92,8 +92,8 @@ export BRIK_INFRA_DIR=/path/to/infra-referential
 brik deploy --version v1.2.3 --environment staging
 ```
 
-See [artifact attestation](../concepts/artifact-attestation.md) for the
-referential structure and [credentials](../operations/credentials.md) for how
+See [artifact attestation](../concepts/supply-chain.md) for the
+referential structure and [credentials](../how-to/manage-credentials.md) for how
 credentials are resolved.
 
 ## CLI reference
@@ -132,6 +132,6 @@ brik version --verbose
 
 ## Next steps
 
-- [Configuration overview](../configuration/overview.md) -- what you can put in `brik.yml`
-- [Fixed flow](../concepts/fixed-flow.md) -- the 12 stages a pipeline runs
-- [Development](../internals/development.md) -- working on Brik itself
+- [Configuration overview](../reference/configuration/overview.md) -- what you can put in `brik.yml`
+- [Fixed flow](../concepts/fixed-flows.md) -- the 12 stages a pipeline runs
+- [Development](../contributing/development.md) -- working on Brik itself

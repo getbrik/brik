@@ -6,7 +6,7 @@ operators, downstream tooling), and the helpers stages should use to
 write under this layout.
 
 For the code-level domain layout (the `lib/` tree, nine notions), see
-[internals/layout.md](../internals/layout.md). For the architectural
+[internals/layout.md](../contributing/layout.md). For the architectural
 rationale behind separating code from runtime data, see
 [architecture.md](architecture.md).
 
@@ -150,4 +150,4 @@ stage-specific runner image.
 
 - [Architecture](architecture.md) -- the layered design that produces this layout
 - [Pipeline context](pipeline-context.md) -- how a stage receives its execution context
-- [Internals layout](../internals/layout.md) -- the source-code domain layout
+- [Internals layout](../contributing/layout.md) -- the source-code domain layout

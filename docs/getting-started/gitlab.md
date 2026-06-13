@@ -3,7 +3,7 @@
 This is the happy path to a working Brik pipeline on a GitLab instance. For the
 full integration reference -- runner images, pipeline variables, cache
 relocation, coverage reports, troubleshooting -- see
-[platforms/gitlab.md](../platforms/gitlab.md).
+[platforms/gitlab.md](../reference/platforms/gitlab.md).
 
 ## Prerequisites
 
@@ -54,7 +54,7 @@ This is a single classic pipeline: a `brik-plan` job computes the
 execution plan, then every stage job consults it and skips itself when
 the plan marks the stage not-applicable -- a docs-only commit shows the
 skipped stages as green "skipped (per plan)" jobs without running their
-work. See [platforms/gitlab.md](../platforms/gitlab.md) for the full
+work. See [platforms/gitlab.md](../reference/platforms/gitlab.md) for the full
 job graph.
 
 ## 4. Add a `brik.yml`
@@ -71,11 +71,11 @@ project:
 `brik init --platform gitlab` can scaffold both files for you; see
 [getting-started/local.md](local.md).
 
-That is it. Your next push runs the full [fixed flow](../concepts/fixed-flow.md):
+That is it. Your next push runs the full [fixed flow](../concepts/fixed-flows.md):
 Init detects the stack and resolves the runner image, then Build, the parallel
 Lint / SAST / Scan / Test group, Package, Container Scan, Deploy, and Notify run
 in order. Every run produces an
-[aggregate report](../operations/pipeline-report.md).
+[aggregate report](../reference/pipeline-report.md).
 
 ## Next steps: Enable supply-chain security
 
@@ -83,7 +83,7 @@ Once CI is working, to use the **CD flow** with attestation verification:
 
 1. Create an infrastructure referential (endpoints, credentials, policies,
    trust material) and mount it on the runner at `/etc/brik/infra`. See
-   [artifact attestation](../concepts/artifact-attestation.md).
+   [artifact attestation](../concepts/supply-chain.md).
 2. Select CI or CD per run with `include:rules`: one repository, two flows,
    discriminated by the `BRIK_DEPLOY_VERSION` trigger variable:
 
@@ -105,11 +105,11 @@ A push or tag runs the CI flow; a "Run pipeline" (or API trigger) with
 `BRIK_DEPLOY_VERSION` and `BRIK_DEPLOY_ENVIRONMENT` runs the CD flow, which
 resolves the version to a digest, verifies the attestations and checks the
 promotion journal before deploying. See
-[platforms/gitlab.md](../platforms/gitlab.md) for the full setup.
+[platforms/gitlab.md](../reference/platforms/gitlab.md) for the full setup.
 
 ## Other next steps
 
-- [Configuration overview](../configuration/overview.md) -- what you can put in `brik.yml`
-- [GitLab platform reference](../platforms/gitlab.md) -- runner images, variables, coverage badge
-- [Credentials](../operations/credentials.md) -- wiring secrets for publish and deploy, signing credential isolation
-- [Troubleshooting](../operations/troubleshooting.md) -- common failures and fixes
+- [Configuration overview](../reference/configuration/overview.md) -- what you can put in `brik.yml`
+- [GitLab platform reference](../reference/platforms/gitlab.md) -- runner images, variables, coverage badge
+- [Credentials](../how-to/manage-credentials.md) -- wiring secrets for publish and deploy, signing credential isolation
+- [Troubleshooting](../how-to/troubleshoot.md) -- common failures and fixes

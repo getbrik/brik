@@ -1,13 +1,13 @@
 # Brik GitLab Shared Library
 
-GitLab CI templates that implement the Brik [fixed flow](../../docs/concepts/fixed-flow.md).
+GitLab CI templates that implement the Brik [fixed flow](../../docs/concepts/fixed-flows.md).
 
 This README is an **implementation annex**. The user-facing documentation is
 canonical and lives in the docs tree:
 
 - [Getting started: GitLab CI](../../docs/getting-started/gitlab.md) -- first-time setup
-- [GitLab platform reference](../../docs/platforms/gitlab.md) -- runner images, pipeline variables, cache relocation, coverage reports, troubleshooting
-- [`brik.yml` configuration](../../docs/configuration/overview.md) -- the project config file
+- [GitLab platform reference](../../docs/reference/platforms/gitlab.md) -- runner images, pipeline variables, cache relocation, coverage reports, troubleshooting
+- [`brik.yml` configuration](../../docs/reference/configuration/overview.md) -- the project config file
 
 ## Directory structure
 
@@ -58,7 +58,7 @@ The Init job emits `.brik-logs/pipeline.env` as a `reports: dotenv:` artifact
 downstream jobs receive the resolved `BRIK_CI_IMAGE` and the trigger gating
 flags. Per-project job overrides (for example a non-default coverage path) are
 merged by GitLab into the templated job -- see the
-[GitLab platform reference](../../docs/platforms/gitlab.md#coverage-reports).
+[GitLab platform reference](../../docs/reference/platforms/gitlab.md#coverage-reports).
 
 ## Tests
 

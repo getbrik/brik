@@ -86,7 +86,7 @@ The supporting modules that produce these inputs:
 | `lib/transverse/coverage.sh` | Parses Cobertura/Jacoco/LCOV; turns a threshold breach into a SARIF result that flows through the same pipeline. |
 | `lib/transverse/gating.sh` | Reads `release.trigger` / `package.trigger` / `deploy.trigger` and decides whether each schedulable stage runs in the current context. |
 
-See [findings](../operations/findings.md) for the full SARIF pipeline these
+See [findings](../how-to/manage-findings.md) for the full SARIF pipeline these
 modules feed.
 
 ## Aggregation chain
@@ -125,6 +125,6 @@ Callers must populate `--findings-ignored` from the stage's own side-band signal
 ## See also
 
 - [Pipeline context](pipeline-context.md) -- how `--context` is resolved and the gatekeeper contract
-- [Findings](../operations/findings.md) -- the SARIF pipeline that produces the fix-exists counters
-- [Risk management](../operations/risk-management.md) -- when the matrix outcome should be overridden, and how
-- [Pipeline report](../operations/pipeline-report.md) -- where `tech.*` and `business.*` are recorded
+- [Findings](../how-to/manage-findings.md) -- the SARIF pipeline that produces the fix-exists counters
+- [Risk management](../how-to/accept-a-finding.md) -- when the matrix outcome should be overridden, and how
+- [Pipeline report](../reference/pipeline-report.md) -- where `tech.*` and `business.*` are recorded

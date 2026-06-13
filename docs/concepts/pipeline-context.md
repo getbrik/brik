@@ -90,5 +90,5 @@ summary:
 ## See also
 
 - [Business outcome](business-outcome.md) -- the decision matrix that scores each stage
-- [Fixed flow](fixed-flow.md) -- the stages whose results feed the verdict
-- [Pipeline report](../operations/pipeline-report.md) -- where `pipeline.context` and the verdict are recorded
+- [Fixed flow](fixed-flows.md) -- the stages whose results feed the verdict
+- [Pipeline report](../reference/pipeline-report.md) -- where `pipeline.context` and the verdict are recorded

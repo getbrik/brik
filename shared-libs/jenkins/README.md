@@ -1,14 +1,14 @@
 # Brik Jenkins Shared Library
 
 Jenkins Global Pipeline Library that implements the Brik
-[fixed flow](../../docs/concepts/fixed-flow.md).
+[fixed flow](../../docs/concepts/fixed-flows.md).
 
 This README is an **implementation annex**. The user-facing documentation is
 canonical and lives in the docs tree:
 
 - [Getting started: Jenkins](../../docs/getting-started/jenkins.md) -- first-time setup
-- [Jenkins platform reference](../../docs/platforms/jenkins.md) -- runner images, parameters, Docker agents, variable mapping, cache management, troubleshooting
-- [`brik.yml` configuration](../../docs/configuration/overview.md) -- the project config file
+- [Jenkins platform reference](../../docs/reference/platforms/jenkins.md) -- runner images, parameters, Docker agents, variable mapping, cache management, troubleshooting
+- [`brik.yml` configuration](../../docs/reference/configuration/overview.md) -- the project config file
 
 ## Directory structure
 
@@ -44,7 +44,7 @@ shared library, so no extra clone is needed).
 
 The per-var responsibilities and the Jenkins-to-`BRIK_*` variable mapping are
 documented in the
-[Jenkins platform reference](../../docs/platforms/jenkins.md).
+[Jenkins platform reference](../../docs/reference/platforms/jenkins.md).
 
 ## Tests
 

@@ -145,4 +145,4 @@ Drop a manifest under `lib/registry/manifests/stages/<id>.yml` (or a
 user dir referenced via `BRIK_REGISTRY_EXTENSIONS_DIRS`), provide a
 matching Bash function, and re-run `brik plan` -- the new stage shows
 up in the topological order automatically. Full walkthrough:
-[`docs/operations/extensions.md`](../operations/extensions.md).
+[`docs/operations/extensions.md`](../how-to/use-extensions.md).
