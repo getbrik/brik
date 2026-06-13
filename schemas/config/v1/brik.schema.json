@@ -189,22 +189,24 @@
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "on-tag":  { "type": "boolean", "default": true,  "description": "Run when the current commit carries a git tag." },
-            "on-main": { "type": "boolean", "default": false, "description": "Run on push to the default branch." },
-            "manual":  { "type": "boolean", "default": false, "description": "Run only when the pipeline was triggered manually (BRIK_TRIGGER_MANUAL=true)." }
+            "on-tag":  { "type": "boolean", "default": true,  "examples": [true],  "description": "Run when the current commit carries a git tag." },
+            "on-main": { "type": "boolean", "default": false, "examples": [true],  "description": "Run on push to the default branch." },
+            "manual":  { "type": "boolean", "default": false, "examples": [true],  "description": "Run only when the pipeline was triggered manually (BRIK_TRIGGER_MANUAL=true)." }
           }
         },
         "strategy": {
-          "description": "Release strategy.",
+          "description": "Release strategy. Only `semver` is implemented; `calver` and `custom` are not yet implemented and fall back to `semver` for now.",
           "type": "string",
           "enum": ["semver", "calver", "custom"],
-          "default": "semver"
+          "default": "semver",
+          "examples": ["semver"]
         },
         "profile": {
           "description": "Git workflow profile that drives candidate detection. trunk-based: candidate on every push to the default branch; git-flow: candidate on release/* branches; github-flow: candidate on every PR-merged commit on main; none: no candidate detection (status quo, the release stage runs only on a tag push). The profile is informational (the planner stamps it into plan.json so adapters can branch on it); the promote stage consumes it to decide whether to push to the candidate or release registry.",
           "type": "string",
           "enum": ["trunk-based", "git-flow", "github-flow", "none"],
-          "default": "none"
+          "default": "none",
+          "examples": ["trunk-based"]
         },
         "candidate": {
           "description": "Candidate-zone artifact configuration. The candidate zone receives every successful build; the promote stage moves an audited candidate to the release zone on a tag push.",
@@ -219,21 +221,25 @@
                 "registry": {
                   "type": "string",
                   "minLength": 1,
+                  "examples": ["registry.candidate.example.com"],
                   "description": "Hostname (and optional port) of the candidate Docker registry, e.g. 'registry.candidate.example.com'."
                 },
                 "image": {
                   "type": "string",
                   "minLength": 1,
+                  "examples": ["myteam/api"],
                   "description": "Image path within the candidate registry, e.g. 'myteam/api'."
                 },
                 "username_var": {
                   "type": "string",
                   "minLength": 1,
+                  "examples": ["BRIK_CANDIDATE_DOCKER_USER"],
                   "description": "Name of the environment variable holding the username for the candidate Docker registry (the value is never stored in brik.yml). The promote stage logs in with it before pulling the candidate. Omit for an anonymous-pull candidate registry."
                 },
                 "password_var": {
                   "type": "string",
                   "minLength": 1,
+                  "examples": ["BRIK_CANDIDATE_DOCKER_PASSWORD"],
                   "description": "Name of the environment variable holding the password/token for the candidate Docker registry. The promote stage logs in with it before pulling the candidate."
                 }
               }
@@ -253,21 +259,25 @@
                 "registry": {
                   "type": "string",
                   "minLength": 1,
+                  "examples": ["registry.release.example.com"],
                   "description": "Hostname (and optional port) of the release Docker registry, e.g. 'registry.release.example.com'."
                 },
                 "image": {
                   "type": "string",
                   "minLength": 1,
+                  "examples": ["myteam/api"],
                   "description": "Image path within the release registry, e.g. 'myteam/api'."
                 },
                 "username_var": {
                   "type": "string",
                   "minLength": 1,
+                  "examples": ["BRIK_RELEASE_DOCKER_USER"],
                   "description": "Name of the environment variable holding the username for the release Docker registry (the value is never stored in brik.yml). The promote stage logs in with it before pushing the promoted image. Omit if the release registry needs no auth."
                 },
                 "password_var": {
                   "type": "string",
                   "minLength": 1,
+                  "examples": ["BRIK_RELEASE_DOCKER_PASSWORD"],
                   "description": "Name of the environment variable holding the password/token for the release Docker registry. The promote stage logs in with it before pushing the promoted image."
                 }
               }
@@ -277,7 +287,8 @@
         "tag_prefix": {
           "description": "Prefix for release tags (e.g. 'v').",
           "type": "string",
-          "default": "v"
+          "default": "v",
+          "examples": ["v"]
         },
         "changelog": {
           "description": "Changelog generation configuration.",
@@ -287,18 +298,21 @@
             "enabled": {
               "description": "Whether to generate a changelog on release.",
               "type": "boolean",
-              "default": true
+              "default": true,
+              "examples": [true]
             },
             "format": {
-              "description": "Changelog format.",
+              "description": "Changelog format. `keep-a-changelog` is not yet implemented; the generator emits `conventional` for now.",
               "type": "string",
               "enum": ["conventional", "keep-a-changelog"],
-              "default": "conventional"
+              "default": "conventional",
+              "examples": ["conventional"]
             },
             "file": {
               "description": "Path to the changelog file.",
               "type": "string",
-              "default": "CHANGELOG.md"
+              "default": "CHANGELOG.md",
+              "examples": ["docs/CHANGELOG.md"]
             }
           }
         }

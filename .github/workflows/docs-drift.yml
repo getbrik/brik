@@ -5,7 +5,7 @@ on:
     branches: [main]
     paths:
       - 'schemas/config/**'
-      - 'docs/configuration/**'
+      - 'docs/reference/configuration/**'
       - 'scripts/gen-config-reference.sh'
       - 'scripts/validate-docs.sh'
       - '.github/workflows/docs-drift.yml'
@@ -13,7 +13,7 @@ on:
     branches: [main]
     paths:
       - 'schemas/config/**'
-      - 'docs/configuration/**'
+      - 'docs/reference/configuration/**'
       - 'scripts/gen-config-reference.sh'
       - 'scripts/validate-docs.sh'
       - '.github/workflows/docs-drift.yml'
@@ -42,7 +42,7 @@ jobs:
           go install github.com/santhosh-tekuri/jsonschema/cmd/jv@v0.7.0
           echo "$HOME/go/bin" >> "$GITHUB_PATH"
 
-      - name: Validate inline YAML blocks in docs/configuration
+      - name: Validate inline YAML blocks in docs/reference/configuration
         run: make validate-docs
 
       - name: Verify schema-doc tables are in sync

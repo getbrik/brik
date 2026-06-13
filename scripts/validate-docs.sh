@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# @description Validate every fenced ```yaml block in docs/configuration/**/*.md
+# @description Validate every fenced ```yaml block in docs/reference/configuration/**/*.md
 #              against the Brik JSON Schema.
 #
 # Each block is written to a tempfile and piped through `bin/brik validate`.
 # Exit code is 0 when every block validates, non-zero otherwise.
 #
 # Usage:
-#   ./scripts/validate-docs.sh             # walk docs/configuration/
+#   ./scripts/validate-docs.sh             # walk docs/reference/configuration/
 #   ./scripts/validate-docs.sh path/to.md  # validate a single file
 
 set -euo pipefail
@@ -14,7 +14,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 BRIK_BIN="${REPO_ROOT}/bin/brik"
-DOCS_ROOT="${REPO_ROOT}/docs/configuration"
+DOCS_ROOT="${REPO_ROOT}/docs/reference/configuration"
 
 if [[ ! -x "${BRIK_BIN}" ]]; then
     echo "[validate-docs] error: ${BRIK_BIN} not found or not executable" >&2
