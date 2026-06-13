@@ -19,13 +19,13 @@ for your project. New to the file? Start with the
 | [`test`](test.md) | | Test framework, coverage thresholds, and reports. |
 | [`package`](package.md) | | Building the release container image. |
 | [`publish`](publish.md) | | The registries the built image is pushed to. |
-| [`artifacts`](#artifacts) | | Channels (where CI publishes and CD resolves) and the evidence journal. |
+| [`artifacts`](artifacts.md) | | Channels (where CI publishes and CD resolves) and the evidence journal. |
 | [`deploy`](deploy.md) | | Environments, targets, gates, and promotion chains. |
 | [`release`](release.md) | | Versioning from git tags and changelog generation. |
 | [`notify`](notify.md) | | Slack, email, and webhook notifications. |
 | [`git`](git.md) | | The git identity Brik uses for the commits and tags it makes. |
 | [`hooks`](hooks.md) | | Inline shell commands to run before or after stages. |
-| [`pipeline`](#pipeline) | | Pipeline-level settings. |
+| [`pipeline`](pipeline.md) | | Pipeline-level settings. |
 
 Each page also links to the JSON schema
 ([`brik.schema.json`](../../../schemas/config/v1/brik.schema.json)), the source
@@ -42,30 +42,3 @@ version: 1
 project:
   name: my-app
 ```
-
-## artifacts
-
-> Dedicated reference page coming with the documentation migration. For now,
-> the two sub-sections are covered conceptually:
-
-- `artifacts.channels` -- named registry endpoints. CI publishes to a channel;
-  CD resolves a version to a digest in the channel an environment accepts. See
-  [supply-chain gates](../../concepts/supply-chain.md).
-- `artifacts.evidence` -- the append-only state-repo holding signed SBOM/
-  provenance and the promotion/deployment journals. See
-  [data layout](../../concepts/data-layout.md).
-
-```yaml
-artifacts:
-  channels:
-    release:
-      registry: registry.example.com/orders/orders-api
-  evidence:
-    repo: https://git.example.com/orders/evidence.git
-    token_var: BRIK_GIT_TOKEN
-```
-
-## pipeline
-
-> Dedicated reference page coming with the documentation migration. Pipeline-level
-> settings that apply across stages.

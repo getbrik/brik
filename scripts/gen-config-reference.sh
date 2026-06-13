@@ -36,9 +36,10 @@ fi
 _resolve_path() {
     local section="$1"
     case "$section" in
-        project) echo '.properties.project' ;;
-        version) echo '.properties.version' ;;
-        *)       echo ".\"\$defs\".${section}" ;;
+        project)   echo '.properties.project' ;;
+        version)   echo '.properties.version' ;;
+        artifacts) echo '.properties.artifacts' ;;
+        *)         echo ".\"\$defs\".${section}" ;;
     esac
 }
 
@@ -231,6 +232,8 @@ package
 publish
 security
 deploy
+artifacts
+pipeline
 EOF
 }
 

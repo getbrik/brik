@@ -102,7 +102,7 @@
           "required": ["repo"],
           "properties": {
             "repo": {
-              "description": "Git URL of the evidence state-repo (append-only, file-per-digest).",
+              "examples": ["https://git.example.com/orders/evidence.git"], "description": "Git URL of the evidence state-repo (append-only, file-per-digest).",
               "type": "string",
               "minLength": 1
             },
@@ -111,7 +111,7 @@
               "type": "string"
             },
             "token_var": {
-              "description": "Name of the environment variable holding the write token for the evidence repo (resolved indirectly, never inlined).",
+              "examples": ["BRIK_GIT_TOKEN"], "description": "Name of the environment variable holding the write token for the evidence repo (resolved indirectly, never inlined).",
               "type": "string"
             },
             "sign": {
@@ -158,7 +158,7 @@
               "type": "string",
               "enum": ["safe", "balanced", "aggressive"],
               "default": "safe",
-              "description": "safe = context-only filtering (default). balanced = adds per-file impact filtering using spec.impact.changes from stage manifests, with optional per-stage overrides under selection.stages. aggressive = per-subproject impact graph; reserved for v0.7+, planner errors with rc=64 if requested."
+              "examples": ["balanced"], "description": "safe = context-only filtering (default). balanced = adds per-file impact filtering using spec.impact.changes from stage manifests, with optional per-stage overrides under selection.stages. aggressive = per-subproject impact graph; reserved for v0.7+, planner errors with rc=64 if requested."
             },
             "stages": {
               "type": "object",
