@@ -136,6 +136,30 @@ YAML
     The stderr should include "failing closed"
   End
 
+  It "fails closed when no referential is configured (parity with promote/authorize)"
+    deploy_no_infra() {
+      unset BRIK_INFRA_DIR
+      cd "$REPO"
+      PATH="${MOCKBIN}:$PATH" cli.deploy.run --version v1.2.3 --environment staging
+    }
+    When call deploy_no_infra
+    The status should equal 4
+    The stderr should include "no infrastructure referential configured"
+  End
+
+  It "fails closed when require_digest is set but no accepts_channel is configured"
+    deploy_require_digest_no_channel() {
+      printf '#!/bin/sh\nprintf "HTTP/1.1 200 OK\\r\\nDocker-Content-Digest: %s\\r\\n\\r\\n"\nexit 0\n' "$DIGEST" > "${MOCKBIN}/curl"
+      chmod +x "${MOCKBIN}/curl"
+      cd "$REPO"
+      yq -i 'del(.deploy.environments.staging.accepts_channel)' "$REPO/brik.yml"
+      PATH="${MOCKBIN}:$PATH" cli.deploy.run --version v1.2.3 --environment staging
+    }
+    When call deploy_require_digest_no_channel
+    The status should equal 7
+    The stderr should include "no accepts_channel is configured"
+  End
+
   It "requires --version"
     When call cli.deploy.run --environment staging
     The status should equal 2

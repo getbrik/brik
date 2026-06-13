@@ -419,6 +419,22 @@ YAML
       The contents of file "$COSIGN_ARGS_FILE" should include "--certificate-oidc-issuer-regexp https://gitlab"
     End
 
+    It "keyless: fails closed without --identity and --issuer (would accept any Fulcio cert)"
+      unset BRIK_COSIGN_KEY
+      When call attest.verify "$REF"
+      The status should equal 2
+      The stderr should include "keyless verification requires --identity and --issuer"
+      # cosign must never run: an unconstrained verify is the fail-open the gate prevents.
+      The contents of file "$COSIGN_ARGS_FILE" should equal ""
+    End
+
+    It "keyless: fails closed with --identity but no --issuer"
+      unset BRIK_COSIGN_KEY
+      When call attest.verify "$REF" --identity 'https://gitlab/.*'
+      The status should equal 2
+      The stderr should include "keyless verification requires --identity and --issuer"
+    End
+
     It "key backend: verifies with the referenced key and ignores the absent tlog"
       verify_key() { use_key_backend; attest.verify "$REF"; }
       When call verify_key

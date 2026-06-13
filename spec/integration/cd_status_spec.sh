@@ -211,4 +211,57 @@ EOF
     The stderr should include "unknown deploy environment"
     The stderr should be present
   End
+
+  # --- Fail-closed gates: status consumes the same signed evidence as deploy
+  # and must refuse rather than report a state it cannot prove. ---------------
+
+  It "fails closed when no referential is configured"
+    status_no_infra() {
+      cd "$REPO"
+      unset BRIK_INFRA_DIR
+      PATH="${MOCKBIN}:$PATH" cli.status.run --environment staging
+    }
+    When call status_no_infra
+    The status should equal 4
+    The stderr should include "no infrastructure referential configured"
+  End
+
+  It "fails closed when the deployment journal cannot be read"
+    status_journal_unreachable() {
+      cd "$REPO"
+      BOGUS="file://${ST_DIR}/does-not-exist.git" yq -i \
+        '.artifacts.evidence.repo = strenv(BOGUS)' "$REPO/brik.yml"
+      PATH="${MOCKBIN}:$PATH" cli.status.run --environment staging
+    }
+    When call status_journal_unreachable
+    The status should equal 5
+    The stderr should include "cannot read the deployment journal"
+  End
+
+  It "fails closed when the signed journal tip does not verify"
+    status_unsigned_tip() {
+      cd "$REPO"
+      # Declare signed evidence and supply allowed_signers, so the only reason
+      # the check fails is the unsigned seed commit at the journal tip.
+      mkdir -p "$INFRA/trust"
+      printf 'e2e@brik.dev ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIE2eTestKeyPlaceholder000000000000000000000\n' \
+        > "$INFRA/trust/allowed_signers"
+      yq -i '.artifacts.evidence.sign = true' "$REPO/brik.yml"
+      PATH="${MOCKBIN}:$PATH" cli.status.run --environment staging
+    }
+    When call status_unsigned_tip
+    The status should equal 5
+    The stderr should include "did not verify"
+  End
+
+  It "fails closed when config_ref cannot be resolved"
+    status_bad_config_ref() {
+      cd "$REPO"
+      yq -i '.deploy.environments.staging.config_ref = "nonexistent-ref"' "$REPO/brik.yml"
+      PATH="${MOCKBIN}:$PATH" cli.status.run --environment staging
+    }
+    When call status_bad_config_ref
+    The status should equal 7
+    The stderr should include "config_ref: cannot resolve"
+  End
 End

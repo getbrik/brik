@@ -112,6 +112,24 @@ EOF
       The output should equal "registry.release/app@${VALID_DIGEST}"
     End
 
+    It "exchanges a bearer token on a 401 challenge, then resolves the digest"
+      # Token-gated registries (ghcr, Docker Hub): the first manifest GET is
+      # answered with a 401 + WWW-Authenticate Bearer realm, the realm GET
+      # returns a token, and the authenticated retry returns the digest.
+      resolve_bearer() {
+        mock.create_script "curl" '
+          case "$*" in
+            *"/token"*) printf "{\"token\":\"TOK123\"}" ;;
+            *Bearer*)   printf "HTTP/1.1 200 OK\r\nDocker-Content-Digest: '"${VALID_DIGEST}"'\r\n\r\n" ;;
+            *)          printf "HTTP/1.1 401 Unauthorized\r\nWWW-Authenticate: Bearer realm=\"https://registry.release/token\",service=\"registry.release\",scope=\"repository:app:pull\"\r\n\r\n" ;;
+          esac'
+        mock.activate
+        channel.resolve_digest v1.2.3 release
+      }
+      When call resolve_bearer
+      The output should equal "registry.release/app@${VALID_DIGEST}"
+    End
+
     It "fails external_fail (5) when the version is absent from the channel"
       resolve_absent() {
         # 404: the manifest endpoint returns no Docker-Content-Digest header.

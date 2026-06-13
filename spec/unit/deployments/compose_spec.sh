@@ -544,4 +544,69 @@ YAML
       End
     End
   End
+
+  # Read-back error paths -- parity with the k8s/helm get_deployed_digest
+  # coverage. The live query must fail closed on a tool error and report
+  # 'unknown' (never a false digest) when nothing is running.
+  Describe "deploy.compose.get_deployed_digest"
+    RB_DIGEST="sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    Before 'mock.setup'
+    After 'mock.cleanup'
+
+    It "requires --service"
+      When call deploy.compose.get_deployed_digest --project app
+      The status should equal 2
+      The stderr should include "service name is required"
+    End
+
+    It "fails closed when 'docker compose ps' fails"
+      rb_ps_fail() {
+        mock.create_script "docker" '[ "$1 $2" = "compose ps" ] && exit 1; exit 0'
+        mock.activate
+        deploy.compose.get_deployed_digest --service app
+      }
+      When call rb_ps_fail
+      The status should equal 5
+      The stderr should include "docker compose ps failed"
+    End
+
+    It "reports 'unknown' when no container is running (never a false digest)"
+      rb_no_container() {
+        mock.create_script "docker" '[ "$1 $2" = "compose ps" ] && exit 0; exit 0'
+        mock.activate
+        deploy.compose.get_deployed_digest --service app
+      }
+      When call rb_no_container
+      The status should equal 0
+      The output should equal "unknown"
+    End
+
+    It "fails closed when 'docker inspect' fails"
+      rb_inspect_fail() {
+        mock.create_script "docker" '
+          [ "$1 $2" = "compose ps" ] && { echo cid123; exit 0; }
+          [ "$1" = "inspect" ] && exit 1
+          exit 0'
+        mock.activate
+        deploy.compose.get_deployed_digest --service app
+      }
+      When call rb_inspect_fail
+      The status should equal 5
+      The stderr should include "docker inspect failed"
+    End
+
+    It "extracts the running digest on success"
+      rb_ok() {
+        mock.create_script "docker" "
+          [ \"\$1 \$2\" = \"compose ps\" ] && { echo cid123; exit 0; }
+          [ \"\$1\" = inspect ] && { echo 'registry.example.com/app@${RB_DIGEST}'; exit 0; }
+          exit 0"
+        mock.activate
+        deploy.compose.get_deployed_digest --service app
+      }
+      When call rb_ok
+      The status should equal 0
+      The output should equal "$RB_DIGEST"
+    End
+  End
 End

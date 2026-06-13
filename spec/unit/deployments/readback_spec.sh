@@ -139,6 +139,64 @@ Describe "deployments/readback.sh - deployed digest read-back"
     End
   End
 
+  Describe "k8s read-back"
+    k8s_manifest() {
+      printf 'apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: app\n' \
+        > "${CAP}/k8s.yml"
+      printf '%s' "${CAP}/k8s.yml"
+    }
+
+    It "records a live match when the deployment digest matches the resolved one"
+      run_it() {
+        export BRIK_DEPLOY_IMAGE_REF="$PINNED"
+        export BRIK_DEPLOY_STAGING_MANIFEST="$(k8s_manifest)"
+        export BRIK_DEPLOY_STAGING_NAMESPACE="staging"
+        deploy.k8s.get_deployed_digest() { printf '%s' "$DIGEST"; }
+        deploy.readback.record --env staging --target k8s
+      }
+      When call run_it
+      The status should be success
+      The result of 'deployed_obj()' should include "\"live\":\"${DIGEST}\""
+      The result of 'deployed_obj()' should include "\"match\":true"
+    End
+
+    It "records match=false and warns when the deployment digest differs"
+      run_it() {
+        export BRIK_DEPLOY_IMAGE_REF="$PINNED"
+        export BRIK_DEPLOY_STAGING_MANIFEST="$(k8s_manifest)"
+        deploy.k8s.get_deployed_digest() { printf '%s' "$OTHER"; }
+        deploy.readback.record --env staging --target k8s
+      }
+      When call run_it
+      The status should be success
+      The result of 'deployed_obj()' should include "\"match\":false"
+      The stderr should include "mismatch"
+    End
+
+    It "marks live unknown when the manifest declares no Deployment"
+      run_it() {
+        export BRIK_DEPLOY_IMAGE_REF="$PINNED"
+        printf 'kind: Service\nmetadata:\n  name: app\n' > "${CAP}/svc.yml"
+        export BRIK_DEPLOY_STAGING_MANIFEST="${CAP}/svc.yml"
+        deploy.readback.record --env staging --target k8s
+      }
+      When call run_it
+      The status should be success
+      The result of 'deployed_obj()' should include "\"live\":\"unknown\""
+    End
+
+    It "live_digest queries the deployment digest directly"
+      run_it() {
+        export BRIK_DEPLOY_STAGING_MANIFEST="$(k8s_manifest)"
+        deploy.k8s.get_deployed_digest() { printf '%s' "$DIGEST"; }
+        deploy.readback.live_digest --env staging --target k8s
+      }
+      When call run_it
+      The status should be success
+      The output should equal "$DIGEST"
+    End
+  End
+
   Describe "dry-run skips the live query"
     It "records live=skipped under BRIK_DRY_RUN"
       run_it() {

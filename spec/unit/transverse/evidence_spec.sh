@@ -135,5 +135,35 @@ Describe "transverse.evidence"
       The status should equal "$BRIK_EXIT_CHECK_FAILED"
       The stderr should include "conflict"
     End
+
+    It "fails closed when the state-repo clone fails"
+      pub_clone_fail() {
+        transverse.state_repo.clone() { return 1; }
+        evidence.publish --repo https://git/state.git --version v1.2.3 --digest "$DIGEST" \
+          <<<"$(printf '{"digest":"%s"}' "$DIGEST")"
+      }
+      When call pub_clone_fail
+      The status should equal "$BRIK_EXIT_EXTERNAL_FAIL"
+    End
+
+    It "fails closed when the append fails"
+      pub_append_fail() {
+        transverse.state_repo.append() { cat >/dev/null; return 1; }
+        evidence.publish --repo https://git/state.git --version v1.2.3 --digest "$DIGEST" \
+          <<<"$(printf '{"digest":"%s"}' "$DIGEST")"
+      }
+      When call pub_append_fail
+      The status should equal "$BRIK_EXIT_IO_FAILURE"
+    End
+
+    It "propagates an external_fail when the push fails"
+      pub_push_fail() {
+        transverse.state_repo.push() { return 1; }
+        evidence.publish --repo https://git/state.git --version v1.2.3 --digest "$DIGEST" \
+          <<<"$(printf '{"digest":"%s"}' "$DIGEST")"
+      }
+      When call pub_push_fail
+      The status should equal "$BRIK_EXIT_EXTERNAL_FAIL"
+    End
   End
 End

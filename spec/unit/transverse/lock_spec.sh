@@ -64,4 +64,22 @@ Describe "transverse/lock.sh - per-environment mutex (E5, S6.5)"
     When call rel
     The status should be success
   End
+
+  It "rejects an empty key"
+    When call transverse.lock.acquire ""
+    The status should equal 2
+    The stderr should include "key is required"
+  End
+
+  It "times out on a lock held by a live holder, failing rather than interleaving"
+    timeout_probe() {
+      # The holder PID is this process (alive), so the lock is never reclaimed
+      # as stale: the second acquirer waits out the timeout and fails closed.
+      transverse.lock.acquire testenv
+      transverse.lock.acquire testenv 1
+    }
+    When call timeout_probe
+    The status should equal 1
+    The stderr should include "timed out acquiring lock"
+  End
 End
