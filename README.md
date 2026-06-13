@@ -108,10 +108,10 @@ has a per-stack default. The rest is where you override what matters for *your*
 project, such as coverage thresholds, deploy targets, registries, and secrets.
 You configure your project. You never write pipeline logic.
 
-> [!TIP] Wondering how to configure each part above? 
-> The **[`brik.yml` reference](docs/reference/configuration/README.md)** lists every
-> top-level section, each with a dedicated page: what it is for, what it does,
-> when it runs, and how to configure it.
+> [!TIP]
+> See the **[`brik.yml` reference](docs/reference/configuration/README.md)** for every
+> top-level section, each on its own page: purpose, behaviour, when it runs, and how to
+> configure it.
 
 ## Two flows, one configuration
 
@@ -234,8 +234,8 @@ brik validate  # confirm the config is valid
 brik integrate # run the full CI flow locally
 ```
 
-> [!TIP] Full documentation
-> See **[docs/README.md](docs/README.md)**.
+> [!TIP]
+> Full documentation: see **[docs/README.md](docs/README.md)**.
 
 ## Quality, in numbers
 
