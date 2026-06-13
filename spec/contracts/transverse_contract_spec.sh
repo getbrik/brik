@@ -5,7 +5,7 @@
 # Unlike the 10 other notions covered by the test architecture, the transverse notion
 # has NO I/O artifact to schematise. Its 141 public functions are pure
 # helpers consumed by every other notion. The L0 contract is the set of
-# static code invariants declared in docs/internals/layout.md and verified
+# static code invariants declared in docs/contributing/layout.md and verified
 # here via grep / file checks.
 #
 # Companion legacy specs:
@@ -17,8 +17,8 @@
 # based; this spec is grep-based since there is no schema).
 
 Describe "transverse notion static invariants (layout.md)"
-  LAYOUT_MD="${BRIK_HOME}/docs/internals/layout.md"
-  CONTRACTS_DOC="${BRIK_HOME}/docs/test-matrix/transverse-contracts.md"
+  LAYOUT_MD="${BRIK_HOME}/docs/contributing/layout.md"
+  CONTRACTS_DOC="${BRIK_HOME}/docs/contributing/test-matrix/transverse-contracts.md"
 
   Describe "documentation"
     It "layout.md exists and contains an Invariants section"
