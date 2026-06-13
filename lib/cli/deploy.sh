@@ -161,15 +161,28 @@ cli.deploy.run() {
     # at the tag (CI->CD immediate) or no tag matches, deploy from the current
     # tree (no checkout). An explicit --config opts out (caller pinned the file).
     local orig_workspace="${workspace}" worktree="" env_worktree=""
+    # Remove any git worktrees created for definition resolution. Idempotent
+    # (each path is cleared after removal) and tolerant, so the single cleanup
+    # at the end of cli.deploy.run runs on EVERY exit path without leaking a
+    # worktree under .git/worktrees/.
     _cli.deploy._cleanup_worktrees() {
         if [[ -n "$worktree" ]]; then
-            transverse.git.worktree_remove "${orig_workspace}" "${worktree}"
+            transverse.git.worktree_remove "${orig_workspace}" "${worktree}" || true
+            worktree=""
         fi
         if [[ -n "$env_worktree" ]]; then
-            transverse.git.worktree_remove "${orig_workspace}" "${env_worktree}"
+            transverse.git.worktree_remove "${orig_workspace}" "${env_worktree}" || true
+            env_worktree=""
         fi
         return 0
     }
+
+    # All gated logic runs in this nested body so EVERY exit path -- a failed
+    # gate, a resolution error or a successful deploy -- funnels through the
+    # single worktree cleanup below. The caller captures the body status under
+    # `set +e`; this is trap-free and robust under any functrace state.
+    _cli.deploy._deploy_body() {
+        set -e
     if [[ -z "$config_explicit" ]] && git -C "${workspace}" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
         brik.use transverse.git
         local _tag _head _tagsha
@@ -214,7 +227,6 @@ cli.deploy.run() {
             done
             if [[ -z "$env_worktree" ]]; then
                 brik_error "config_ref: cannot resolve '${_cfg_ref}' for environment '${environment}' -- failing closed"
-                _cli.deploy._cleanup_worktrees
                 return "${BRIK_EXIT_CONFIG_ERROR}"
             fi
             workspace="$env_worktree"
@@ -244,7 +256,6 @@ cli.deploy.run() {
     # BRIK_DEPLOY_<ENV>_* variables (target, channel, require_digest, ...).
     local wrapper="${BRIK_HOME}/shared-libs/local/scripts/local-wrapper.sh"
     if ! pipeline.require_file "${wrapper}"; then
-        _cli.deploy._cleanup_worktrees
         return "${BRIK_EXIT_IO_FAILURE}"
     fi
     # shellcheck source=/dev/null
@@ -255,7 +266,6 @@ cli.deploy.run() {
     rc=$?
     set -e
     if [[ "$rc" -ne 0 ]]; then
-        _cli.deploy._cleanup_worktrees
         return "$rc"
     fi
 
@@ -490,7 +500,9 @@ cli.deploy.run() {
         fi
 
         local el_type
-        for el_type in ${requires_eligibility//,/ }; do
+        local -a _el_types=()
+        IFS=',' read -ra _el_types <<< "$requires_eligibility"
+        for el_type in "${_el_types[@]}"; do
             if ! printf '%s' "$el_events" | jq -e --arg t "$el_type" \
                     'any(.[]; .type == $t)' >/dev/null; then
                 brik_error "requires_eligibility: no ${el_type} grant for ${pinned##*@} on '${environment}' -- refusing to deploy"
@@ -517,7 +529,6 @@ cli.deploy.run() {
     # `brik deploy` runs against one env must not interleave their applies.
     brik.use transverse.lock
     if ! transverse.lock.acquire "deploy-${environment}"; then
-        _cli.deploy._cleanup_worktrees
         return "${BRIK_EXIT_FAILURE}"
     fi
 
@@ -629,6 +640,14 @@ cli.deploy.run() {
     [[ "$rc" -ne 0 ]] && _nstatus="failed"
     _cli.deploy._notify "$environment" "$version" "${pinned##*@}" "$_nstatus" "$_gates"
 
-    _cli.deploy._cleanup_worktrees
     return "$rc"
+    }
+
+    local _body_rc=0
+    set +e
+    _cli.deploy._deploy_body
+    _body_rc=$?
+    set -e
+    _cli.deploy._cleanup_worktrees
+    return "$_body_rc"
 }
