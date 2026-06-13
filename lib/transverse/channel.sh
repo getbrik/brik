@@ -101,6 +101,37 @@ _channel._basic_credential() {
     return 1
 }
 
+# channel.scoped_docker_config - materialize an ephemeral Docker config
+# directory carrying the registry auth for each <host>, so cosign and oras
+# authenticate through the credential store (DOCKER_CONFIG) instead of a
+# --password flag visible in the process table on a shared host. The current
+# config.json is copied first so a prior `docker login` (inline auth, credsStore
+# or credHelpers) keeps working; the BRIK_REGISTRY_USER/PASSWORD fallback is then
+# merged inline for the hosts it is scoped to. Echoes the directory; the caller
+# runs the tool with DOCKER_CONFIG set to it and removes it afterwards.
+# Usage: dir="$(channel.scoped_docker_config <host>...)"
+channel.scoped_docker_config() {
+    local dir src host
+    dir="$(mktemp -d)" || return "$BRIK_EXIT_IO_FAILURE"
+    src="${DOCKER_CONFIG:-${HOME}/.docker}/config.json"
+    if [[ -f "$src" ]]; then
+        cp "$src" "${dir}/config.json" 2>/dev/null || printf '{}' >"${dir}/config.json"
+    else
+        printf '{}' >"${dir}/config.json"
+    fi
+    for host in "$@"; do
+        if [[ -n "${BRIK_REGISTRY_USER:-}" && -n "${BRIK_REGISTRY_PASSWORD:-}" \
+              && ( -z "${BRIK_REGISTRY_HOST:-}" || "${BRIK_REGISTRY_HOST}" == "$host" ) ]]; then
+            local b64 merged
+            b64="$(printf '%s:%s' "$BRIK_REGISTRY_USER" "$BRIK_REGISTRY_PASSWORD" | base64 | tr -d '\n')"
+            merged="$(jq --arg h "$host" --arg a "$b64" \
+                '.auths = (.auths // {}) | .auths[$h].auth = $a' "${dir}/config.json" 2>/dev/null)" \
+                && printf '%s' "$merged" >"${dir}/config.json"
+        fi
+    done
+    printf '%s' "$dir"
+}
+
 # _channel._bearer_token - satisfy a Bearer challenge: GET the realm token
 # endpoint (passing the stored Basic credential when present) and echo the
 # token. Handles registries like ghcr / Docker Hub that gate manifest reads
@@ -198,13 +229,13 @@ _channel._registry_digest() {
     printf '%s' "$digest"
 }
 
-# _channel._oras_side_args - append the oras flags one side (from|to) of a
-# copy requires, derived from the Registry endpoint the referential declares
+# _channel._oras_side_args - append the oras transport flags one side (from|to)
+# of a copy requires, derived from the Registry endpoint the referential declares
 # for the host: a declared http:// URL maps to --<side>-plain-http, a
 # declared tls.trust: insecure to --<side>-insecure, and an undeclared host
-# fails closed. The canonical BRIK_REGISTRY_USER/PASSWORD credential is
-# forwarded, gated on BRIK_REGISTRY_HOST so it never reaches the other side
-# of a cross-registry copy.
+# fails closed. Registry credentials are NOT passed here -- they travel through
+# the scoped DOCKER_CONFIG (channel.scoped_docker_config) so a password never
+# lands in the process table.
 # Usage: _channel._oras_side_args <array_name> <from|to> <host>
 _channel._oras_side_args() {
     local -n _oargv="$1"
@@ -221,12 +252,6 @@ _channel._oras_side_args() {
         _oargv+=("--${_side}-insecure")
     elif [[ -n "$_ca" ]]; then
         _oargv+=("--${_side}-ca-file" "$_ca")
-    fi
-
-    if [[ -n "${BRIK_REGISTRY_USER:-}" && -n "${BRIK_REGISTRY_PASSWORD:-}" \
-          && ( -z "${BRIK_REGISTRY_HOST:-}" || "${BRIK_REGISTRY_HOST}" == "$_host" ) ]]; then
-        _oargv+=("--${_side}-username" "$BRIK_REGISTRY_USER" \
-                 "--${_side}-password" "$BRIK_REGISTRY_PASSWORD")
     fi
     return 0
 }
@@ -305,11 +330,18 @@ channel.copy_with_referrers() {
         _channel._oras_side_args args from "${from_registry%%/*}" || return "$?"
         _channel._oras_side_args args to "${to_registry%%/*}" || return "$?"
 
+        # Credentials travel through a scoped Docker config, never the argv.
+        local _dcfg
+        _dcfg="$(channel.scoped_docker_config "${from_registry%%/*}" "${to_registry%%/*}")" \
+            || return "$?"
+
         log.info "copying ${src_pinned} -> ${to_registry}:${version} (with referrers)"
-        if ! oras "${args[@]}" "$src_pinned" "${to_registry}:${version}"; then
+        if ! DOCKER_CONFIG="$_dcfg" oras "${args[@]}" "$src_pinned" "${to_registry}:${version}"; then
+            rm -rf "$_dcfg"
             log.error "channel.copy_with_referrers: oras cp failed (${from} -> ${to})"
             return "$BRIK_EXIT_EXTERNAL_FAIL"
         fi
+        rm -rf "$_dcfg"
 
         # Prove the bytes: the version in the destination channel must be
         # the exact content the source pinned.

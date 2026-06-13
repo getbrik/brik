@@ -20,6 +20,9 @@ Describe "transverse.attest"
 
   Include "${BRIK_HOME}/lib/transverse/env.sh"
   Include "${BRIK_HOME}/lib/transverse/infra.sh"
+  # channel.sh provides channel.scoped_docker_config: cosign authenticates to
+  # the registry through a scoped DOCKER_CONFIG, never a --registry-password.
+  Include "${BRIK_HOME}/lib/transverse/channel.sh"
   Include "${BRIK_HOME}/lib/transverse/attest.sh"
 
   # Record the argv cosign is called with for assertions, and declare the
@@ -34,6 +37,14 @@ Describe "transverse.attest"
     cosign() {
       printf '%s\n' "$*" >"$COSIGN_ARGS_FILE"
       printf 'BAO_ADDR=%s\n' "${BAO_ADDR:-}" >>"$COSIGN_ARGS_FILE"
+      # Registry credentials must reach cosign through DOCKER_CONFIG, never the
+      # argv (a --registry-password is visible in the process table). Record the
+      # config auths so the spec can prove the credential travelled out of band.
+      if [[ -f "${DOCKER_CONFIG:-}/config.json" ]]; then
+        printf 'DOCKER_AUTHS=%s\n' \
+          "$(jq -c '.auths // {}' "${DOCKER_CONFIG}/config.json" 2>/dev/null)" \
+          >>"$COSIGN_ARGS_FILE"
+      fi
       return 0
     }
     oras()   { printf '%s\n' "$*"; return 0; }
@@ -229,7 +240,7 @@ YAML
       The contents of file "$COSIGN_ARGS_FILE" should equal ""
     End
 
-    It "derives HTTP + auth flags from a declared http:// registry endpoint"
+    It "derives the HTTP flag from a declared http:// registry endpoint and keeps the credential out of the argv"
       unset BRIK_COSIGN_KEY
       export BRIK_REGISTRY_USER=u BRIK_REGISTRY_PASSWORD=p
       yq -i '.url = "http://registry.example.com"' "$ATTEST_INFRA/endpoints/registry.yml"
@@ -237,8 +248,11 @@ YAML
       When call attest.sign "$REF" --sbom "${SHELLSPEC_TMPBASE}/sbom.json"
       The status should be success
       The contents of file "$COSIGN_ARGS_FILE" should include "--allow-http-registry"
-      The contents of file "$COSIGN_ARGS_FILE" should include "--registry-username u"
-      The contents of file "$COSIGN_ARGS_FILE" should include "--registry-password p"
+      # The password never reaches the process table: cosign reads it from the
+      # scoped DOCKER_CONFIG (base64 of "u:p" == "dTpw").
+      The contents of file "$COSIGN_ARGS_FILE" should not include "--registry-password"
+      The contents of file "$COSIGN_ARGS_FILE" should not include "--registry-username"
+      The contents of file "$COSIGN_ARGS_FILE" should include "dTpw"
     End
 
     It "derives --allow-insecure-registry from a declared tls.trust: insecure https endpoint"

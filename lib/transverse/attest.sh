@@ -214,9 +214,9 @@ _attest._backend_args() {
 # from the Registry endpoint the referential declares for the ref's host:
 # a declared http:// URL maps to --allow-http-registry, a declared
 # tls.trust: insecure maps to --allow-insecure-registry, and an undeclared
-# host fails closed. Basic auth comes from the canonical
-# BRIK_REGISTRY_USER/PASSWORD when present (attaching a referrer is a
-# registry write).
+# host fails closed. Registry credentials are NOT passed here -- they travel
+# through the scoped DOCKER_CONFIG (channel.scoped_docker_config) so a password
+# never lands in the process table.
 # Usage: _attest._registry_args <array_name> <ref>
 _attest._registry_args() {
     local -n _argv="$1"
@@ -234,9 +234,6 @@ _attest._registry_args() {
         _argv+=(--allow-insecure-registry)
     elif [[ -n "$_ca" ]]; then
         _argv+=(--registry-cacert "$_ca")
-    fi
-    if [[ -n "${BRIK_REGISTRY_USER:-}" && -n "${BRIK_REGISTRY_PASSWORD:-}" ]]; then
-        _argv+=(--registry-username "$BRIK_REGISTRY_USER" --registry-password "$BRIK_REGISTRY_PASSWORD")
     fi
     return 0
 }
@@ -340,23 +337,32 @@ attest.sign() {
 
     _attest._registry_args key_args "$ref" || return "$?"
 
+    # Registry credentials travel through a scoped Docker config, never the argv.
+    brik.use transverse.channel
+    local _dcfg
+    _dcfg="$(channel.scoped_docker_config "${ref%%/*}")" || return "$?"
+
     log.info "attesting ${sbom_type} SBOM on ${ref} [${backend}]"
-    if ! cosign attest "${key_args[@]}" --predicate "$sbom" --type "$sbom_type" -y "$ref"; then
+    if ! DOCKER_CONFIG="$_dcfg" cosign attest "${key_args[@]}" --predicate "$sbom" --type "$sbom_type" -y "$ref"; then
+        rm -rf "$_dcfg"
         log.error "attest.sign: cosign failed to attach the SBOM attestation"
         return "$BRIK_EXIT_EXTERNAL_FAIL"
     fi
 
     if [[ -n "$provenance" ]]; then
         if [[ ! -f "$provenance" ]]; then
+            rm -rf "$_dcfg"
             log.error "attest.sign: provenance file not found: ${provenance}"
             return "$BRIK_EXIT_IO_FAILURE"
         fi
         log.info "attesting SLSA provenance on ${ref} [${backend}]"
-        if ! cosign attest "${key_args[@]}" --predicate "$provenance" --type slsaprovenance1 -y "$ref"; then
+        if ! DOCKER_CONFIG="$_dcfg" cosign attest "${key_args[@]}" --predicate "$provenance" --type slsaprovenance1 -y "$ref"; then
+            rm -rf "$_dcfg"
             log.error "attest.sign: cosign failed to attach the provenance attestation"
             return "$BRIK_EXIT_EXTERNAL_FAIL"
         fi
     fi
+    rm -rf "$_dcfg"
     return 0
 }
 
@@ -416,16 +422,23 @@ attest.verify() {
     _attest._registry_args args "$ref" || return "$?"
     args+=("$ref")
 
+    # Registry credentials travel through a scoped Docker config, never the argv.
+    brik.use transverse.channel
+    local _dcfg
+    _dcfg="$(channel.scoped_docker_config "${ref%%/*}")" || return "$?"
+
     log.info "verifying ${att_type} attestation on ${ref} [${backend}]"
     # On success cosign prints the whole verified in-toto envelope (base64
     # SBOM, megabytes) to stdout: discard it unless the caller asked for it
     # (--output, used by verify_provenance to check predicate expectations).
     # The registry already holds the attestation, the verification summary
     # stays on stderr, and brik logs the business outcome itself.
-    if ! cosign "${args[@]}" >"${output:-/dev/null}"; then
+    if ! DOCKER_CONFIG="$_dcfg" cosign "${args[@]}" >"${output:-/dev/null}"; then
+        rm -rf "$_dcfg"
         log.error "attest.verify: attestation did not verify for ${ref} (fail-closed)"
         return "$BRIK_EXIT_EXTERNAL_FAIL"
     fi
+    rm -rf "$_dcfg"
     return 0
 }
 

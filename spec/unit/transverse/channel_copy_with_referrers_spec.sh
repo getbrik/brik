@@ -89,11 +89,18 @@ EOF
   }
 
   # oras mock: records its argv and populates the destination (the marker the
-  # curl mock keys on), like a real copy would.
+  # curl mock keys on), like a real copy would. Registry credentials no longer
+  # ride the argv: they reach oras through DOCKER_CONFIG, so the mock also
+  # records, per host, an "AUTH:<host>" marker for each auth the scoped config
+  # carries -- that is what proves a credential was delivered out of band.
   mock_oras_ok() {
     cat > "${MOCK_BIN}/oras" <<EOF
 #!/bin/sh
-echo "oras \$*" >> "${MOCK_LOG}"
+auths=""
+if [ -f "\${DOCKER_CONFIG}/config.json" ]; then
+  auths="\$(jq -r '.auths // {} | keys[]? | "AUTH:"+.' "\${DOCKER_CONFIG}/config.json" 2>/dev/null | tr '\n' ' ')"
+fi
+echo "oras \$* \${auths}" >> "${MOCK_LOG}"
 touch "${MOCK_BIN}/.release-populated"
 EOF
     chmod +x "${MOCK_BIN}/oras"
@@ -221,21 +228,27 @@ EOF
     The stderr should include "trust/ca/registry.internal"
   End
 
-  It "passes the canonical registry credential to both sides when unscoped"
+  It "delivers the canonical registry credential to both sides via DOCKER_CONFIG, never the argv"
     copy_creds() {
+      export DOCKER_CONFIG; DOCKER_CONFIG="$(mktemp -d)"; printf '{}' >"$DOCKER_CONFIG/config.json"
       export BRIK_REGISTRY_USER="admin" BRIK_REGISTRY_PASSWORD="s3cr3t"
       mock_copy_ok
       channel.copy_with_referrers v1.2.3 candidate release >/dev/null || return $?
       mock.call_args oras
     }
     When call copy_creds
-    The output should include "--from-username admin"
-    The output should include "--to-username admin"
+    # The password never reaches the process table.
+    The output should not include "--from-username"
+    The output should not include "--to-password"
+    # Both registries are authenticated through the scoped Docker config.
+    The output should include "AUTH:registry.internal"
+    The output should include "AUTH:registry.release"
     The stderr should include "copying"
   End
 
-  It "does not send the credential to a side other than BRIK_REGISTRY_HOST"
+  It "scopes the credential to BRIK_REGISTRY_HOST, never the other side"
     copy_scoped_creds() {
+      export DOCKER_CONFIG; DOCKER_CONFIG="$(mktemp -d)"; printf '{}' >"$DOCKER_CONFIG/config.json"
       export BRIK_REGISTRY_HOST="registry.release"
       export BRIK_REGISTRY_USER="admin" BRIK_REGISTRY_PASSWORD="s3cr3t"
       mock_copy_ok
@@ -243,8 +256,11 @@ EOF
       mock.call_args oras
     }
     When call copy_scoped_creds
-    The output should include "--to-username admin"
     The output should not include "--from-username"
+    The output should not include "--to-username"
+    # Only the BRIK_REGISTRY_HOST side carries the credential.
+    The output should include "AUTH:registry.release"
+    The output should not include "AUTH:registry.internal"
     The stderr should include "copying"
   End
 
