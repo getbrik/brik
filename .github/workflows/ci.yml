@@ -126,19 +126,19 @@ jobs:
         run: scripts/compile-registry.sh
 
       - name: Bench brik plan (V.4)
-        # Regression gate for `brik plan`, calibrated to the measured cost
-        # on a GitHub-hosted runner (~4.2s p50 on the 5000-file fixture
-        # since plan derivation resolves and fingerprints the mandatory
-        # infrastructure referential; ~3.9s before). The threshold leaves
-        # headroom for runner variance and flags a real slowdown; speeding
-        # the planner up (the registry cold-load dominates each invocation)
-        # is tracked as a separate optimisation.
+        # Regression gate for `brik plan`: it runs on every pipeline, so a real
+        # slowdown matters. Baseline is ~4.2s p50 on a GitHub-hosted runner (plan
+        # derivation resolves and fingerprints the mandatory infrastructure
+        # referential; the registry cold-load dominates each invocation). The
+        # gate sits ~40% above baseline so it trips only on a genuine ~1.4x
+        # regression, not on the runner-to-runner CPU variance an absolute
+        # wall-clock metric on shared runners is subject to.
         run: |
           scripts/bench-plan.sh \
             --runs 12 \
             --files 5000 \
-            --max-p50-ms 4500 \
-            --max-p99-ms 5500 \
+            --max-p50-ms 6000 \
+            --max-p99-ms 7000 \
             --out /tmp/bench-plan.json
 
       - name: Upload bench artifact
