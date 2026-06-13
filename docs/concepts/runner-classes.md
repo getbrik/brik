@@ -1,115 +1,79 @@
-# Runner-class registry (image mapping)
+# Runner classes
 
-`lib/registry/runner_classes.yml` is the single source of truth that maps
-each stage's runner *class* to the container image that runs it. Both the
-GitLab and the Jenkins adapter consume it identically, so a stage's image
-is defined in exactly one place.
+> Each stage runs in a pinned, provable OCI image chosen by its declared class
+> -- the same image on your laptop and in CI.
 
-## The five classes
+**Audience:** users, operators &nbsp;·&nbsp; **Type:** Explanation
 
-```yaml
-classes:
-  base:
-    image: ghcr.io/getbrik/brik-runner-base
-    tag: latest
-  stack:
-    # Dynamic: image computed by the init stage from the project stack
-    # (node/python/java/...) and read back from BRIK_CI_IMAGE.
-    image_env: BRIK_CI_IMAGE
-  analysis:
-    image: ghcr.io/getbrik/brik-runner-analysis
-    tag: latest
-  scanner:
-    image: ghcr.io/getbrik/brik-runner-scanner
-    tag: latest
-  deploy:
-    image: ghcr.io/getbrik/brik-runner-deploy
-    tag: latest
-```
+## What it is (functionally)
 
-| Class | Kind | Resolves to | Stages |
-|---|---|---|---|
-| `base` | static | `brik-runner-base:latest` | init, release, notify |
-| `stack` | dynamic | stack image (e.g. `brik-runner-node:22`) | build, lint, test, package |
-| `analysis` | static | `brik-runner-analysis:latest` | sast |
-| `scanner` | static | `brik-runner-scanner:latest` | scan, container-scan |
-| `deploy` | static | `brik-runner-deploy:latest` | deploy, promote |
+Stages do not run on "whatever image the runner happens to have". Each stage
+declares a **runner class**, and a single registry maps that class to a specific
+container image from
+[brik-images](https://github.com/getbrik/brik-images) (multi-arch, scanned,
+rebuilt weekly for CVE fixes):
 
-A stage selects its class via `spec.runner.class` in its manifest (see
-[manifest-stage.md](../contributing/registry/manifest-stage.md)).
+| Class | Image | Stages that use it |
+|-------|-------|--------------------|
+| `base` | `brik-runner-base` | init, release, notify |
+| `stack` | the project's toolchain image (e.g. `brik-runner-node:22`) | build, lint, test, package |
+| `analysis` | `brik-runner-analysis` (semgrep, checkov, ...) | sast |
+| `scanner` | `brik-runner-scanner` (grype, syft, gitleaks, ...) | scan, container-scan |
+| `deploy` | `brik-runner-deploy` (helm, kubectl, argocd, ...) | deploy, promote |
 
-## Static vs dynamic
+The `stack` class is **dynamic**: Init detects your stack and resolves the
+matching toolchain image, so the build, lint, and test stages run with your
+language's real tools. The other four are fixed.
 
-The four static classes declare an `image` and a `tag`;
-`registry.runner_class.image <class>` returns `image:tag`. The `stack`
-class declares `image_env: BRIK_CI_IMAGE` instead: the accessor returns
-the current value of that environment variable, which the init stage sets
-to the project's language-stack image. This keeps the per-project image
-(node 22, python 3.13, ...) out of the shared registry while still routing
-it through the same accessor.
+## Why it matters
 
-This is orthogonal to language-stack image *versions*, which are declared
-in the stack manifests (`spec.runner.{image,defaultVersion,versions}`, see
-[manifest-stack.md](../contributing/registry/manifest-stack.md)). The base image is not a language
-stack; `lib/pipeline/runner-images.sh` owns only the last-resort base
-fallback (`runner.base_image`, `runner.resolve_stack_or_base`) used before
-the init dotenv exists.
+- **The linter really runs in the analysis image, and the deploy really runs in
+  the deploy image** -- on GitLab, on Jenkins, and on your laptop, because every
+  adapter and the local containerized runner resolve images through the same
+  map. Reproducing a CI failure locally is running the same stage in the same
+  image, not "read the runner docs and pray".
+- **Which image ran a stage is an auditable fact, not a guess.** The
+  actually-executed image is stamped into the report and into the SLSA builder
+  identity, so provenance can name the toolchain that produced an artifact.
+- **One place to retarget the whole fleet.** Point at an alternate map to use a
+  registry mirror, a digest-pinned set, or an air-gapped registry without
+  touching the bundled default.
 
-## The dotenv contract
+## How it works
 
-The init stage resolves all five classes and publishes them into
-`.brik-logs/pipeline.env`:
+A stage selects its class in its manifest (`spec.runner.class`). Init resolves
+all five classes once and publishes them so every later stage -- and every
+platform adapter -- reads the same image for a given class. The `stack` class
+resolves to the project's language image (kept per-project, out of the shared
+map), while the four static classes resolve to a fixed `image:tag`.
 
-```text
-BRIK_IMG_BASE=ghcr.io/getbrik/brik-runner-base:latest
-BRIK_IMG_ANALYSIS=ghcr.io/getbrik/brik-runner-analysis:latest
-BRIK_IMG_SCANNER=ghcr.io/getbrik/brik-runner-scanner:latest
-BRIK_IMG_DEPLOY=ghcr.io/getbrik/brik-runner-deploy:latest
-BRIK_CI_IMAGE=ghcr.io/getbrik/brik-runner-node:22
-BRIK_IMG_STACK=ghcr.io/getbrik/brik-runner-node:22
-```
+The language-stack image *versions* (node 22, python 3.13, ...) are declared in
+the stack manifests, separately from the class-to-image map -- the base image is
+not a language stack.
 
-- **GitLab** job templates reference `${BRIK_IMG_<CLASS>}` directly in
-  their `image:` directive; the dotenv is forwarded via
-  `artifacts.reports.dotenv`.
-- **Jenkins** reads the same file via `brikReadDotenv` and resolves each
-  stage's image with `brikDriver.resolveImage`, which looks up the
-  matching `BRIK_IMG_<CLASS>` variable.
+## Configuration & reference
 
-## Overriding every image: `BRIK_RUNNER_CLASSES_FILE`
+- **Source of truth:** [`lib/registry/runner_classes.yml`](../../lib/registry/runner_classes.yml)
+  maps each class to its image; a stage picks its class in its manifest.
+- **Retarget every image:** set `BRIK_RUNNER_CLASSES_FILE` to an alternate copy
+  of `runner_classes.yml` (a mirror, a digest-pinned fleet, an air-gapped
+  registry, or an e2e stub) to supersede every image without editing the
+  bundled default. On GitLab set it as a CI/CD variable; on Jenkins pass it as a
+  build parameter. The stages that *read* the file (init, plan) still run on
+  their bootstrap image; the override only affects the stages launched from the
+  resolved map.
+- **How adapters consume it:** Init writes the resolved images into the
+  inter-stage dotenv (`BRIK_IMG_<CLASS>`, `BRIK_CI_IMAGE` for the stack); GitLab
+  job templates reference `${BRIK_IMG_<CLASS>}` in their `image:` directive,
+  Jenkins resolves each stage's image from the same variables.
+- **Contributor detail** (the registry API, the manifest fields, the dotenv
+  contract): [registry deep-dive](../contributing/registry/README.md),
+  [stage manifest](../contributing/registry/manifest-stage.md),
+  [stack manifest](../contributing/registry/manifest-stack.md).
 
-Set `BRIK_RUNNER_CLASSES_FILE` to an alternate copy of
-`runner_classes.yml` to supersede every image without editing the bundled
-default. Use cases: a registry mirror, an air-gapped environment, or an
-e2e stub fleet where every class points at a single no-op image.
+## Related
 
-```yaml
-# my-mirror-classes.yml
-classes:
-  base:     { image: registry.internal/brik-runner-base,     tag: latest }
-  stack:    { image_env: BRIK_CI_IMAGE }
-  analysis: { image: registry.internal/brik-runner-analysis, tag: latest }
-  scanner:  { image: registry.internal/brik-runner-scanner,  tag: latest }
-  deploy:   { image: registry.internal/brik-runner-deploy,   tag: latest }
-```
-
-- **GitLab**: set `BRIK_RUNNER_CLASSES_FILE` as a CI/CD variable (FILE
-  type, or a path resolvable inside the runner). Init reads it and the
-  resolved images flow through the dotenv as usual.
-- **Jenkins**: pass `BRIK_RUNNER_CLASSES_FILE` as a build parameter. A
-  path relative to the brik library root is resolved to absolute before it
-  reaches the stage containers (the library is checked out under
-  `${WORKSPACE}@libs/<hash>/`, so a relative value would not resolve from
-  a stage container's working directory otherwise).
-
-The stages that *read* the classes file (init, plan) still run on their
-own default bootstrap image; the override only affects the images of the
-stages that are launched from the resolved map.
-
-## API
-
-| Function | Returns |
-|---|---|
-| `registry.runner_class.image <class>` | `image:tag` for a static class; `$BRIK_CI_IMAGE` for the dynamic `stack` class. rc=`IO_FAILURE` (classes file missing), `MISSING_DEP` (`yq` absent), `INVALID_INPUT` (unknown class). |
-
-See [api.md](../contributing/registry/api.md) for the full registry API.
+- [Fixed flows](fixed-flows.md) -- which stage runs where in the flow
+- [Local execution](local-execution.md) -- the same images, run on your machine
+- [Supply-chain gates](supply-chain.md) -- the builder identity the image stamps into provenance
+- [Declarations](declarations.md) -- the manifests that declare classes and stacks

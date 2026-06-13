@@ -1,79 +1,91 @@
-# Schemas: every contract is declared, versioned and enforced
+# Declarations
 
-Everything brik exchanges with the outside world -- project config, the
-infrastructure referential, plans, reports, journal events, policies --
-is governed by a JSON Schema (draft 2020-12) under `schemas/`. The schema
-is not documentation of the contract; it **is** the contract.
+> Your project, the pipeline, the operator knobs, and your infrastructure are
+> all schema-validated declarations -- not code you maintain.
 
-## Philosophy
+**Audience:** users, operators &nbsp;·&nbsp; **Type:** Explanation
 
-**The schema is the single source of truth.** Human-facing reference docs
-are generated from it, never written by hand: the configuration reference
-under [docs/configuration/](../reference/configuration/overview.md) is produced from
-`schemas/config/v1/brik.schema.json` by `scripts/gen-config-reference.sh`,
-and a drift check fails the build when the committed docs no longer match
-the schema. To change a contract, you change the schema; everything else
-follows.
+## What it is (functionally)
 
-**Validation is fail-closed, at runtime, on every boundary.** brik
-validates the documents it consumes before acting on them: `brik.yml` at
-validate/init, every referential document at init and deploy, the plan on
-write, promotion-journal events on write AND on read (an invalid event
-poisons the whole read, it is never skipped). The validator chain prefers
-`jv` (Go) and falls back to `check-jsonschema` (Python); when neither is
-available the operation fails as a missing dependency rather than running
-unvalidated.
+Brik hides none of its behaviour in code you have to read. Everything that
+shapes a pipeline is a **declaration you can read, validate, and audit**, and
+each is governed by a JSON Schema (draft 2020-12) under `schemas/`:
 
-**Unknown fields are errors.** The schemas declare
-`additionalProperties: false`: a typo or an unsupported key refuses the
-document instead of being silently ignored. A security posture you believe
-you declared but misspelled must fail loudly, not degrade.
+- **Your project** -- `brik.yml`. The only file you normally write.
+- **The pipeline itself** -- YAML manifests in the registry describe the stages,
+  the stacks, and the capability providers. You do not script the flow; you
+  read how it is assembled.
+- **The operator surface** -- one manifest declares every user-facing pipeline
+  parameter (its type, default, and which flow it drives), so every platform
+  exposes the same knobs.
+- **Your infrastructure** -- a referential of declared endpoints, credential
+  references, trust material, and policy.
 
-**Every field justifies itself.** A field that can be derived from other
-fields is not added. This keeps the contracts small enough to audit and
-prevents two declarations of the same fact from drifting apart.
+In each case the schema is not documentation *of* the contract; it **is** the
+contract.
 
-**References, never values.** Credential documents in the referential carry
-`env://`, `file://` or `bao://` references. A schema pattern enforces it:
-a literal secret does not validate, so it cannot be committed.
+## Why it matters
+
+- **The document an auditor reads is the document the pipeline obeys.** What is
+  a legal TLS posture, what a signing declaration may contain, what a promotion
+  grant must carry, which gates an environment can set -- all answered by
+  reading a schema, because the same schema is enforced fail-closed at runtime.
+- **It cannot drift.** The configuration reference is *generated* from
+  `brik.schema.json`; a CI drift check fails the build when the committed docs
+  no longer match the schema. To change a contract you change the schema, and
+  everything else follows.
+- **Unknown fields are errors.** Schemas declare `additionalProperties: false`:
+  a misspelled key refuses the document instead of being silently ignored. A
+  posture you believe you declared but mistyped fails loudly.
+- **References, never values.** Credential documents carry `env://`, `file://`,
+  or `bao://` references; a schema pattern rejects a literal secret, so it
+  cannot be committed.
+
+## How it works
+
+**Validation is fail-closed, at runtime, on every boundary.** Brik validates
+the documents it consumes before acting: `brik.yml` at validate/init, every
+referential document at init and deploy, the plan on write, promotion-journal
+events on write *and* on read (an invalid event poisons the whole read, never
+skipped). The validator chain prefers `jv` (Go) and falls back to
+`check-jsonschema` (Python); with neither available the operation fails as a
+missing dependency rather than running unvalidated.
 
 **Versioned evolution.** Each family lives in a versioned directory
 (`config/v1/`, `report/v1.1/`, ...). A breaking change is a new version
-directory consumed explicitly, never a silent mutation of the existing
-contract.
+directory consumed explicitly, never a silent mutation. Third-party formats
+(SARIF 2.1.0, CycloneDX 1.5) are vendored under `schemas/external/` behind a
+checksum, so they cannot drift with a network fetch. Spec campaigns validate
+real produced artifacts against the schemas, so a contract break fails the
+suite before it ships.
 
-**External formats are pinned.** Third-party schemas (SARIF 2.1.0,
-CycloneDX 1.5) are vendored under `schemas/external/` and guarded by a
-checksum file, so the contracts brik validates findings and SBOMs against
-cannot drift with a network fetch.
+The schema families:
 
-**Contracts are regression-tested.** Spec campaigns validate real produced
-artifacts (reports, fragments, plans, SARIF, journal events) against the
-schemas, so a code change that breaks a contract fails the suite before it
-ships.
+| Family | Governs |
+|--------|---------|
+| `config/v1` | the project's `brik.yml`; the generated configuration reference derives from it |
+| `referential/v1` | the infrastructure referential (one schema per kind: Registry, Signing, Credential, Binding, Policy, ...); TLS posture and credential references validate fail-closed |
+| `registry/v1` | the stage, stack, and capability-provider manifests the pipeline is compiled from |
+| `plan/v1` | the byte-reproducible per-commit plan, including the mandatory `infra.fingerprint` audit block |
+| `state/v1` | PromotionJournal events (the digest is required, which makes grants replay-proof) |
+| `policy/v1` | the org-wide policy document (findings posture, `state_repo_protection`) |
+| `report/v1`, `report/v1.1`, `stages/v1` | the pipeline report backbone, its per-stage fragments, and stage summaries |
+| `execution/v1` | the dotenv contract between stages |
+| `findings/v1` | Brik's extensions to SARIF findings |
+| `rollout/v1` | the built-in deployment workflow profiles |
+| `external/` | pinned third-party formats (SARIF, CycloneDX) |
 
-## The families
+## Configuration & reference
 
-| Family | Schema(s) | Governs |
-|--------|-----------|---------|
-| `config/v1` | `brik.schema.json` | the project's `brik.yml`; the generated configuration reference derives from it |
-| `referential/v1` | one schema **per kind** (Registry, GitHost, Signing, SecretManager, ArgoCD, K8sTarget, SshTarget, PackageRegistry, Notification, Credential, Binding, Policy, Referential) | the infrastructure referential documents; TLS posture, credential references and cross-references (bindings, endpoint credentials) validate fail-closed |
-| `plan/v1` | `plan.schema.json` | the byte-reproducible per-commit plan, including the mandatory `infra.fingerprint` audit block |
-| `state/v1` | `promotion-event.schema.json` | PromotionJournal events (artifact_promoted, validated_for, authorized_for); the digest is required, which is what makes grants replay-proof |
-| `policy/v1` | `brik-policy.schema.json` | the org-wide policy document (findings posture, `state_repo_protection`) |
-| `findings/v1` | `brik-extensions.schema.json` | brik's extensions to SARIF findings |
-| `report/v1`, `report/v1.1` | `aggregate`, `fragment` | the pipeline report backbone and its per-stage fragments |
-| `stages/v1` | `stage-summary.schema.json` | per-stage summary artifacts |
-| `execution/v1`, `execution-environment/v1` | `pipeline-env`, `wrapper-context` | the dotenv contract between stages and the wrapper context |
-| `registry/v1` | `stage`, `stack`, `provider` | the registry manifests stages, stacks and capability providers are compiled from |
-| `rollout/v1` | `deploy-profile.schema.json` | built-in deployment workflow profiles |
-| `external/` | SARIF 2.1.0, CycloneDX 1.5 (+ `SCHEMAS.sha256`) | pinned third-party formats |
+- The schemas, the source of truth: [`schemas/`](../../schemas/)
+- The generated `brik.yml` reference: [reference/configuration](../reference/configuration/README.md)
+- The pipeline manifests: [`lib/registry/manifests/`](../../lib/registry/manifests/)
+- The operator parameter manifest: [`lib/registry/pipeline-params.yml`](../../lib/registry/pipeline-params.yml)
+- The infrastructure referential: [manage credentials](../how-to/manage-credentials.md)
 
-## Why this matters for security and compliance
+## Related
 
-The schemas are the conformance surface. What an auditor needs to know --
-which TLS postures are legal, what a signing declaration can contain, what
-a promotion grant must carry to be accepted, which gates an environment can
-declare -- is answered by reading a schema, not by reading code. And
-because the same schema is enforced fail-closed at runtime, the document
-the auditor read is the document the pipeline obeyed.
+- [The plan](plan.md) -- the per-commit declaration of what runs
+- [Supply-chain gates](supply-chain.md) -- the gates an environment declares
+- [Runner classes](runner-classes.md) -- the declared image per stage
+- [Configuration overview](../reference/configuration/overview.md) -- "declare what, not how"
