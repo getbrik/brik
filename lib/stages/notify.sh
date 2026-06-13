@@ -181,9 +181,16 @@ _notify._should_send() {
 _notify._webhook_endpoint() {
     brik.use transverse.infra 2>/dev/null || true
     declare -f infra.root >/dev/null 2>&1 || return 0
+    # No referential configured -> legacy BRIK_NOTIFY_WEBHOOK_URL path (silent).
+    [[ -n "${BRIK_INFRA_DIR:-}" || -n "${BRIK_INFRA_REPO:-}" ]] || return 0
 
     local root
-    root="$(infra.root 2>/dev/null)" || return 0
+    if ! root="$(infra.root 2>/dev/null)"; then
+        # Configured but unreadable: warn rather than skip in silence, so a
+        # mistyped BRIK_INFRA_DIR does not quietly drop webhook delivery.
+        log.warn "notify: a referential is configured but could not be read -- skipping webhook endpoint discovery"
+        return 0
+    fi
 
     local file found=""
     for file in "${root}/endpoints"/*.yml "${root}/endpoints"/*.yaml; do

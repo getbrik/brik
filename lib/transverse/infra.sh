@@ -71,17 +71,25 @@ _infra._clone() {
     [[ "$spec" == *'#'* ]] && ref="${spec#*#}"
 
     mkdir -p "$(dirname "$dest")"
+    # Redact any embedded credential (https://token@host) from the URL and the
+    # git output before logging, the way state_repo does for push errors.
+    local safe_url
+    safe_url="$(printf '%s' "$url" | sed -E 's#://[^@/]*@#://***@#')"
     if ! out="$(git clone --quiet "$url" "$dest" 2>&1)"; then
-        log.error "failed to clone referential repo ${url}: ${out}"
+        log.error "failed to clone referential repo ${safe_url}: $(printf '%s' "$out" | sed -E 's#://[^@/]*@#://***@#')"
         return "$BRIK_EXIT_EXTERNAL_FAIL"
     fi
     if [[ -n "$ref" ]]; then
         if ! out="$(git -C "$dest" checkout --quiet --detach "$ref" 2>&1)"; then
-            log.error "failed to checkout referential ref '${ref}': ${out}"
+            log.error "failed to checkout referential ref '${ref}': $(printf '%s' "$out" | sed -E 's#://[^@/]*@#://***@#')"
             return "$BRIK_EXIT_EXTERNAL_FAIL"
         fi
     else
-        log.warn "BRIK_INFRA_REPO carries no pinned ref (append '#<ref>'): using the default branch, unpinned"
+        # The referential is the trust material (allowed_signers, policies,
+        # endpoints). An unpinned clone can change between two deploys of the
+        # same version; the plan.json fingerprint records the drift but cannot
+        # prevent it -- pin the ref ('#<ref>') for a reproducible referential.
+        log.warn "BRIK_INFRA_REPO carries no pinned ref (append '#<ref>'): using the default branch, unpinned -- the trust material can change between runs"
     fi
 
     printf '%s' "$dest"
@@ -316,7 +324,7 @@ infra.credential_for() {
         return "$BRIK_EXIT_CONFIG_ERROR"
     fi
 
-    cred="$(yq ".endpoints.\"${endpoint}\" // \"\"" "$file")"
+    cred="$(endpoint="$endpoint" yq '.endpoints[strenv(endpoint)] // ""' "$file")"
     if [[ -z "$cred" ]]; then
         log.error "environment '${env}' binds no credential for endpoint '${endpoint}'"
         return "$BRIK_EXIT_CONFIG_ERROR"
@@ -441,7 +449,7 @@ infra.ssh_target_for() {
     for file in "${root}/endpoints"/*.yml "${root}/endpoints"/*.yaml; do
         [[ -f "$file" ]] || continue
         [[ "$(yq '.kind // ""' "$file")" == "SshTarget" ]] || continue
-        if [[ "$(yq ".hosts // [] | contains([\"${host}\"])" "$file")" == "true" ]]; then
+        if [[ "$(host="$host" yq '.hosts // [] | contains([strenv(host)])' "$file")" == "true" ]]; then
             yq -o json '.' "$file"
             return 0
         fi
