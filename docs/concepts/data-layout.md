@@ -22,15 +22,15 @@ Every Brik run materialises two top-level directories under
 
 `brik-artifacts/` is the **product**: per-stage report fragments, SARIF
 findings, JUnit reports, coverage reports, SBOM, aggregate report copies.
-External tools may pin filenames here -- the schema is versioned
+External tools may pin filenames here, because the schema is versioned
 (`schema_version: "1.1"` for fragments) and additions are backward-compat.
 
 `.brik-logs/` is the **trace**: per-stage `.log` files, the
 `pipeline.env` cross-stage env file, the aggregate-report backend
 (before notify copies it to `brik-artifacts/`), the policy cache,
 `plan.json` (the reproducible stage-selection plan with the referential
-fingerprint for audit), and mutex lock files. Format is **not contractual**
--- file names and shapes may change between Brik versions without warning.
+fingerprint for audit), and mutex lock files. Format is **not contractual**:
+file names and shapes may change between Brik versions without warning.
 Consumers who scrape these files do so at their own risk; the supported way
 to read pipeline state is through `report.read` or the JSON in
 `brik-artifacts/aggregate-report.json`.
@@ -86,7 +86,7 @@ reads this file. Operators who need the raw tool output (e.g. to
 compare against post-policy filtering) can read the sibling.
 
 For lint specifically, `<stage>/<check>.sarif` is per-check
-(`lint.sarif`, `format.sarif`, `type_check.sarif`) -- multiple
+(`lint.sarif`, `format.sarif`, `type_check.sarif`): multiple
 sibling files, one per configured check. The post-policy
 `findings.sarif` aggregates all checks.
 
@@ -148,6 +148,6 @@ stage-specific runner image.
 
 ## See also
 
-- [Architecture](architecture.md) -- the layered design that produces this layout
-- [Pipeline context](pipeline-context.md) -- how a stage receives its execution context
-- [Internals layout](../contributing/layout.md) -- the source-code domain layout
+- [Architecture](architecture.md): the layered design that produces this layout
+- [Pipeline context](pipeline-context.md): how a stage receives its execution context
+- [Internals layout](../contributing/layout.md): the source-code domain layout

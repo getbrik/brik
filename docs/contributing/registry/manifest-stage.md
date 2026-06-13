@@ -90,7 +90,7 @@ free to run in parallel on platforms that support it (GitLab matrix,
 Jenkins parallel).
 
 The loader resolves all placements into a total order accessible via
-`registry.stage.list` -- that ordered list is the only thing exposed,
+`registry.stage.list`: that ordered list is the only thing exposed,
 there is no per-stage rank accessor. The topological sort applies a
 depth fallback rather than aborting, so an unresolvable `after`/`before`
 edge sorts the stage last instead of failing the load.
@@ -141,7 +141,7 @@ gate:
 runtime context is derived from `BRIK_COMMIT_TAG` (`release` if set,
 `snapshot` otherwise) by `_pipeline.detect_metadata`. A stage with
 `contexts: [release]` outside a tag pipeline is skipped with reason
-`context-mismatch` -- this is how "release-only" semantics is encoded
+`context-mismatch`: this is how "release-only" semantics is encoded
 without a separate gate mode.
 
 ## spec.dry_run

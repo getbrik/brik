@@ -55,6 +55,7 @@ Tests live in `spec/` and `shared-libs/*/spec/`, using
 [ShellSpec](https://shellspec.info). The `.shellspec` config at the repo root
 sets the shell, the spec path (`--default-path "**/spec"`), and the helper.
 
+> [!IMPORTANT]
 > On macOS, `ulimit -n 1024` is required when running kcov directly. The
 > Makefile's `coverage` target handles this automatically. See
 > [kcov#293](https://github.com/SimonKagstrom/kcov/issues/293).
@@ -79,9 +80,9 @@ passes ShellCheck.
 
 GitHub Actions runs three jobs on every push and pull request:
 
-- **lint** -- ShellCheck on all Bash source files.
-- **test** -- the full ShellSpec suite plus kcov coverage uploaded to Codecov.
-- **metrics** -- shellmetrics badge generation (push to `main` only).
+- **lint**: ShellCheck on all Bash source files.
+- **test**: the full ShellSpec suite plus kcov coverage uploaded to Codecov.
+- **metrics**: shellmetrics badge generation (push to `main` only).
 
 A separate **Docs drift** workflow runs `make validate-docs` and
 `make check-docs-drift` when `docs/configuration/`, the schema, or the doc
@@ -89,7 +90,7 @@ scripts change.
 
 ## See also
 
-- [Layout](layout.md) -- the domain notions and the `lib/` tree (ten domain directories)
-- [Extending a stack](extending-stack.md) -- add a language ecosystem
-- [Extending a stage](extending-stage.md) -- add to the fixed flow
-- [Briklab](briklab.md) -- the end-to-end test infrastructure
+- [Layout](layout.md): the domain notions and the `lib/` tree (ten domain directories)
+- [Extending a stack](extending-stack.md): add a language ecosystem
+- [Extending a stage](extending-stage.md): add to the fixed flow
+- [Briklab](briklab.md): the end-to-end test infrastructure

@@ -28,22 +28,22 @@ Two schema versions coexist under [`schemas/report/`](../../schemas/report):
 
 The v1.1 deltas in detail:
 
-- **`business.status`** (enum `success | warning | error`) -- outcome derived by
+- **`business.status`** (enum `success | warning | error`): outcome derived by
   the [business filter](../concepts/business-outcome.md) from the technical exit
   code, the [pipeline context](../concepts/pipeline-context.md), and
   stage-emitted side-band signals. Required on every fragment.
-- **`business.reason`** (string) -- human-readable explanation of a non-`success`
+- **`business.reason`** (string): human-readable explanation of a non-`success`
   outcome. Optional, but conventionally required when `status != success`.
 - **`tech.kind`** (12-value enum: `ok`, `failure`, `invalid-input`,
   `missing-dependency`, `invalid-environment`, `external-service-unavailable`,
   `io-failure`, `configuration-error`, `timeout`, `interrupted`, `check-failed`,
-  `not-applicable`) -- readable label derived from the exit code.
-- **`pipeline.context`** (enum `snapshot | release`) -- `release` when
+  `not-applicable`): readable label derived from the exit code.
+- **`pipeline.context`** (enum `snapshot | release`): `release` when
   `pipeline.commit.tag` is non-null, `snapshot` otherwise.
-- **`pipeline.business.status`** -- pipeline-wide outcome aggregated from
+- **`pipeline.business.status`**: pipeline-wide outcome aggregated from
   per-stage `business.status` (`error` if any stage is `error`, `warning` if any
   is `warning` and none `error`, `success` otherwise).
-- **`summary.business`** -- typed counts `{success_count, warning_count,
+- **`summary.business`**: typed counts `{success_count, warning_count,
   error_count}` across the `stages` array.
 - The legacy `tech.warning` boolean and `summary.warnings[]` array are rejected
   by v1.1; the same information lives in `business.{status, reason}`.
@@ -74,7 +74,7 @@ signals would live here as well.
 
 | Field | Type | Source |
 |-------|------|--------|
-| `tech.dry_run` | bool | `BRIK_DRY_RUN` -- present and `true` only when the run was launched with `BRIK_DRY_RUN=true`; absent otherwise. Stamped by `_pipeline._stamp_dry_run` in local mode and by `report.aggregate_fragments` in CI mode. |
+| `tech.dry_run` | bool | `BRIK_DRY_RUN`, present and `true` only when the run was launched with `BRIK_DRY_RUN=true`; absent otherwise. Stamped by `_pipeline._stamp_dry_run` in local mode and by `report.aggregate_fragments` in CI mode. |
 
 Renderers surface this field as a top-of-report `DRY-RUN` banner (Markdown
 blockquote and HTML hero badge) so an operator scanning the report can tell
@@ -236,7 +236,7 @@ treat it as optional.
 | `channels[].configured` | bool | `true` when the channel trigger var is set at run time |
 | `channels[].on` | string | dispatch policy; defaults to `always` when configured without a policy |
 | `channels[].would_send` | bool | `true` when the channel was configured and its policy matched the outcome |
-| `gatekeeper.decision` | enum | `pass` / `fail` -- `fail` when `pipeline.business.status` is `error` |
+| `gatekeeper.decision` | enum | `pass` / `fail`, with `fail` when `pipeline.business.status` is `error` |
 | `gatekeeper.business_status` | enum | mirrors `pipeline.business.status` |
 
 ## CI aggregation
@@ -250,7 +250,7 @@ for the local-vs-CI split.
 
 ## See also
 
-- [Business outcome](../concepts/business-outcome.md) -- how `tech.*` becomes `business.*`
-- [Pipeline context](../concepts/pipeline-context.md) -- where `pipeline.context` comes from
-- [Findings](../how-to/manage-findings.md) -- the SARIF pipeline behind the scan stage fields
-- `lib/pipeline/report.sh` -- the producer implementation
+- [Business outcome](../concepts/business-outcome.md): how `tech.*` becomes `business.*`
+- [Pipeline context](../concepts/pipeline-context.md): where `pipeline.context` comes from
+- [Findings](../how-to/manage-findings.md): the SARIF pipeline behind the scan stage fields
+- `lib/pipeline/report.sh`: the producer implementation

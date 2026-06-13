@@ -7,8 +7,8 @@ runtime does around each stage see
 
 ## Why Brik
 
-CI/CD pipelines share the same logic across projects -- build, test, lint,
-deploy -- yet every team rewrites that logic per platform. Switch from GitLab to
+CI/CD pipelines share the same logic across projects (build, test, lint,
+deploy), yet every team rewrites that logic per platform. Switch from GitLab to
 GitHub Actions? Rewrite everything. Add Jenkins? Rewrite again. The business
 logic is the same; only the orchestration differs.
 
@@ -31,7 +31,7 @@ These guide every implementation decision in Brik.
    stages; they never define pipeline structure. This buys consistency,
    auditability, and predictability.
 2. **Declarative configuration.** `brik.yml` is the only user interface. Users
-   declare their stack, tools, thresholds, and environments -- never pipeline
+   declare their stack, tools, thresholds, and environments, never pipeline
    logic. Sensible per-stack defaults mean a valid config can be five lines.
 3. **Bash portability.** All CI/CD business logic is portable Bash. Bash is on
    every CI runner, container, and VM. No compilation step, no runtime
@@ -57,22 +57,22 @@ flowchart TD
     L3 --> L2 --> L1 --> L0
 ```
 
-**Layer 0 -- Bash Runtime** (`lib/pipeline/`). The execution framework that
+**Layer 0, Bash Runtime** (`lib/pipeline/`). The execution framework that
 wraps every stage: `stage.run` (lifecycle engine), structured logging,
 execution context, pre/post hooks, error handling, step summaries. It knows
-nothing about CI/CD -- it only runs functions with observability.
+nothing about CI/CD; it only runs functions with observability.
 
-**Layer 1 -- brik-lib** (`lib/{stages,stacks,deployments,rollout,package-managers,planning,registry,transverse,cli}/`).
+**Layer 1, brik-lib** (`lib/{stages,stacks,deployments,rollout,package-managers,planning,registry,transverse,cli}/`).
 Reusable CI/CD business functions organized by domain. Each function performs
 one CI/CD action for one stack or tool. Layer 1 depends on Layer 0 for logging
 and context but knows nothing about any CI platform.
 
-**Layer 2 -- Shared Library** (`shared-libs/<platform>/`). Thin adapters that
+**Layer 2, Shared Library** (`shared-libs/<platform>/`). Thin adapters that
 bridge a CI platform to the Bash layers. Each adapter reads `brik.yml`, extracts
 configuration, and calls `stage.run` per stage. See [GitLab](../reference/platforms/gitlab.md)
 and [Jenkins](../reference/platforms/jenkins.md).
 
-**Layer 3 -- brik.yml** (`schemas/config/v1/brik.schema.json`). The user-facing
+**Layer 3, brik.yml** (`schemas/config/v1/brik.schema.json`). The user-facing
 configuration file, validated against a JSON Schema. Only `version` and
 `project.name` are required. See [configuration](../reference/configuration/overview.md).
 
@@ -88,7 +88,7 @@ configuration file, validated against a JSON Schema. Only `version` and
 ## Key architectural decisions
 
 **Why Bash?** It is the only language guaranteed available on every CI runner,
-container, and VM -- no compilation, no runtime install, no dependency
+container, and VM: no compilation, no runtime install, no dependency
 management. The trade-off is reduced expressiveness, but CI/CD logic is mostly
 glue code and command invocation, which Bash handles well.
 
@@ -130,13 +130,13 @@ See [artifact attestation](supply-chain.md) for the full gate semantics.
 
 **Credential isolation by phase.** Signing credentials (BRIK_SIGNING_* prefix) reach
 only the signing container; deploy credentials (resolved at deploy time) are
-separate from CI publish credentials. Token lifetime is a provider parameter --
+separate from CI publish credentials. Token lifetime is a provider parameter:
 rotation happens at the secret-manager level, invisible to Brik code.
 
 ## See also
 
-- [Fixed flow](fixed-flows.md) -- the 12 stages and their order
-- [Data layout](data-layout.md) -- the runtime on-disk contract (`brik-artifacts/` vs `.brik-logs/`)
-- [Layout](../contributing/layout.md) -- the domain notions and the `lib/` tree (ten domain directories)
-- [Stage lifecycle](../contributing/stage-lifecycle.md) -- the `stage.run` lifecycle in detail
-- [Business outcome](business-outcome.md) -- the tech/business two-axis result model
+- [Fixed flow](fixed-flows.md): the 12 stages and their order
+- [Data layout](data-layout.md): the runtime on-disk contract (`brik-artifacts/` vs `.brik-logs/`)
+- [Layout](../contributing/layout.md): the domain notions and the `lib/` tree (ten domain directories)
+- [Stage lifecycle](../contributing/stage-lifecycle.md): the `stage.run` lifecycle in detail
+- [Business outcome](business-outcome.md): the tech/business two-axis result model

@@ -61,8 +61,8 @@ detect:
 
 | Field | Semantics |
 |---|---|
-| `markers.any` | OR -- the stack matches if at least one file exists in the workspace root. |
-| `markers.all` | AND -- the stack matches only if all listed files exist. Combined with `markers.any` via AND across the two. |
+| `markers.any` | OR: the stack matches if at least one file exists in the workspace root. |
+| `markers.all` | AND: the stack matches only if all listed files exist. Combined with `markers.any` via AND across the two. |
 
 Detection is single-pass and rooted at the workspace top: `stacks.detect`
 never recurses. If your stack only marks a subdirectory, document the
@@ -90,7 +90,7 @@ Consumers: `lib/pipeline/runner-images.sh` resolves the image to pull
 via `registry.stack.runner_image <id>`, which takes only the stack id
 and returns the bare image ref; the version tag is resolved separately
 from `defaultVersion` / `versions`. The Jenkins wrapper, the GitLab
-template, and the local wrapper all go through the same resolver -- the
+template, and the local wrapper all go through the same resolver; the
 manifest is the only place that knows the image.
 
 ## spec.cache

@@ -79,8 +79,8 @@ Each brik job template declares both:
 
 | Transport | What GitLab does with it | Cumulative? |
 |---|---|---|
-| `artifacts.paths: [.brik-logs/]` | Extracts upstream `pipeline.env` files into workspace | **No** -- merge order across colliding paths is undefined ([gitlab-org/gitlab#244714](https://gitlab.com/gitlab-org/gitlab/-/issues/244714), open since 2020). Init's snapshot frequently survives. |
-| `artifacts.reports.dotenv: .brik-logs/pipeline.env` | Parses dotenv keys, promotes them as CI variables | **Yes** -- documented [union with last-wins](https://docs.gitlab.com/ci/variables/dotenv_variables/) across all upstream `needs:` dotenv reports. |
+| `artifacts.paths: [.brik-logs/]` | Extracts upstream `pipeline.env` files into workspace | **No**, merge order across colliding paths is undefined ([gitlab-org/gitlab#244714](https://gitlab.com/gitlab-org/gitlab/-/issues/244714), open since 2020). Init's snapshot frequently survives. |
+| `artifacts.reports.dotenv: .brik-logs/pipeline.env` | Parses dotenv keys, promotes them as CI variables | **Yes**, documented [union with last-wins](https://docs.gitlab.com/ci/variables/dotenv_variables/) across all upstream `needs:` dotenv reports. |
 
 The CI variable channel is the one Brik relies on. When `release` exports
 `BRIK_APP_VERSION=0.1.0` and `package` consumes `${BRIK_APP_VERSION}`,
@@ -143,7 +143,7 @@ per stage:
 | `BRIK_DEPLOY_IMAGE` | `ghcr.io/getbrik/brik-runner-deploy:latest` | Deploy |
 
 The Init stage resolves `BRIK_CI_IMAGE` to a stack-specific image from
-`project.stack` and `project.stack_version` -- no manual configuration:
+`project.stack` and `project.stack_version` (no manual configuration):
 
 | Stack | Resolved image |
 |-------|----------------|
@@ -155,7 +155,7 @@ The Init stage resolves `BRIK_CI_IMAGE` to a stack-specific image from
 
 If `stack` is unset or unrecognized, the pipeline falls back to
 `brik-runner-base:latest`. Overriding `BRIK_CI_IMAGE` from `.gitlab-ci.yml` is
-not yet supported -- Init always resolves it from `brik.yml`.
+not yet supported: Init always resolves it from `brik.yml`.
 
 ### Custom images
 
@@ -235,8 +235,8 @@ redirects tool caches:
 
 The `brik-test` job ships a `coverage_report` block so GitLab can render a
 coverage badge on merge requests. GitLab's YAML schema only accepts `cobertura`
-or `jacoco` for `coverage_format` and validates it at YAML parse time -- before
-any job runs -- so the value cannot come from an init-stage dotenv. The template
+or `jacoco` for `coverage_format` and validates it at YAML parse time (before
+any job runs), so the value cannot come from an init-stage dotenv. The template
 hardcodes the cobertura defaults:
 
 ```yaml
@@ -256,7 +256,7 @@ Out of the box:
 | rust (cargo-llvm-cov) | lcov -> `coverage/lcov.info` | override or accept no badge |
 
 Stacks where the badge does not match still archive their coverage files and the
-pipeline stays green -- only the inline MR-diff badge is missing.
+pipeline stays green; only the inline MR-diff badge is missing.
 
 ### Coverage percentage badge (automatic)
 
@@ -276,12 +276,12 @@ brik-test:
 
 `lib/transverse/coverage.sh` reads either `coverage/coverage.xml` (Cobertura) or
 `brik-artifacts/test/coverage/jacoco.xml` (Jacoco) and computes the line
-percentage -- no per-project regex, works for every stack.
+percentage (no per-project regex), works for every stack.
 
 ### Project-level override
 
 To enable the MR badge for jacoco, lcov, or a non-default path, override the
-`brik-test` job in your own `.gitlab-ci.yml` -- GitLab merges the override into
+`brik-test` job in your own `.gitlab-ci.yml`; GitLab merges the override into
 the templated job:
 
 ```yaml
@@ -319,7 +319,7 @@ The permitted pipeline sources are:
 | `web` | On-demand re-run from the GitLab UI or API |
 
 A push to a feature branch that already has an open MR is suppressed
-(the MR pipeline is kept; the branch pipeline is dropped) -- this is
+(the MR pipeline is kept; the branch pipeline is dropped). This is
 the anti-duplicate rule:
 
 ```yaml
@@ -337,7 +337,7 @@ workflow:
 Other sources (`trigger`, `webide`, `pipeline` for external triggers)
 are intentionally not in the allow-list. Add them locally if the project needs them; do not
 remove the existing entries without replacing the parity they provide
-(particularly the `schedule` and `web` entries -- losing them breaks
+(particularly the `schedule` and `web` entries: losing them breaks
 the on-call team's ability to re-run a pipeline manually).
 
 ## Anti-patterns checklist
@@ -345,29 +345,29 @@ the on-call team's ability to re-run a pipeline manually).
 Before opening a PR that touches `.gitlab-ci.yml` (or the shared
 `shared-libs/gitlab/templates/*.yml`), confirm each of the following:
 
-- [ ] **`only/except` is never mixed with `rules:`** -- the two
+- [ ] **`only/except` is never mixed with `rules:`**: the two
       mechanisms have intersecting semantics and GitLab's
       precedence ordering surprises everyone. Brik uses `rules:`
       exclusively. Override projects that pull our templates must
       keep this discipline.
-- [ ] **No `deploy` from a Merge Request pipeline** -- in MR
+- [ ] **No `deploy` from a Merge Request pipeline**: in MR
       pipelines, `$CI_PIPELINE_SOURCE == "merge_request_event"`. A
       deploy job that fires in this context publishes against the
       MR's source branch state, not the target branch the
       reviewer is about to merge. Gate deploys on
       `$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH` or
       `$CI_COMMIT_TAG`.
-- [ ] **`workflow:` always allows `schedule` and `web`** -- the
+- [ ] **`workflow:` always allows `schedule` and `web`**: the
       template ships both; do not remove them when copy-pasting.
       Operators rely on `web` for retries and `schedule` for the
       nightly run.
-- [ ] **Pipeline triggers stay limited to the workflow allow-list**
-      -- `trigger:`, `webide`, and `pipeline` (from an external
+- [ ] **Pipeline triggers stay limited to the workflow allow-list**:
+      `trigger:`, `webide`, and `pipeline` (from an external
       orchestrator) all create pipelines outside the Brik flow. If
       you need to allow one, add an explicit entry with a rationale
       comment.
 - [ ] **`resource_group:` on every deploy job that touches a
-      shared environment** -- otherwise two pipelines on the same
+      shared environment**: otherwise two pipelines on the same
       ref can race the same target.
 
 This checklist enforces the Stephane Robert anti-pattern
@@ -385,7 +385,7 @@ until the runtime detection lands.
 
 ## See also
 
-- [Getting started: GitLab CI](../../getting-started/gitlab.md) -- first-time setup
-- [Configuration overview](../configuration/overview.md) -- `brik.yml`
-- [Credentials](../../how-to/manage-credentials.md) -- wiring secrets
-- [Troubleshooting](../../how-to/troubleshoot.md) -- common failures
+- [Getting started: GitLab CI](../../getting-started/gitlab.md): first-time setup
+- [Configuration overview](../configuration/overview.md): `brik.yml`
+- [Credentials](../../how-to/manage-credentials.md): wiring secrets
+- [Troubleshooting](../../how-to/troubleshoot.md): common failures

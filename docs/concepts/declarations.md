@@ -1,7 +1,8 @@
 # Declarations
 
+> [!NOTE]
 > Your project, the pipeline, the operator knobs, and your infrastructure are
-> all schema-validated declarations -- not code you maintain.
+> all schema-validated declarations, not code you maintain.
 
 **Audience:** users, operators &nbsp;·&nbsp; **Type:** Explanation
 
@@ -11,14 +12,14 @@ Brik hides none of its behaviour in code you have to read. Everything that
 shapes a pipeline is a **declaration you can read, validate, and audit**, and
 each is governed by a JSON Schema (draft 2020-12) under `schemas/`:
 
-- **Your project** -- `brik.yml`. The only file you normally write.
-- **The pipeline itself** -- YAML manifests in the registry describe the stages,
+- **Your project**: `brik.yml`. The only file you normally write.
+- **The pipeline itself**: YAML manifests in the registry describe the stages,
   the stacks, and the capability providers. You do not script the flow; you
   read how it is assembled.
-- **The operator surface** -- one manifest declares every user-facing pipeline
+- **The operator surface**: one manifest declares every user-facing pipeline
   parameter (its type, default, and which flow it drives), so every platform
   exposes the same knobs.
-- **Your infrastructure** -- a referential of declared endpoints, credential
+- **Your infrastructure**: a referential of declared endpoints, credential
   references, trust material, and policy.
 
 In each case the schema is not documentation *of* the contract; it **is** the
@@ -28,7 +29,7 @@ contract.
 
 - **The document an auditor reads is the document the pipeline obeys.** What is
   a legal TLS posture, what a signing declaration may contain, what a promotion
-  grant must carry, which gates an environment can set -- all answered by
+  grant must carry, which gates an environment can set: all answered by
   reading a schema, because the same schema is enforced fail-closed at runtime.
 - **It cannot drift.** The configuration reference is *generated* from
   `brik.schema.json`; a CI drift check fails the build when the committed docs
@@ -85,7 +86,7 @@ The schema families:
 
 ## Related
 
-- [The plan](plan.md) -- the per-commit declaration of what runs
-- [Supply-chain gates](supply-chain.md) -- the gates an environment declares
-- [Runner classes](runner-classes.md) -- the declared image per stage
-- [Configuration overview](../reference/configuration/overview.md) -- "declare what, not how"
+- [The plan](plan.md): the per-commit declaration of what runs
+- [Supply-chain gates](supply-chain.md): the gates an environment declares
+- [Runner classes](runner-classes.md): the declared image per stage
+- [Configuration overview](../reference/configuration/overview.md): "declare what, not how"

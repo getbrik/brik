@@ -144,7 +144,7 @@ intent, the answer is almost always one of:
    `expires`  this is the supported path.
 2. Adjust `quality.findings.policy` at the project level to pick a
    different preset.
-3. Change the matrix itself -- an org-wide policy shift decided
+3. Change the matrix itself: an org-wide policy shift decided
    outside an individual project.
 
 Never disable the matrix by exporting `BRIK_CONTINUE_ON_ERROR=1` in CI.
@@ -155,18 +155,18 @@ The CI findings gates sit in the **Build** and **Package** stages. A separate se
 of gates runs in the **Deploy** stage, where the infrastructure referential takes
 over:
 
-- **`require_digest`** -- the deploy must pin the exact digest produced by CI.
-- **`require_attestation`** -- the SBOM and SLSA provenance attached to that
+- **`require_digest`**: the deploy must pin the exact digest produced by CI.
+- **`require_attestation`**: the SBOM and SLSA provenance attached to that
   digest must be signed and verifiable against your trust material. The
   `expected_builder` regex and `expected_source` regex let you enforce that the
   builder identity matches your expectations.
-- **`requires_eligibility`** -- the digest must have a signed grant in the
+- **`requires_eligibility`**: the digest must have a signed grant in the
   promotion journal (`brik authorize`) or a signed validation from a prior
   environment's successful deploy.
 
 Every gate is fail-closed: missing evidence, an unverifiable signature, or
-ineligibility refuses the deploy. This is independent of the CI findings matrix
--- a perfectly-clean CI run cannot deploy without valid evidence and a signed
+ineligibility refuses the deploy. This is independent of the CI findings matrix:
+a perfectly-clean CI run cannot deploy without valid evidence and a signed
 promotion.
 
 For the full gate semantics and the builder-identity convention, see
@@ -185,7 +185,7 @@ The proofs live in two stores, and each store owns its garbage collection:
 
 Brik never purges anything. The org declares its retention posture in
 `brik-policy.yml` under `retention:` (`registry_days`, `state_repo_days`,
-0 = unlimited) -- the fields are **informative**: they document, in the one
+0 = unlimited); the fields are **informative**: they document, in the one
 governed file audits already read, what the registry GC and the git-host
 policies are configured to do elsewhere. Two operating rules:
 
@@ -198,7 +198,7 @@ policies are configured to do elsewhere. Two operating rules:
 
 ## References
 
-- [policy.md](configure-org-policy.md) -- schema reference for `brik-policy.yml`.
-- [findings.md](manage-findings.md) -- runtime behaviour, presets, gating semantics.
+- [policy.md](configure-org-policy.md): schema reference for `brik-policy.yml`.
+- [findings.md](manage-findings.md): runtime behaviour, presets, gating semantics.
 - [business-outcome.md / Decision matrix](../concepts/business-outcome.md#decision-matrix)
-  -- the 10-row business.evaluate matrix that consumes policy outputs.
+  (the 10-row business.evaluate matrix that consumes policy outputs).

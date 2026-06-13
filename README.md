@@ -27,21 +27,27 @@
 
 ## The problem Brik solves
 
-CI/CD logic is the same everywhere. Build the code. Run the tests. Scan for
-vulnerabilities. Push the image. Deploy. Notify. Yet every team rewrites it --
-per project, per platform, per migration.
+Your CI/CD logic is business-critical code, yet it lives trapped in each
+platform's dialect. Every pipeline does the same handful of things: *build, test,
+scan, package, deploy, notify*. But the know-how that does them is written in *YAML*
+for one platform and in *Groovy* for the next. Change platforms, and you rewrite
+everything. That is the real cost of lock-in: not a licence fee, but losing your
+delivery methodology the day you migrate.
 
-- Move from GitLab to GitHub Actions? Rewrite the pipeline.
-- Add Jenkins for a customer? Rewrite again, in Groovy.
-- Onboard a new repo? Copy-paste the last one and pray.
-- Tighten a coverage threshold across 40 services? Forty pull requests.
+Components and shared libraries organise that code, yet they make the logic
+*reusable, not portable*. The know-how stays written in the platform's native
+dialect. So the same intent leaks into vendor syntax, drifts as it is copied
+between projects, and cannot run on your laptop, where your machine executes
+different code than the platform does.
 
-Brik treats CI/CD like the solved problem it is. The logic lives in one place.
-Platforms are thin adapters. **You describe your project, not the pipeline.**
+**Brik inverts this. A platform should *execute* delivery logic, not *define* it.**
+
+The logic lives in one portable place, and each platform becomes a thin adapter
+that runs it. **You describe your project, not the pipeline.**
 
 ## What you write
 
-A realistic `brik.yml` for a deployable Node service, deployed via GitOps:
+A fully-featured `brik.yml` for a deployable Node service, bringing CI, GitOps CD, and promotion gates into one file:
 
 ```yaml
 version: 1
@@ -89,17 +95,21 @@ deploy:
         requires_eligibility: [artifact_validated_for]   # staging vouched for this digest
 ```
 
-That is the entire definition -- the CI flow, the CD flow, the promotion chain
-between environments, and the gates that protect production. No 400-line
-`.gitlab-ci.yml`. No custom-Groovy `Jenkinsfile`. No bash glue you maintain.
+That single file is the entire delivery definition: the CI flow, the CD flow,
+the promotion chain between environments, and the gates that protect production.
+It is configuration, not code. There is no platform pipeline to author and keep
+in sync alongside it: no hand-written `.gitlab-ci.yml`, no custom-Groovy
+`Jenkinsfile`, no bash glue. The same file drives GitLab, Jenkins, and your
+laptop.
 
-Only `version` and `project.name` are required: the stack is auto-detected and
-every other field has a per-stack default. The rest of `brik.yml` is where you
-override what matters for *your* project -- thresholds, deploy targets,
-registries, secrets. You configure your project. You never write pipeline logic.
+And it is as large as your project needs, no larger. Only `version` and
+`project.name` are required; the stack is auto-detected and every other field
+has a per-stack default. The rest is where you override what matters for *your*
+project, such as coverage thresholds, deploy targets, registries, and secrets.
+You configure your project. You never write pipeline logic.
 
-> Wondering how to configure each part above? The
-> **[`brik.yml` reference](docs/reference/configuration/README.md)** lists every
+> [!TIP] Wondering how to configure each part above? 
+> The **[`brik.yml` reference](docs/reference/configuration/README.md)** lists every
 > top-level section, each with a dedicated page: what it is for, what it does,
 > when it runs, and how to configure it.
 
@@ -116,6 +126,8 @@ running from the same repository and the same `brik.yml`:
 
 The two flows are **decoupled in time**: build once, deploy that version to any
 environment, any number of times, days later.
+
+### CI Flow
 
 ```mermaid
 flowchart LR
@@ -134,10 +146,12 @@ flowchart LR
     promote --> notify["Notify"]
 ```
 
-> **CI** -- the quality gate sits at Package: nothing is packaged unless tests
-> pass and the security stages succeed. Container Scan signs an SBOM and SLSA
-> provenance onto the image digest; Promote copies the artifact *and its
-> evidence* to the release channel.
+The quality gate sits at Package: nothing is packaged unless tests
+pass and the security stages succeed. Container Scan signs an SBOM and SLSA
+provenance onto the image digest; Promote copies the artifact *and its
+evidence* to the release channel.
+
+### CD Flow
 
 ```mermaid
 flowchart LR
@@ -149,13 +163,14 @@ flowchart LR
     journal --> notify["Notify"]
 ```
 
-> **CD** -- resolve the version to a digest, walk the fail-closed gates, deploy
-> the pinned digest, read the live state back, and journal the result.
-> `brik status --environment <e>` then reports the environment as three layers
-> and flags any drift.
+Resolve the version to a digest, walk the fail-closed gates, deploy
+the pinned digest, read the live state back, and journal the result.
+`brik status --environment <e>` then reports the environment as three layers
+and flags any drift.
 
-You cannot accidentally ship broken or unverified code by editing the pipeline,
-because there is no pipeline to edit. See **[Fixed flows](docs/concepts/fixed-flows.md)**.
+> [!TIP] 
+> You cannot accidentally ship broken or unverified code by editing the pipeline,
+> because there is no pipeline to edit. See **[Fixed flows](docs/concepts/fixed-flows.md)**.
 
 ## Core concepts
 
@@ -164,16 +179,16 @@ functional "what it does for you" to the configuration and the source of truth.
 
 | Concept | In one sentence | Learn more |
 |---------|-----------------|------------|
-| **Fixed flows** | Two flows -- CI builds one signed artifact, CD deploys a pinned digest -- selected by trigger, never one monolith you edit. | [fixed-flows](docs/concepts/fixed-flows.md) |
-| **The plan** | A reproducible per-commit JSON document that decides which stages run and why, identical on every platform (`brik plan --explain`). | [plan](docs/concepts/plan.md) |
-| **Declarations everywhere** | Your project, the pipeline, the operator knobs, and your infrastructure are all schema-validated declarations, enforced fail-closed at runtime. | [declarations](docs/concepts/declarations.md) |
-| **Runner classes** | Each stage runs in a pinned, provable OCI image chosen by its declared class -- the same image on your laptop and in CI. | [runner-classes](docs/concepts/runner-classes.md) |
-| **Supply-chain gates** | CI signs evidence; CD enforces three fail-closed gates -- digest, attestation, eligibility -- before deploying. | [supply-chain](docs/concepts/supply-chain.md) |
-| **Business vs technical** | A pure decision matrix separating "did it exit zero" from "does that block the release", so a daily pipeline neither cries wolf nor ships known-broken. | [business-outcome](docs/concepts/business-outcome.md) |
-| **Local execution** | The same Bash code path and runner images on your laptop, with divergences from CI declared, not silent. | [local-execution](docs/concepts/local-execution.md) |
+| **Fixed flows** | Two flows selected by trigger (CI builds one signed artifact, CD deploys a pinned digest), never one monolith you edit. | [Fixed flows](docs/concepts/fixed-flows.md) |
+| **The plan** | A reproducible per-commit JSON document that decides which stages run and why, identical on every platform (`brik plan --explain`). | [Plan](docs/concepts/plan.md) |
+| **Declarations everywhere** | Your project, the pipeline, the operator knobs, and your infrastructure are all schema-validated declarations, enforced fail-closed at runtime. | [Declarations](docs/concepts/declarations.md) |
+| **Runner classes** | Each stage runs in a pinned, provable OCI image chosen by its declared class, the same image on your laptop and in CI. | [Runner classes](docs/concepts/runner-classes.md) |
+| **Supply-chain gates** | CI signs evidence; CD enforces three fail-closed gates (digest, attestation, eligibility) before deploying. | [Supply chain](docs/concepts/supply-chain.md) |
+| **Business vs technical** | A pure decision matrix separating "did it exit zero" from "does that block the release", so a daily pipeline neither cries wolf nor ships known-broken. | [Business outcome](docs/concepts/business-outcome.md) |
+| **Local execution** | The same Bash code path and runner images on your laptop, with divergences from CI declared, not silent. | [Local execution](docs/concepts/local-execution.md) |
 
-For the layered architecture behind these, see
-[architecture](docs/concepts/architecture.md).
+> [!TIP] 
+> For the layered architecture behind these, see [Architecture](docs/concepts/architecture.md).
 
 ## Supported stacks
 
@@ -187,7 +202,7 @@ For the layered architecture behind these, see
 | **docker** | `Dockerfile` / `Containerfile` | docker build | -- | -- |
 
 Each stack is itself a declarative manifest and ships with a runner image from
-[brik-images](https://github.com/getbrik/brik-images) (multi-arch, scanned,
+[Brik images](https://github.com/getbrik/brik-images) (multi-arch, scanned,
 rebuilt weekly for CVE fixes).
 
 ## Platform support
@@ -219,13 +234,14 @@ brik validate  # confirm the config is valid
 brik integrate # run the full CI flow locally
 ```
 
-Full documentation: **[docs/README.md](docs/README.md)**.
+> [!TIP] Full documentation
+> See **[docs/README.md](docs/README.md)**.
 
 ## Quality, in numbers
 
-- ✅ **5100+** ShellSpec examples in the core suite, 0 failures -- plus dedicated suites for the GitLab, Jenkins, and local adapters
+- ✅ **5100+** ShellSpec examples in the core suite, 0 failures, plus dedicated suites for the GitLab, Jenkins, and local adapters
 - ✅ **80%** Codecov gate on project and patch, enforced in CI
-- ✅ **22** live end-to-end scenarios against real GitLab and Jenkins instances in [briklab](https://github.com/getbrik/briklab) -- digest-pinned CD, signed-attestation keystones, promotion-chain refusals, channel immutability
+- ✅ **22** live end-to-end scenarios against real GitLab and Jenkins instances in [briklab](https://github.com/getbrik/briklab): digest-pinned CD, signed-attestation keystones, promotion-chain refusals, channel immutability
 - ✅ **29** JSON Schemas govern every contract (config, referential, plan, journal events, reports), validated fail-closed at runtime
 - ✅ **Drift gates in CI**: the generated config reference, the compiled registry cache, and every platform parameter surface must all match their source of truth
 - ✅ **ShellCheck** clean on every file; **shellmetrics** tracks complexity, function count, and LLOC on every push to `main` (the badges above are live)
@@ -238,9 +254,10 @@ Full documentation: **[docs/README.md](docs/README.md)**.
 
 ## Transparency notice
 
-We use AI-assisted development to accelerate implementation. Every contribution,
-human or AI-generated, goes through the same gates: code review, ShellSpec
-coverage, ShellCheck, end-to-end runs on briklab, and CI.
+We use AI-assisted development ([Claude Code](https://claude.ai/code) + [ECC](https://github.com/affaan-m/ECC)) to accelerate implementation:
+
+- Every contribution (human or AI-generated) follows the same quality gates: code review, test coverage, E2E testing, and CI checks.
+- AI-generated code is not perfect. Regular refactoring passes address its shortcomings, and the overall productivity gains are still significant.
 
 ## License
 

@@ -63,10 +63,10 @@ source `registry.sh` cheaply.
 
 Refresh paths:
 
-- `registry.use` -- idempotent; subsequent calls are no-ops.
-- `_registry._reset` -- internal, drops the in-memory state. Used in
+- `registry.use`: idempotent; subsequent calls are no-ops.
+- `_registry._reset`: internal, drops the in-memory state. Used in
   ShellSpec to test scenarios where extensions are added.
-- `_registry._reload` -- internal, equivalent to `_reset` + `_load`.
+- `_registry._reload`: internal, equivalent to `_reset` + `_load`.
 
 The loader is **never** called from production code outside
 `registry.*`. Consumers depend on the API, not the cache shape.
@@ -101,7 +101,7 @@ unambiguously (`acme-java`, not `java`).
 Stage manifests declare `spec.placement.{slot, after, before}`. The
 loader (`_loader.sh`) resolves these into a total order via a
 depth-based topological sort run at cache load time; `registry.stage.list`
-returns ids in that order. The order is the only thing exposed -- there
+returns ids in that order. The order is the only thing exposed: there
 is no per-stage rank field in the cache or the public API.
 
 The sort has a depth fallback: a stage whose `after`/`before`
@@ -143,11 +143,11 @@ path.
 
 The registry deliberately does **not** carry:
 
-- Stage runtime logic (`lib/stages/*.sh`) -- only references to it
+- Stage runtime logic (`lib/stages/*.sh`), only references to it
   via `spec.module` / `spec.function`.
-- Stack-specific tooling (`lib/stacks/*.sh`) -- only references via
+- Stack-specific tooling (`lib/stacks/*.sh`), only references via
   `spec.module`.
-- Site-specific configuration (registry URLs, auth) -- lives in
+- Site-specific configuration (registry URLs, auth), which lives in
   `brik.yml` (per project) or platform secrets.
 
 Keeping behavior out of the registry is what lets the same cache feed

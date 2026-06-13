@@ -1,16 +1,16 @@
 # Extending a Stage
 
 Adding a stage to the [fixed flow](../concepts/fixed-flows.md) is rare and
-deliberate -- the flow is fixed on purpose. When it is genuinely needed, the
+deliberate, because the flow is fixed on purpose. When it is genuinely needed, the
 change touches the stage entry point, every platform adapter, and the schema.
 
 ## Recipe: add a stage
 
-1. **Stage entry point** -- create `lib/stages/<stage>.sh` implementing
+1. **Stage entry point**: create `lib/stages/<stage>.sh` implementing
    `stages.<stage>` following the pattern of the existing stages (it runs
    through [`stage.run`](stage-lifecycle.md)).
 
-2. **Shared library template** -- add the stage to
+2. **Shared library template**: add the stage to
    `shared-libs/gitlab/templates/brik-integrate.yml` (and the other platform
    adapters). For GitLab specifically, the new job template **must declare**
    `artifacts.reports.dotenv: .brik-logs/pipeline.env`, otherwise downstream
@@ -20,13 +20,13 @@ change touches the stage entry point, every platform adapter, and the schema.
    [GitLab env propagation](../reference/platforms/gitlab.md#env-propagation) for the
    underlying mechanism.
 
-3. **Pipeline flow** -- add the stage name to the `stages:` list in the GitLab
+3. **Pipeline flow**: add the stage name to the `stages:` list in the GitLab
    template so it appears in the DAG.
 
-4. **Schema** -- add any stage-specific configuration properties to
+4. **Schema**: add any stage-specific configuration properties to
    `schemas/config/v1/brik.schema.json`.
 
-5. **Tests** -- add ShellSpec tests under `spec/stages/<stage>_spec.sh`.
+5. **Tests**: add ShellSpec tests under `spec/stages/<stage>_spec.sh`.
 
 ## Repository layout
 
@@ -70,7 +70,7 @@ The `verify/` directory is internal implementation, not a CI-visible stage:
 
 ## See also
 
-- [Stage lifecycle](stage-lifecycle.md) -- what `stage.run` wraps your stage with
-- [Layout](layout.md) -- the nine domain notions in detail
-- [Extending a stack](extending-stack.md) -- the more common extension
-- [Architecture](../concepts/architecture.md) -- why the flow is fixed
+- [Stage lifecycle](stage-lifecycle.md): what `stage.run` wraps your stage with
+- [Layout](layout.md): the nine domain notions in detail
+- [Extending a stack](extending-stack.md): the more common extension
+- [Architecture](../concepts/architecture.md): why the flow is fixed

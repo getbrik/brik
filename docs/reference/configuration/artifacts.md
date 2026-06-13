@@ -1,5 +1,6 @@
 # `artifacts`
 
+> [!NOTE]
 > Named registry channels for the CD flow, and the append-only evidence journal.
 
 **Section:** `artifacts` (optional) &nbsp;·&nbsp; **Schema:** [`brik.schema.json` (properties.artifacts)](../../../schemas/config/v1/brik.schema.json)
@@ -16,10 +17,10 @@ build evidence and the promotion and deployment journals.
 
 ## What it does
 
-- **`channels`** -- each entry maps a channel name to the registry repository it
+- **`channels`**: each entry maps a channel name to the registry repository it
   resolves against. A version is resolved as `<registry>:<version>` to
   `<registry>@sha256:<hex>`, so a deploy always pins a digest.
-- **`evidence`** -- when set, Container Scan commits a BuildEvidence record per
+- **`evidence`**: when set, Container Scan commits a BuildEvidence record per
   digest to this repo, and the CD verbs append their promotion and deployment
   journal events here. Credentials are references (`token_var`), never values.
 
@@ -112,7 +113,7 @@ artifacts:
 
 ## See also
 
-- [Supply-chain gates](../../concepts/supply-chain.md) -- how channels and evidence feed the CD gates
-- [Data layout](../../concepts/data-layout.md) -- what the evidence state-repo holds
-- [`deploy`](deploy.md) -- where an environment names the channel it accepts
-- [`brik.yml` reference](README.md) -- all top-level sections
+- [Supply-chain gates](../../concepts/supply-chain.md): how channels and evidence feed the CD gates
+- [Data layout](../../concepts/data-layout.md): what the evidence state-repo holds
+- [`deploy`](deploy.md): where an environment names the channel it accepts
+- [`brik.yml` reference](README.md): all top-level sections

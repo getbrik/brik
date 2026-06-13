@@ -3,7 +3,7 @@
 A Brik **plan** is a reproducible record of which stages will run for a
 given commit, why, and on what input. It is the single source of truth
 shared by the local wrapper, Jenkins, and GitLab adapters: same commit,
-same plan, same outcome -- no matter which adapter executes it.
+same plan, same outcome, no matter which adapter executes it.
 
 ## Anatomy
 
@@ -129,12 +129,12 @@ plan's reason. Without the env var, the runtime behaves exactly like
 the pre-planner runtime (the gate is a no-op).
 
 In Jenkins (`brikIntegrate.groovy`), each downstream stage runs through
-`planSaysRun(<id>)` -- a `sh "brik plan gate <id>"` round-trip. A
+`planSaysRun(<id>)`, a `sh "brik plan gate <id>"` round-trip. A
 skipped stage stays in the Stage View as "skipped per plan" and its
 fragment is still stashed so `brik-notify` aggregates it.
 
 In GitLab, the `brik-plan` job computes the plan and every stage job
-sources `/tmp/brik-plan-gate.sh <id>` -- the same `brik plan gate`
+sources `/tmp/brik-plan-gate.sh <id>`, the same `brik plan gate`
 round-trip as Jenkins. A skipped stage shows as a green "skipped (per
 plan)" job and its not-applicable fragment is uploaded so `brik-notify`
 aggregates it into the final report.
@@ -143,6 +143,6 @@ aggregates it into the final report.
 
 Drop a manifest under `lib/registry/manifests/stages/<id>.yml` (or a
 user dir referenced via `BRIK_REGISTRY_EXTENSIONS_DIRS`), provide a
-matching Bash function, and re-run `brik plan` -- the new stage shows
+matching Bash function, and re-run `brik plan`: the new stage shows
 up in the topological order automatically. Full walkthrough:
 [`docs/operations/extensions.md`](../how-to/use-extensions.md).

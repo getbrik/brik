@@ -54,9 +54,9 @@ consumers can branch when needed.
 - **Why YAML at author time, JSON at runtime.** YAML is what humans
   edit (comments, multi-line strings, natural nesting); JSON is what
   the runtime parses with `jq`. There are no `kustomize`-style
-  overlays -- the compiler merges manifests into one flat cache.
+  overlays: the compiler merges manifests into one flat cache.
 - **Contract testing.** `spec/registry/contract/` enforces the public
   API contract for every registry implementation (builtin +
   extensions), so a function signature cannot change silently.
 - [`docs/concepts/architecture.md`](../../concepts/architecture.md)
-  section "Registry" -- where the registry sits in the broader runtime.
+  section "Registry", where the registry sits in the broader runtime.

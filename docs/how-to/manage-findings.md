@@ -22,8 +22,8 @@ flowchart LR
 Tools that already emit SARIF (semgrep, grype, gitleaks, eslint, osv-scanner,
 checkov, ...) plug in directly. Tools without native SARIF (ruff, bandit,
 clippy, dockle, trufflehog, scancode, junit-xml) go through a converter under
-`lib/transverse/findings/converters/<tool>.sh` -- see
-[policy.md](configure-org-policy.md#adding-a-converter) for adding one.
+`lib/transverse/findings/converters/<tool>.sh` (see
+[policy.md](configure-org-policy.md#adding-a-converter) for adding one).
 
 ## Built-in policy presets
 
@@ -38,7 +38,7 @@ below the severity floor and findings with no upstream fix.
 | `permissive` | floor = critical | yes | yes | only critical with an upstream fix |
 
 A result that already carries a non-empty `suppressions[]` (a tool-native
-allowlist, an inline annotation, ...) is never re-classified -- the SARIF owner
+allowlist, an inline annotation, ...) is never re-classified: the SARIF owner
 keeps full control.
 
 ## Severity resolution
@@ -186,7 +186,7 @@ churn before it bites.
 
 ## See also
 
-- [Policy](configure-org-policy.md) -- the org-wide `brik-policy.yml` schema and distribution
-- [Risk management](accept-a-finding.md) -- when and how to accept a finding
-- [Business outcome](../concepts/business-outcome.md) -- how findings counts feed `business.evaluate`
-- [security reference](../reference/configuration/security.md) -- the `security.*` keys per scanner
+- [Policy](configure-org-policy.md): the org-wide `brik-policy.yml` schema and distribution
+- [Risk management](accept-a-finding.md): when and how to accept a finding
+- [Business outcome](../concepts/business-outcome.md): how findings counts feed `business.evaluate`
+- [security reference](../reference/configuration/security.md): the `security.*` keys per scanner

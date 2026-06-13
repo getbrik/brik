@@ -68,7 +68,7 @@ publish:
   `npm ci`), which means non-reproducible installs. Commit a lock file
   to pin versions.
 - **`npm test` vs `npx jest`.** When `scripts.test` is missing from
-  `package.json`, Brik falls through to `npx jest` -- this fails
+  `package.json`, Brik falls through to `npx jest`, which fails
   silently if Jest is not installed.
 - **Supported frameworks: `jest`, `vitest`, `npm`.** `vitest` emits
   `npx vitest run` (with `--reporter=junit` and Cobertura coverage when

@@ -1,5 +1,6 @@
 # `deploy`
 
+> [!NOTE]
 > Declare the environments your application ships to and the target each one uses.
 
 **Section:** `deploy` (optional) &nbsp;·&nbsp; **Schema:** [`brik.schema.json#$defs/deploy`](../../../schemas/config/v1/brik.schema.json)

@@ -1,5 +1,6 @@
 # `package`
 
+> [!NOTE]
 > Build a release artifact (today, a Docker image) from the sources the build
 > stage produced.
 

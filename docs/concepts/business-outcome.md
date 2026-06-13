@@ -4,10 +4,10 @@ Brik separates two orthogonal axes for every stage result. This is the model
 that lets a failing stage block a release but only warn on a feature branch,
 and lets a CVE with no upstream fix stay a warning while a fixable one blocks.
 
-- **Technical axis** -- what the stage logic actually returned. Captured in
+- **Technical axis**: what the stage logic actually returned. Captured in
   `tech.status` (`success | failed | skipped`) and `tech.kind` (a human label
   derived from the exit code). Lives in `<stage>.tech.*`.
-- **Business axis** -- what that technical outcome *means* for the user, given
+- **Business axis**: what that technical outcome *means* for the user, given
   the pipeline context. Captured in `business.status`
   (`success | warning | error`) and `business.reason` (an explanation string).
   Lives in `<stage>.business.*`.
@@ -45,8 +45,8 @@ invokes `business.evaluate`. Inputs come from the report backend
 ## Decision matrix
 
 The mapping is fixed and centralised. `business.evaluate` consumes four inputs
--- tech status, the fix-exists counters, side-band signals, and the pipeline
-context -- and emits one row:
+(tech status, the fix-exists counters, side-band signals, and the pipeline
+context) and emits one row:
 
 | `tech.status` | side-band | `pipeline.context` | `business.status` | `business.reason` |
 |---|---|---|---|---|
@@ -63,14 +63,14 @@ context -- and emits one row:
 
 When several `fix_class` counters are non-zero the priority is
 `has_fix > unknown > no_fix-only`. When all three are zero the default is
-`has_fix` -- conservative: it blocks in release. `<kind>` defaults to `failure`
+`has_fix`, conservative: it blocks in release. `<kind>` defaults to `failure`
 when `--tech-kind` is omitted.
 
 ## The fix-exists axis
 
 The `fix_class` axis is what distinguishes "the dependency has a CVE we can
-upgrade" (`has_fix` -- blocks release) from "the vendor will not fix this and we
-have a mitigation in place" (`no_fix` -- stays a warning even in release). It
+upgrade" (`has_fix`, blocks release) from "the vendor will not fix this and we
+have a mitigation in place" (`no_fix`, stays a warning even in release). It
 comes from `fix_classifier` annotations on each SARIF finding
 (`brikFixClassification` in `{has_fix, no_fix, unknown}`), optionally filtered
 by `severity.is_tool_blocking` for the lint and format stages so tool *warnings*
@@ -124,7 +124,7 @@ Callers must populate `--findings-ignored` from the stage's own side-band signal
 
 ## See also
 
-- [Pipeline context](pipeline-context.md) -- how `--context` is resolved and the gatekeeper contract
-- [Findings](../how-to/manage-findings.md) -- the SARIF pipeline that produces the fix-exists counters
-- [Risk management](../how-to/accept-a-finding.md) -- when the matrix outcome should be overridden, and how
-- [Pipeline report](../reference/pipeline-report.md) -- where `tech.*` and `business.*` are recorded
+- [Pipeline context](pipeline-context.md): how `--context` is resolved and the gatekeeper contract
+- [Findings](../how-to/manage-findings.md): the SARIF pipeline that produces the fix-exists counters
+- [Risk management](../how-to/accept-a-finding.md): when the matrix outcome should be overridden, and how
+- [Pipeline report](../reference/pipeline-report.md): where `tech.*` and `business.*` are recorded

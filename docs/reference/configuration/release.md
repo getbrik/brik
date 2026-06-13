@@ -1,5 +1,6 @@
 # `release`
 
+> [!NOTE]
 > Compute the application version from git tags. On a tag, also generate the
 > changelog and finalise the release.
 

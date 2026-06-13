@@ -1,5 +1,6 @@
 # `pipeline`
 
+> [!NOTE]
 > Pipeline-level selection settings: how the planner decides which stages run.
 
 **Section:** `pipeline` (optional) &nbsp;·&nbsp; **Schema:** [`brik.schema.json#$defs/pipeline`](../../../schemas/config/v1/brik.schema.json)
@@ -72,6 +73,6 @@ pipeline:
 
 ## See also
 
-- [The plan](../../concepts/plan.md) -- the per-commit decision this section tunes
-- [Fixed flows](../../concepts/fixed-flows.md) -- the stages the plan selects from
-- [`brik.yml` reference](README.md) -- all top-level sections
+- [The plan](../../concepts/plan.md): the per-commit decision this section tunes
+- [Fixed flows](../../concepts/fixed-flows.md): the stages the plan selects from
+- [`brik.yml` reference](README.md): all top-level sections

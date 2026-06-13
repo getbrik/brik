@@ -27,7 +27,7 @@ flowchart TD
 `_stage._finalize_fragment` records `tech.{duration_ms, exit_code, status}` into
 `aggregate-report.json`, calls [`business.evaluate`](../concepts/business-outcome.md)
 to derive `business.{status, reason}`, and emits the per-stage fragment to
-`brik-artifacts/<stage>/<stage>.json` -- unless `BRIK_DISABLE_REPORT_FRAGMENTS=1`
+`brik-artifacts/<stage>/<stage>.json`, unless `BRIK_DISABLE_REPORT_FRAGMENTS=1`
 is set (the local all-in-one path sets it so it does not trigger CI aggregation
 mode).
 
@@ -36,7 +36,7 @@ mode).
 - **Never `exit`.** Stages return exit codes; they never call `exit` directly.
   That lets the runtime always run cleanup and the summary.
 - **Hooks are best-effort.** `on_success`, `on_failure`, and `post_stage` use
-  `|| true` -- they cannot override the stage's real exit code.
+  `|| true`, so they cannot override the stage's real exit code.
 - **Pre-stage can abort.** `hook.pre_stage` is the only hook that can prevent
   stage execution (skip conditions, environment gates).
 - **Each stage has its own context.** An isolated context file holds
@@ -81,7 +81,7 @@ for the schema versions.
 
 ## See also
 
-- [Architecture](../concepts/architecture.md) -- the 4-layer model `stage.run` sits in
-- [Fixed flow](../concepts/fixed-flows.md) -- the stages this lifecycle wraps
-- [Business outcome](../concepts/business-outcome.md) -- what `_finalize_fragment` computes
-- [Pipeline report](../reference/pipeline-report.md) -- the report the fragments build
+- [Architecture](../concepts/architecture.md): the 4-layer model `stage.run` sits in
+- [Fixed flow](../concepts/fixed-flows.md): the stages this lifecycle wraps
+- [Business outcome](../concepts/business-outcome.md): what `_finalize_fragment` computes
+- [Pipeline report](../reference/pipeline-report.md): the report the fragments build

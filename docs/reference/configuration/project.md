@@ -1,5 +1,6 @@
 # `project`
 
+> [!NOTE]
 > Declare the application's identity and which stack toolchain the pipeline runs on.
 
 **Section:** `project` (required) &nbsp;·&nbsp; **Schema:** [`brik.schema.json#properties/project`](../../../schemas/config/v1/brik.schema.json)

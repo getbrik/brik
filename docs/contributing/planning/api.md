@@ -33,7 +33,7 @@ This is the **default** for pipelines that do not invoke the planner.
 | `pipeline.plan.reason <stage_id> [<plan_file>]` | reason code on stdout | Empty when no plan exists or the stage is not listed. |
 | `pipeline.plan.runner_class <stage_id> [<plan_file>]` | runner_class on stdout | Empty when no plan exists. Used by adapters to pick a runner image. |
 | `pipeline.plan.gate <stage_id> [<plan_file>]` | gate.mode on stdout | `blocking` or `opt_in`. Empty when no plan exists. |
-| `pipeline.plan.stages [<plan_file>]` | one id per line | Canonical stage order from the plan. Empty when no plan exists -- callers can fall back to `registry.stage.list`. |
+| `pipeline.plan.stages [<plan_file>]` | one id per line | Canonical stage order from the plan. Empty when no plan exists, so callers can fall back to `registry.stage.list`. |
 | `pipeline.plan.fingerprint [<plan_file>]` | 64-hex sha256 | Empty when no plan exists. Lets adapters cache across pipelines. |
 | `pipeline.plan.release_profile [<plan_file>]` | profile enum on stdout | Empty when no plan exists. |
 | `pipeline.plan.release_version [<plan_file>]` | semver on stdout | Empty when no plan exists. |
@@ -64,10 +64,10 @@ brik plan [--workspace <dir>] [--mode <m>] [--out <path>]
 
 Defaults:
 
-- `--workspace` -- `$BRIK_WORKSPACE` or `$PWD`.
-- `--mode` -- read from `brik.yml`'s `pipeline.selection.mode`, falling
+- `--workspace`: `$BRIK_WORKSPACE` or `$PWD`.
+- `--mode`: read from `brik.yml`'s `pipeline.selection.mode`, falling
   back to `safe`.
-- `--out` -- `${workspace}/.brik-logs/plan.json`.
+- `--out`: `${workspace}/.brik-logs/plan.json`.
 
 Writes a `plan.json` and prints `plan: <path>` to stdout.
 
@@ -106,14 +106,14 @@ regression at the boundary rather than at the adapter that consumes it.
 Decides run/skip for `<stage_id>` against the active plan. Return
 codes:
 
-- **rc=0** -- the stage should run. Caller proceeds with
+- **rc=0**: the stage should run. Caller proceeds with
   `brik stage <id>`.
-- **rc=1** -- the stage should skip. The gate has already written a
+- **rc=1**: the stage should skip. The gate has already written a
   per-stage fragment to `brik-artifacts/<id>/<id>.json` with
   `tech.status=skipped`, `tech.kind=not-applicable`, and
   `business.reason=<plan reason>`, so the aggregate report still
   records the stage as a deliberate skip.
-- **rc=2** -- usage error: no stage id given, or no plan file under
+- **rc=2**: usage error, either no stage id given or no plan file under
   `--strict`.
 
 Without `--strict`, a missing plan file returns rc=0 (run) so

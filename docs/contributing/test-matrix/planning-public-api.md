@@ -47,8 +47,8 @@ La notion `planning` écrit `.brik-logs/plan.json` consommé par chaque stage vi
 | `context` | string | contexte d'exécution ("release", "snapshot", ...) |
 | `mode` | string | mode planner ("safe", "balanced", ...) |
 | `workspace` | object | métadonnées du workspace courant |
-| `changes` | object | `{files, from_ref, to_ref, source}` -- résultat de l'analyse d'impact |
+| `changes` | object | `{files, from_ref, to_ref, source}`, résultat de l'analyse d'impact |
 | `release` | object | métadonnées de release (tag, version calculée) |
 | `stages` | array/object | décisions par stage (RUN / SKIP avec reason) |
-| `dag` | object | `{edges: [{from, to}], ...}` -- DAG d'orchestration |
+| `dag` | object | `{edges: [{from, to}], ...}`, DAG d'orchestration |
 | `fingerprint` | string | hash byte-reproductible du plan |

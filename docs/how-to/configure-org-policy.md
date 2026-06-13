@@ -3,7 +3,7 @@
 This guide is for **DSI / security teams** distributing a centralised
 findings-management policy across many Brik projects. The policy file
 (`brik-policy.yml`) lets the org allow-list specific CVEs and file paths,
-override the built-in preset, and document why an exception exists -- all
+override the built-in preset, and document why an exception exists, all
 without touching individual project configuration.
 
 For project-side knobs and the SARIF pipeline overview, see
@@ -50,7 +50,7 @@ allow:
 
 Required fields per CVE entry: `id` (CVE-XXXX-N..), `reason`, `expires`
 (YYYY-MM-DD). Required for path entries: `glob`, `reason`, `expires`.
-Wildcards in `projects[]` are not supported in v1 -- use exact matches.
+Wildcards in `projects[]` are not supported in v1; use exact matches.
 
 Beyond findings management, the file also carries two CD governance knobs:
 
@@ -63,7 +63,7 @@ retention:                        # informative: documents the GC configured
 ```
 
 `state_repo_protection` gates the deploy on the state-repo branch protection
-(fail-closed when `required`). `retention` is declarative only -- see
+(fail-closed when `required`). `retention` is declarative only; see
 [proof retention](accept-a-finding.md#proof-retention) for the operating
 rules.
 
@@ -107,7 +107,7 @@ Override the path with `BRIK_POLICY_CACHE_PATH` if you want the cache in
 a different location.
 
 The cache is regenerated on every pipeline (no TTL) so an updated policy
-is in effect on the next CI run -- no per-project bump required.
+is in effect on the next CI run, with no per-project bump required.
 
 ## Debugging
 
@@ -137,7 +137,7 @@ jq '.stages[].business.findings.ignored.by_source' brik-artifacts/aggregate-repo
 
 ## Expiration
 
-Every allowlist entry **must** carry `expires` -- the schema makes
+Every allowlist entry **must** carry `expires`: the schema makes
 the field mandatory. The runner emits a non-blocking warning at
 init when an entry expires within `BRIK_FINDINGS_EXPIRING_SOON_DAYS`
 (default 30) and lists it in the aggregate report's "Expiring soon"
@@ -155,7 +155,7 @@ lib/transverse/findings/converters/<tool>.sh
 
 exposing `findings.converters.<tool>.to_sarif <input> <output>`. Look at
 `junit.sh`, `ruff.sh`, or `bandit.sh` for the structure. The dispatcher
-auto-discovers the file -- no further wiring needed.
+auto-discovers the file, with no further wiring needed.
 
 For each converter ship a synthetic JSON fixture under
 `spec/fixtures/json/<tool>.json` and a matching ShellSpec under

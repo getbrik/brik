@@ -1,7 +1,8 @@
 # Runner classes
 
-> Each stage runs in a pinned, provable OCI image chosen by its declared class
-> -- the same image on your laptop and in CI.
+> [!NOTE]
+> Each stage runs in a pinned, provable OCI image chosen by its declared class,
+> the same image on your laptop and in CI.
 
 **Audience:** users, operators &nbsp;·&nbsp; **Type:** Explanation
 
@@ -28,7 +29,7 @@ language's real tools. The other four are fixed.
 ## Why it matters
 
 - **The linter really runs in the analysis image, and the deploy really runs in
-  the deploy image** -- on GitLab, on Jenkins, and on your laptop, because every
+  the deploy image** on GitLab, on Jenkins, and on your laptop, because every
   adapter and the local containerized runner resolve images through the same
   map. Reproducing a CI failure locally is running the same stage in the same
   image, not "read the runner docs and pray".
@@ -42,13 +43,13 @@ language's real tools. The other four are fixed.
 ## How it works
 
 A stage selects its class in its manifest (`spec.runner.class`). Init resolves
-all five classes once and publishes them so every later stage -- and every
-platform adapter -- reads the same image for a given class. The `stack` class
+all five classes once and publishes them so every later stage (and every
+platform adapter) reads the same image for a given class. The `stack` class
 resolves to the project's language image (kept per-project, out of the shared
 map), while the four static classes resolve to a fixed `image:tag`.
 
 The language-stack image *versions* (node 22, python 3.13, ...) are declared in
-the stack manifests, separately from the class-to-image map -- the base image is
+the stack manifests, separately from the class-to-image map: the base image is
 not a language stack.
 
 ## Configuration & reference
@@ -73,7 +74,7 @@ not a language stack.
 
 ## Related
 
-- [Fixed flows](fixed-flows.md) -- which stage runs where in the flow
-- [Local execution](local-execution.md) -- the same images, run on your machine
-- [Supply-chain gates](supply-chain.md) -- the builder identity the image stamps into provenance
-- [Declarations](declarations.md) -- the manifests that declare classes and stacks
+- [Fixed flows](fixed-flows.md): which stage runs where in the flow
+- [Local execution](local-execution.md): the same images, run on your machine
+- [Supply-chain gates](supply-chain.md): the builder identity the image stamps into provenance
+- [Declarations](declarations.md): the manifests that declare classes and stacks

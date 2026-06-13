@@ -174,7 +174,7 @@ shellspec spec/registry/extensions_spec.sh
 ```
 
 For author-side validation of your own extension (schema, api symbols,
-no-exit, compile, dry-call), use `brik extension test` -- see
+no-exit, compile, dry-call), use `brik extension test`; see
 [extension-authoring.md](../contributing/extension-authoring.md) for the walkthrough
 and the five contract checks it performs.
 
@@ -183,7 +183,7 @@ and the five contract checks it performs.
 - **No override path for a colliding id.** `compile-registry.sh`
   unconditionally aborts when the same `metadata.id` appears in a
   builtin and an extension. There is no `metadata.replaces` override
-  and no `brik.lock` escape hatch -- if you need to supersede a
+  and no `brik.lock` escape hatch; if you need to supersede a
   builtin, fork it under a distinct id.
 - **No cycle detection across extensions.** A stage that declares
   `placement.after: [my-other-stage]` works only if `my-other-stage` is

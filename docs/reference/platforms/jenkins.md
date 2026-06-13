@@ -35,8 +35,8 @@ orchestration. `shared-libs/jenkins/vars/` defines six small variables:
 | `brikDockerArgs` | Builds the Docker run args (HOME redirection, JVM cache paths, memory cap, network attachment, `--env-file` for `NEXUS_` / `BRIK_` / `REGISTRY_` / `ARGOCD_` / `CARGO_` / `SSH_` vars). |
 | `brikReadDotenv` | Parses `.brik-logs/pipeline.env` so the controller can extract `BRIK_CI_IMAGE`, mirroring GitLab's dotenv contract (single-file, projected from the report env section). |
 
-`brikIntegrate` exposes five per-image stage helpers -- `runInBase`, `runStage`,
-`runInAnalysis`, `runInScanner`, `runInDeploy` -- all routed through
+`brikIntegrate` exposes five per-image stage helpers (`runInBase`, `runStage`,
+`runInAnalysis`, `runInScanner`, `runInDeploy`) all routed through
 `brikRunStage`.
 
 ## Runner images
@@ -76,7 +76,7 @@ After Init, `brikIntegrate` runs a **Plan** stage. The planner runs on the
 agent (it only needs `jq`/`yq`/`git`) and writes `.brik-logs/plan.json`,
 pointed at via the `BRIK_PLAN_FILE` env var. Every subsequent stage is
 plan-driven: the `runStageWithPlan` helper still creates the Jenkins stage
-block -- so the Stage View records skipped entries -- but the stage body
+block (so the Stage View records skipped entries) but the stage body
 only runs when `brik plan gate <stage>` (the `planSaysRun` check) returns
 zero. On a skip, the gate records a not-applicable fragment so the
 aggregate report explains why the stage did not run.
@@ -124,7 +124,7 @@ brikIntegrate(useDockerAgent: false)   // run on the agent instead of containers
 **First-build gotcha**: Jenkins registers parameters declared via
 `properties([parameters([...])])` only *after* the first build of a job
 runs. On a freshly-created job the UI shows "Build Now" instead of
-"Build with Parameters" -- one warm-up build is enough to surface the
+"Build with Parameters"; one warm-up build is enough to surface the
 form for subsequent runs. If you provision jobs through Job DSL
 (Configuration-as-Code, seed job, `pipelineJob` script), redeclare the
 same parameters on the job itself to make them visible from creation.
@@ -148,7 +148,7 @@ same parameters on the job itself to make them visible from creation.
 
 Jenkins clones Global Libraries into `${WORKSPACE}@libs/brik/`. The brik repo
 contains both the runtime and the shared library, so that path is used directly
-as `BRIK_HOME` -- no extra clone.
+as `BRIK_HOME`, no extra clone.
 
 ### Docker integration and caches
 
@@ -168,17 +168,17 @@ Environment variables matching `NEXUS_*`, `BRIK_*`, `REGISTRY_*`, `ARGOCD_*`,
 ### Signing credential isolation
 
 The shared library writes three per-phase env-files (CI stages, the deploy
-stage, the signing stage) and mounts the signing one -- the `BRIK_SIGNING_*`
-and `COSIGN_*` variables -- only on the `container-scan` container, where the
+stage, the signing stage) and mounts the signing one (the `BRIK_SIGNING_*`
+and `COSIGN_*` variables) only on the `container-scan` container, where the
 attestations are signed.
 
 Caveat for an isolation claim: `docker.inside()` re-injects the whole build
 environment as trailing `-e` flags on every stage container, which beat any
 `--env-file` on the run line. A signing secret declared as a controller
 global (JCasC `globalNodeProperties`) therefore reaches every container,
-env-files or not. To actually isolate it, deliver the secret per stage --
-for example bind it with `withCredentials` around the signing work in a
-custom pipeline -- and never as a build global.
+env-files or not. To actually isolate it, deliver the secret per stage
+(for example bind it with `withCredentials` around the signing work in a
+custom pipeline) and never as a build global.
 
 The registry write identity follows the same model: signing attaches the
 attestation referrers to the digest (a registry write), so declare
@@ -200,7 +200,7 @@ the tools required by your stack and stages.
 
 ## See also
 
-- [Getting started: Jenkins](../../getting-started/jenkins.md) -- first-time setup
-- [Configuration overview](../configuration/overview.md) -- `brik.yml`
-- [Credentials](../../how-to/manage-credentials.md) -- wiring secrets
-- [Troubleshooting](../../how-to/troubleshoot.md) -- common failures
+- [Getting started: Jenkins](../../getting-started/jenkins.md): first-time setup
+- [Configuration overview](../configuration/overview.md): `brik.yml`
+- [Credentials](../../how-to/manage-credentials.md): wiring secrets
+- [Troubleshooting](../../how-to/troubleshoot.md): common failures

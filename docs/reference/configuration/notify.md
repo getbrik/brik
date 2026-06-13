@@ -1,5 +1,6 @@
 # `notify`
 
+> [!NOTE]
 > Announce the pipeline outcome over one or more channels (Slack, email,
 > webhook).
 

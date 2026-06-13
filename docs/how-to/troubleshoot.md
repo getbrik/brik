@@ -8,7 +8,7 @@ symptom; platform-specific notes are called out inline.
 Brik needs `yq` and `jq` on every runner.
 
 - **GitLab**: the job `before_script` downloads `yq` automatically. If that
-  fails, the runner has no internet access -- use a `brik-runner-*` image (which
+  fails, the runner has no internet access: use a `brik-runner-*` image (which
   ships `yq`, `jq`, `git`, `bash` preinstalled) or mirror the images to a
   reachable registry.
 - **Jenkins**: with Docker agents (the default) `yq` and `jq` are preinstalled
@@ -55,7 +55,7 @@ brikIntegrate(brikHome: '/custom/path/to/brik')
 
 The Brik library must be a **trusted** Global Pipeline Library (not sandboxed),
 because it uses `sh` steps. This is the default when configured via CasC with
-`modernSCM` -- see [getting-started/jenkins.md](../getting-started/jenkins.md).
+`modernSCM` (see [getting-started/jenkins.md](../getting-started/jenkins.md)).
 
 ## `GIT_BRANCH` has an `origin/` prefix (Jenkins)
 
@@ -145,7 +145,7 @@ The CD trace names the missing grant type and the digest it looked for.
 
 ## See also
 
-- [GitLab platform](../reference/platforms/gitlab.md) -- runner images, variables, requirements
-- [Jenkins platform](../reference/platforms/jenkins.md) -- parameters, Docker agents, prerequisites
-- [Credentials](manage-credentials.md) -- secret wiring per platform
-- [Briklab](../contributing/briklab.md) -- a local environment to reproduce CI failures
+- [GitLab platform](../reference/platforms/gitlab.md): runner images, variables, requirements
+- [Jenkins platform](../reference/platforms/jenkins.md): parameters, Docker agents, prerequisites
+- [Credentials](manage-credentials.md): secret wiring per platform
+- [Briklab](../contributing/briklab.md): a local environment to reproduce CI failures

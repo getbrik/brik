@@ -1,7 +1,7 @@
 # Getting Started: Local (CLI)
 
 The `brik` CLI lets you validate `brik.yml`, scaffold a project, and run
-pipelines (or single stages) on your own machine -- no CI platform required.
+pipelines (or single stages) on your own machine, with no CI platform required.
 
 ## Install
 
@@ -38,8 +38,8 @@ brik init --stack node --platform gitlab --dir ./my-project
 ```
 
 `brik init` writes a `brik.yml` plus a platform bootstrap file. `--platform`
-accepts `gitlab`, `jenkins`, and `github` -- the GitHub bootstrap is generated
-today even though the reusable GitHub Actions workflows are still in progress.
+accepts `gitlab`, `jenkins`, and `github` (the GitHub bootstrap is generated
+today even though the reusable GitHub Actions workflows are still in progress).
 Add `--non-interactive` to skip the prompts.
 
 ## Validate
@@ -132,6 +132,6 @@ brik version --verbose
 
 ## Next steps
 
-- [Configuration overview](../reference/configuration/overview.md) -- what you can put in `brik.yml`
-- [Fixed flow](../concepts/fixed-flows.md) -- the 12 stages a pipeline runs
-- [Development](../contributing/development.md) -- working on Brik itself
+- [Configuration overview](../reference/configuration/overview.md): what you can put in `brik.yml`
+- [Fixed flow](../concepts/fixed-flows.md): the 12 stages a pipeline runs
+- [Development](../contributing/development.md): working on Brik itself

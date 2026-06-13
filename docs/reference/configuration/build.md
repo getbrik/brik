@@ -1,5 +1,6 @@
 # `build`
 
+> [!NOTE]
 > Select how the application is compiled or assembled during the Build stage.
 
 **Section:** `build` (optional) &nbsp;·&nbsp; **Schema:** [`brik.schema.json#$defs/build`](../../../schemas/config/v1/brik.schema.json)

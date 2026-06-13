@@ -94,9 +94,9 @@ env-files, never as controller globals.
 Name all signing credentials with the `BRIK_SIGNING_` prefix so Brik can
 identify and isolate them. Examples:
 
-- `BRIK_SIGNING_COSIGN_KEY` -- cosign private key
-- `BRIK_SIGNING_BAO_TOKEN` -- OpenBAO token for signing
-- `BRIK_SIGNING_REGISTRY_USER`, `BRIK_SIGNING_REGISTRY_PASSWORD` -- registry
+- `BRIK_SIGNING_COSIGN_KEY`: cosign private key
+- `BRIK_SIGNING_BAO_TOKEN`: OpenBAO token for signing
+- `BRIK_SIGNING_REGISTRY_USER`, `BRIK_SIGNING_REGISTRY_PASSWORD`: registry
   credentials for writing attestations (remapped to `BRIK_REGISTRY_*` in the
   signing container only)
 
@@ -105,7 +105,7 @@ identify and isolate them. Examples:
 ## Publish credentials
 
 Publish credentials authenticate artifact uploads to package registries.
-**The variable name is yours to choose** -- declare it via `token_var`,
+**The variable name is yours to choose**: declare it via `token_var`,
 `username_var`, or `password_var` in `brik.yml`, and Brik resolves the
 matching CI variable at publish time.
 
@@ -130,7 +130,7 @@ At publish time Brik:
 
 1. Reads `${MY_NPM_TOKEN}` from the environment.
 2. Copies the value into the env var the publishing tool expects (see
-   *Tool-internal variables* below) -- scoped to the publish step only.
+   *Tool-internal variables* below), scoped to the publish step only.
 3. Runs the tool, then unsets the internal variable.
 
 You never have to name your CI variable `NPM_TOKEN`, `NUGET_API_KEY`,
@@ -152,7 +152,7 @@ Scoped npm packages also accept `publish.npm.access: public | restricted`.
 ### Example (using conventional names)
 
 You may name your CI variables after the conventional ecosystem names
-if you prefer -- nothing in Brik enforces it, and it makes log lines
+if you prefer, since nothing in Brik enforces it, and it makes log lines
 slightly easier to read.
 
 ```yaml
@@ -232,7 +232,7 @@ explicit `strict_host_key: false` opt-out. An undeclared host fails closed.
 
 **Note on SSH_PRIVATE_KEY format:** This variable can contain either the key content
 directly (inline) or a file path. GitLab CI "File" type variables automatically write
-the content to a temporary file and set the variable to the file path -- Brik handles
+the content to a temporary file and set the variable to the file path, and Brik handles
 both cases transparently.
 
 ### Kubernetes (k8s and helm targets)
@@ -299,7 +299,7 @@ Example variables:
   ARGOCD_AUTH_TOKEN   = eyJhbGciOiJI...         (Variable, Masked, Protected)
 ```
 
-**Tip:** For SSH keys, always use "File" type -- this avoids newline issues and the
+**Tip:** For SSH keys, always use "File" type, which avoids newline issues and the
 Brik runtime detects file paths automatically.
 
 ### Jenkins
@@ -315,7 +315,7 @@ Jenkins credentials are configured in **Manage Jenkins > Credentials**.
 
 Brik's Jenkins shared library maps credentials to environment variables automatically.
 In your `Jenkinsfile`, credentials are injected via the Jenkins Credentials Binding
-plugin. The Brik Jenkins shared library handles the mapping -- you only need to create
+plugin. The Brik Jenkins shared library handles the mapping; you only need to create
 the credentials in Jenkins with the expected IDs.
 
 ```
@@ -360,7 +360,7 @@ jobs:
   logs
 - **Protect variables** so they are only available on protected branches/tags
 - **Use "File" type variables** (GitLab) for multi-line secrets like SSH keys
-  and kubeconfig -- this avoids encoding issues
+  and kubeconfig (this avoids encoding issues)
 - **Separate CI and CD credentials**. The publish account (CI) and the deploy
   account (CD) should map to distinct identities at the provider. Revoking one
   does not break the other.

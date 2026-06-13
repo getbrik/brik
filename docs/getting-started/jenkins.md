@@ -1,8 +1,8 @@
 # Getting Started: Jenkins
 
 This is the happy path to a working Brik pipeline on Jenkins. For the full
-integration reference -- runner images, parameters, Docker agents, variable
-mapping, cache management, troubleshooting -- see
+integration reference (runner images, parameters, Docker agents, variable
+mapping, cache management, troubleshooting), see
 [platforms/jenkins.md](../reference/platforms/jenkins.md).
 
 ## Prerequisites
@@ -32,7 +32,7 @@ unclassified:
 ```
 
 The brik repo contains both the runtime and the shared library, so no separate
-clone is needed -- Jenkins clones the library into `${WORKSPACE}@libs/brik/` and
+clone is needed: Jenkins clones the library into `${WORKSPACE}@libs/brik/` and
 uses that path as `BRIK_HOME`.
 
 ## 2. Add a `Jenkinsfile`
@@ -85,7 +85,7 @@ the full setup.
 
 ## Other next steps
 
-- [Configuration overview](../reference/configuration/overview.md) -- what you can put in `brik.yml`
-- [Jenkins platform reference](../reference/platforms/jenkins.md) -- parameters, Docker agents, variable mapping, signing credential isolation
-- [Credentials](../how-to/manage-credentials.md) -- wiring secrets for publish and deploy
-- [Troubleshooting](../how-to/troubleshoot.md) -- common failures and fixes
+- [Configuration overview](../reference/configuration/overview.md): what you can put in `brik.yml`
+- [Jenkins platform reference](../reference/platforms/jenkins.md): parameters, Docker agents, variable mapping, signing credential isolation
+- [Credentials](../how-to/manage-credentials.md): wiring secrets for publish and deploy
+- [Troubleshooting](../how-to/troubleshoot.md): common failures and fixes

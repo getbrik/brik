@@ -1,5 +1,6 @@
 # `test`
 
+> [!NOTE]
 > Run the project's automated tests, and optionally enforce a coverage threshold and emit CI reports.
 
 **Section:** `test` (optional) &nbsp;·&nbsp; **Schema:** [`brik.schema.json#$defs/test`](../../../schemas/config/v1/brik.schema.json)
@@ -157,14 +158,14 @@ Several fields above are accepted by the schema but are **not yet consumed** by 
 
 | Field | Status |
 |-------|--------|
-| `test.command` | wired -- `eval`'d from `BRIK_WORKSPACE` |
-| `test.framework` | wired -- branched per stack (see *Supported framework values* below) |
-| `test.coverage.threshold` | wired -- when set, the Test stage exits with `BRIK_EXIT_CHECK_FAILED` (10) if measured coverage is below the threshold. Requires `test.reports.enabled: true` so a coverage report exists; missing or malformed reports never block the pipeline. |
+| `test.command` | wired (`eval`'d from `BRIK_WORKSPACE`) |
+| `test.framework` | wired, branched per stack (see *Supported framework values* below) |
+| `test.coverage.threshold` | wired: when set, the Test stage exits with `BRIK_EXIT_CHECK_FAILED` (10) if measured coverage is below the threshold. Requires `test.reports.enabled: true` so a coverage report exists; missing or malformed reports never block the pipeline. |
 | `test.coverage.report` | **accepted, not consumed** |
-| `test.reports.enabled` | wired -- single master flag for coverage + JUnit emission |
-| `test.reports.coverage.format` | **decorative** -- the actual format is hardcoded per stack (see table below); setting `jacoco` on a Node project does not produce jacoco |
-| `test.reports.coverage.output_dir` | wired -- consumed by stack test commands |
-| `test.reports.junit.output_path` | wired -- consumed by stack test commands |
+| `test.reports.enabled` | wired: single master flag for coverage + JUnit emission |
+| `test.reports.coverage.format` | **decorative**: the actual format is hardcoded per stack (see table below); setting `jacoco` on a Node project does not produce jacoco |
+| `test.reports.coverage.output_dir` | wired, consumed by stack test commands |
+| `test.reports.junit.output_path` | wired, consumed by stack test commands |
 
 ### Supported framework values
 

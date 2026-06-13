@@ -83,7 +83,7 @@ Format: `<notion>.<submodule>.<verb>` (convention layout.md).
 
 ## Outputs publiés (observés sur campagne v0.6.0)
 
-Chaque stage écrit dans `.brik-logs/<stage>-summary.json` (sauf `plan` qui n'a pas de summary — voir notion `planning`).
+Chaque stage écrit dans `.brik-logs/<stage>-summary.json` (sauf `plan` qui n'a pas de summary, voir notion `planning`).
 
 ### Schéma observé `<stage>-summary.json`
 

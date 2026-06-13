@@ -45,7 +45,7 @@ flags produce a **byte-identical** `plan.json`. This is enforced by:
 2. `plan.dag.edges` outputs sorted edges (`LC_ALL=C sort -u`).
 3. No timestamps are embedded.
 4. The `fingerprint` is `sha256` of the canonical bytes with the
-   fingerprint field replaced by `""`, then substituted in -- a
+   fingerprint field replaced by `""`, then substituted in: a
    round-trip self-hash idiom.
 
 Tested by [`spec/integration/plan_reproducibility_spec.sh`](../../../spec/integration/plan_reproducibility_spec.sh).
@@ -62,12 +62,12 @@ accept both during the deprecation window.
 
 ## Related material
 
-- [`docs/concepts/plan.md`](../../concepts/plan.md) -- user-facing
+- [`docs/concepts/plan.md`](../../concepts/plan.md): user-facing
   walkthrough (what is a plan, how do I read one).
-- [`docs/concepts/pipeline-context.md`](../../concepts/pipeline-context.md)
-  -- the `snapshot` / `release` context the planner stamps into
+- [`docs/concepts/pipeline-context.md`](../../concepts/pipeline-context.md):
+  the `snapshot` / `release` context the planner stamps into
   `plan.json`.
-- [`docs/registry/`](../registry) -- the registry the planner reads
+- [`docs/registry/`](../registry): the registry the planner reads
   from. Stages and stacks declare their `gate`, `impact`, and
   `runner_class` here. Manifests are authored in YAML (comments,
   multi-line strings, natural nesting) and compiled to JSON, which is

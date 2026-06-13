@@ -7,10 +7,10 @@ The test suite is organised along the **11 domain notions** declared in
 there. It is layered into four typed layers, all under
 `brik/spec/{contracts,unit,integration,pipeline-e2e}/`:
 
-- **L0 Contracts** -- does a notion's data match its JSON Schema? (shape only)
-- **L1 Unit** -- is one notion's logic correct in isolation? (binaries mocked)
-- **L2 Notion-pair** -- do two notions wire together correctly? (one real graph edge)
-- **L3 Pipeline-E2E** -- does the whole flow run on a real platform? (briklab)
+- **L0 Contracts**: does a notion's data match its JSON Schema? (shape only)
+- **L1 Unit**: is one notion's logic correct in isolation? (binaries mocked)
+- **L2 Notion-pair**: do two notions wire together correctly? (one real graph edge)
+- **L3 Pipeline-E2E**: does the whole flow run on a real platform? (briklab)
 
 See [The four layers, explained](#the-four-layers-explained) for what each
 layer tests, a concrete example, and why the split exists.
@@ -64,22 +64,22 @@ referenced by absolute path (`$BRIK_HOME/spec/support/...`) from 84+ specs.
 
 ## The four layers, explained
 
-Brik has no application UI -- it is shell libraries that drive real CI
+Brik has no application UI: it is shell libraries that drive real CI
 platforms. Running the whole thing end to end is slow (minutes) and, when it
 fails, does not tell you *which* piece broke. So the suite is split into four
 layers, from cheap-and-isolated to expensive-and-realistic. Each answers a
 different question. Together they form a pyramid: many fast tests at the
 bottom (L0/L1), a handful of slow ones at the top (L3). The number in the name
-(L0..L3) is simply how far you have zoomed out -- from a single data shape to a
+(L0..L3) is simply how far you have zoomed out, from a single data shape to a
 whole pipeline on a real platform.
 
-### L0 -- Contracts: "does the shape hold?"
+### L0 Contracts: "does the shape hold?"
 
 **Question it answers:** does a notion's input/output match its published JSON
 Schema?
 
-An L0 test runs no business logic. It feeds sample data -- a
-`<stage>-summary.json`, a `plan.json`, a stage manifest -- to its schema under
+An L0 test runs no business logic. It feeds sample data (a
+`<stage>-summary.json`, a `plan.json`, a stage manifest) to its schema under
 `brik/schemas/<notion>/v1/` and checks that valid samples pass and broken ones
 (wrong enum value, missing field) are rejected.
 
@@ -87,7 +87,7 @@ An L0 test runs no business logic. It feeds sample data -- a
   `*-summary.json` shape against `schemas/stages/v1/stage-summary.schema.json`.
 - **Cost:** < 100 ms. **How many:** ~one per notion.
 
-### L1 -- Unit: "is the logic correct, in isolation?"
+### L1 Unit: "is the logic correct, in isolation?"
 
 **Question it answers:** given controlled inputs, does one function of one
 notion take the right branch and return the right value/exit code?
@@ -103,15 +103,16 @@ branches, error paths and edge cases get covered. It is the bulk of the suite.
   `stacks.node.install` runs `npm ci` when a lockfile is present.
 - **Cost:** < 1 s. **How many:** most specs.
 
+> [!IMPORTANT]
 > **L1 purity rule.** An L1 spec must pass with only the brik prerequisites on
-> PATH -- bash, jq, yq, jv, git, ShellSpec -- and **no stack/deploy tool
+> PATH (bash, jq, yq, jv, git, ShellSpec) and **no stack/deploy tool
 > installed** (this is exactly the CI runner). It mocks every external binary.
 > If a spec needs a *real* binary, a real service, or a real filesystem outside
-> `/tmp`, it is not a unit test -- it is L2 or L3. (Reference environment = the
+> `/tmp`, it is not a unit test: it is L2 or L3. (Reference environment = the
 > CI runner, not a bare busybox image; a few specs use GNU-coreutils behaviour
 > such as `date`, which is fine.)
 
-### L2 -- Notion-pair: "do two notions talk to each other correctly?"
+### L2 Notion-pair: "do two notions talk to each other correctly?"
 
 **Question it answers:** when notion A uses notion B, does A call B correctly
 and react correctly to B's result?
@@ -119,16 +120,16 @@ and react correctly to B's result?
 L1 fakes B; **L2 uses the real B.** Each L2 family targets one **edge of the
 dependency graph** (the arrows in `layout.md`): the notions on both ends are
 real, only the leaf binaries stay mocked. This catches wiring bugs that no
-single-notion test can see -- the kind that previously needed a full pipeline
+single-notion test can see, the kind that previously needed a full pipeline
 to surface.
 
 - **Example:** `integration/execution-env-x-stages/` sets
   `BRIK_WITH_DEPLOY=true` and checks that `brik plan` really enables the deploy
-  stage -- the cross-platform propagation bug, reproduced in ~1 s instead of a
+  stage, catching the cross-platform propagation bug, reproduced in ~1 s instead of a
   full GitLab+Jenkins run.
 - **Cost:** 5-20 s. **How many:** one family per graph edge (11).
 
-### L3 -- Pipeline-E2E: "does the whole thing work on a real platform?"
+### L3 Pipeline-E2E: "does the whole thing work on a real platform?"
 
 **Question it answers:** does the complete fixed flow run green on a real
 orchestrator, and do the things only a live platform can prove actually hold?
@@ -185,14 +186,15 @@ The per-notion **coverage floor** lives in `codecov.yml`:
 notion holds at least 80% line coverage today (measured with kcov; global
 ~90%), so 80% is the uniform floor; registry keeps a 90% bar and planning 85%.
 A PR that drops a notion below its floor fails that notion's Codecov status
-check. This is the per-notion PR-gate -- there is no bespoke coverage script;
+check. This is the per-notion PR-gate: there is no bespoke coverage script;
 kcov + Codecov are the single source of truth.
 
+> [!NOTE]
 > Caveat: kcov instruments the in-process ShellSpec bash, not child processes.
 > A CLI command exercised only via `When run script "$BRIK_BIN" <cmd>` runs in
 > a subprocess, so its lines read as uncovered even when the end-to-end spec
 > passes. To make that coverage visible, add in-process `When call cli.<cmd>.*`
-> tests -- the `*_internals_spec.sh` pattern -- alongside the end-to-end spec
+> tests (the `*_internals_spec.sh` pattern) alongside the end-to-end spec
 > (see `registry_internals_spec.sh`). Before treating a 0% file as untested,
 > check whether it is only covered by a subprocess spec.
 

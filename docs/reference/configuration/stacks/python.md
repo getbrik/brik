@@ -65,7 +65,7 @@ publish:
   the stack, but a `pyproject.toml`, `setup.py`, or `Pipfile` must
   also exist for the build to produce an artefact.
 - **`uv.lock` wins over `poetry.lock`.** Both files in the same repo
-  resolves to `uv` -- Brik does not warn. Remove the unused lock file
+  resolves to `uv` (Brik does not warn). Remove the unused lock file
   to avoid confusion.
 - **Type checking is opt-in.** `quality.type_check.tool: mypy` (or
   `pyright`) is required to run a type check; Brik never auto-detects

@@ -1,11 +1,12 @@
 # `brik.yml` reference
 
+> [!NOTE]
 > Every top-level section of `brik.yml`, one line each. Follow a section to its
 > dedicated page: what it is for, what it does, when it runs, and how to
 > configure it.
 
 Only **`version`** and **`project`** are required. Everything else is optional
-and has a per-stack default -- you set a section only to override what matters
+and has a per-stack default, so you set a section only to override what matters
 for your project. New to the file? Start with the
 [configuration overview](overview.md) ("declare what, not how").
 

@@ -153,8 +153,8 @@ time.
 The dry-call harness invokes the function against a minimal workspace
 (an empty tempdir with a synthetic `brik.yml`). It expects `rc=0`. A
 non-zero return on this fixture means the function does not handle the
-"no real workspace state" case -- usually a missing input file or a
-hard-coded path. Add a guard:
+"no real workspace state" case (usually a missing input file or a
+hard-coded path). Add a guard:
 
 ```bash
 stages.audit() {
@@ -176,7 +176,7 @@ stages.audit() {
 The contract requires every conformant function to record at least
 one `tech.*` key. Without it, the aggregate report has no signal for
 the stage and the planner cannot reason about its outcome. Call
-`report.record` even on the skip path -- it is what makes a stage
+`report.record` even on the skip path: it is what makes a stage
 "observable".
 
 ### Stage module calls `exit`
@@ -198,13 +198,13 @@ error, and the aggregate report misses the record. Replace `exit` with
 ```
 
 A manifest's `metadata.id` must be unique across the merged registry.
-`compile-registry.sh` aborts unconditionally on any id collision --
+`compile-registry.sh` aborts unconditionally on any id collision:
 there is no `metadata.replaces` override and no `brik.lock` escape
 hatch. Pick a namespaced id (e.g. `myteam-node`) instead.
 
 ## See also
 
-- [extensions.md](../how-to/use-extensions.md) -- consuming extensions in a project.
-- [`docs/registry/`](registry) -- registry author reference.
-- [`docs/planning/`](planning) -- planner reference (how the
+- [extensions.md](../how-to/use-extensions.md): consuming extensions in a project.
+- [`docs/registry/`](registry): registry author reference.
+- [`docs/planning/`](planning): planner reference (how the
   registry feeds `plan.json`).

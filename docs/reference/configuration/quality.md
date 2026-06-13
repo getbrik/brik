@@ -1,5 +1,6 @@
 # `quality`
 
+> [!NOTE]
 > Drive the Lint stage: linting, formatting, optional type checking, and the findings policy.
 
 **Section:** `quality` (optional) &nbsp;·&nbsp; **Schema:** [`brik.schema.json#$defs/quality`](../../../schemas/config/v1/brik.schema.json)
@@ -164,14 +165,14 @@ A few fields are accepted by the schema but are **not yet consumed** by the runt
 
 | Field | Status |
 |-------|--------|
-| `quality.lint.enabled` | **deprecated, not consumed** -- lint always runs; Init emits a one-shot warning when `false` is detected |
+| `quality.lint.enabled` | **deprecated, not consumed** (lint always runs; Init emits a one-shot warning when `false` is detected) |
 | `quality.lint.command` | wired (Tier 1) |
 | `quality.lint.tool` | wired (Tier 2) |
-| `quality.lint.config` | **accepted, not consumed** -- the linter discovers its own config file from disk |
-| `quality.lint.fix` | **accepted, not consumed** -- linters always run in check mode |
+| `quality.lint.config` | **accepted, not consumed** (the linter discovers its own config file from disk) |
+| `quality.lint.fix` | **accepted, not consumed** (linters always run in check mode) |
 | `quality.format.command` | wired (Tier 1) |
 | `quality.format.tool` | wired (Tier 2) |
-| `quality.format.check` | **accepted, not consumed** -- formatters always run in check mode anyway |
+| `quality.format.check` | **accepted, not consumed** (formatters always run in check mode anyway) |
 | `quality.type_check.command` | wired (Tier 1) |
 | `quality.type_check.tool` | wired (Tier 2) |
 

@@ -1,5 +1,6 @@
 # `security`
 
+> [!NOTE]
 > Configure the security-scanning stages: SAST, dependency and secret scanning,
 > license compliance, and container image scanning.
 

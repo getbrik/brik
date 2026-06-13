@@ -1,5 +1,6 @@
 # `publish`
 
+> [!NOTE]
 > Push the packaged artifact to one or more package registries (npm, Docker,
 > Maven, PyPI, Cargo, NuGet).
 

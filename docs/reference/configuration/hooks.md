@@ -1,5 +1,6 @@
 # `hooks`
 
+> [!NOTE]
 > Run your own shell commands before or after any pipeline stage.
 
 **Section:** `hooks` (optional) &nbsp;·&nbsp; **Schema:** [`brik.schema.json#$defs/hooks`](../../../schemas/config/v1/brik.schema.json)

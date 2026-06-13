@@ -2,7 +2,7 @@
 
 Mirrors [`schemas/plan/v1/plan.schema.json`](../../../schemas/plan/v1/plan.schema.json)
 field by field, with the runtime semantics each adapter consumer can
-rely on. The schema itself is authoritative -- this page exists so an
+rely on. The schema itself is authoritative; this page exists so an
 adapter author can read the contract without parsing JSON Schema.
 
 ## Top-level object
@@ -12,7 +12,7 @@ adapter author can read the contract without parsing JSON Schema.
 | `schemaVersion` | string | yes | const `"v1"` | Plans tagged `v1` are accepted by every v0.6.x runtime. |
 | `brikVersion` | string | yes | semver pattern | Informational; never used for gating. Lets adapters log which runtime produced the plan. |
 | `context` | string | yes | enum `snapshot`, `release` | Resolved from `BRIK_COMMIT_TAG` at plan time. `release` when the env var is set; `snapshot` otherwise. |
-| `mode` | string | yes | enum `safe`, `balanced`, `aggressive` | Selection mode. `aggressive` errors out -- it is reserved for the per-subproject impact graph, not yet implemented. |
+| `mode` | string | yes | enum `safe`, `balanced`, `aggressive` | Selection mode. `aggressive` errors out: it is reserved for the per-subproject impact graph, not yet implemented. |
 | `workspace` | string | no | non-empty | Absolute path to the workspace root the plan was computed against. Informational. |
 | `changes` | object | no | see [Changes block](#changes-block) | Snapshot of the changed-files set used by the planner. |
 | `release` | object | yes | see [Release block](#release-block) | Release state: profile + project version + candidate flag. |
@@ -37,13 +37,13 @@ adapter author can read the contract without parsing JSON Schema.
 | `source` | string | yes | enum `gitlab`, `jenkins`, `local`, `none` | Which backend resolved the range. `none` means no diff basis was available (cold start). |
 | `from_ref` | string | no | -- | Resolved base ref of the diff. Empty when `source=none`. |
 | `to_ref` | string | no | -- | Resolved head ref of the diff. Empty when `source=none`. |
-| `files` | array of string | yes | unique, items min length 1 | Snapshot of the changed-file set. Currently always emitted empty (v0.6) -- the planner consumes it internally but does not embed it for size reasons. Reserved for adapters that need to re-validate impact without re-running git. |
+| `files` | array of string | yes | unique, items min length 1 | Snapshot of the changed-file set. Currently always emitted empty (v0.6); the planner consumes it internally but does not embed it for size reasons. Reserved for adapters that need to re-validate impact without re-running git. |
 
 ### Consumer rule for `source=none`
 
 When `source=none`, every blocking stage must be marked `run` by
 construction (the planner's cold-start safety net). Adapters that
-re-derive selection from `changes` alone must respect this -- skipping
+re-derive selection from `changes` alone must respect this; skipping
 blocking stages on a cold start would defeat the conservative default.
 
 ## Infra block
@@ -136,7 +136,7 @@ a code is a planner change, not an adapter change.
 | `opt-in-flag-missing` | `gate.mode=opt_in` and the required `--with-*` flag was not passed. |
 | `impacted` | `balanced` mode, at least one glob matched at least one changed file. |
 | `no-impact` | `balanced` mode, declared globs but no changed file matched. |
-| `no-impact-declared` | `balanced` mode, stage neither declares own globs nor inherits from the stack -- conservative run. |
+| `no-impact-declared` | `balanced` mode, stage neither declares own globs nor inherits from the stack (conservative run). |
 | `no-diff` | Cold start: `changes.source=none`, conservative run. |
 | `plan-test` | Reserved for adapter tests. Not emitted by the planner. |
 
@@ -159,7 +159,7 @@ a code is a planner change, not an adapter change.
 | `edges[].to` | string | yes | `^[a-z][a-z0-9-]*$` | Destination stage id. |
 
 Edges are sorted lexicographically by `(from, to)`. Two plans with the
-same DAG produce the same `edges[]` sequence -- this is load-bearing
+same DAG produce the same `edges[]` sequence: this is load-bearing
 for fingerprint stability.
 
 ## Fingerprint
@@ -172,8 +172,8 @@ computes it in three steps:
 2. Hash the bytes (`sha256sum`).
 3. Substitute the real hash in via `jq -S`.
 
-Round-tripping a plan -- re-running `brik plan` against the same HEAD
-with the same flags -- reproduces the same fingerprint. Adapters can
+Round-tripping a plan (re-running `brik plan` against the same HEAD
+with the same flags) reproduces the same fingerprint. Adapters can
 short-circuit downstream work when the fingerprint has not changed
 across two pipelines on the same SHA.
 
@@ -183,8 +183,8 @@ When writing a new adapter, the planner guarantees:
 
 - [ ] `schemaVersion=="v1"`. Reject anything else with a clear error.
 - [ ] Every stage from `registry.stage.list` appears in `stages[]`.
-- [ ] `stages[].decision` is one of `run`, `skip` -- never anything else.
+- [ ] `stages[].decision` is one of `run`, `skip`, never anything else.
 - [ ] When `changes.source=="none"`, every blocking stage is `run`.
 - [ ] Two consecutive runs on the same SHA produce the same `fingerprint`.
-- [ ] `dag.edges` is the source of truth for the DAG -- never recompute
+- [ ] `dag.edges` is the source of truth for the DAG; never recompute
       `after`/`before` from the manifest yourself.

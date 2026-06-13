@@ -24,7 +24,7 @@ flowchart TD
 Each layer has one responsibility (SRP); arrows point down because the
 inner layer never reads anything above it.
 
-## Layer 1 -- CLI surface
+## Layer 1: CLI surface
 
 `cli.plan.run` parses CLI flags (`--workspace`, `--mode`, `--out`,
 `--explain`, `--validate-only`, `--format`, the three `--with-*`
@@ -41,7 +41,7 @@ The CLI also normalizes platform CI variables via `_pipeline.detect_metadata`
 so that, e.g., a GitLab tag-push pipeline (`BRIK_TAG` set by the wrapper)
 becomes `BRIK_COMMIT_TAG` before `plan.compute` reads the context.
 
-## Layer 2 -- serializer
+## Layer 2: serializer
 
 `plan_writer.write` runs `plan.compute` and pipes its stream into
 `plan_writer.from_stream`, which:
@@ -56,7 +56,7 @@ becomes `BRIK_COMMIT_TAG` before `plan.compute` reads the context.
 The output is deterministic by construction: jq sorts keys, sort sorts
 edges, no timestamps are emitted.
 
-## Layer 3 -- compute
+## Layer 3: compute
 
 `plan.compute` is the heart of the planner:
 
@@ -68,15 +68,15 @@ for each stage in registry.stage.list:
 
 `plan.decide` applies five filters in order:
 
-1. **Context filter** -- if `gate.contexts` is non-empty and does not
+1. **Context filter**: if `gate.contexts` is non-empty and does not
    include the active context, skip with `context-mismatch`.
-2. **Opt-in filter** -- if `gate.mode=opt_in` and the flag was not
+2. **Opt-in filter**: if `gate.mode=opt_in` and the flag was not
    passed (or unknown), skip with `opt-in-flag-missing`.
-3. **Mode short-circuit (safe)** -- `safe` mode runs everything that
+3. **Mode short-circuit (safe)**: `safe` mode runs everything that
    passed the two filters above, with reason `context-match`.
-4. **Cold-start** -- if `changes.source=none`, run with reason
+4. **Cold-start**: if `changes.source=none`, run with reason
    `no-diff` (conservative fallback when no diff basis exists).
-5. **Impact filter (balanced)** -- if the resolved glob set is empty
+5. **Impact filter (balanced)**: if the resolved glob set is empty
    declare `no-impact-declared` and run; otherwise match the changed
    files against `impact.stage_patterns` and emit `impacted` /
    `no-impact`.
@@ -84,7 +84,7 @@ for each stage in registry.stage.list:
 `plan.dag.edges` resolves `after:` / `before:` from every stage's
 manifest into a sorted directed-edge list `(from, to)`.
 
-## Layer 4 -- inputs
+## Layer 4: inputs
 
 ### `changes.diff` (`lib/transverse/changes.sh`)
 
@@ -106,14 +106,14 @@ spaces in filenames are safe. `BRIK_CHANGES_SOURCE` and
 Three thin layers on top of `[[ "$path" == $pattern ]]` with `shopt -s
 globstar`:
 
-- `impact.match_one <path> <pattern>` -- single-pattern bash glob.
-- `impact.match_any <path> <pattern>...` -- short-circuit any-match.
-- `impact.stage_patterns <stage> [<stack>]` -- resolves the effective
+- `impact.match_one <path> <pattern>`: single-pattern bash glob.
+- `impact.match_any <path> <pattern>...`: short-circuit any-match.
+- `impact.stage_patterns <stage> [<stack>]`: resolves the effective
   glob set: stage's own `spec.impact.changes` wins, otherwise
   `spec.impact.use_stack_impact` redirects to the stack's source /
   test / build set.
 
-## Layer 5 -- registry
+## Layer 5: registry
 
 The planner is a **read-only consumer** of `registry.stack.*` and
 `registry.stage.*`. Every input it needs (gate mode, gate contexts,

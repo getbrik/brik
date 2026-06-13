@@ -1,5 +1,6 @@
 # `git`
 
+> [!NOTE]
 > Pin the Git identity Brik uses when a stage commits or annotates a tag.
 
 **Section:** `git` (optional) &nbsp;·&nbsp; **Schema:** [`brik.schema.json#$defs/git`](../../../schemas/config/v1/brik.schema.json)

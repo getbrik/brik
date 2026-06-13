@@ -1,8 +1,8 @@
 # Getting Started: GitLab CI
 
 This is the happy path to a working Brik pipeline on a GitLab instance. For the
-full integration reference -- runner images, pipeline variables, cache
-relocation, coverage reports, troubleshooting -- see
+full integration reference (runner images, pipeline variables, cache
+relocation, coverage reports, troubleshooting), see
 [platforms/gitlab.md](../reference/platforms/gitlab.md).
 
 ## Prerequisites
@@ -52,7 +52,7 @@ include:
 
 This is a single classic pipeline: a `brik-plan` job computes the
 execution plan, then every stage job consults it and skips itself when
-the plan marks the stage not-applicable -- a docs-only commit shows the
+the plan marks the stage not-applicable: a docs-only commit shows the
 skipped stages as green "skipped (per plan)" jobs without running their
 work. See [platforms/gitlab.md](../reference/platforms/gitlab.md) for the full
 job graph.
@@ -109,7 +109,7 @@ promotion journal before deploying. See
 
 ## Other next steps
 
-- [Configuration overview](../reference/configuration/overview.md) -- what you can put in `brik.yml`
-- [GitLab platform reference](../reference/platforms/gitlab.md) -- runner images, variables, coverage badge
-- [Credentials](../how-to/manage-credentials.md) -- wiring secrets for publish and deploy, signing credential isolation
-- [Troubleshooting](../how-to/troubleshoot.md) -- common failures and fixes
+- [Configuration overview](../reference/configuration/overview.md): what you can put in `brik.yml`
+- [GitLab platform reference](../reference/platforms/gitlab.md): runner images, variables, coverage badge
+- [Credentials](../how-to/manage-credentials.md): wiring secrets for publish and deploy, signing credential isolation
+- [Troubleshooting](../how-to/troubleshoot.md): common failures and fixes

@@ -1,7 +1,8 @@
 # Supply-chain gates
 
-> CI signs evidence onto every artifact; CD enforces three fail-closed gates --
-> digest, attestation, eligibility -- before deploying it.
+> [!NOTE]
+> CI signs evidence onto every artifact; CD enforces three fail-closed gates
+> (digest, attestation, eligibility) before deploying it.
 
 **Audience:** operators, users &nbsp;·&nbsp; **Type:** Explanation
 
@@ -27,7 +28,7 @@ digest; production typically requires all three.
 ## Why it matters
 
 - **The artifact you verify is the artifact you deploy.** The digest is
-  tamper-evident -- change one byte and it is a different digest -- so pinning to
+  tamper-evident (change one byte and it is a different digest), so pinning to
   it closes the "we tested X but shipped Y" gap, including the
   deploy-a-mutable-`:latest`-tag gap.
 - **Every gate is fail-closed.** Missing trust material, an unreachable journal,
@@ -35,8 +36,9 @@ digest; production typically requires all three.
   pass: a gate you asked for but cannot enforce fails, it does not quietly skip.
 - **Attestation is not eligibility.** Attestation is produced by CI and travels
   *with* the artifact (it says where it comes from). Eligibility is a *posterior
-  decision* -- a human `brik authorize`, or a validated deploy on the previous
-  environment -- recorded in a signed journal (it says where it may go). A
+  decision*, recorded in a signed journal, that comes from a human
+  `brik authorize` or a validated deploy on the previous environment (it says
+  where it may go). A
   perfectly attested artifact may still not be eligible for production; a grant
   never replaces the authenticity check.
 
@@ -52,13 +54,13 @@ flowchart LR
     g3 --> inject["Inject pinned<br/>digest"] --> rollout["Rollout"] --> rb["Read-back"]
 ```
 
-- **Digest** -- the version is resolved to its `sha256` in the channel the
+- **Digest**: the version is resolved to its `sha256` in the channel the
   environment accepts (`accepts_channel`); content-addressing *is* the proof.
-- **Attestation** -- `cosign` verifies the signed in-toto attestations on the
+- **Attestation**: `cosign` verifies the signed in-toto attestations on the
   digest against the **profile's trust material**, then checks the provenance
   against the deploy expectations: the version being deployed (anti-substitution),
   the builder identity, and the source repository.
-- **Eligibility** -- the signed promotion journal is cloned, its tip signature
+- **Eligibility**: the signed promotion journal is cloned, its tip signature
   verified, and every required grant must exist *for this digest and this
   environment*. Grants come from `brik authorize` (`artifact_authorized_for`) or,
   in a declarative chain, from a green deploy on the previous environment
@@ -66,7 +68,7 @@ flowchart LR
 
 **Declarative promotion chains.** An environment names the next link with
 `validates_for`; a successful CD run on it journals `artifact_validated_for` for
-that next environment -- so a green staging deploy can bless production. The
+that next environment, so a green staging deploy can bless production. The
 grant is written **after** the rollout, only once a live read-back agrees with
 the pinned digest (a reconciling controller gets a bounded window to converge);
 a read-back that never converges withholds the grant and fails the run.
@@ -74,7 +76,7 @@ a read-back that never converges withholds the grant and fails the run.
 **Re-entry converges.** Re-running a deploy for the same `(version,
 environment)` re-evaluates the gates against the same digest, applies
 idempotently, and reads back the same digest. Journal and evidence writes are
-append-only -- a re-run adds to history, never rewrites it.
+append-only: a re-run adds to history, never rewrites it.
 
 ## Configuration & reference
 
@@ -98,8 +100,8 @@ deploy:
 The provenance predicate CI emits carries a verifiable builder identity that
 `require_attestation` checks (on the cosign-verified payload only):
 
-- `runDetails.builder.id` = `<orchestrator-url>/-/brik/<runner-class>` -- the
-  orchestrator base URL (`CI_SERVER_URL`, `JENKINS_URL`, or `https://brik.sh/local`)
+- `runDetails.builder.id` = `<orchestrator-url>/-/brik/<runner-class>`, combining
+  the orchestrator base URL (`CI_SERVER_URL`, `JENKINS_URL`, or `https://brik.sh/local`)
   and the stage's runner class.
 - `buildDefinition.externalParameters.version` = the git tag being built
   (matched tolerant of `release.tag_prefix`).
@@ -113,7 +115,7 @@ The provenance predicate CI emits carries a verifiable builder identity that
 - **Build L2** is claimable only when the signing credential is scoped to the
   signing phase, so user-defined commands cannot read it. Brik provides the
   isolation mechanics (the `BRIK_SIGNING_` prefix delivers the credential to the
-  `container-scan` stage only -- the `brik/signing` GitLab environment, a
+  `container-scan` stage only, via the `brik/signing` GitLab environment or a
   dedicated Jenkins env-file); the claim holds only when the operator actually
   scopes it. `kms` and `keyless` backends can claim L2; a `file://` private key
   in the referential cannot.
@@ -146,7 +148,7 @@ invisible to it.
 
 ## Related
 
-- [Fixed flows](fixed-flows.md) -- where the gates sit in the CD flow
-- [Manage credentials](../how-to/manage-credentials.md) -- the infrastructure referential and credential scoping
-- [Organisation policy](../how-to/configure-org-policy.md) -- enforcing gate requirements org-wide
-- [Data layout](data-layout.md) -- where evidence and journals live on disk
+- [Fixed flows](fixed-flows.md): where the gates sit in the CD flow
+- [Manage credentials](../how-to/manage-credentials.md): the infrastructure referential and credential scoping
+- [Organisation policy](../how-to/configure-org-policy.md): enforcing gate requirements org-wide
+- [Data layout](data-layout.md): where evidence and journals live on disk
