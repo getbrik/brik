@@ -37,6 +37,15 @@ required field in `brik.yml` apart from the top-level `version`.
   Path to the project-level env file (KEY=VALUE format), relative to the project root. Optional. When omitted, Brik auto-detects 'brik.env' at the repo root. Existing environment variables (CI secrets, etc.) take precedence over file entries.
 
 
+*Example*
+
+```yaml
+project:
+  name: orders-api
+  stack: node
+  stack_version: 22
+```
+
 <!-- END AUTO-GENERATED -->
 
 `project.name` is required (minimum length 1). `project.stack` is

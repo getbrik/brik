@@ -21,16 +21,19 @@
         "name": {
           "description": "Project name. Used in logs, notifications, and artefact labels.",
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "examples": ["orders-api"]
         },
         "stack": {
           "description": "Technology stack. Optional - Brik performs auto-detection from project files (package.json -> node, pom.xml -> java, etc.) when omitted.",
           "type": "string",
-          "enum": ["node", "java", "python", "dotnet", "rust"]
+          "enum": ["node", "java", "python", "dotnet", "rust"],
+          "examples": ["node"]
         },
         "stack_version": {
           "description": "Stack version for runner image selection (e.g. '22' for node, '21' for java). When omitted, uses the default version.",
-          "type": "string"
+          "type": "string",
+          "examples": ["22"]
         },
         "root": {
           "description": "Relative path to the service root directory. Used in monorepos where each service has its own brik.yml.",
@@ -346,7 +349,8 @@
         "framework": {
           "description": "Test framework to use. Overrides the stack default (e.g. jest for node, junit for java, pytest for python).",
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "examples": ["jest"]
         },
         "coverage": {
           "description": "Test coverage threshold enforcement.",
@@ -358,7 +362,8 @@
               "type": "integer",
               "minimum": 0,
               "maximum": 100,
-              "default": 80
+              "default": 80,
+              "examples": [80]
             },
             "report": {
               "description": "Path to the coverage report file (Cobertura XML).",
@@ -687,7 +692,8 @@
             "image": {
               "description": "Full image name including registry and repository (e.g. registry.example.com/my-service).",
               "type": "string",
-              "minLength": 1
+              "minLength": 1,
+              "examples": ["registry.example.com/orders/orders-api"]
             },
             "dockerfile": {
               "description": "Path to the Dockerfile relative to the build context.",
@@ -779,7 +785,8 @@
             "registry": {
               "description": "Container registry URL for docker login.",
               "type": "string",
-              "minLength": 1
+              "minLength": 1,
+              "examples": ["registry.example.com"]
             },
             "tags": {
               "description": "List of tags to push. If empty, uses BRIK_APP_VERSION.",
@@ -794,12 +801,14 @@
             "username_var": {
               "description": "Name of the environment variable holding the registry username.",
               "type": "string",
-              "minLength": 1
+              "minLength": 1,
+              "examples": ["BRIK_PUBLISH_DOCKER_USER"]
             },
             "password_var": {
               "description": "Name of the environment variable holding the registry password or token.",
               "type": "string",
-              "minLength": 1
+              "minLength": 1,
+              "examples": ["BRIK_PUBLISH_DOCKER_PASSWORD"]
             }
           }
         },

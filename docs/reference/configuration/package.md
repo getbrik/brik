@@ -74,6 +74,14 @@ Docker image build and push configuration.
   Docker build arguments passed as --build-arg. Keys and values must be strings.
 
 
+*Example*
+
+```yaml
+package:
+  docker:
+    image: registry.example.com/orders/orders-api
+```
+
 ### `package.registry`
 
 Metadata about the registry that hosts the published image. Optional; used to enrich the pipeline report.

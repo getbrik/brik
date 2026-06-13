@@ -88,6 +88,16 @@ Push Docker image to a container registry.
   Name of the environment variable holding the registry password or token.
 
 
+*Example*
+
+```yaml
+publish:
+  docker:
+    registry: registry.example.com
+    username_var: BRIK_PUBLISH_DOCKER_USER
+    password_var: BRIK_PUBLISH_DOCKER_PASSWORD
+```
+
 ### `publish.maven`
 
 Publish to a Maven repository.

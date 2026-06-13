@@ -19,6 +19,13 @@
   Test framework to use. Overrides the stack default (e.g. jest for node, junit for java, pytest for python).
 
 
+*Example*
+
+```yaml
+test:
+  framework: jest
+```
+
 ### `test.coverage`
 
 Test coverage threshold enforcement.
@@ -36,6 +43,14 @@ Test coverage threshold enforcement.
 
   Path to the coverage report file (Cobertura XML).
 
+
+*Example*
+
+```yaml
+test:
+  coverage:
+    threshold: 80
+```
 
 ### `test.reports`
 
