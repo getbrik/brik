@@ -1,20 +1,51 @@
-# `hooks` configuration
+# `hooks`
 
-> Schema source: [`brik.schema.json#$defs/hooks`](../../../schemas/config/v1/brik.schema.json)
+> Run your own shell commands before or after any pipeline stage.
 
-The `hooks` section attaches inline shell commands before or after each
-pipeline stage. Hooks declared in `brik.yml` run alongside file-based
-hooks at `.brik/hooks/<hook>.sh`; the two mechanisms coexist and both
-fire.
+**Section:** `hooks` (optional) &nbsp;·&nbsp; **Schema:** [`brik.schema.json#$defs/hooks`](../../../schemas/config/v1/brik.schema.json)
 
-`pre_*` hooks run before the stage and can abort it (non-zero exit).
-`post_*` hooks run after the stage completes successfully and are
-best-effort -- they cannot override the stage's exit code.
+## What it is for
 
-## Quick reference
+Insert *your own logic around a stage* without changing the stage itself.
 
-Each hook value is a single inline shell command. Chain multiple
-commands with `&&` or `;`. Empty strings are rejected by the schema.
+A hook is a single inline shell command attached to a stage by name. Use a
+`pre_*` hook to prepare or gate a stage, and a `post_*` hook to react to its
+result. Typical uses are cleaning a workspace, running a migration check, or
+notifying an external dashboard.
+
+This section is optional. With no `hooks` block nothing extra runs.
+
+## What it does
+
+- Runs the `pre_<stage>` command before the stage. A non-zero exit aborts the
+  stage.
+
+- Runs the `post_<stage>` command after the stage completes successfully. It
+  is best-effort and cannot override the stage's exit code.
+
+- `eval`s the command in the runner's shell with all Brik-exported variables
+  (`BRIK_APP_VERSION`, `BRIK_PROJECT_NAME`, `BRIK_WORKSPACE`, ...) in scope.
+
+- Runs alongside file-based hooks at `.brik/hooks/<hook>.sh`. The two
+  mechanisms coexist and both fire; the file-based hook runs after the inline
+  command, and failure of either path aborts the stage in the `pre_*` case.
+
+- Treats `brik.yml` as trusted project config, the same trust level as the
+  project's own code. There is no sandbox.
+
+## When it runs
+
+Each hook fires around the stage it names, so a hook runs only when its stage
+runs. A `pre_<stage>` command fires immediately before the stage starts; a
+`post_<stage>` command fires immediately after the stage finishes successfully.
+
+There is one hook pair per CI-visible stage (init, release, build, lint, sast,
+scan, container_scan, test, package, deploy, notify), letting you attach logic
+at any point in the flow.
+
+## How to configure
+
+Each hook value is a single inline shell command; chain commands with `&&` or `;`.
 
 <!-- BEGIN AUTO-GENERATED: quick-reference -->
 | Field | Type | Default |
@@ -131,33 +162,24 @@ commands with `&&` or `;`. Empty strings are rejected by the schema.
   Commands executed after the notify stage completes successfully.
 
 
-<!-- END AUTO-GENERATED -->
-
-## Behaviour
-
-- The command is `eval`-ed in the runner's shell, with all
-  Brik-exported variables (`BRIK_APP_VERSION`, `BRIK_PROJECT_NAME`,
-  `BRIK_WORKSPACE`, ...) in scope.
-- `brik.yml` is treated as trusted project config (same trust level as
-  the project's own code) -- there is no sandbox.
-- File-based hooks (`.brik/hooks/pre_<stage>.sh`) are sourced and run in
-  addition to the inline command, after it. Failure of either path
-  aborts the stage in the `pre_*` case.
-- A hook value must be non-empty (`minLength: 1`).
-
-## Examples
-
-### Single inline command
+*Example*
 
 ```yaml
-version: 1
-project:
-  name: my-app
 hooks:
-  pre_build: ./scripts/clean.sh
+  pre_build: ./scripts/clean.sh && ./scripts/setup.sh
+  pre_deploy: ./scripts/check-migration.sh
+  post_deploy: ./scripts/smoke-test.sh
 ```
 
-### Chained commands with `&&`
+<!-- END AUTO-GENERATED -->
+
+A hook value must be non-empty; empty strings are rejected by the schema.
+
+### Examples
+
+Per-field examples are above. These are whole-section scenarios.
+
+Chain commands around a stage. Clean before build, prune after package:
 
 ```yaml
 version: 1
@@ -168,7 +190,7 @@ hooks:
   post_package: npm prune --production
 ```
 
-### Pre-deploy gate and post-deploy smoke test
+Gate the deploy and smoke-test it afterwards:
 
 ```yaml
 version: 1
@@ -180,10 +202,10 @@ hooks:
 ```
 
 If `check-migration.sh` exits non-zero the deploy stage is skipped.
-`smoke-test.sh` runs after a successful deploy; if it fails the deploy
-result is unchanged but the failure surfaces in logs.
+`smoke-test.sh` runs after a successful deploy; if it fails the deploy result
+is unchanged but the failure surfaces in logs.
 
-### Notify external dashboard after release
+Notify an external dashboard after a release, using an exported variable:
 
 ```yaml
 version: 1
@@ -195,7 +217,7 @@ hooks:
 
 ## See also
 
-- [`overview.md`](overview.md) - declarative model
-- [`reference/release.md`](release.md) - `BRIK_APP_VERSION` semantics
-- [`reference/deploy.md`](deploy.md) - deploy stage lifecycle
-- File-based hooks under `.brik/hooks/` (handled by the Bash runtime, not by `brik.yml`)
+- [`release`](release.md) - `BRIK_APP_VERSION` semantics available to hooks
+- [`deploy`](deploy.md) - deploy stage lifecycle around `pre_deploy` / `post_deploy`
+- [Fixed flows](../../concepts/fixed-flows.md) - the stages each hook pair attaches to
+- [`brik.yml` reference](README.md) - all top-level sections

@@ -1,15 +1,41 @@
-# `publish` configuration
+# `publish`
 
-> Schema source: [`brik.schema.json#$defs/publish`](../../../schemas/config/v1/brik.schema.json)
+> Push the packaged artifact to one or more package registries (npm, Docker,
+> Maven, PyPI, Cargo, NuGet).
 
-The `publish` section declares one or more registry targets. The
-package stage triggers each declared target after the local artifact
-build succeeds. Each target is independent and entirely optional.
+**Section:** `publish` (optional) &nbsp;·&nbsp; **Schema:** [`brik.schema.json#$defs/publish`](../../../schemas/config/v1/brik.schema.json)
+
+## What it is for
+
+Distribute your build output to the registries your consumers pull from.
+
+Each ecosystem has its own sub-object (`npm`, `docker`, `maven`, `pypi`,
+`cargo`, `nuget`). Declare as many as you need. Each target is independent and
+entirely optional.
+
+## What it does
+
+- Publishes the built artifact to each declared registry target after the local
+  artifact build succeeds.
+- Reads every credential from a CI environment variable named by a `*_var`
+  field, never from a value stored in `brik.yml`.
+- Skips a target whose `*_var` points to an unset variable, with a warning. The
+  pipeline does not fail.
+- Falls back to `package.docker.image` for `publish.docker.image`, and to
+  `BRIK_APP_VERSION` (or the commit SHA) for `publish.docker.tags`, when those
+  are omitted.
+
+## When it runs
+
+Publishing happens inside the Package stage, after the local artifact build
+succeeds. The Package stage runs after Build once Lint, SAST, Scan, and Test
+have all completed, on a tag push by default (or whenever `package.trigger`
+matches).
 
 ## The `*_var` convention
 
-Every credential lives in a CI environment variable. `brik.yml` carries
-the **name** of that variable, never its value:
+Every credential lives in a CI environment variable. `brik.yml` carries the
+**name** of that variable, never its value:
 
 ```yaml
 publish:
@@ -17,14 +43,14 @@ publish:
     token_var: NPM_TOKEN
 ```
 
-The runner reads `$NPM_TOKEN` at publish time. This keeps secrets out
-of the repository and lets the same `brik.yml` work across multiple
-environments by setting different env values.
+The runner reads `$NPM_TOKEN` at publish time. This keeps secrets out of the
+repository and lets the same `brik.yml` work across multiple environments by
+setting different env values.
 
-A target whose `*_var` field points to an unset variable is skipped
-with a warning -- the pipeline does not fail.
+## How to configure
 
-## Quick reference
+Declare a sub-object per ecosystem you publish to. Each field's type and default
+is in the table; its description follows below.
 
 <!-- BEGIN AUTO-GENERATED: quick-reference -->
 ### `publish.npm`
@@ -54,6 +80,15 @@ Publish to npm registry.
 
   Name of the environment variable holding the npm auth token. Never put the token value here.
 
+
+*Example*
+
+```yaml
+publish:
+  npm:
+    access: public
+    token_var: NPM_TOKEN
+```
 
 ### `publish.docker`
 
@@ -121,6 +156,14 @@ Publish to a Maven repository.
   Name of the environment variable holding the repository password.
 
 
+*Example*
+
+```yaml
+publish:
+  maven:
+    repository: https://nexus.example.com/repository/maven-releases/
+```
+
 ### `publish.pypi`
 
 Publish to PyPI or a compatible registry.
@@ -162,6 +205,14 @@ Publish to crates.io or a compatible Cargo registry (e.g. Nexus).
   Name of the environment variable holding the registry API token.
 
 
+*Example*
+
+```yaml
+publish:
+  cargo:
+    index: sparse+http://nexus:8081/repository/brik-cargo/
+```
+
 ### `publish.nuget`
 
 Publish to NuGet or a compatible feed.
@@ -182,32 +233,19 @@ Publish to NuGet or a compatible feed.
 
 <!-- END AUTO-GENERATED -->
 
-`publish.docker.image` falls back to `package.docker.image` at runtime
-when omitted. `publish.docker.tags` defaults to `BRIK_APP_VERSION` or
-the commit SHA when the array is empty.
+`publish.docker.image` falls back to `package.docker.image` at runtime when
+omitted. `publish.docker.tags` defaults to `BRIK_APP_VERSION` or the commit SHA
+when the array is empty.
 
-## Examples
+### Examples
 
-### npm public package
+Per-field examples are under each field above. These are whole-section scenarios
+that those do not show.
 
-```yaml
-version: 1
-project:
-  name: my-lib
-  stack: node
-publish:
-  npm:
-    access: public
-    token_var: NPM_TOKEN
-```
-
-### Docker image to GHCR
+Docker image to GHCR, reusing the packaged image. `publish.docker.image` is
+omitted, so the runtime falls back to `package.docker.image`:
 
 ```yaml
-version: 1
-project:
-  name: my-app
-  stack: node
 package:
   docker:
     image: ghcr.io/org/app
@@ -218,16 +256,9 @@ publish:
     password_var: GHCR_TOKEN
 ```
 
-`publish.docker.image` is omitted; the runtime falls back to
-`package.docker.image`.
-
-### Maven to a private repository
+Maven to a private repository:
 
 ```yaml
-version: 1
-project:
-  name: my-lib
-  stack: java
 publish:
   maven:
     repository: https://nexus.example.com/repository/maven-releases/
@@ -235,25 +266,9 @@ publish:
     password_var: MAVEN_PASSWORD
 ```
 
-### PyPI
+Private Cargo registry, which needs a sparse index URL:
 
 ```yaml
-version: 1
-project:
-  name: my-lib
-  stack: python
-publish:
-  pypi:
-    token_var: PYPI_API_TOKEN
-```
-
-### Private Cargo registry
-
-```yaml
-version: 1
-project:
-  name: my-crate
-  stack: rust
 publish:
   cargo:
     registry: brik-cargo
@@ -261,25 +276,10 @@ publish:
     token_var: CARGO_TOKEN
 ```
 
-### NuGet
+Multiple targets in one config. The same run publishes both an npm package and a
+Docker image:
 
 ```yaml
-version: 1
-project:
-  name: my-lib
-  stack: dotnet
-publish:
-  nuget:
-    token_var: NUGET_TOKEN
-```
-
-### Multiple targets in one config
-
-```yaml
-version: 1
-project:
-  name: polyglot
-  stack: node
 package:
   docker:
     image: ghcr.io/org/polyglot
@@ -294,6 +294,7 @@ publish:
 
 ## See also
 
-- [`reference/package.md`](package.md) - the build that feeds publish
-- [`reference/release.md`](release.md) - `BRIK_APP_VERSION` semantics that drive tag choice
-- [`overview.md`](overview.md) - declarative model
+- [`package`](package.md) - the build that feeds publish
+- [`release`](release.md) - `BRIK_APP_VERSION` semantics that drive tag choice
+- [Fixed flows](../../concepts/fixed-flows.md) - where publishing sits in the Package stage
+- [`brik.yml` reference](README.md) - all top-level sections

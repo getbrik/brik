@@ -1,13 +1,38 @@
-# `quality` configuration
+# `quality`
 
-> Schema source: [`brik.schema.json#$defs/quality`](../../../schemas/config/v1/brik.schema.json)
+> Drive the Lint stage: linting, formatting, optional type checking, and the findings policy.
 
-The `quality` section drives the lint stage, which runs three
-independent checks: linting, formatting, and (optional) type checking.
-Each sub-section follows the same Tier 1 (`command`) / Tier 2 (`tool`) /
-Tier 3 (stack default) pattern as `build` and `test`.
+**Section:** `quality` (optional) &nbsp;·&nbsp; **Schema:** [`brik.schema.json#$defs/quality`](../../../schemas/config/v1/brik.schema.json)
 
-## Quick reference
+## What it is for
+
+Tell Brik how to check code quality before the artifact is packaged.
+
+The whole section is optional. With no `quality` block, Brik runs each stack's default linter and formatter, so a typical project never needs to configure it.
+
+When you do need control, you can pin the tools, supply exact commands, add a type check, or change which findings fail the build.
+
+## What it does
+
+The Lint stage runs three independent checks: linting, formatting, and (optional) type checking. Each sub-section resolves its command using the canonical three-tier order:
+
+- **Tier 1 (`command`)**: when a sub-section's `command` is set, it runs verbatim and its `tool` is ignored.
+
+- **Tier 2 (`tool`)**: when only a `tool` is set, the active stack module emits that tool's standard invocation.
+
+- **Tier 3 (stack default)**: with neither field set, the stack module runs its default tool. Type checking has no Tier 3 default; it runs only when `quality.type_check.command` or `quality.type_check.tool` is set.
+
+The `quality.findings.policy` preset decides which findings fail the build versus are ignored with a reason.
+
+## When it runs
+
+The Lint stage runs on every CI pipeline, in parallel with Test, SAST, and Scan, after Build.
+
+The Package stage waits on all four and gates on their business outcome, so a finding that the active policy treats as a failure blocks packaging.
+
+## How to configure
+
+Pin a `tool` or `command` per check, add a `type_check` to enable it, and pick a `findings.policy` preset.
 
 <!-- BEGIN AUTO-GENERATED: quick-reference -->
 ### `quality.lint`
@@ -43,6 +68,14 @@ Linting configuration.
   Whether to run the linter in auto-fix mode.
 
 
+*Example*
+
+```yaml
+quality:
+  lint:
+    tool: eslint
+```
+
 ### `quality.format`
 
 Code formatting configuration.
@@ -66,6 +99,14 @@ Code formatting configuration.
   Whether to run the formatter in check mode (fail if files would be reformatted) rather than applying changes.
 
 
+*Example*
+
+```yaml
+quality:
+  format:
+    tool: prettier
+```
+
 ### `quality.type_check`
 
 Type checking configuration.
@@ -84,6 +125,14 @@ Type checking configuration.
   Type checker to use (e.g. tsc, mypy, pyright). Overrides auto-detection (Tier 2).
 
 
+*Example*
+
+```yaml
+quality:
+  type_check:
+    tool: tsc
+```
+
 ### `quality.findings`
 
 Findings management policy. Selects the built-in preset that decides which findings fail the build vs. are ignored with reason. Org-wide exception lists are configured separately via the referential.s Policy document (an org-owned brik-policy.yml).
@@ -97,15 +146,21 @@ Findings management policy. Selects the built-in preset that decides which findi
   Built-in policy preset. pragmatic (default): ignores findings without an upstream fix or below the severity floor; fails the rest. strict: fails every finding at or above the severity floor, including no-fix entries. permissive: fails only critical findings that already have a fix.
 
 
+*Example*
+
+```yaml
+quality:
+  findings:
+    policy: strict
+```
+
 <!-- END AUTO-GENERATED -->
 
-The type-check sub-stage runs only when `quality.type_check.command` or
-`quality.type_check.tool` is set. There is no Tier 3 default for it.
+The type-check sub-stage runs only when `quality.type_check.command` or `quality.type_check.tool` is set. There is no Tier 3 default for it.
 
 ### Runtime status of each field
 
-A few fields are accepted by the schema but are **not yet consumed** by
-the runtime. They pass validation but do not change pipeline behaviour.
+A few fields are accepted by the schema but are **not yet consumed** by the runtime. They pass validation but do not change pipeline behaviour.
 
 | Field | Status |
 |-------|--------|
@@ -120,7 +175,7 @@ the runtime. They pass validation but do not change pipeline behaviour.
 | `quality.type_check.command` | wired (Tier 1) |
 | `quality.type_check.tool` | wired (Tier 2) |
 
-## Stack defaults
+### Stack defaults
 
 | Stack | Lint default | Format default |
 |-------|--------------|----------------|
@@ -130,23 +185,11 @@ the runtime. They pass validation but do not change pipeline behaviour.
 | `rust` | `clippy` | `rustfmt` |
 | `dotnet` | `dotnet-format` | `dotnet-format` |
 
-When the stack default tool is missing on the runner, Brik exits with
-`BRIK_EXIT_MISSING_DEP` rather than silently skipping.
+When the stack default tool is missing on the runner, Brik exits with `BRIK_EXIT_MISSING_DEP` rather than silently skipping.
 
-## Examples
+### Examples
 
-### Defaults (omit the section)
-
-```yaml
-version: 1
-project:
-  name: my-app
-  stack: node
-```
-
-Runs `eslint` and `prettier` with stack defaults. No type check.
-
-### Auto-fix on lint, format check-only
+Auto-fix on lint, format check-only. `eslint --fix` rewrites files; `prettier --check` fails the stage on any drift instead of rewriting:
 
 ```yaml
 version: 1
@@ -162,10 +205,7 @@ quality:
     check: true
 ```
 
-`eslint --fix` will rewrite files; `prettier --check` will fail the
-stage on any drift instead of rewriting.
-
-### Add a TypeScript type check
+Add a TypeScript type check. The lint stage now runs lint, format, and `tsc --noEmit`:
 
 ```yaml
 version: 1
@@ -177,9 +217,7 @@ quality:
     tool: tsc
 ```
 
-The lint stage now runs lint + format + `tsc --noEmit`.
-
-### Custom commands (Tier 1) end-to-end
+Custom commands (Tier 1) end-to-end. Each sub-section's command runs verbatim:
 
 ```yaml
 version: 1

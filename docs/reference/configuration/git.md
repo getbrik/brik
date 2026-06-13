@@ -1,16 +1,50 @@
-# `git` configuration
+# `git`
 
-> Schema source: [`brik.schema.json#$defs/git`](../../../schemas/config/v1/brik.schema.json)
+> Pin the Git identity Brik uses when a stage commits or annotates a tag.
 
-The `git` section pins the Git identity that Brik applies via
-`git config --global` before any stage that commits or annotates tags.
-Concretely: the release stage's changelog commit and tag, and the
-GitOps deploy stage's commit to the config repository.
+**Section:** `git` (optional) &nbsp;·&nbsp; **Schema:** [`brik.schema.json#$defs/git`](../../../schemas/config/v1/brik.schema.json)
 
-CI runners are ephemeral and ship without a Git identity, which is why
-this resolution exists at all.
+## What it is for
 
-## Quick reference
+Decide *who authors the commits and tags Brik creates on your behalf*.
+
+CI runners are ephemeral and ship without a Git identity, so something has to
+supply a `user.name` and `user.email` before any commit can be made. This
+section lets you set that identity explicitly, typically a fixed bot identity,
+instead of inheriting whoever happened to trigger the pipeline.
+
+You rarely configure this section. When it is absent Brik falls back to the CI
+platform's author variables, then to a built-in `Brik CI` default.
+
+## What it does
+
+- Applies the resolved identity via `git config --global` before any stage
+  that commits or annotates a tag.
+
+- Resolves each of `email` and `name` independently, taking the first
+  non-empty value in order: `brik.yml`, then CI platform variables
+  (`GITLAB_USER_EMAIL` / `CHANGE_AUTHOR_EMAIL` for the email,
+  `GITLAB_USER_NAME` / `CHANGE_AUTHOR_DISPLAY_NAME` for the name), then the
+  `brik-ci@brik.local` / `Brik CI` fallback.
+
+- Exports the resolved values as `BRIK_GIT_USER_EMAIL` and
+  `BRIK_GIT_USER_NAME` and writes them to the pipeline env file, so every later
+  stage shares the same identity.
+
+## When it runs
+
+This section is cross-cutting. It does not drive a stage of its own.
+
+The identity is used by the Release stage when it commits the generated
+changelog and annotates the release tag. It is also used by the Deploy stage's
+GitOps target when it commits the updated manifest to the config repository.
+
+If the pipeline never commits or pushes, no release on a tag and no GitOps
+deploy, the identity is never used and the section can be omitted.
+
+## How to configure
+
+The whole section is optional; set `git.user.*` only to pin a fixed identity.
 
 <!-- BEGIN AUTO-GENERATED: quick-reference -->
 ### `git.user`
@@ -31,51 +65,26 @@ Git user identity applied via 'git config --global' before stages that commit or
   Git user.name. If absent, falls back to CI-platform vars then to 'Brik CI'.
 
 
-<!-- END AUTO-GENERATED -->
-
-When the fields above are unset, Brik falls back to the CI platform
-variables and finally to the `brik-ci@brik.local` / `Brik CI` defaults.
-See *Resolution order* below.
-
-## Resolution order
-
-For each of `email` and `name`, the first non-empty value wins:
-
-1. `brik.yml` -- `git.user.email` / `git.user.name`.
-2. CI platform variables -- `GITLAB_USER_EMAIL` or `CHANGE_AUTHOR_EMAIL`
-   for the email; `GITLAB_USER_NAME` or `CHANGE_AUTHOR_DISPLAY_NAME` for
-   the name.
-3. Fallback -- `brik-ci@brik.local` / `Brik CI`.
-
-The resolved values are exported as `BRIK_GIT_USER_EMAIL` and
-`BRIK_GIT_USER_NAME` and written to the pipeline env file, so all
-later stages share the same identity.
-
-## When the section can be omitted
-
-- The pipeline never commits or pushes (no release on tag, no GitOps
-  deploy). The fallback is then unused.
-- The CI platform already exposes the human author via
-  `GITLAB_USER_EMAIL` / `CHANGE_AUTHOR_EMAIL` and that is the desired
-  attribution.
-
-Set `git.user.*` explicitly only when you want every commit to carry a
-fixed bot identity regardless of which user triggered the pipeline.
-
-## Examples
-
-### Defaults (no section)
+*Example*
 
 ```yaml
-version: 1
-project:
-  name: my-app
+git:
+  user:
+    email: ci@example.com
+    name: Brik CI
 ```
 
-The release stage will commit as the platform-detected user, falling
-back to `Brik CI <brik-ci@brik.local>` if no platform variable is set.
+<!-- END AUTO-GENERATED -->
 
-### Pinned bot identity
+Set `git.user.*` explicitly only when you want every commit to carry a fixed
+bot identity regardless of which user triggered the pipeline.
+
+### Examples
+
+Per-field examples are above. These are whole-section scenarios.
+
+Pin a fixed bot identity. Every release commit and every GitOps deploy commit
+is authored by `Brik CI <ci@example.com>` regardless of the triggering user:
 
 ```yaml
 version: 1
@@ -87,10 +96,8 @@ git:
     email: ci@example.com
 ```
 
-Every release commit and every GitOps deploy commit will be authored
-by `Brik CI <ci@example.com>` regardless of the triggering user.
-
-### Email only
+Pin the email only. The name still resolves from the platform variables, or
+falls back to `Brik CI`:
 
 ```yaml
 version: 1
@@ -101,11 +108,9 @@ git:
     email: ci@example.com
 ```
 
-Email is pinned; the name still resolves from the platform variables
-(or falls back to `Brik CI`).
-
 ## See also
 
-- [`reference/release.md`](release.md) - the changelog commit and tag use this identity
-- [`reference/deploy.md`](deploy.md) - the GitOps target commits to the config repo with this identity
-- [`overview.md`](overview.md) - declarative model
+- [`release`](release.md) - the changelog commit and tag use this identity
+- [`deploy`](deploy.md) - the GitOps target commits to the config repo with this identity
+- [Fixed flows](../../concepts/fixed-flows.md) - where the Release and Deploy stages sit in the flow
+- [`brik.yml` reference](README.md) - all top-level sections

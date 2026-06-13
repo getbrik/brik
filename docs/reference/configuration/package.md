@@ -1,16 +1,43 @@
-# `package` configuration
+# `package`
 
-> Schema source: [`brik.schema.json#$defs/package`](../../../schemas/config/v1/brik.schema.json)
+> Build a release artifact (today, a Docker image) from the sources the build
+> stage produced.
 
-The `package` stage builds a release artifact from the previously built
-sources. Only Docker image packaging is currently wired; the section
-key is reserved for future package types.
+**Section:** `package` (optional) &nbsp;·&nbsp; **Schema:** [`brik.schema.json#$defs/package`](../../../schemas/config/v1/brik.schema.json)
 
-When `package.docker.image` is unset the package stage logs `skipping
-package stage` and returns 0 -- the rest of the pipeline (deploy,
-notify) still runs.
+## What it is for
 
-## Quick reference
+Turn your built sources into the immutable artifact the rest of the flow
+publishes, scans, and deploys.
+
+Only Docker image packaging is currently wired. The section key is reserved for
+future package types.
+
+## What it does
+
+- Builds a Docker image from your `Dockerfile` and build context, then loads it
+  into the local Docker daemon so the publish targets in the same stage can push
+  it.
+- Tags the image with the version computed by the `release` stage
+  (`BRIK_APP_VERSION`), falling back to the short commit SHA, then to `latest`.
+- Optionally records a browseable registry UI URL so the pipeline report can
+  link to the image page.
+- Skips itself when `package.docker.image` is unset. The rest of the flow
+  (publish, deploy, notify) still runs.
+
+## When it runs
+
+The Package stage runs after Build, once Lint, SAST, Scan, and Test have all
+completed.
+
+By default it runs on a tag push. You can broaden that with `package.trigger`,
+for example `on-main: true` to package every push to the default branch, or
+`on-feature: true` to build a dev image per feature branch.
+
+## How to configure
+
+The whole section is optional. Each field's type and default is in the table;
+its description follows below.
 
 <!-- BEGIN AUTO-GENERATED: quick-reference -->
 ### `package.trigger`
@@ -80,6 +107,8 @@ Docker image build and push configuration.
 package:
   docker:
     image: registry.example.com/orders/orders-api
+    dockerfile: services/api/Dockerfile
+    context: services/api/
 ```
 
 ### `package.registry`
@@ -95,74 +124,38 @@ Metadata about the registry that hosts the published image. Optional; used to en
   Browseable registry UI URL, distinct from the docker push endpoint (Nexus 3 splits these on ports 8081 vs 8082). Surfaced as business.registry.ui_url so the HTML report links to the image page. The BRIK_PACKAGE_REGISTRY_UI_URL env var set on the runner takes precedence over this value.
 
 
-<!-- END AUTO-GENERATED -->
-
-When `package.docker.image` is unset, the package stage is skipped
-(the pipeline still continues with deploy and notify). `platforms` is
-accepted by the schema today but not yet consumed by the build wrapper.
-
-## Tagging
-
-The image is tagged with `<image>:<tag>` where `<tag>` is, in order of
-preference:
-
-1. `BRIK_APP_VERSION` -- the version computed by the `release` stage.
-2. `BRIK_COMMIT_SHORT_SHA` -- the short Git commit SHA when no release
-   has run.
-3. `latest` -- ultimate fallback.
-
-A typical pipeline produces `registry.example.com/my-service:1.4.2` on
-release builds and `registry.example.com/my-service:abc1234` on
-non-release builds.
-
-## Build engine
-
-`docker buildx build --load` is preferred when buildx is available on
-the runner; otherwise the wrapper falls back to legacy `docker build`
-with a warning. The image is loaded into the local Docker daemon by
-default so the publish targets, which run later within the same
-`package` stage, can push it.
-
-## Registry UI link
-
-`package.registry.ui_url` is purely cosmetic: it lets the pipeline
-report link to the human-browseable registry page. Many registries
-expose a push endpoint that differs from their UI -- Nexus 3, for
-instance, serves the docker API on port 8082 and the web browser on
-port 8081 -- so the URL parsed out of `package.docker.image` is not the
-one a human would open.
-
-Set it in `brik.yml`, or override it once at the CI level with the
-`BRIK_PACKAGE_REGISTRY_UI_URL` env var on the runner (the env var
-wins). When neither is set, `business.registry.ui_url` is omitted and
-the report falls back to a best-effort URL derived from the image
-host.
-
-## Examples
-
-### Minimal docker package
+*Example*
 
 ```yaml
-version: 1
-project:
-  name: my-app
-  stack: node
 package:
-  docker:
-    image: registry.example.com/my-service
+  registry:
+    ui_url: https://nexus.example.com:8081/#browse/browse:docker-hosted
 ```
 
-Builds `registry.example.com/my-service:<version-or-sha>` from
-`Dockerfile` at the workspace root.
+<!-- END AUTO-GENERATED -->
 
-### Custom Dockerfile and context (monorepo)
+`docker buildx build --load` is preferred when buildx is available on the runner.
+Otherwise the wrapper falls back to legacy `docker build` with a warning.
+`platforms` is accepted by the schema today but not yet consumed by the build
+wrapper, so the multi-arch build is a runtime gap.
+
+`package.registry.ui_url` is purely cosmetic. It lets the report link to the
+human-browseable registry page. Many registries expose a push endpoint that
+differs from their UI. Nexus 3, for instance, serves the docker API on port 8082
+and the web browser on port 8081, so the URL parsed out of `package.docker.image`
+is not the one a human would open. The `BRIK_PACKAGE_REGISTRY_UI_URL` env var on
+the runner takes precedence over this value. When neither is set, the report
+falls back to a best-effort URL derived from the image host.
+
+### Examples
+
+Per-field examples are under each field above. These are whole-section scenarios
+that those do not show.
+
+Custom Dockerfile and context for a monorepo. Build only the `services/api`
+subtree:
 
 ```yaml
-version: 1
-project:
-  name: api
-  stack: node
-  root: services/api
 package:
   docker:
     image: registry.example.com/api
@@ -170,31 +163,10 @@ package:
     context: services/api/
 ```
 
-### Multi-arch (schema-only today)
+Registry with a separate UI host. The image is pushed to `nexus.example.com:8082`
+while the report links to the Nexus web UI on port 8081:
 
 ```yaml
-version: 1
-project:
-  name: my-app
-  stack: rust
-package:
-  docker:
-    image: registry.example.com/my-service
-    platforms:
-      - linux/amd64
-      - linux/arm64
-```
-
-The schema validates the value, but the multi-arch build is a runtime
-gap -- it is not yet implemented.
-
-### Registry with a separate UI host
-
-```yaml
-version: 1
-project:
-  name: my-app
-  stack: node
 package:
   docker:
     image: nexus.example.com:8082/my-app
@@ -202,16 +174,10 @@ package:
     ui_url: https://nexus.example.com:8081/#browse/browse:docker-hosted
 ```
 
-The image is pushed to `nexus.example.com:8082` but the report links
-to the Nexus web UI on port 8081.
-
-### Build args
+Build args passed through to `docker build`. `$BRIK_COMMIT_SHORT_SHA` is expanded
+by the runner before the build runs:
 
 ```yaml
-version: 1
-project:
-  name: my-app
-  stack: node
 package:
   docker:
     image: registry.example.com/my-service
@@ -220,12 +186,10 @@ package:
       COMMIT_SHA: $BRIK_COMMIT_SHORT_SHA
 ```
 
-`$BRIK_COMMIT_SHORT_SHA` is expanded by the runner before invoking
-`docker build`.
-
 ## See also
 
-- [`reference/publish.md`](publish.md) - pushing the built image to the registry
-- [`reference/release.md`](release.md) - `BRIK_APP_VERSION` semantics that drive the image tag
-- [`reference/security.md`](security.md) - the container scan stage runs on the built image
-- [`overview.md`](overview.md) - declarative model
+- [`publish`](publish.md) - pushing the built image to the registry
+- [`release`](release.md) - `BRIK_APP_VERSION` semantics that drive the image tag
+- [`security`](security.md) - the container scan stage runs on the built image
+- [Fixed flows](../../concepts/fixed-flows.md) - where the Package stage sits in the flow
+- [`brik.yml` reference](README.md) - all top-level sections

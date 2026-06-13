@@ -1,8 +1,42 @@
-# `test` configuration
+# `test`
 
-> Schema source: [`brik.schema.json#$defs/test`](../../../schemas/config/v1/brik.schema.json)
+> Run the project's automated tests, and optionally enforce a coverage threshold and emit CI reports.
 
-## Quick reference
+**Section:** `test` (optional) &nbsp;·&nbsp; **Schema:** [`brik.schema.json#$defs/test`](../../../schemas/config/v1/brik.schema.json)
+
+## What it is for
+
+Tell Brik how to run your test suite.
+
+The whole section is optional. With no `test` block, Brik runs the stack's default framework, so a typical project never needs to configure it.
+
+When you do need control, you can pin the framework, supply an exact command, turn on report generation, or enforce a minimum coverage percentage.
+
+## What it does
+
+Brik resolves the test command using its canonical three-tier order:
+
+- **Tier 1 (`command`)**: when `test.command` is set, it runs verbatim from `BRIK_WORKSPACE` and the framework is ignored.
+
+- **Tier 2 (`framework`)**: when only `test.framework` is set, the active stack module emits that framework's standard invocation.
+
+- **Tier 3 (stack default)**: with neither field set, the stack module runs its default framework.
+
+On top of that:
+
+- With `test.reports.enabled: true`, Brik injects framework-specific flags into the test command to produce a coverage report and a JUnit-compatible XML report at the configured paths, which the CI consumes automatically.
+
+- With `test.coverage.threshold` set, the stage fails when measured coverage falls below the threshold (it requires reports to be enabled so a coverage report exists).
+
+## When it runs
+
+The Test stage runs on every CI pipeline, in parallel with Lint, SAST, and Scan, after Build.
+
+The Package stage waits on all four and gates on their business outcome, so a coverage threshold failure here blocks packaging.
+
+## How to configure
+
+Pin a `framework` or `command`, then optionally enable `reports` and a coverage `threshold`.
 
 <!-- BEGIN AUTO-GENERATED: quick-reference -->
 | Field | Type | Default |
@@ -23,6 +57,7 @@
 
 ```yaml
 test:
+  command: npm test -- --runInBand
   framework: jest
 ```
 
@@ -83,6 +118,15 @@ Coverage report configuration. Gated by the parent `reports.enabled` toggle.
   Directory where the coverage report is written. Default: coverage.
 
 
+*Example*
+
+```yaml
+test:
+  reports:
+    coverage:
+      output_dir: target/coverage
+```
+
 #### `test.reports.junit`
 
 JUnit-compatible XML test report configuration. Gated by the parent `reports.enabled` toggle.
@@ -96,13 +140,20 @@ JUnit-compatible XML test report configuration. Gated by the parent `reports.ena
   Path where the JUnit XML report is written. Default: reports/junit.xml.
 
 
+*Example*
+
+```yaml
+test:
+  reports:
+    junit:
+      output_path: target/junit.xml
+```
+
 <!-- END AUTO-GENERATED -->
 
-## Runtime status of each field
+### Runtime status of each field
 
-Several fields above are accepted by the schema but are **not yet
-consumed** by the runtime. Setting them does not break validation, but
-it does not change pipeline behaviour either.
+Several fields above are accepted by the schema but are **not yet consumed** by the runtime. Setting them does not break validation, but it does not change pipeline behaviour either.
 
 | Field | Status |
 |-------|--------|
@@ -115,10 +166,9 @@ it does not change pipeline behaviour either.
 | `test.reports.coverage.output_dir` | wired -- consumed by stack test commands |
 | `test.reports.junit.output_path` | wired -- consumed by stack test commands |
 
-## Supported framework values
+### Supported framework values
 
-Each stack accepts a closed set of framework names; the dispatcher
-rejects any other value before the test command is built.
+Each stack accepts a closed set of framework names; the dispatcher rejects any other value before the test command is built.
 
 | Stack | Accepted `framework` values |
 |-------|------------------------------|
@@ -128,7 +178,7 @@ rejects any other value before the test command is built.
 | `rust` | `cargo` |
 | `dotnet` | `dotnet`, `xunit`, `nunit` (aliases for the same `dotnet test` invocation; the runner is auto-detected from the project's `<PackageReference>`) |
 
-## Stack defaults
+### Stack defaults
 
 | Stack | `test.framework` default | Coverage format produced |
 |-------|-------------------------|--------------------------|
@@ -138,25 +188,11 @@ rejects any other value before the test command is built.
 | `rust` | `cargo` | `cobertura` (when `cargo-llvm-cov` is available) |
 | `dotnet` | `xunit` | `cobertura` |
 
-## Examples
+`test.command` (Tier 1) wins over `test.framework` (Tier 2), which wins over the stack default (Tier 3).
 
-### Minimal (all defaults)
+### Examples
 
-```yaml
-version: 1
-project:
-  name: my-app
-  stack: node
-test:
-  framework: jest
-```
-
-### Reports enabled
-
-When `test.reports.enabled` is `true`, Brik injects framework-specific
-flags into the test command to produce a Cobertura coverage report and
-a JUnit XML report at the documented paths. The CI consumes those
-artifacts automatically.
+Reports enabled. Brik injects framework-specific flags to produce a coverage report and a JUnit XML report at the documented paths, which the CI consumes automatically:
 
 ```yaml
 version: 1
@@ -174,7 +210,7 @@ test:
       output_path: target/junit.xml
 ```
 
-### Coverage threshold (enforced)
+Coverage threshold (enforced). The stage compares the parsed coverage percentage against this value after the test command runs and exits with `BRIK_EXIT_CHECK_FAILED` (10) when it is too low. The gate runs only when reports are enabled so a report exists; a missing or malformed report logs a warning and lets the pipeline continue. A passing-but-undercovered run is escalated to a failure, while a failing test run keeps its own return code:
 
 ```yaml
 version: 1
@@ -187,20 +223,6 @@ test:
   coverage:
     threshold: 90
 ```
-
-When set, the Test stage compares the parsed coverage percentage against
-this value after the test command runs. If the measured coverage is
-below the threshold, the stage exits with `BRIK_EXIT_CHECK_FAILED` (10).
-The gate runs only when `test.reports.enabled: true` so a coverage
-report exists; a missing or malformed report logs a warning and lets
-the pipeline continue. A passing-but-undercovered run is escalated to a
-failure; a failing test run keeps its own rc rather than being
-overwritten by the gate.
-
-## Tier semantics
-
-`test.command` (Tier 1) wins over `test.framework` (Tier 2), which wins
-over the stack default (Tier 3).
 
 ## See also
 

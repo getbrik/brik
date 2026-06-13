@@ -1,23 +1,42 @@
-# `security` configuration
+# `security`
 
-> Schema source: [`brik.schema.json#$defs/security`](../../../schemas/config/v1/brik.schema.json)
+> Configure the security-scanning stages: SAST, dependency and secret scanning,
+> license compliance, and container image scanning.
 
-The `security` section drives three CI-visible stages that run in
-parallel with `quality`:
+**Section:** `security` (optional) &nbsp;·&nbsp; **Schema:** [`brik.schema.json#$defs/security`](../../../schemas/config/v1/brik.schema.json)
 
-- **SAST** -- static application security testing, plus opt-in IaC
-  scanning when `security.iac` is set.
-- **Scan** -- dependency vulnerability scan + secret scan + license
-  compliance.
-- **Container scan** -- image-level vulnerability scan, runs after
-  `package`.
+## What it is for
 
-The whole section is optional. With no overrides, each stage applies a
-stack-aware default tool (e.g. `semgrep` for SAST, `osv-scanner` for
-deps) and uses the global `severity_threshold` (or the per-section
-override) to decide what fails the build.
+Catch vulnerabilities, leaked secrets, and license problems before an artifact
+is published or deployed, and decide what severity blocks the build.
 
-## Quick reference
+You almost never need to configure this section. With no overrides, each stage
+picks a stack-aware default tool (for example `semgrep` for SAST, `osv-scanner`
+for dependencies) and uses the `high` threshold to decide what fails.
+
+## What it does
+
+- Runs static application security testing (SAST), with opt-in Infrastructure as
+  Code scanning when `security.iac` is set.
+- Scans dependencies for known vulnerabilities, scans for committed secrets, and
+  checks license compliance, optionally emitting an SBOM.
+- Scans the packaged container image for image-level vulnerabilities.
+- Fails a stage when a finding's severity meets or exceeds the resolved
+  threshold. Lower-severity findings are reported but do not block.
+
+## When it runs
+
+This section drives three CI-visible stages.
+
+SAST and Scan (dependency, secret, license) run after Build, in parallel with
+the Test and Lint branches. They always run.
+
+Container Scan runs after the Package stage, against the image Package produced.
+
+## How to configure
+
+The whole section is optional. Each field's type and default is in the table;
+its description follows below.
 
 <!-- BEGIN AUTO-GENERATED: quick-reference -->
 | Field | Type | Default |
@@ -61,6 +80,15 @@ Static application security testing configuration.
 
   Path (relative to the workspace) where the SAST tool writes its report. Defaults to target/sast.sarif.
 
+
+*Example*
+
+```yaml
+security:
+  sast:
+    tool: semgrep
+    ruleset: p/security-audit
+```
 
 ### `security.deps`
 
@@ -154,6 +182,14 @@ License compliance checking configuration.
   Comma-separated list of denied licenses.
 
 
+*Example*
+
+```yaml
+security:
+  license:
+    allowed: MIT,Apache-2.0,BSD-3-Clause
+```
+
 ### `security.container`
 
 Container image vulnerability scanning configuration.
@@ -190,81 +226,52 @@ Infrastructure as Code scanning configuration.
   IaC scanning tool to use (e.g. checkov, tfsec).
 
 
+*Example*
+
+```yaml
+security:
+  iac:
+    tool: checkov
+```
+
 <!-- END AUTO-GENERATED -->
 
-When both `license.allowed` and `license.denied` are set, `denied` is
-checked first. The IaC stage runs only when `security.iac.command` or
-`security.iac.tool` is set.
+When both `license.allowed` and `license.denied` are set, `denied` is checked
+first. The IaC scan runs only when `security.iac.command` or `security.iac.tool`
+is set.
 
-## Severity semantics
+### Severity semantics
 
-A finding fails the stage when its severity is greater than or equal to
-the resolved threshold (lowest precedence first):
+A finding fails the stage when its severity is greater than or equal to the
+resolved threshold. The threshold is resolved in this order, lowest precedence
+first:
 
-1. **Per-section** -- `security.deps.severity`, `security.container.severity`.
-2. **Global** -- `security.severity_threshold`.
-3. **Built-in default** -- `high`.
+1. **Per-section**: `security.deps.severity`, `security.container.severity`.
+2. **Global**: `security.severity_threshold`.
+3. **Built-in default**: `high`.
 
-The ordering of severities is `critical > high > medium > low`.
+The ordering of severities is `critical > high > medium > low`. Omit the section
+entirely and you get `semgrep` (SAST), `osv-scanner` plus `gitleaks` (Scan), and
+the default container scan, all failing on `high` or `critical` findings.
 
-## Examples
+### Examples
 
-### Defaults (omit the section)
+Per-field examples are under each field above. These are whole-section scenarios
+that those do not show.
 
-```yaml
-version: 1
-project:
-  name: my-app
-  stack: node
-```
-
-Runs `semgrep` (SAST), `osv-scanner` + `gitleaks` (Scan), and the
-default container scan after package. All stages fail on `high` or
-`critical` findings.
-
-### Tighten the threshold globally
+Pin the SAST tool with a custom ruleset:
 
 ```yaml
-version: 1
-project:
-  name: my-app
-  stack: python
-security:
-  severity_threshold: medium
-```
-
-### License allow-list
-
-```yaml
-version: 1
-project:
-  name: my-lib
-  stack: node
-security:
-  license:
-    allowed: MIT,Apache-2.0,BSD-3-Clause
-```
-
-### Pin SAST tool with a custom ruleset
-
-```yaml
-version: 1
-project:
-  name: my-app
-  stack: python
 security:
   sast:
     tool: semgrep
     ruleset: p/security-audit
 ```
 
-### Per-section thresholds
+Per-section thresholds. `deps` blocks only on `critical`, `container` blocks on
+`medium` or above, and everything else uses the global `high`:
 
 ```yaml
-version: 1
-project:
-  name: my-app
-  stack: node
 security:
   severity_threshold: high
   deps:
@@ -273,23 +280,17 @@ security:
     severity: medium
 ```
 
-`deps` blocks only on `critical`; `container` blocks on `medium` or
-above; everything else uses the global `high`.
-
-### IaC scan opt-in
+License allow-list. Only the listed licenses pass compliance:
 
 ```yaml
-version: 1
-project:
-  name: infra
-  stack: python
 security:
-  iac:
-    tool: checkov
+  license:
+    allowed: MIT,Apache-2.0,BSD-3-Clause
 ```
 
 ## See also
 
-- [`reference/quality.md`](quality.md) - lint, format, type check (parallel branch)
-- [`reference/package.md`](package.md) - the container image fed to `security.container`
-- [`overview.md`](overview.md) - declarative model
+- [`quality`](quality.md) - lint, format, type check (parallel branch)
+- [`package`](package.md) - the container image fed to `security.container`
+- [Fixed flows](../../concepts/fixed-flows.md) - where SAST, Scan, and Container Scan sit in the flow
+- [`brik.yml` reference](README.md) - all top-level sections

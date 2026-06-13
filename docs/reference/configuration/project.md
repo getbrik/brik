@@ -1,11 +1,36 @@
-# `project` configuration
+# `project`
 
-> Schema source: [`brik.schema.json#properties/project`](../../../schemas/config/v1/brik.schema.json)
+> Declare the application's identity and which stack toolchain the pipeline runs on.
 
-The `project` section carries identity. `project.name` is the only
-required field in `brik.yml` apart from the top-level `version`.
+**Section:** `project` (required) &nbsp;·&nbsp; **Schema:** [`brik.schema.json#properties/project`](../../../schemas/config/v1/brik.schema.json)
 
-## Quick reference
+## What it is for
+
+Give the application a name and tell Brik which technology stack it is built with.
+
+`project.name` is the only required field in `brik.yml` apart from the top-level `version`. Everything else in the section is optional and has a working default.
+
+The stack and stack version decide which runner image the pipeline uses, so every stage runs with the right toolchain available.
+
+## What it does
+
+- Labels the build in logs, notifications, and artifact names from `project.name`.
+
+- Selects the runner image from `project.stack` and `project.stack_version`. When the stack is omitted, Brik auto-detects it from marker files in the repository.
+
+- Resolves a service root in monorepos from `project.root`, so each service can carry its own `brik.yml`.
+
+- Loads project-level environment variables from `project.env` (or an auto-detected `brik.env` at the repo root). Existing environment variables, such as CI secrets, always take precedence over file entries.
+
+## When it runs
+
+The `project` section is read on every pipeline run, during Init, before any stage executes.
+
+It does not drive a stage of its own. Instead it sets the execution context (name, runner image, working directory, env file) that the whole flow depends on.
+
+## How to configure
+
+`project.name` is required; the rest is optional with auto-detection and sensible defaults.
 
 <!-- BEGIN AUTO-GENERATED: quick-reference -->
 | Field | Type | Default |
@@ -44,15 +69,13 @@ project:
   name: orders-api
   stack: node
   stack_version: 22
+  root: services/api
+  env: services/api/.env.ci
 ```
 
 <!-- END AUTO-GENERATED -->
 
-`project.name` is required (minimum length 1). `project.stack` is
-auto-detected from marker files when omitted (see below). `project.env`
-defaults to `brik.env` at the repo root when the file exists.
-
-## Stack auto-detection
+### Stack auto-detection
 
 When `project.stack` is omitted, Brik infers it from marker files.
 
@@ -64,14 +87,11 @@ When `project.stack` is omitted, Brik infers it from marker files.
 | `Cargo.toml` | `rust` |
 | `*.csproj`, `*.sln` | `dotnet` |
 
-If no marker is present the stack stays empty and stage logic falls back
-to the base runner image (`brik-runner-base:latest`).
+If no marker is present the stack stays empty and stage logic falls back to the base runner image (`brik-runner-base:latest`).
 
-## Stack versions
+### Stack versions
 
-`project.stack_version` is a free-form string matched against the
-runner image tag. The supported tags are published in
-[`brik-images/versions.json`](https://github.com/getbrik/brik-images/blob/main/versions.json).
+`project.stack_version` is a free-form string matched against the runner image tag. The supported tags are published in [`brik-images/versions.json`](https://github.com/getbrik/brik-images/blob/main/versions.json).
 
 | Stack | Supported `stack_version` values |
 |-------|----------------------------------|
@@ -81,22 +101,17 @@ runner image tag. The supported tags are published in
 | `rust` | `"1"` |
 | `dotnet` | `"9.0"`, `"10.0"` |
 
-Always quote numeric versions to keep them as strings (`"3.13"`, not
-`3.13`); the schema rejects numeric values.
+Always quote numeric versions to keep them as strings (`"3.13"`, not `3.13`); the schema rejects numeric values.
 
-## Examples
+### The top-level `version` key
 
-### Minimal
+The top-level `version` key declares the schema major version. It is a singleton `const: 1`; any other value fails validation at `brik validate` and at the `init` stage (exit code 7).
 
-```yaml
-version: 1
-project:
-  name: my-app
-```
+A future schema bump (breaking changes) will introduce `version: 2` and a parallel `schemas/config/v2/`. Until then, `1` is the only legal value.
 
-Stack auto-detected from the repo, default runner image.
+### Examples
 
-### Pinned stack and version
+Pinned stack and version. Skip auto-detection and force a Java 21 runner image:
 
 ```yaml
 version: 1
@@ -106,7 +121,7 @@ project:
   stack_version: "21"
 ```
 
-### Monorepo service with a project-level env file
+Monorepo service with a project-level env file. `root` is interpreted relative to the repository root; `env` is interpreted relative to `root` (or to the repository root when `root` is unset):
 
 ```yaml
 version: 1
@@ -118,28 +133,9 @@ project:
   env: services/api/.env.ci
 ```
 
-`root` is interpreted relative to the repository root; `env` is
-interpreted relative to `root` (or to the repository root when `root` is
-unset).
-
-## Version
-
-The top-level `version` key declares the schema major version. It is a
-singleton `const: 1`; any other value fails validation at `brik
-validate` and at the `init` stage (exit code 7).
-
-```yaml
-version: 1
-project:
-  name: my-app
-```
-
-A future schema bump (breaking changes) will introduce `version: 2` and
-a parallel `schemas/config/v2/`. Until then, `1` is the only legal
-value.
-
 ## See also
 
 - [`overview.md`](overview.md) - declarative model and three-tier resolution
-- [`reference/build.md`](build.md) - how `stack`/`stack_version` flow into the build stage
+- [`build`](build.md) - how `stack`/`stack_version` flow into the build stage
 - [`stacks/node.md`](stacks/node.md), [`python.md`](stacks/python.md), [`java.md`](stacks/java.md), [`rust.md`](stacks/rust.md), [`dotnet.md`](stacks/dotnet.md) - per-stack notes
+- [`brik.yml` reference](README.md) - all top-level sections

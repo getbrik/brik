@@ -36,11 +36,11 @@
           "examples": ["22"]
         },
         "root": {
-          "description": "Relative path to the service root directory. Used in monorepos where each service has its own brik.yml.",
+          "examples": ["services/api"], "description": "Relative path to the service root directory. Used in monorepos where each service has its own brik.yml.",
           "type": "string"
         },
         "env": {
-          "description": "Path to the project-level env file (KEY=VALUE format), relative to the project root. Optional. When omitted, Brik auto-detects 'brik.env' at the repo root. Existing environment variables (CI secrets, etc.) take precedence over file entries.",
+          "examples": ["services/api/.env.ci"], "description": "Path to the project-level env file (KEY=VALUE format), relative to the project root. Optional. When omitted, Brik auto-detects 'brik.env' at the repo root. Existing environment variables (CI secrets, etc.) take precedence over file entries.",
           "type": "string",
           "minLength": 1
         }
@@ -326,12 +326,12 @@
       "additionalProperties": false,
       "properties": {
         "command": {
-          "description": "Build command to execute. Overrides both tool selection and stack defaults (Tier 1).",
+          "examples": ["mvn package -DskipTests"], "description": "Build command to execute. Overrides both tool selection and stack defaults (Tier 1).",
           "type": "string",
           "minLength": 1
         },
         "tool": {
-          "description": "Build tool to use (e.g. npm, yarn, pnpm, maven, gradle, poetry, uv, pip, pipenv, cargo, dotnet). Overrides auto-detection from lock/marker files (Tier 2). Ignored when command is set.",
+          "examples": ["pnpm"], "description": "Build tool to use (e.g. npm, yarn, pnpm, maven, gradle, poetry, uv, pip, pipenv, cargo, dotnet). Overrides auto-detection from lock/marker files (Tier 2). Ignored when command is set.",
           "type": "string",
           "minLength": 1
         }
@@ -342,7 +342,7 @@
       "additionalProperties": false,
       "properties": {
         "command": {
-          "description": "Test command to execute. Overrides framework-derived and stack-default commands (Tier 1).",
+          "examples": ["npm test -- --runInBand"], "description": "Test command to execute. Overrides framework-derived and stack-default commands (Tier 1).",
           "type": "string",
           "minLength": 1
         },
@@ -394,7 +394,7 @@
                   "default": "auto"
                 },
                 "output_dir": {
-                  "description": "Directory where the coverage report is written. Default: coverage.",
+                  "examples": ["target/coverage"], "description": "Directory where the coverage report is written. Default: coverage.",
                   "type": "string",
                   "default": "coverage"
                 }
@@ -406,7 +406,7 @@
               "additionalProperties": false,
               "properties": {
                 "output_path": {
-                  "description": "Path where the JUnit XML report is written. Default: reports/junit.xml.",
+                  "examples": ["target/junit.xml"], "description": "Path where the JUnit XML report is written. Default: reports/junit.xml.",
                   "type": "string",
                   "default": "reports/junit.xml"
                 }
@@ -437,7 +437,7 @@
               "minLength": 1
             },
             "tool": {
-              "description": "Lint tool to use (e.g. eslint, biome, oxlint, checkstyle, ruff, flake8, pylint, clippy, dotnet-format). Overrides the stack default (Tier 2).",
+              "examples": ["eslint"], "description": "Lint tool to use (e.g. eslint, biome, oxlint, checkstyle, ruff, flake8, pylint, clippy, dotnet-format). Overrides the stack default (Tier 2).",
               "type": "string",
               "minLength": 1
             },
@@ -464,7 +464,7 @@
               "minLength": 1
             },
             "tool": {
-              "description": "Formatter to use (e.g. prettier, biome, ruff format, black, rustfmt, dotnet-format). Overrides the stack default (Tier 2).",
+              "examples": ["prettier"], "description": "Formatter to use (e.g. prettier, biome, ruff format, black, rustfmt, dotnet-format). Overrides the stack default (Tier 2).",
               "type": "string",
               "minLength": 1
             },
@@ -486,7 +486,7 @@
               "minLength": 1
             },
             "tool": {
-              "description": "Type checker to use (e.g. tsc, mypy, pyright). Overrides auto-detection (Tier 2).",
+              "examples": ["tsc"], "description": "Type checker to use (e.g. tsc, mypy, pyright). Overrides auto-detection (Tier 2).",
               "type": "string",
               "minLength": 1
             }
@@ -498,7 +498,7 @@
           "additionalProperties": false,
           "properties": {
             "policy": {
-              "description": "Built-in policy preset. pragmatic (default): ignores findings without an upstream fix or below the severity floor; fails the rest. strict: fails every finding at or above the severity floor, including no-fix entries. permissive: fails only critical findings that already have a fix.",
+              "examples": ["strict"], "description": "Built-in policy preset. pragmatic (default): ignores findings without an upstream fix or below the severity floor; fails the rest. strict: fails every finding at or above the severity floor, including no-fix entries. permissive: fails only critical findings that already have a fix.",
               "type": "string",
               "enum": ["pragmatic", "strict", "permissive"],
               "default": "pragmatic"
@@ -522,12 +522,12 @@
               "minLength": 1
             },
             "tool": {
-              "description": "SAST tool to use (e.g. semgrep, sonarqube, codeql). Overrides auto-detection (Tier 2).",
+              "examples": ["semgrep"], "description": "SAST tool to use (e.g. semgrep, sonarqube, codeql). Overrides auto-detection (Tier 2).",
               "type": "string",
               "minLength": 1
             },
             "ruleset": {
-              "description": "Ruleset or profile for the SAST tool (e.g. auto, p/security-audit).",
+              "examples": ["p/security-audit"], "description": "Ruleset or profile for the SAST tool (e.g. auto, p/security-audit).",
               "type": "string",
               "minLength": 1
             },
@@ -619,7 +619,7 @@
           "additionalProperties": false,
           "properties": {
             "allowed": {
-              "description": "Comma-separated list of allowed licenses.",
+              "examples": ["MIT,Apache-2.0,BSD-3-Clause"], "description": "Comma-separated list of allowed licenses.",
               "type": "string"
             },
             "denied": {
@@ -656,7 +656,7 @@
               "minLength": 1
             },
             "tool": {
-              "description": "IaC scanning tool to use (e.g. checkov, tfsec).",
+              "examples": ["checkov"], "description": "IaC scanning tool to use (e.g. checkov, tfsec).",
               "type": "string",
               "minLength": 1
             }
@@ -696,13 +696,13 @@
               "examples": ["registry.example.com/orders/orders-api"]
             },
             "dockerfile": {
-              "description": "Path to the Dockerfile relative to the build context.",
+              "examples": ["services/api/Dockerfile"], "description": "Path to the Dockerfile relative to the build context.",
               "type": "string",
               "minLength": 1,
               "default": "Dockerfile"
             },
             "context": {
-              "description": "Docker build context path.",
+              "examples": ["services/api/"], "description": "Docker build context path.",
               "type": "string",
               "minLength": 1,
               "default": "."
@@ -732,7 +732,7 @@
           "additionalProperties": false,
           "properties": {
             "ui_url": {
-              "description": "Browseable registry UI URL, distinct from the docker push endpoint (Nexus 3 splits these on ports 8081 vs 8082). Surfaced as business.registry.ui_url so the HTML report links to the image page. The BRIK_PACKAGE_REGISTRY_UI_URL env var set on the runner takes precedence over this value.",
+              "examples": ["https://nexus.example.com:8081/#browse/browse:docker-hosted"], "description": "Browseable registry UI URL, distinct from the docker push endpoint (Nexus 3 splits these on ports 8081 vs 8082). Surfaced as business.registry.ui_url so the HTML report links to the image page. The BRIK_PACKAGE_REGISTRY_UI_URL env var set on the runner takes precedence over this value.",
               "type": "string",
               "minLength": 1
             }
@@ -761,12 +761,12 @@
               "default": "latest"
             },
             "access": {
-              "description": "Package access level for scoped packages.",
+              "examples": ["public"], "description": "Package access level for scoped packages.",
               "type": "string",
               "enum": ["public", "restricted"]
             },
             "token_var": {
-              "description": "Name of the environment variable holding the npm auth token. Never put the token value here.",
+              "examples": ["NPM_TOKEN"], "description": "Name of the environment variable holding the npm auth token. Never put the token value here.",
               "type": "string",
               "minLength": 1
             }
@@ -818,7 +818,7 @@
           "additionalProperties": false,
           "properties": {
             "repository": {
-              "description": "Maven repository URL.",
+              "examples": ["https://nexus.example.com/repository/maven-releases/"], "description": "Maven repository URL.",
               "type": "string",
               "format": "uri"
             },
@@ -863,7 +863,7 @@
               "default": "crates-io"
             },
             "index": {
-              "description": "Sparse index URL for the registry (e.g. sparse+http://nexus:8081/repository/brik-cargo/). Required for private registries.",
+              "examples": ["sparse+http://nexus:8081/repository/brik-cargo/"], "description": "Sparse index URL for the registry (e.g. sparse+http://nexus:8081/repository/brik-cargo/). Required for private registries.",
               "type": "string"
             },
             "token_var": {
@@ -909,7 +909,7 @@
           }
         },
         "workflow": {
-          "description": "Git workflow convention for automatic environment mapping. When set, Brik loads a built-in profile that pre-configures environments based on branch/tag patterns. User-defined environments override profile defaults.",
+          "examples": ["github-flow"], "description": "Git workflow convention for automatic environment mapping. When set, Brik loads a built-in profile that pre-configures environments based on branch/tag patterns. User-defined environments override profile defaults.",
           "type": "string",
           "enum": ["trunk-based", "git-flow", "github-flow"]
         },
@@ -1119,7 +1119,7 @@
           "additionalProperties": false,
           "properties": {
             "channel": {
-              "description": "Slack channel name including the # prefix (e.g. #deployments).",
+              "examples": ["#deployments"], "description": "Slack channel name including the # prefix (e.g. #deployments).",
               "type": "string",
               "minLength": 1
             },
@@ -1135,7 +1135,7 @@
           "additionalProperties": false,
           "properties": {
             "to": {
-              "description": "Recipient email address or comma-separated list of addresses.",
+              "examples": ["oncall@example.com"], "description": "Recipient email address or comma-separated list of addresses.",
               "type": "string",
               "minLength": 1
             },
@@ -1151,7 +1151,7 @@
           "additionalProperties": false,
           "properties": {
             "url": {
-              "description": "Webhook endpoint URL.",
+              "examples": ["https://hooks.example.com/notify"], "description": "Webhook endpoint URL.",
               "type": "string",
               "format": "uri",
               "minLength": 1
@@ -1190,7 +1190,7 @@
           "$ref": "#/$defs/hookCommand"
         },
         "pre_build": {
-          "description": "Commands executed before the build stage.",
+          "examples": ["./scripts/clean.sh && ./scripts/setup.sh"], "description": "Commands executed before the build stage.",
           "$ref": "#/$defs/hookCommand"
         },
         "post_build": {
@@ -1246,11 +1246,11 @@
           "$ref": "#/$defs/hookCommand"
         },
         "pre_deploy": {
-          "description": "Commands executed before the deploy stage.",
+          "examples": ["./scripts/check-migration.sh"], "description": "Commands executed before the deploy stage.",
           "$ref": "#/$defs/hookCommand"
         },
         "post_deploy": {
-          "description": "Commands executed after the deploy stage completes successfully.",
+          "examples": ["./scripts/smoke-test.sh"], "description": "Commands executed after the deploy stage completes successfully.",
           "$ref": "#/$defs/hookCommand"
         },
         "pre_notify": {
@@ -1273,12 +1273,12 @@
           "additionalProperties": false,
           "properties": {
             "email": {
-              "description": "Git user.email. If absent, falls back to CI-platform vars (GITLAB_USER_EMAIL, CHANGE_AUTHOR_EMAIL) then to brik-ci@brik.local.",
+              "examples": ["ci@example.com"], "description": "Git user.email. If absent, falls back to CI-platform vars (GITLAB_USER_EMAIL, CHANGE_AUTHOR_EMAIL) then to brik-ci@brik.local.",
               "type": "string",
               "format": "email"
             },
             "name": {
-              "description": "Git user.name. If absent, falls back to CI-platform vars then to 'Brik CI'.",
+              "examples": ["Brik CI"], "description": "Git user.name. If absent, falls back to CI-platform vars then to 'Brik CI'.",
               "type": "string",
               "minLength": 1
             }
