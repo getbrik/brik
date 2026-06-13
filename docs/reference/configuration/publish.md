@@ -77,6 +77,9 @@ Publish to npm registry.
 
   Package access level for scoped packages.
 
+  - **`public`**: publish the scoped package publicly
+  - **`restricted`**: publish the scoped package privately (restricted)
+
 - **`publish.npm.token_var`**
 
   Name of the environment variable holding the npm auth token. Never put the token value here.

@@ -48,6 +48,11 @@ its description follows below.
 
   Global minimum vulnerability severity that causes the security stage to fail. Vulnerabilities below this level are reported but do not block the pipeline.
 
+  - **`critical`**: most severe, typically exploitable issues
+  - **`high`**: serious issues that should be fixed promptly
+  - **`medium`**: moderate-risk issues
+  - **`low`**: minor or informational issues
+
 
 ### `security.sast`
 
@@ -109,6 +114,11 @@ Dependency vulnerability scanning configuration.
 - **`security.deps.severity`**
 
   Minimum severity level that causes the dependency scan to fail.
+
+  - **`critical`**: most severe, typically exploitable issues
+  - **`high`**: serious issues that should be fixed promptly
+  - **`medium`**: moderate-risk issues
+  - **`low`**: minor or informational issues
 
 - **`security.deps.tool`**
 
@@ -207,6 +217,11 @@ Container image vulnerability scanning configuration.
 - **`security.container.severity`**
 
   Minimum severity level that causes the container scan to fail.
+
+  - **`critical`**: most severe, typically exploitable issues
+  - **`high`**: serious issues that should be fixed promptly
+  - **`medium`**: moderate-risk issues
+  - **`low`**: minor or informational issues
 
 
 ### `security.iac`

@@ -112,7 +112,12 @@ Coverage report configuration. Gated by the parent `reports.enabled` toggle.
 
 - **`test.reports.coverage.format`**
 
-  Coverage report format. Stack defaults: lcov for node/rust, cobertura for python/dotnet, jacoco for java. Use 'auto' (default) to let Brik pick.
+  Coverage report format.
+
+  - **`lcov`**: stack default for node and rust
+  - **`cobertura`**: stack default for python and dotnet
+  - **`jacoco`**: stack default for java
+  - **`auto`** (default): let Brik pick the format from the stack
 
 - **`test.reports.coverage.output_dir`**
 

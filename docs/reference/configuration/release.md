@@ -53,11 +53,20 @@ its description follows below.
 
 - **`release.strategy`**
 
-  Release strategy. Only `semver` is implemented; `calver` and `custom` are not yet implemented and fall back to `semver` for now.
+  Release strategy.
+
+  - **`semver`** (default): semantic versioning (the only strategy implemented)
+  - **`calver`**: calendar versioning; not yet implemented, falls back to `semver` for now
+  - **`custom`**: user-defined scheme; not yet implemented, falls back to `semver` for now
 
 - **`release.profile`**
 
-  Git workflow profile that drives candidate detection. trunk-based: candidate on every push to the default branch; git-flow: candidate on release/* branches; github-flow: candidate on every PR-merged commit on main; none: no candidate detection (status quo, the release stage runs only on a tag push). The profile is informational (the planner stamps it into plan.json so adapters can branch on it); the promote stage consumes it to decide whether to push to the candidate or release registry.
+  Git workflow profile that drives candidate detection. The profile is informational (the planner stamps it into plan.json so adapters can branch on it); the promote stage consumes it to decide whether to push to the candidate or release registry.
+
+  - **`trunk-based`**: candidate on every push to the default branch
+  - **`git-flow`**: candidate on `release/*` branches
+  - **`github-flow`**: candidate on every PR-merged commit on `main`
+  - **`none`** (default): no candidate detection; the release stage runs only on a tag push
 
 - **`release.tag_prefix`**
 
@@ -210,7 +219,10 @@ Changelog generation configuration.
 
 - **`release.changelog.format`**
 
-  Changelog format. `keep-a-changelog` is not yet implemented; the generator emits `conventional` for now.
+  Changelog format.
+
+  - **`conventional`** (default): Conventional Commits; the only format emitted for now
+  - **`keep-a-changelog`**: Keep a Changelog; not yet implemented
 
 - **`release.changelog.file`**
 

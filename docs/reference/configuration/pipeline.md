@@ -39,7 +39,11 @@ The planner reads this before any stage runs, to produce `plan.json`. It changes
 
 - **`pipeline.selection.mode`**
 
-  safe = context-only filtering (default). balanced = adds per-file impact filtering using spec.impact.changes from stage manifests, with optional per-stage overrides under selection.stages. aggressive = per-subproject impact graph; reserved for v0.7+, planner errors with rc=64 if requested.
+  How the planner decides which stages run.
+
+  - **`safe`** (default): context-only filtering
+  - **`balanced`**: adds per-file impact filtering using spec.impact.changes from stage manifests, with optional per-stage overrides under selection.stages
+  - **`aggressive`**: per-subproject impact graph; reserved for v0.7+, the planner errors with rc=64 if requested
 
 - **`pipeline.selection.stages`**
 

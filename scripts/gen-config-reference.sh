@@ -81,11 +81,34 @@ _render_fields() {
         | "| `\($prefix).\(.key)` | \(.value | fmt_type) | \(.value | fmt_default) |"
     ' <<< "$props"
     printf '\n'
-    jq -r --arg prefix "$prefix" '
+    jq -r --arg prefix "$prefix" --slurpfile schema "${SCHEMA}" '
+        # Resolve a $ref like "#/$defs/notifyEventList" to its target schema.
+        def deref:
+            if .["$ref"] then
+                .["$ref"] as $r
+                | $r | sub("^#/\\$defs/"; "") as $name
+                | $schema[0]["$defs"][$name]
+            else .
+            end;
         def fmt_desc:
             (.description // "(no description)") | gsub("\\n"; " ");
+        # When a field carries per-value meanings in x-enumDescriptions, render
+        # one bullet per enum value below the description, marking the default.
+        def enum_bullets:
+            . as $f
+            | ($f | deref) as $r
+            | ($f["x-enumDescriptions"] // $r["x-enumDescriptions"] // $r.items["x-enumDescriptions"] // {}) as $ed
+            | ($f.default // $r.default) as $def
+            | ($r.enum // $r.items.enum // []) as $vals
+            | if ($ed | length) > 0 then
+                "\n\n" + ([ $vals[]
+                    | "  - **`\(.)`**"
+                      + (if . == $def then " (default)" else "" end)
+                      + (if $ed[.] then ": \($ed[.])" else "" end)
+                  ] | join("\n"))
+              else "" end;
         to_entries[]
-        | "- **`\($prefix).\(.key)`**\n\n  \(.value | fmt_desc)\n"
+        | "- **`\($prefix).\(.key)`**\n\n  \(.value | fmt_desc)\(.value | enum_bullets)\n"
     ' <<< "$props"
 }
 
@@ -130,6 +153,17 @@ _render_level() {
         | select(.value.type == "object" and (.value.properties | type == "object"))
         | .key
     ' <<< "${props}")"
+    # Map-of-$ref properties (e.g. deploy.environments -> deployEnvironment): an
+    # object keyed by user-chosen names whose values all share one $def. Render
+    # that $def's fields as a "<name>" sub-level so target-specific options and
+    # their enums are documented instead of left as an opaque `object`.
+    local map_keys
+    map_keys="$(jq -r '
+        to_entries[]
+        | select((.value.properties // null) == null)
+        | select((.value.additionalProperties["$ref"]? // null) != null)
+        | .key
+    ' <<< "${props}")"
 
     if [[ "$(jq 'length' <<< "${leaf_props}")" -gt 0 ]]; then
         printf '%s\n' "${leaf_props}" | _render_fields "${prefix}"
@@ -163,6 +197,20 @@ _render_level() {
             jq --arg k "${key}" '.[$k].properties' <<< "${props}" \
                 | _render_level "${prefix}.${key}" "${hashes}#"
         done <<< "${nested_keys}"
+    fi
+
+    if [[ -n "${map_keys}" ]]; then
+        local mkey mdesc mref mdef
+        while IFS= read -r mkey; do
+            [[ -z "${mkey}" ]] && continue
+            printf '%s `%s.%s.<name>`\n\n' "${hashes}" "${prefix}" "${mkey}"
+            mdesc="$(jq -r --arg k "${mkey}" '.[$k].description // empty | gsub("\n"; " ")' <<< "${props}")"
+            [[ -n "${mdesc}" ]] && printf '%s\n\n' "${mdesc}"
+            mref="$(jq -r --arg k "${mkey}" '.[$k].additionalProperties["$ref"] // empty' <<< "${props}")"
+            mdef="${mref##*/}"
+            jq --arg d "${mdef}" '.["$defs"][$d].properties // {}' "${SCHEMA}" \
+                | _render_level "${prefix}.${mkey}.<name>" "${hashes}#"
+        done <<< "${map_keys}"
     fi
 }
 

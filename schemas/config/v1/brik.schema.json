@@ -28,6 +28,13 @@
           "description": "Technology stack. Optional - Brik performs auto-detection from project files (package.json -> node, pom.xml -> java, etc.) when omitted.",
           "type": "string",
           "enum": ["node", "java", "python", "dotnet", "rust"],
+          "x-enumDescriptions": {
+            "node": "Node.js (JavaScript or TypeScript)",
+            "java": "Java on the JVM (Maven or Gradle)",
+            "python": "Python",
+            "dotnet": ".NET (C#)",
+            "rust": "Rust (Cargo)"
+          },
           "examples": ["node"]
         },
         "stack_version": {
@@ -158,7 +165,12 @@
               "type": "string",
               "enum": ["safe", "balanced", "aggressive"],
               "default": "safe",
-              "examples": ["balanced"], "description": "safe = context-only filtering (default). balanced = adds per-file impact filtering using spec.impact.changes from stage manifests, with optional per-stage overrides under selection.stages. aggressive = per-subproject impact graph; reserved for v0.7+, planner errors with rc=64 if requested."
+              "examples": ["balanced"], "description": "How the planner decides which stages run.",
+              "x-enumDescriptions": {
+                "safe": "context-only filtering",
+                "balanced": "adds per-file impact filtering using spec.impact.changes from stage manifests, with optional per-stage overrides under selection.stages",
+                "aggressive": "per-subproject impact graph; reserved for v0.7+, the planner errors with rc=64 if requested"
+              }
             },
             "stages": {
               "type": "object",
@@ -198,16 +210,27 @@
           }
         },
         "strategy": {
-          "description": "Release strategy. Only `semver` is implemented; `calver` and `custom` are not yet implemented and fall back to `semver` for now.",
+          "description": "Release strategy.",
           "type": "string",
           "enum": ["semver", "calver", "custom"],
+          "x-enumDescriptions": {
+            "semver": "semantic versioning (the only strategy implemented)",
+            "calver": "calendar versioning; not yet implemented, falls back to `semver` for now",
+            "custom": "user-defined scheme; not yet implemented, falls back to `semver` for now"
+          },
           "default": "semver",
           "examples": ["semver"]
         },
         "profile": {
-          "description": "Git workflow profile that drives candidate detection. trunk-based: candidate on every push to the default branch; git-flow: candidate on release/* branches; github-flow: candidate on every PR-merged commit on main; none: no candidate detection (status quo, the release stage runs only on a tag push). The profile is informational (the planner stamps it into plan.json so adapters can branch on it); the promote stage consumes it to decide whether to push to the candidate or release registry.",
+          "description": "Git workflow profile that drives candidate detection. The profile is informational (the planner stamps it into plan.json so adapters can branch on it); the promote stage consumes it to decide whether to push to the candidate or release registry.",
           "type": "string",
           "enum": ["trunk-based", "git-flow", "github-flow", "none"],
+          "x-enumDescriptions": {
+            "trunk-based": "candidate on every push to the default branch",
+            "git-flow": "candidate on `release/*` branches",
+            "github-flow": "candidate on every PR-merged commit on `main`",
+            "none": "no candidate detection; the release stage runs only on a tag push"
+          },
           "default": "none",
           "examples": ["trunk-based"]
         },
@@ -305,9 +328,13 @@
               "examples": [true]
             },
             "format": {
-              "description": "Changelog format. `keep-a-changelog` is not yet implemented; the generator emits `conventional` for now.",
+              "description": "Changelog format.",
               "type": "string",
               "enum": ["conventional", "keep-a-changelog"],
+              "x-enumDescriptions": {
+                "conventional": "Conventional Commits; the only format emitted for now",
+                "keep-a-changelog": "Keep a Changelog; not yet implemented"
+              },
               "default": "conventional",
               "examples": ["conventional"]
             },
@@ -388,9 +415,15 @@
               "additionalProperties": false,
               "properties": {
                 "format": {
-                  "description": "Coverage report format. Stack defaults: lcov for node/rust, cobertura for python/dotnet, jacoco for java. Use 'auto' (default) to let Brik pick.",
+                  "description": "Coverage report format.",
                   "type": "string",
                   "enum": ["lcov", "cobertura", "jacoco", "auto"],
+                  "x-enumDescriptions": {
+                    "lcov": "stack default for node and rust",
+                    "cobertura": "stack default for python and dotnet",
+                    "jacoco": "stack default for java",
+                    "auto": "let Brik pick the format from the stack"
+                  },
                   "default": "auto"
                 },
                 "output_dir": {
@@ -498,9 +531,14 @@
           "additionalProperties": false,
           "properties": {
             "policy": {
-              "examples": ["strict"], "description": "Built-in policy preset. pragmatic (default): ignores findings without an upstream fix or below the severity floor; fails the rest. strict: fails every finding at or above the severity floor, including no-fix entries. permissive: fails only critical findings that already have a fix.",
+              "examples": ["strict"], "description": "Built-in policy preset: which findings fail the build.",
               "type": "string",
               "enum": ["pragmatic", "strict", "permissive"],
+              "x-enumDescriptions": {
+                "pragmatic": "ignores findings without an upstream fix or below the severity floor; fails the rest",
+                "strict": "fails every finding at or above the severity floor, including no-fix entries",
+                "permissive": "fails only critical findings that already have a fix"
+              },
               "default": "pragmatic"
             }
           }
@@ -556,7 +594,13 @@
             "severity": {
               "description": "Minimum severity level that causes the dependency scan to fail.",
               "type": "string",
-              "enum": ["critical", "high", "medium", "low"]
+              "enum": ["critical", "high", "medium", "low"],
+              "x-enumDescriptions": {
+                "critical": "most severe, typically exploitable issues",
+                "high": "serious issues that should be fixed promptly",
+                "medium": "moderate-risk issues",
+                "low": "minor or informational issues"
+              }
             },
             "tool": {
               "description": "Dependency scanning tool to use (e.g. npm-audit, pip-audit, osv-scanner).",
@@ -641,7 +685,13 @@
             "severity": {
               "description": "Minimum severity level that causes the container scan to fail.",
               "type": "string",
-              "enum": ["critical", "high", "medium", "low"]
+              "enum": ["critical", "high", "medium", "low"],
+              "x-enumDescriptions": {
+                "critical": "most severe, typically exploitable issues",
+                "high": "serious issues that should be fixed promptly",
+                "medium": "moderate-risk issues",
+                "low": "minor or informational issues"
+              }
             }
           }
         },
@@ -665,7 +715,13 @@
         "severity_threshold": {
           "description": "Global minimum vulnerability severity that causes the security stage to fail. Vulnerabilities below this level are reported but do not block the pipeline.",
           "type": "string",
-          "enum": ["critical", "high", "medium", "low"]
+          "enum": ["critical", "high", "medium", "low"],
+          "x-enumDescriptions": {
+            "critical": "most severe, typically exploitable issues",
+            "high": "serious issues that should be fixed promptly",
+            "medium": "moderate-risk issues",
+            "low": "minor or informational issues"
+          }
         }
       }
     },
@@ -763,7 +819,11 @@
             "access": {
               "examples": ["public"], "description": "Package access level for scoped packages.",
               "type": "string",
-              "enum": ["public", "restricted"]
+              "enum": ["public", "restricted"],
+              "x-enumDescriptions": {
+                "public": "publish the scoped package publicly",
+                "restricted": "publish the scoped package privately (restricted)"
+              }
             },
             "token_var": {
               "examples": ["NPM_TOKEN"], "description": "Name of the environment variable holding the npm auth token. Never put the token value here.",
@@ -911,7 +971,12 @@
         "workflow": {
           "examples": ["github-flow"], "description": "Git workflow convention for automatic environment mapping. When set, Brik loads a built-in profile that pre-configures environments based on branch/tag patterns. User-defined environments override profile defaults.",
           "type": "string",
-          "enum": ["trunk-based", "git-flow", "github-flow"]
+          "enum": ["trunk-based", "git-flow", "github-flow"],
+          "x-enumDescriptions": {
+            "trunk-based": "staging on the `main` branch, production on a `v*` tag",
+            "git-flow": "dev on `develop`, staging on `release/*` branches",
+            "github-flow": "preview on `feature/*` branches, production on `main`"
+          }
         },
         "environments": {
           "description": "Named deployment environments. Each key is an environment name (e.g. staging, production). Each value defines the deployment condition and target.",
@@ -940,7 +1005,14 @@
         "target": {
           "description": "Deployment target type.",
           "type": "string",
-          "enum": ["ssh", "compose", "k8s", "helm", "gitops"]
+          "enum": ["ssh", "compose", "k8s", "helm", "gitops"],
+          "x-enumDescriptions": {
+            "ssh": "runs the deploy commands over SSH on a remote host",
+            "compose": "brings up a Docker Compose stack on the target host",
+            "k8s": "applies raw Kubernetes manifests to a cluster",
+            "helm": "installs or upgrades a Helm release",
+            "gitops": "commits the desired state to a config repo for a controller (ArgoCD) to reconcile"
+          }
         },
         "namespace": {
           "description": "Kubernetes namespace for k8s and helm targets.",
@@ -1031,12 +1103,21 @@
         "strategy": {
           "description": "Deployment strategy for targets that support it.",
           "type": "string",
-          "enum": ["rolling", "blue-green", "canary"]
+          "enum": ["rolling", "blue-green", "canary"],
+          "x-enumDescriptions": {
+            "rolling": "replaces instances incrementally, keeping the service available",
+            "blue-green": "stands up the new version beside the old, then switches traffic over",
+            "canary": "shifts a small share of traffic to the new version before a full rollout"
+          }
         },
         "on_health_failure": {
-          "description": "What brik does when a deployment or its post-rollout health check fails. 'hold' (default) leaves the environment on the previous version and marks the run failed. 'rollback' additionally reverts the deployment where the target supports it (the gitops target reverts the last config-repo commit); a target with no rollback path holds and logs that rollback is unsupported. A failed deploy is never reported as success.",
+          "description": "What brik does when a deployment or its post-rollout health check fails. A failed deploy is never reported as success.",
           "type": "string",
           "enum": ["hold", "rollback"],
+          "x-enumDescriptions": {
+            "hold": "leaves the environment on the previous version and marks the run failed",
+            "rollback": "additionally reverts the deployment where the target supports it (the gitops target reverts the last config-repo commit); a target with no rollback path holds and logs that rollback is unsupported"
+          },
           "default": "hold"
         },
         "accepts_channel": {
@@ -1104,7 +1185,12 @@
       "type": "array",
       "items": {
         "type": "string",
-        "enum": ["failure", "success", "always"]
+        "enum": ["failure", "success", "always"],
+        "x-enumDescriptions": {
+          "failure": "send only when the run fails",
+          "success": "send only when the run succeeds",
+          "always": "send on every run, success or failure"
+        }
       },
       "minItems": 1,
       "uniqueItems": true

@@ -52,6 +52,10 @@ Slack notification configuration.
 
   Pipeline events that trigger a Slack notification.
 
+  - **`failure`**: send only when the run fails
+  - **`success`**: send only when the run succeeds
+  - **`always`**: send on every run, success or failure
+
 
 *Example*
 
@@ -78,6 +82,10 @@ Email notification configuration.
 
   Pipeline events that trigger an email notification.
 
+  - **`failure`**: send only when the run fails
+  - **`success`**: send only when the run succeeds
+  - **`always`**: send on every run, success or failure
+
 
 *Example*
 
@@ -103,6 +111,10 @@ Webhook notification configuration.
 - **`notify.webhook.on`**
 
   Pipeline events that trigger a webhook call.
+
+  - **`failure`**: send only when the run fails
+  - **`success`**: send only when the run succeeds
+  - **`always`**: send on every run, success or failure
 
 
 *Example*

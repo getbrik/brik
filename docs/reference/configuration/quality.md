@@ -144,7 +144,11 @@ Findings management policy. Selects the built-in preset that decides which findi
 
 - **`quality.findings.policy`**
 
-  Built-in policy preset. pragmatic (default): ignores findings without an upstream fix or below the severity floor; fails the rest. strict: fails every finding at or above the severity floor, including no-fix entries. permissive: fails only critical findings that already have a fix.
+  Built-in policy preset: which findings fail the build.
+
+  - **`pragmatic`** (default): ignores findings without an upstream fix or below the severity floor; fails the rest
+  - **`strict`**: fails every finding at or above the severity floor, including no-fix entries
+  - **`permissive`**: fails only critical findings that already have a fix
 
 
 *Example*

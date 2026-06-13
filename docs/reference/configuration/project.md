@@ -50,6 +50,12 @@ It does not drive a stage of its own. Instead it sets the execution context (nam
 
   Technology stack. Optional - Brik performs auto-detection from project files (package.json -> node, pom.xml -> java, etc.) when omitted.
 
+  - **`node`**: Node.js (JavaScript or TypeScript)
+  - **`java`**: Java on the JVM (Maven or Gradle)
+  - **`python`**: Python
+  - **`dotnet`**: .NET (C#)
+  - **`rust`**: Rust (Cargo)
+
 - **`project.stack_version`**
 
   Stack version for runner image selection (e.g. '22' for node, '21' for java). When omitted, uses the default version.
