@@ -25,11 +25,11 @@ coverage: ## Run tests with kcov coverage report (--jobs ignored: kcov disables 
 	@# raises a low one -- do not change it to a raise-only guard.
 	ulimit -n 1024 && shellspec --kcov --shell "$(BASH_PATH)"
 
-validate: ## Validate example brik.yml files
-	bin/brik validate --config examples/minimal-node/brik.yml
-	bin/brik validate --config examples/java-maven/brik.yml
-	bin/brik validate --config examples/python-pytest/brik.yml
-	bin/brik validate --config examples/mono-dotnet/brik.yml
+validate: ## Validate every example brik.yml against the schema
+	@for cfg in examples/*/brik.yml; do \
+		echo "validate $$cfg"; \
+		bin/brik validate --config "$$cfg" || exit 1; \
+	done
 
 validate-docs: ## Validate every fenced ```yaml block in docs/reference/configuration/**/*.md
 	./scripts/validate-docs.sh

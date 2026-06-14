@@ -61,7 +61,7 @@ brik/
     local/                  Local execution wrapper
     github/                 GitHub Actions (planned)
   schemas/                  JSON Schema for brik.yml + report + policy
-  examples/                 minimal-node, java-maven, python-pytest, mono-dotnet
+  examples/                 documented brik.yml references + schema fixtures (see examples/README.md)
 ```
 
 The `verify/` directory is internal implementation, not a CI-visible stage:

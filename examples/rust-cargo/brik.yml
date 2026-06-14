@@ -1,0 +1,7 @@
+version: 1
+project:
+  name: rust-cli
+  stack: rust
+  stack_version: "1.83"
+test:
+  framework: cargo

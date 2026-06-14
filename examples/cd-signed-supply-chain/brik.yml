@@ -1,0 +1,47 @@
+version: 1
+project:
+  name: payments-api
+  stack: node
+  stack_version: "22"
+release:
+  strategy: semver
+  tag_prefix: v
+test:
+  framework: npm
+package:
+  docker:
+    image: registry.example.com/payments/payments-api
+    dockerfile: Dockerfile
+publish:
+  docker:
+    registry: registry.example.com
+    username_var: BRIK_PUBLISH_DOCKER_USER
+    password_var: BRIK_PUBLISH_DOCKER_PASSWORD
+artifacts:
+  channels:
+    release:
+      registry: registry.example.com/payments/payments-api
+  evidence:
+    repo: https://git.example.com/payments/evidence.git
+    branch: main
+    token_var: BRIK_GIT_TOKEN
+    sign: true
+deploy:
+  environments:
+    production:
+      target: gitops
+      accepts_channel: release
+      gates:
+        require_digest: true
+        require_attestation: true
+        expected_builder: "^https://github\\.com/example/payments-api/\\.github/workflows/"
+        expected_source: "github\\.com/example/payments-api$"
+        verify_identity: "^https://github\\.com/example/payments-api/\\.github/workflows/release\\.yml@"
+        verify_issuer: "^https://token\\.actions\\.githubusercontent\\.com$"
+        requires_eligibility: [artifact_authorized_for]
+      repo: https://git.example.com/payments/config-deploy.git
+      git_token_var: BRIK_GIT_TOKEN
+      path: k8s
+      source: k8s
+      controller: argocd
+      app_name: payments-prod

@@ -1,0 +1,84 @@
+version: 1
+project:
+  name: storefront
+  stack: node
+  stack_version: "22"
+release:
+  strategy: semver
+  tag_prefix: v
+test:
+  framework: npm
+package:
+  docker:
+    image: registry.example.com/storefront/web
+    dockerfile: Dockerfile
+publish:
+  docker:
+    registry: registry.example.com
+    username_var: BRIK_PUBLISH_DOCKER_USER
+    password_var: BRIK_PUBLISH_DOCKER_PASSWORD
+artifacts:
+  channels:
+    release:
+      registry: registry.example.com/storefront/web
+  evidence:
+    repo: https://git.example.com/storefront/evidence.git
+    token_var: BRIK_GIT_TOKEN
+    branch: main
+    sign: false
+deploy:
+  workflow: trunk-based
+  trigger:
+    on-tag: true
+    on-main: true
+    manual: true
+  environments:
+    review:
+      target: ssh
+      when: "branch =~ 'feature/*'"
+      host: review.example.com
+      remote_path: /srv/storefront
+      source: dist
+      restart_cmd: systemctl restart storefront
+    dev:
+      target: compose
+      when: "branch == 'develop'"
+      compose_file: docker-compose.yml
+      service: web
+      source: deploy
+    staging:
+      target: k8s
+      when: "branch == 'main'"
+      accepts_channel: release
+      validates_for: production
+      config_ref: main
+      namespace: storefront-staging
+      manifest: k8s/staging
+      strategy: rolling
+      gates:
+        require_digest: true
+    production:
+      target: helm
+      when: "tag =~ 'v*'"
+      accepts_channel: release
+      namespace: storefront-prod
+      chart: ./charts/storefront
+      release_name: storefront
+      values: charts/values-production.yaml
+      strategy: blue-green
+      on_health_failure: rollback
+      gates:
+        require_digest: true
+        requires_eligibility: [artifact_validated_for]
+    canary:
+      target: gitops
+      when: "tag =~ 'v*'"
+      accepts_channel: release
+      repo: https://git.example.com/storefront/infra.git
+      git_token_var: BRIK_GIT_TOKEN
+      path: apps/storefront
+      source: k8s
+      controller: argocd
+      app_name: storefront
+      strategy: canary
+      on_health_failure: rollback
