@@ -32,3 +32,24 @@ so every file here is guaranteed to validate against
 make validate                                  # all examples
 bin/brik validate --config examples/<name>/brik.yml   # one
 ```
+
+## Run a pipeline locally
+
+These directories are **config references** (each is a `brik.yml`, not a runnable
+app), so copy the relevant `brik.yml` into a real project of that stack and run
+it there. With a container engine (`docker`) available, a bare `brik integrate`
+runs the full CI flow on your machine, one container per stage -- no
+infrastructure to configure (Brik falls back to a built-in `p-local` referential):
+
+```bash
+cd path/to/your-node-project
+cp /path/to/brik/examples/minimal-node/brik.yml .
+git add -A && git commit -qm "add brik.yml"   # only committed state is run
+brik integrate
+```
+
+The CD examples (`cd-*`, `publish-registries`) additionally need a real
+referential and reachable endpoints. See
+[getting-started/local.md](../docs/getting-started/local.md) for the full local
+workflow and [concepts/local-execution.md](../docs/concepts/local-execution.md)
+for the execution model.
