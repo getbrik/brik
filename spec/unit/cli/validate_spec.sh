@@ -4,43 +4,27 @@
 Describe "brik validate"
 
   Describe "valid configurations"
-
-    Describe "minimal-node example"
-      It "exits with code 0 and prints 'brik.yml is valid'"
-        When run script "${BRIK_BIN}" validate --config "${EXAMPLES}/minimal-node/brik.yml"
-        The status should eq 0
-        The output should include "valid"
-        The stderr should be blank
-      End
+    # Every example brik.yml must pass validation (schema + coherence).
+    # One row per example -- add a line when you add an example under examples/.
+    Parameters
+      "${EXAMPLES}/minimal-node/brik.yml"
+      "${EXAMPLES}/java-maven/brik.yml"
+      "${EXAMPLES}/python-pytest/brik.yml"
+      "${EXAMPLES}/mono-dotnet/brik.yml"
+      "${EXAMPLES}/rust-cargo/brik.yml"
+      "${EXAMPLES}/full-ci-pipeline/brik.yml"
+      "${EXAMPLES}/publish-registries/brik.yml"
+      "${EXAMPLES}/cd-channels-promote/brik.yml"
+      "${EXAMPLES}/cd-signed-supply-chain/brik.yml"
+      "${EXAMPLES}/cd-multi-target/brik.yml"
     End
 
-    Describe "java-maven example"
-      It "exits with code 0 and prints 'brik.yml is valid'"
-        When run script "${BRIK_BIN}" validate --config "${EXAMPLES}/java-maven/brik.yml"
-        The status should eq 0
-        The output should include "valid"
-        The stderr should be blank
-      End
+    Example "validates $1"
+      When run script "${BRIK_BIN}" validate --config "$1"
+      The status should eq 0
+      The output should include "valid"
+      The stderr should be blank
     End
-
-    Describe "python-pytest example"
-      It "exits with code 0 and prints 'brik.yml is valid'"
-        When run script "${BRIK_BIN}" validate --config "${EXAMPLES}/python-pytest/brik.yml"
-        The status should eq 0
-        The output should include "valid"
-        The stderr should be blank
-      End
-    End
-
-    Describe "mono-dotnet example"
-      It "exits with code 0 and prints 'brik.yml is valid'"
-        When run script "${BRIK_BIN}" validate --config "${EXAMPLES}/mono-dotnet/brik.yml"
-        The status should eq 0
-        The output should include "valid"
-        The stderr should be blank
-      End
-    End
-
   End
 
   Describe "invalid configurations"

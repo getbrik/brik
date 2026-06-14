@@ -1,0 +1,116 @@
+version: 1
+
+project:
+  name: orders-api
+  stack: node
+  stack_version: "22"
+
+release:
+  strategy: semver
+  tag_prefix: v
+  trigger:
+    on-tag: true
+    on-main: true
+  changelog:
+    enabled: true
+    format: conventional
+    file: CHANGELOG.md
+
+build:
+  tool: pnpm
+
+quality:
+  lint:
+    tool: eslint
+    config: .eslintrc.json
+    fix: false
+  format:
+    tool: prettier
+    check: true
+  type_check:
+    tool: tsc
+  findings:
+    policy: strict
+
+test:
+  framework: jest
+  coverage:
+    threshold: 85
+    report: coverage/cobertura-coverage.xml
+  reports:
+    enabled: true
+    coverage:
+      format: lcov
+      output_dir: coverage
+    junit:
+      output_path: reports/junit.xml
+
+security:
+  severity_threshold: high
+  sast:
+    tool: semgrep
+    ruleset: p/security-audit
+    output_format: sarif
+    output_path: target/sast.sarif
+  deps:
+    tool: osv-scanner
+    severity: high
+    output_path: target/scan.sarif
+    sbom:
+      enabled: true
+      format: cyclonedx-1-5
+      output_path: target/sbom.cdx.json
+  secrets:
+    tool: gitleaks
+    output_path: target/secret.sarif
+  license:
+    allowed: MIT,Apache-2.0,BSD-3-Clause
+    denied: GPL-3.0-only
+  container:
+    image: registry.example.com/orders/orders-api
+    severity: critical
+  iac:
+    tool: checkov
+
+package:
+  trigger:
+    on-tag: true
+    on-main: true
+  docker:
+    image: registry.example.com/orders/orders-api
+    dockerfile: Dockerfile
+    context: .
+    platforms:
+      - linux/amd64
+      - linux/arm64
+    build_args:
+      NODE_ENV: production
+  registry:
+    ui_url: https://nexus.example.com:8081/#browse/browse:docker-hosted
+
+notify:
+  slack:
+    channel: "#deployments"
+    on: [failure, success]
+  email:
+    to: oncall@example.com
+    on: [failure]
+
+hooks:
+  pre_build: ./scripts/setup.sh
+  post_test: ./scripts/upload-coverage.sh
+  post_deploy: ./scripts/smoke-test.sh
+
+git:
+  user:
+    name: Brik CI
+    email: ci@example.com
+
+pipeline:
+  selection:
+    mode: balanced
+    stages:
+      test:
+        changes:
+          - "src/**"
+          - "test/**"

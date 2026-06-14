@@ -1,0 +1,41 @@
+version: 1
+project:
+  name: orders-api
+  stack: node
+  stack_version: "22"
+pipeline:
+  selection:
+    mode: safe
+release:
+  strategy: semver
+  tag_prefix: v
+  profile: trunk-based
+  candidate:
+    docker:
+      registry: registry.candidate.example.com
+      image: orders/orders-api
+      username_var: BRIK_CANDIDATE_DOCKER_USER
+      password_var: BRIK_CANDIDATE_DOCKER_PASSWORD
+  release:
+    docker:
+      registry: registry.release.example.com
+      image: orders/orders-api
+      username_var: BRIK_RELEASE_DOCKER_USER
+      password_var: BRIK_RELEASE_DOCKER_PASSWORD
+test:
+  framework: npm
+package:
+  docker:
+    image: registry.candidate.example.com/orders/orders-api
+    dockerfile: Dockerfile
+publish:
+  docker:
+    registry: registry.candidate.example.com
+    username_var: BRIK_PUBLISH_DOCKER_USER
+    password_var: BRIK_PUBLISH_DOCKER_PASSWORD
+artifacts:
+  channels:
+    candidate:
+      registry: registry.candidate.example.com/orders/orders-api
+    release:
+      registry: registry.release.example.com/orders/orders-api

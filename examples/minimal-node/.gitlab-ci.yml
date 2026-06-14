@@ -1,4 +1,0 @@
-include:
-  - project: 'brik/gitlab-templates'
-    ref: v0.7.0
-    file: '/templates/brik-integrate.yml'
