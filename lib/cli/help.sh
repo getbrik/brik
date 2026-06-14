@@ -69,6 +69,12 @@ Options for stage:
   --dry-run            Skip destructive deploy actions (compose up, k8s apply,
                        helm upgrade, argocd sync, rsync). Print what would run
                        instead. Exports BRIK_DRY_RUN=true.
+  --platform <p>       Run containers for a specific platform (e.g. linux/amd64)
+                       for exact CI arch parity. Default: host architecture.
+  --bind-mount         Mount the project dir live instead of copy-to-volume
+                       (fast edit/inspect). Waives the committed-state isolation:
+                       untracked/dirty files are visible and outputs land in the
+                       project dir.
 
 Options for integrate:
   --config <path>         Path to brik.yml (default: brik.yml in workspace)
@@ -80,6 +86,11 @@ Options for integrate:
   --with-release          Include the release stage
   --with-package          Include the package stage
   --with-deploy           Include deploy and notify stages
+  --platform <p>          Run containers for a platform (e.g. linux/amd64) for
+                          exact CI arch parity. Default: host architecture.
+  --bind-mount            Mount the project dir live instead of copy-to-volume
+                          (fast edit/inspect). Waives committed-state isolation:
+                          untracked/dirty files visible, outputs land in the dir.
 
 Options for extension test:
   (positional)            Path to the extension directory (must contain

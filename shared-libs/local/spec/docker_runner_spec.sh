@@ -599,6 +599,54 @@ exit \"\${MOCK_DOCKER_RC:-0}\"
       The output should equal "stage lint failed (rc=1)"
     End
 
+    It "threads --platform into every engine run when BRIK_LOCAL_PLATFORM is set"
+      check_platform() {
+        BRIK_LOCAL_PLATFORM=linux/amd64 \
+          brik.local.docker.run_pipeline >/dev/null 2>&1
+        local runs untagged
+        runs="$(grep -c "docker run" "$MOCK_LOG")"
+        untagged="$(grep "docker run" "$MOCK_LOG" | grep -vc -- "--platform linux/amd64")"
+        [[ "$runs" -gt 0 && "$untagged" -eq 0 ]] && echo "ok" \
+          || echo "runs=$runs untagged=$untagged"
+      }
+      When call check_platform
+      The output should equal "ok"
+    End
+
+    It "emits no --platform by default"
+      check_no_platform() {
+        brik.local.docker.run_pipeline >/dev/null 2>&1
+        grep -c -- "--platform" "$MOCK_LOG" || true
+      }
+      When call check_no_platform
+      The output should equal "0"
+    End
+
+    It "bind-mounts the project dir instead of a volume when BRIK_LOCAL_BIND_MOUNT=1"
+      check_bind() {
+        BRIK_LOCAL_BIND_MOUNT=1 \
+          brik.local.docker.run_pipeline >/dev/null 2>&1
+        local bound created
+        grep -q -- "-v ${PROJECT_DIR}:/work" "$MOCK_LOG" && bound=yes || bound=no
+        grep -q "volume create" "$MOCK_LOG" && created=yes || created=no
+        echo "bound=$bound volume_created=$created"
+      }
+      When call check_bind
+      The output should equal "bound=yes volume_created=no"
+    End
+
+    It "uses a volume (not the project dir) by default"
+      check_volume_default() {
+        brik.local.docker.run_pipeline >/dev/null 2>&1
+        local created bound
+        grep -q "volume create" "$MOCK_LOG" && created=yes || created=no
+        grep -q -- "-v ${PROJECT_DIR}:/work" "$MOCK_LOG" && bound=yes || bound=no
+        echo "volume_created=$created project_bound=$bound"
+      }
+      When call check_volume_default
+      The output should equal "volume_created=yes project_bound=no"
+    End
+
     It "extracts the run logs back to the host"
       check_extract() {
         brik.local.docker.run_pipeline >/dev/null 2>&1

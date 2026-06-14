@@ -53,6 +53,15 @@ cli.integrate.run() {
                 pipeline_flags+=("$1")
                 shift
                 ;;
+            --platform)
+                brik_require_arg "--platform" "${2-}" || return "$?"
+                export BRIK_LOCAL_PLATFORM="$2"
+                shift 2
+                ;;
+            --bind-mount)
+                export BRIK_LOCAL_BIND_MOUNT=1
+                shift
+                ;;
             -h|--help)
                 brik_print_verb_help integrate
                 return 0
