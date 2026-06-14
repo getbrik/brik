@@ -570,6 +570,35 @@ exit \"\${MOCK_DOCKER_RC:-0}\"
       The output should equal "rc=1 test=yes"
     End
 
+    It "runs verify-group siblings independently when one fails (CI parity)"
+      # lint, sast, scan, test share placement.group=verify (after: build).
+      # A failed lint must NOT skip its siblings, exactly as the parallel CI
+      # group behaves; downstream (after the group) still stops; notify runs.
+      check_siblings() {
+        MOCK_DOCKER_FAIL_MATCH="container-stage.sh lint" \
+          brik.local.docker.run_pipeline >/dev/null 2>&1
+        local rc=$?
+        local sast scan test notify
+        grep -q "container-stage.sh sast" "$MOCK_LOG" && sast=yes || sast=no
+        grep -q "container-stage.sh scan" "$MOCK_LOG" && scan=yes || scan=no
+        grep -q "container-stage.sh test" "$MOCK_LOG" && test=yes || test=no
+        grep -q "container-stage.sh notify" "$MOCK_LOG" && notify=yes || notify=no
+        echo "rc=$rc sast=$sast scan=$scan test=$test notify=$notify"
+      }
+      When call check_siblings
+      The output should equal "rc=1 sast=yes scan=yes test=yes notify=yes"
+    End
+
+    It "logs the real exit code of a failed stage, not rc=0"
+      check_rc() {
+        MOCK_DOCKER_FAIL_MATCH="container-stage.sh lint" \
+          brik.local.docker.run_pipeline 2>&1 \
+          | grep -oE "stage lint failed \(rc=[0-9]+\)"
+      }
+      When call check_rc
+      The output should equal "stage lint failed (rc=1)"
+    End
+
     It "extracts the run logs back to the host"
       check_extract() {
         brik.local.docker.run_pipeline >/dev/null 2>&1

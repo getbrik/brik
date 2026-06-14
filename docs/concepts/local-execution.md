@@ -47,7 +47,13 @@ One run = one named workspace volume (`brik-run-<id>`):
 3. **Stages**: one container per registry stage, in registry order. The
    plan gate and the stage execute INSIDE the container (the CI job
    contract, replayed). The stack image comes from `BRIK_CI_IMAGE`, posted
-   by init into the volume's `pipeline.env`.
+   by init into the volume's `pipeline.env`. Stages sharing a placement
+   group run as an independent wave: the verify group
+   (`[lint || sast || scan || test]`) behaves exactly like the parallel CI
+   jobs -- a failure in one does **not** skip its siblings, so the local
+   stage set and outcome match CI for the same commit. A failure still gates
+   the next wave (downstream stages do not run unless `--continue-on-error`),
+   and `notify` always runs.
 4. **Extract**: `.brik-logs/` and `brik-artifacts/` are copied back to
    the host in every outcome.
 5. The volume is destroyed on success and kept for inspection on failure.
