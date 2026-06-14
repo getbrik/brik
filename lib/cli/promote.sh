@@ -68,6 +68,7 @@ cli.promote.run() {
             --issuer)    brik_require_arg "--issuer" "${2-}" || return "$?"
                          issuer="$2"; shift 2 ;;
             --dry-run)   dry_run="true"; shift ;;
+            -h|--help)   brik_print_verb_help promote; return 0 ;;
             *) brik_usage_error "unknown option: $1" || return "$?" ;;
         esac
     done

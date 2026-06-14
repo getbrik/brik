@@ -23,6 +23,11 @@ cli.stage.run() {
         return "${BRIK_EXIT_INVALID_INPUT}"
     fi
 
+    if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+        brik_print_verb_help stage
+        return 0
+    fi
+
     stage_name="$1"
     shift
     workspace="$(pwd)"
@@ -42,6 +47,10 @@ cli.stage.run() {
             --dry-run)
                 dry_run="true"
                 shift
+                ;;
+            -h|--help)
+                brik_print_verb_help stage
+                return 0
                 ;;
             *)
                 brik_usage_error "unknown option: $1" || return "$?"

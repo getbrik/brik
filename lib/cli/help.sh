@@ -36,8 +36,8 @@ Commands:
   validate         Validate brik.yml against the JSON Schema
   doctor           Check prerequisites (tools, stack detection)
   init             Scaffold brik.yml and platform bootstrap file
-  run stage        Execute a single pipeline stage locally (in its runner-class container)
-  run pipeline     Execute the full pipeline locally (one container per stage)
+  stage            Execute a single pipeline stage locally (in its runner-class container)
+  integrate        Execute the full CI pipeline locally (one container per stage)
   extension test   Validate an extension manifest+module against the contract
   deploy           Deploy a version to an environment (digest-pinned CD flow)
   promote          Promote a version between artifact channels (evidence carried)
@@ -63,14 +63,14 @@ Options for init:
   --dir <path>         Target directory (default: current directory)
   --non-interactive    Skip prompts, fail if stack cannot be auto-detected
 
-Options for run stage:
+Options for stage:
   --config <path>      Path to brik.yml (default: brik.yml in workspace)
   --workspace <path>   Path to project workspace (default: current directory)
   --dry-run            Skip destructive deploy actions (compose up, k8s apply,
                        helm upgrade, argocd sync, rsync). Print what would run
                        instead. Exports BRIK_DRY_RUN=true.
 
-Options for run pipeline:
+Options for integrate:
   --config <path>         Path to brik.yml (default: brik.yml in workspace)
   --workspace <path>      Path to project workspace (default: current directory)
   --dry-run               Skip destructive deploy actions (compose up, k8s apply,
@@ -84,6 +84,25 @@ Options for run pipeline:
 Options for extension test:
   (positional)            Path to the extension directory (must contain
                           stacks/ or stages/ manifests, and lib/*.sh modules).
+
+Options for deploy:
+  --version <v>           Artifact version to deploy (resolved to a digest in
+                          the channel the environment accepts)
+  --environment <e>       Target environment key from deploy.environments
+  --strategy <name>       Rollout strategy override (default: env definition)
+  --config <path>         Path to brik.yml (default: brik.yml in workspace)
+  --workspace <path>      Path to project workspace (default: current directory)
+  --dry-run               Skip destructive deploy actions; print what would run
+
+Options for promote:
+  --version <v>           Artifact version to promote
+  --from <channel>        Source channel (default: candidate)
+  --to <channel>          Destination channel (default: release)
+  --identity <id>         Signer identity for keyless verification (optional)
+  --issuer <url>          OIDC issuer for keyless verification (optional)
+  --config <path>         Path to brik.yml (default: brik.yml in workspace)
+  --workspace <path>      Path to project workspace (default: current directory)
+  --dry-run               Describe the promotion without performing it
 
 Options for authorize:
   --version <v>           Artifact version to authorize (resolved to a digest
