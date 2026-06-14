@@ -536,15 +536,29 @@ brik.local.docker.run_pipeline() {
              else
                  brik.local.docker.run_plan_container "$run_id" "${plan_flags[@]}"
              fi; }; then
-        local stage rc
+        local stage rc group prev_group="" skip_rest=false
         for stage in "${stages[@]}"; do
-            # Mirror the CI behavior after a failure: downstream jobs do not
-            # run (no fragment), except notify which is always-on.
-            if $had_failure && ! $continue_on_error && [[ "$stage" != "notify" ]]; then
+            # Mirror the CI dependency graph: stages sharing a placement group
+            # (e.g. [lint || sast || scan || test], group=verify) run as an
+            # independent wave -- a failed sibling never skips the others. A
+            # failure only gates the NEXT wave (the skip decision is locked at
+            # each group boundary), and notify is always-on. An empty group is
+            # a singleton wave keyed by the stage id, preserving stop-on-failure
+            # for the linear stages (build, package, ...).
+            group="$(registry.stage.placement_group "$stage" 2>/dev/null || true)"
+            [[ -z "$group" ]] && group="$stage"
+            if [[ "$group" != "$prev_group" ]]; then
+                if $had_failure && ! $continue_on_error; then
+                    skip_rest=true
+                fi
+                prev_group="$group"
+            fi
+            if $skip_rest && [[ "$stage" != "notify" ]]; then
                 continue
             fi
-            if ! brik.local.docker.run_stage_container "$run_id" "$stage"; then
-                rc=$?
+            rc=0
+            brik.local.docker.run_stage_container "$run_id" "$stage" || rc=$?
+            if (( rc != 0 )); then
                 had_failure=true
                 log.error "stage ${stage} failed (rc=${rc})"
             fi
