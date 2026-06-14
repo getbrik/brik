@@ -176,6 +176,10 @@ cli.doctor.run() {
                 workspace="$2"
                 shift 2
                 ;;
+            -h|--help)
+                brik_print_verb_help doctor
+                return 0
+                ;;
             *)
                 brik_usage_error "unknown option: $1" || return "$?"
                 ;;

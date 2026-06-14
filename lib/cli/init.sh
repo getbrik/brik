@@ -39,6 +39,10 @@ cli.init.run() {
                 non_interactive=true
                 shift
                 ;;
+            -h|--help)
+                brik_print_verb_help init
+                return 0
+                ;;
             *)
                 brik_usage_error "unknown option: $1" || return "$?"
                 ;;

@@ -16,6 +16,10 @@ cli.infra.run() {
 
     local sub="${1:-}"
     case "$sub" in
+        -h|--help)
+            brik_print_verb_help infra
+            return 0
+            ;;
         init)
             shift
             _cli.infra._init "$@"

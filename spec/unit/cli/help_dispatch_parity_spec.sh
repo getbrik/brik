@@ -43,14 +43,24 @@ Describe "brik help / dispatch parity"
     End
   End
 
-  Describe "every user-facing verb answers --help"
+  Describe "every user-facing command answers --help"
     Parameters
+      validate
+      doctor
+      init
+      plan
       integrate
       stage
       deploy
       promote
       authorize
       status
+      infra
+      extension
+      registry
+      self-update
+      self-uninstall
+      version
     End
 
     It "prints usage and exits 0 for: $1"
