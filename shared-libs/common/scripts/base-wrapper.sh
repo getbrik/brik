@@ -58,7 +58,12 @@ brik.wrapper.validate_home() {
         return "$BRIK_EXIT_INVALID_ENV"
     fi
 
-    export BRIK_HOME="$brik_home"
+    # BRIK_HOME may already be exported readonly by bin/brik (host pre-exec
+    # path). Re-exporting the identical value triggers a "readonly variable"
+    # error, so only assign when the value actually changes.
+    if [[ "${BRIK_HOME:-}" != "$brik_home" ]]; then
+        export BRIK_HOME="$brik_home"
+    fi
 
     # Verify runtime files exist
     export _BRIK_PIPELINE_DIR="${BRIK_HOME}/lib/pipeline"

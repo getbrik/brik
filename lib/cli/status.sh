@@ -41,6 +41,7 @@ cli.status.run() {
             --workspace)   brik_require_arg "--workspace" "${2-}" || return "$?"
                            workspace="$2"; shift 2 ;;
             --json)        json="true"; shift ;;
+            -h|--help)     brik_print_verb_help status; return 0 ;;
             *) brik_usage_error "unknown option: $1" || return "$?" ;;
         esac
     done

@@ -53,6 +53,10 @@ cli.integrate.run() {
                 pipeline_flags+=("$1")
                 shift
                 ;;
+            -h|--help)
+                brik_print_verb_help integrate
+                return 0
+                ;;
             *)
                 brik_usage_error "unknown option: $1" || return "$?"
                 ;;

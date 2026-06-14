@@ -27,6 +27,30 @@ brik_usage_error() {
     return "${BRIK_EXIT_INVALID_INPUT}"
 }
 
+# brik_print_verb_help - print usage for a single verb, sourced from the
+# canonical `brik help` text (single source of truth). Extracts the verb's
+# "Options for <verb>:" block; falls back to the full help when the verb has
+# no dedicated section. Used by each verb's -h/--help handler.
+brik_print_verb_help() {
+    local verb="$1"
+    brik.use cli.help
+    local full section
+    full="$(cli.help.run)"
+    section="$(printf '%s\n' "$full" | awk -v hdr="Options for ${verb}:" '
+        $0 == hdr { show = 1 }
+        show {
+            if (started && NF == 0) { exit }
+            print
+            started = 1
+        }
+    ')"
+    if [[ -z "$section" ]]; then
+        printf '%s\n' "$full"
+        return 0
+    fi
+    printf 'Usage: brik %s [options]\n\n%s\n' "$verb" "$section"
+}
+
 # brik_require_arg - guard that an option has a non-empty value.
 # Usage: brik_require_arg --flag "${2-}" || return $?
 brik_require_arg() {
