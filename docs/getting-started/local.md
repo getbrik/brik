@@ -19,17 +19,19 @@ Then check your environment:
 brik doctor
 ```
 
-`brik doctor` reports whether the Brik core tools and your stack tools are
-present. The Brik core tools are `bash 4+`,
-[`yq`](https://github.com/mikefarah/yq), [`jq`](https://jqlang.github.io/jq/),
-and [`jv`](https://github.com/santhosh-tekuri/jsonschema). Stack tools depend on
-`project.stack`: `node` needs node + a package manager, `java` needs java +
-mvn/gradle, `python` needs python3 + pip/poetry/uv, `rust` needs rustc + cargo,
-`dotnet` needs the .NET SDK.
+Local execution is **containerized**: `brik integrate` and `brik stage` run each
+stage in a [brik-images](https://github.com/getbrik/brik-images)
+(`ghcr.io/getbrik/brik-runner-*`) container of its runner class -- the same images
+the GitLab and Jenkins adapters use. So the host needs only `bash 4+`, `git`,
+[`yq`](https://github.com/mikefarah/yq), [`jq`](https://jqlang.github.io/jq/), and
+a reachable container engine (`docker`). **The project toolchain lives in the
+stack images, not on your machine** -- you do not need node, java, the .NET SDK,
+etc. installed to run a pipeline locally.
 
-For CI, [brik-images](https://github.com/getbrik/brik-images)
-(`ghcr.io/getbrik/brik-runner-*`) ship every prerequisite preinstalled and the
-shared library selects the right image automatically.
+`brik doctor` checks the core tools and the engine. Its stack-tool report is
+informational (handy when you work outside containers); a containerized run does
+not depend on it. See [concepts/local-execution.md](../concepts/local-execution.md)
+for the full execution model.
 
 ## Scaffold a project
 
@@ -54,13 +56,22 @@ config that passes locally passes init in CI. See
 
 ## Run a pipeline locally
 
-```bash
-# A single stage
-brik stage build --config brik.yml --workspace .
+From any committed git project with a `brik.yml`, a bare `brik integrate` runs
+the full CI flow -- **no setup**:
 
-# The full pipeline
-brik integrate --with-release --with-package --with-deploy
+```bash
+# The full CI pipeline, one container per stage
+brik integrate
+
+# A single stage
+brik stage build
 ```
+
+Each stage runs in its runner-class container; `build`/`lint`/`test` need nothing
+configured. When no infrastructure referential is set, Brik falls back to a
+built-in default (profile `p-local`) so a plain CI run works out of the box -- see
+[the referential section](#infrastructure-referential-for-cd-and-signing) for when
+you need a real one.
 
 Valid stages for `brik stage`: `init`, `release`, `build`, `lint`, `sast`,
 `scan`, `test`, `package`, `container-scan`, `promote`, `deploy`, `notify`.
@@ -81,20 +92,38 @@ brik integrate --with-deploy --dry-run
 The same behaviour can be triggered by exporting `BRIK_DRY_RUN=true` in the
 caller shell; the CLI flag is the supported way to surface it.
 
-## Infrastructure referential (for CD deployments)
-
-If you intend to use `brik deploy` with attestation verification, you need an
-infrastructure referential: a directory with endpoints, credentials, policies,
-and trust material. Point to it via `BRIK_INFRA_DIR`:
+Two more opt-in flags tune the containerized run (`brik integrate`/`brik stage`):
 
 ```bash
-export BRIK_INFRA_DIR=/path/to/infra-referential
+brik integrate --platform linux/amd64   # run amd64 images for exact CI arch parity
+brik integrate --bind-mount             # mount the project dir live (fast edit/inspect)
+```
+
+`--platform` (or `BRIK_LOCAL_PLATFORM`) pins the container architecture; the
+default is your host's. `--bind-mount` (or `BRIK_LOCAL_BIND_MOUNT=1`) mounts the
+project directory instead of copying the committed state into a volume -- it
+**waives** the committed-state isolation (untracked and dirty files become
+visible, and outputs land in your project dir). See
+[concepts/local-execution.md](../concepts/local-execution.md) for both.
+
+## Infrastructure referential (for CD and signing)
+
+A plain CI run needs **no** referential: Brik falls back to a built-in default
+(profile `p-local`). You only need to configure one to `brik deploy`, to publish,
+or to sign evidence -- a directory of endpoints, credentials, policies, and trust
+material. Scaffold one (it lands in `.brik/infra/` by default) and point
+`BRIK_INFRA_DIR` at it:
+
+```bash
+brik infra init --profile p-open        # or p-entreprise / p-lab / p-local
+export BRIK_INFRA_DIR=.brik/infra
 brik deploy --version v1.2.3 --environment staging
 ```
 
-See [artifact attestation](../concepts/supply-chain.md) for the
-referential structure and [credentials](../how-to/manage-credentials.md) for how
-credentials are resolved.
+The CD verbs (`deploy`/`authorize`/`status`) always require an explicit
+referential -- they never use the local default. See
+[artifact attestation](../concepts/supply-chain.md) for the referential structure
+and [credentials](../how-to/manage-credentials.md) for how credentials are resolved.
 
 ## CLI reference
 
@@ -123,8 +152,11 @@ brik doctor --workspace ./my-project
 brik init --stack node --platform gitlab --dir ./my-project --non-interactive
 brik stage build --config brik.yml --workspace .
 brik stage deploy --dry-run
+brik integrate
 brik integrate --continue-on-error --with-release --with-package --with-deploy
 brik integrate --with-deploy --dry-run
+brik integrate --platform linux/amd64
+brik integrate --bind-mount
 brik self-update --channel edge --version v0.7.0
 brik self-uninstall --force
 brik version --verbose
