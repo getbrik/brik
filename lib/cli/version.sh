@@ -16,6 +16,7 @@ cli.version.run() {
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --verbose) verbose=true; shift ;;
+            -h|--help) brik_print_verb_help version; return 0 ;;
             *) brik_usage_error "unknown option: $1" || return "$?" ;;
         esac
     done

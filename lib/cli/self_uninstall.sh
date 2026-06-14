@@ -17,6 +17,7 @@ cli.self_uninstall.run() {
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --force) force=true; shift ;;
+            -h|--help) brik_print_verb_help self-uninstall; return 0 ;;
             *) brik_usage_error "unknown option: $1" || return "$?" ;;
         esac
     done

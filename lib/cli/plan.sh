@@ -85,6 +85,7 @@ cli.plan.run() {
             --with-release)    with_release=true; shift ;;
             --with-package)    with_package=true; shift ;;
             --with-deploy)     with_deploy=true; shift ;;
+            -h|--help)         brik_print_verb_help plan; return 0 ;;
             *) brik_usage_error "unknown option: $1" || return "$?" ;;
         esac
     done

@@ -23,6 +23,7 @@ cli.registry.run() {
 
     local subcommand="$1"; shift
     case "$subcommand" in
+        -h|--help) brik_print_verb_help registry; return 0 ;;
         stages) cli.registry.stages "$@" ;;
         *)
             brik_usage_error "unknown registry subcommand: $subcommand" || return "$?"

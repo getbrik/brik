@@ -69,6 +69,10 @@ cli.validate.run() {
                 schema_path="$2"
                 shift 2
                 ;;
+            -h|--help)
+                brik_print_verb_help validate
+                return 0
+                ;;
             *)
                 brik_usage_error "unknown option: $1" || return "$?"
                 ;;

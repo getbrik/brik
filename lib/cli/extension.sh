@@ -33,6 +33,7 @@ cli.extension.run() {
 
     local subcmd="$1"; shift
     case "$subcmd" in
+        -h|--help) brik_print_verb_help "extension test"; return 0 ;;
         test) cli.extension.test "$@" ;;
         *) brik_usage_error "unknown extension subcommand: $subcmd" || return "$?" ;;
     esac
