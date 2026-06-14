@@ -87,6 +87,23 @@ declared by the referential's credentials; values never appear in the
 engine argv. On a Linux host the socket mount adds the socket's gid as a
 supplementary group (`root:docker 0660`); Docker Desktop needs nothing.
 
+## Bind-mount mode (opt-in)
+
+By default a run copies the **committed** state into a throwaway volume, so
+untracked files and uncommitted edits never enter the run and the volume is
+destroyed on success. `brik integrate --bind-mount` (or `BRIK_LOCAL_BIND_MOUNT=1`)
+instead mounts the project directory live at `/work`:
+
+- The working tree is used as-is: **untracked and dirty files are visible** -
+  the committed-state isolation is deliberately waived.
+- Outputs (`.brik-logs/`, `brik-artifacts/`) are written straight into the
+  project dir (no copy-back, no volume to inspect).
+- It is an edit/inspect convenience, not a speedup: on macOS the bind is slower
+  than the copy-to-volume default.
+
+Use it to iterate on a stage against live edits; use the default for a faithful,
+isolated run.
+
 ## Declared divergences from CI
 
 Local execution is the same flow, not the same machine. The known,
@@ -94,6 +111,9 @@ accepted differences:
 
 - **Architecture**: images run for the host architecture (arm64 on Apple
   Silicon); CI runners may build amd64. Digests pin content per platform.
+  Pass `--platform <p>` (e.g. `brik integrate --platform linux/amd64`, or set
+  `BRIK_LOCAL_PLATFORM`) to run every container on a specific platform for
+  exact CI parity -- slower on a mismatched host (Rosetta/QEMU).
 - **Network**: stage containers sit on the default bridge. The
   referential's endpoint URLs must be reachable from a container; endpoint
   hosts the HOST resolves through a loopback `/etc/hosts` entry (a

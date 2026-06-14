@@ -47,6 +47,36 @@ _brik.local.docker.engine() {
     printf '%s' "${BRIK_CONTAINER_ENGINE:-docker}"
 }
 
+# --platform tokens when BRIK_LOCAL_PLATFORM is set (exact arch parity, e.g.
+# linux/amd64 on an arm64 host). Empty by default = host architecture.
+_brik.local.docker.platform_args() {
+    [[ -n "${BRIK_LOCAL_PLATFORM:-}" ]] && printf '%s\n' "--platform" "${BRIK_LOCAL_PLATFORM}"
+    return 0
+}
+
+# engine_run - the single chokepoint for `<engine> run`. Injects --platform so
+# every container of a run (seed, plan, stage, extract) executes on the same
+# architecture. All run sites go through here.
+_brik.local.docker.engine_run() {
+    local engine
+    engine="$(_brik.local.docker.engine)"
+    local -a plat=()
+    mapfile -t plat < <(_brik.local.docker.platform_args)
+    "${engine}" run "${plat[@]}" "$@"
+}
+
+# work_mount - the `-v <src>:/work` spec for a run. Bind-mounts the project dir
+# live when BRIK_LOCAL_BIND_MOUNT=1 (fast edit/inspect loop, waives the
+# committed-state guarantee), otherwise the per-run named volume.
+_brik.local.docker.work_mount() {
+    local run_id="$1"
+    if [[ "${BRIK_LOCAL_BIND_MOUNT:-}" == "1" ]]; then
+        printf '%s' "${BRIK_PROJECT_DIR}:${_BRIK_LOCAL_DOCKER_WORK}"
+    else
+        printf '%s' "$(brik.local.docker.volume_name "$run_id"):${_BRIK_LOCAL_DOCKER_WORK}"
+    fi
+}
+
 _brik.local.docker.uid_gid() {
     printf '%s:%s' "$(id -u)" "$(id -g)"
 }
@@ -130,14 +160,14 @@ brik.local.docker.seed_workspace() {
     # Plain pipe semantics: the engine's exit code decides; a broken tar
     # stream surfaces as a tar -x failure inside the container.
     if ! tar -C "$project_dir" -cf - .git \
-        | "$engine" run --rm -i -v "${volume}:${_BRIK_LOCAL_DOCKER_WORK}" "$base_image" \
+        | _brik.local.docker.engine_run --rm -i -v "$(_brik.local.docker.work_mount "$run_id")" "$base_image" \
             sh -c "tar -xf - -C ${_BRIK_LOCAL_DOCKER_WORK} && chown -R ${uid_gid} ${_BRIK_LOCAL_DOCKER_WORK}"; then
         log.error "seed_workspace: failed to copy .git into ${volume}"
         return "$BRIK_EXIT_IO_FAILURE"
     fi
 
-    if ! "$engine" run --rm --user "$uid_gid" -e "HOME=${_BRIK_LOCAL_DOCKER_HOME}" \
-        -v "${volume}:${_BRIK_LOCAL_DOCKER_WORK}" "$base_image" \
+    if ! _brik.local.docker.engine_run --rm --user "$uid_gid" -e "HOME=${_BRIK_LOCAL_DOCKER_HOME}" \
+        -v "$(_brik.local.docker.work_mount "$run_id")" "$base_image" \
         sh -c "git -C ${_BRIK_LOCAL_DOCKER_WORK} checkout -f HEAD && mkdir -p ${_BRIK_LOCAL_DOCKER_HOME} ${_BRIK_LOCAL_DOCKER_WORK}/.brik-logs"; then
         log.error "seed_workspace: failed to materialize the work tree in ${volume}"
         return "$BRIK_EXIT_IO_FAILURE"
@@ -166,8 +196,8 @@ brik.local.docker.seed_plan() {
     volume="$(brik.local.docker.volume_name "$run_id")"
     base_image="$(_brik.local.docker.base_image)" || return "$?"
 
-    if ! "$engine" run --rm -i --user "$(_brik.local.docker.uid_gid)" \
-        -v "${volume}:${_BRIK_LOCAL_DOCKER_WORK}" "$base_image" \
+    if ! _brik.local.docker.engine_run --rm -i --user "$(_brik.local.docker.uid_gid)" \
+        -v "$(_brik.local.docker.work_mount "$run_id")" "$base_image" \
         sh -c "cat > ${_BRIK_LOCAL_DOCKER_WORK}/.brik-logs/plan.json" < "$plan_file"; then
         log.error "seed_plan: failed to copy ${plan_file} into ${volume}"
         return "$BRIK_EXIT_IO_FAILURE"
@@ -192,7 +222,7 @@ _brik.local.docker.read_volume_env() {
     volume="$(brik.local.docker.volume_name "$run_id")"
     base_image="$(_brik.local.docker.base_image)" || return "$?"
 
-    content="$("$engine" run --rm -v "${volume}:${_BRIK_LOCAL_DOCKER_WORK}" "$base_image" \
+    content="$(_brik.local.docker.engine_run --rm -v "$(_brik.local.docker.work_mount "$run_id")" "$base_image" \
         sh -c "cat ${_BRIK_LOCAL_DOCKER_WORK}/.brik-logs/pipeline.env 2>/dev/null" 2>/dev/null)" || content=""
     [[ -z "$content" ]] && return 1
 
@@ -312,7 +342,7 @@ _brik.local.docker.common_run_args() {
         "-e" "BRIK_CONFIG_FILE=${config_path}" \
         "-e" "BRIK_LOG_DIR=${_BRIK_LOCAL_DOCKER_WORK}/.brik-logs" \
         "-e" "BRIK_PLAN_FILE=${_BRIK_LOCAL_DOCKER_WORK}/.brik-logs/plan.json" \
-        "-v" "${volume}:${_BRIK_LOCAL_DOCKER_WORK}" \
+        "-v" "$(_brik.local.docker.work_mount "$run_id")" \
         "-v" "${BRIK_HOME}:${_BRIK_LOCAL_DOCKER_BRIK_HOME}:ro" \
         "-w" "$_BRIK_LOCAL_DOCKER_WORK"
 
@@ -407,7 +437,7 @@ brik.local.docker.run_plan_container() {
     # fallback reports the stack image for every stage).
     args+=("-e" "BRIK_RUNNER_IMAGE=${image}")
 
-    "$(_brik.local.docker.engine)" run "${args[@]}" "$image" \
+    _brik.local.docker.engine_run "${args[@]}" "$image" \
         "${_BRIK_LOCAL_DOCKER_BRIK_HOME}/bin/brik" plan \
         --workspace "$_BRIK_LOCAL_DOCKER_WORK" \
         --out "${_BRIK_LOCAL_DOCKER_WORK}/.brik-logs/plan.json" "$@"
@@ -440,7 +470,7 @@ brik.local.docker.run_stage_container() {
         args+=("${socket_args[@]}")
     fi
 
-    "$(_brik.local.docker.engine)" run "${args[@]}" "$image" \
+    _brik.local.docker.engine_run "${args[@]}" "$image" \
         bash "${_BRIK_LOCAL_DOCKER_BRIK_HOME}/shared-libs/local/scripts/container-stage.sh" "$stage"
 }
 
@@ -457,7 +487,7 @@ brik.local.docker.extract_logs() {
     base_image="$(_brik.local.docker.base_image)" || return "$?"
     tmp="$(mktemp)"
 
-    "$engine" run --rm -v "${volume}:${_BRIK_LOCAL_DOCKER_WORK}" "$base_image" \
+    _brik.local.docker.engine_run --rm -v "$(_brik.local.docker.work_mount "$run_id")" "$base_image" \
         sh -c "cd ${_BRIK_LOCAL_DOCKER_WORK} && tar -cf - \$(ls -d .brik-logs brik-artifacts 2>/dev/null) 2>/dev/null || true" \
         > "$tmp" 2>/dev/null || true
 
@@ -527,15 +557,32 @@ brik.local.docker.run_pipeline() {
     local run_id
     run_id="$(brik.local.docker.run_id)"
 
-    brik.local.docker.create_volume "$run_id" || return "$?"
+    local bind=false
+    [[ "${BRIK_LOCAL_BIND_MOUNT:-}" == "1" ]] && bind=true
+
+    if ! $bind; then
+        brik.local.docker.create_volume "$run_id" || return "$?"
+    fi
 
     local had_failure=false
-    if brik.local.docker.seed_workspace "$run_id" "$project_dir" \
-        && { if [[ -n "$plan_file" ]]; then
-                 brik.local.docker.seed_plan "$run_id" "$plan_file"
-             else
-                 brik.local.docker.run_plan_container "$run_id" "${plan_flags[@]}"
-             fi; }; then
+    # Seed the work dir, then the plan. Non-bind copies the committed state
+    # into the volume; bind uses the live project dir as /work (the
+    # committed-state guarantee is waived by opt-in) and only ensures the log
+    # dir exists. The plan runs the same way in both modes.
+    local prepared=false
+    if $bind; then
+        mkdir -p "${project_dir}/.brik-logs" && prepared=true
+    elif brik.local.docker.seed_workspace "$run_id" "$project_dir"; then
+        prepared=true
+    fi
+    if $prepared; then
+        if [[ -n "$plan_file" ]]; then
+            brik.local.docker.seed_plan "$run_id" "$plan_file" || prepared=false
+        else
+            brik.local.docker.run_plan_container "$run_id" "${plan_flags[@]}" || prepared=false
+        fi
+    fi
+    if $prepared; then
         local stage rc group prev_group="" skip_rest=false
         for stage in "${stages[@]}"; do
             # Mirror the CI dependency graph: stages sharing a placement group
@@ -568,13 +615,21 @@ brik.local.docker.run_pipeline() {
         log.error "run aborted before the stage sequence (seed or plan failed)"
     fi
 
-    brik.local.docker.extract_logs "$run_id" "$project_dir" || true
+    if ! $bind; then
+        brik.local.docker.extract_logs "$run_id" "$project_dir" || true
+    fi
 
     if $had_failure; then
-        log.warn "run volume kept for inspection: $(brik.local.docker.volume_name "$run_id")"
+        if $bind; then
+            log.warn "run failed; outputs are in ${project_dir}/.brik-logs"
+        else
+            log.warn "run volume kept for inspection: $(brik.local.docker.volume_name "$run_id")"
+        fi
         return "$BRIK_EXIT_FAILURE"
     fi
-    brik.local.docker.destroy_volume "$run_id" || true
+    if ! $bind; then
+        brik.local.docker.destroy_volume "$run_id" || true
+    fi
     return "$BRIK_EXIT_OK"
 }
 
@@ -687,7 +742,7 @@ _brik.local.docker._run_cli_verb_container() {
 
     local rc=0
     if brik.local.docker.seed_workspace "$run_id" "$project_dir"; then
-        "$(_brik.local.docker.engine)" run "${args[@]}" "$image" \
+        _brik.local.docker.engine_run "${args[@]}" "$image" \
             "${_BRIK_LOCAL_DOCKER_BRIK_HOME}/bin/brik" "$verb" "${verb_args[@]}" || rc=$?
     else
         rc="$BRIK_EXIT_FAILURE"
