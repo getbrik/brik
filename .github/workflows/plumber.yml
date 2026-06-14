@@ -1,0 +1,86 @@
+name: Plumber
+
+# CI/CD compliance scan of this repo's GitHub Actions (workflow content +
+# repository settings) via the official Plumber action. Two signals:
+#   - SARIF uploaded to GitHub Code Scanning (the live security view), and
+#   - a self-updating shields.io endpoint badge (docs/badges/plumber.json),
+#     committed on push to main (same signed-commit path as the ci.yml
+#     metrics badges).
+# soft-fail is on everywhere: the badge always reflects the real score; a
+# regression shows up as Code Scanning alerts rather than a red job.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  plumber:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write          # commit the badge JSON to main (push event only)
+      security-events: write   # upload SARIF to Code Scanning
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - id: plumber
+        uses: getplumber/plumber@9a74a6e0eccc2dad90f89ae8441c58fc97a35196 # v0.3.58
+        with:
+          # Never fail the run: the badge must reflect the real score, and
+          # findings are surfaced through Code Scanning instead of a red gate.
+          soft-fail: true
+
+      - name: Build compliance badge
+        if: github.event_name == 'push'
+        run: |
+          set -euo pipefail
+          comp='${{ steps.plumber.outputs.compliance }}'
+          comp=${comp%.*}   # floor to an integer percentage
+          grade=$(jq -r '.plumberScore.score' plumber-report.json)
+          case "$grade" in
+            A) color=brightgreen ;;
+            B) color=green ;;
+            C) color=yellow ;;
+            D) color=orange ;;
+            *) color=red ;;
+          esac
+          mkdir -p docs/badges
+          jq -n --arg msg "${comp}% (${grade})" --arg color "$color" \
+            '{schemaVersion:1, label:"GH Actions compliance", message:$msg, color:$color}' \
+            > docs/badges/plumber.json
+          echo "badge: $(cat docs/badges/plumber.json)"
+
+      - name: Commit badge (signed via GraphQL)
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if git diff --quiet HEAD -- docs/badges/plumber.json; then
+            echo "No badge change to commit"
+            exit 0
+          fi
+          HEAD_OID=$(gh api "repos/${GITHUB_REPOSITORY}/branches/main" --jq .commit.sha)
+          additions=$(jq -n \
+            --arg path "docs/badges/plumber.json" \
+            --arg contents "$(base64 -w0 < docs/badges/plumber.json)" \
+            '[{path: $path, contents: $contents}]')
+          jq -n \
+            --arg repo "$GITHUB_REPOSITORY" \
+            --arg oid "$HEAD_OID" \
+            --argjson additions "$additions" \
+            '{
+              query: "mutation($input: CreateCommitOnBranchInput!) { createCommitOnBranch(input: $input) { commit { url oid } } }",
+              variables: {
+                input: {
+                  branch: { repositoryNameWithOwner: $repo, branchName: "main" },
+                  message: { headline: "ci: update plumber compliance badge" },
+                  expectedHeadOid: $oid,
+                  fileChanges: { additions: $additions }
+                }
+              }
+            }' | gh api -X POST graphql --input -

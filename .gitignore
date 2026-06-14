@@ -26,6 +26,14 @@ report/
 !lib/pipeline/report/
 .brik-logs/
 
+# Plumber: local audit reports + action-generated artifacts.
+# The committed shields badge (docs/badges/plumber.json) is NOT ignored.
+.plumber-reports/
+plumber-report.json
+plumber-pbom.json
+plumber-cyclonedx-sbom.json
+plumber.sarif
+
 # Claude Code workspace (local state, plans, checkpoints)
 .claude/
 

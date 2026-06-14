@@ -1,0 +1,127 @@
+# Plumber configuration (https://github.com/getplumber/plumber)
+# Required by `plumber analyze`. brik is a GitHub repo, so only the GitHub
+# path is configured here (the gitlab: block from the default template is
+# dropped — it is ignored on the GitHub path anyway).
+version: "2.0"
+
+github:
+  controls:
+    # gitleaks over workflow files; off by default (external dependency).
+    pipelineMustNotLeakSecretsInConfig:
+      enabled: false
+
+    # Third-party actions must be pinned by 40-char commit SHA (first-party
+    # actions/* and github/* are exempt).
+    actionsMustBePinnedByCommitSha:
+      enabled: true
+      trustedOwners:
+        - actions
+        - github
+
+    # Container images must be pinned by digest, never a mutable tag.
+    containerImageMustNotUseForbiddenTags:
+      enabled: true
+      tags:
+        - latest
+        - dev
+        - development
+        - staging
+        - main
+        - master
+      containerImagesMustBePinnedByDigest: true
+
+    # No docker:dind / insecure daemon.
+    pipelineMustNotUseDockerInDocker:
+      enabled: true
+      detectInsecureDaemon: true
+
+    # No pipe-to-shell / download-then-exec in run: steps (ISSUE-411).
+    pipelineMustNotExecuteUnverifiedScripts:
+      enabled: true
+      trustedUrls: []
+
+    # Reusable workflows must not use `secrets: inherit`.
+    reusableWorkflowsMustNotInheritSecrets:
+      enabled: true
+
+    # Security/scanner jobs must not be neutralised (continue-on-error,
+    # manual-only, redefined rules).
+    securityJobsMustNotBeWeakened:
+      enabled: true
+      securityJobPatterns:
+        - "*codeql*"
+        - "*dependency-review*"
+        - "*trufflehog*"
+        - "*gitleaks*"
+        - "*osv-scanner*"
+        - "*-sast"
+        - "*-sast-*"
+        - "*-scan"
+        - "*scan*"
+        - "*-security"
+        - "*-security-*"
+        - "*-audit"
+        - "*-audit-*"
+      allowFailureMustBeFalse:
+        enabled: true
+      rulesMustNotBeRedefined:
+        enabled: true
+      whenMustNotBeManual:
+        enabled: true
+
+    # No attacker-controlled ${{ github.event.* }} interpolated into run:.
+    workflowMustNotInjectUserInputInScripts:
+      enabled: true
+
+    # No pull_request_target / workflow_run triggers.
+    workflowMustNotUseDangerousTriggers:
+      enabled: true
+
+    # pull_request_target must not check out the PR head.
+    pullRequestTargetMustNotCheckoutHead:
+      enabled: true
+
+    # Every workflow must declare an explicit permissions: block (ISSUE-801).
+    workflowsMustDeclarePermissions:
+      enabled: true
+
+    # Branch governance: control stays ON (verifies main is protected and
+    # force-push is off), but code-owner approval is NOT required — this is a
+    # solo-maintainer repo with a "solo-friendly" ruleset, where requiring
+    # code-owner approval would lock the sole maintainer out of merging their
+    # own PRs. Accepted posture exception for ISSUE-505.
+    branchMustBeProtected:
+      enabled: true
+      defaultMustBeProtected: true
+      namePatterns:
+        - main
+        - master
+        - release/*
+        - production
+        - dev
+      allowForcePush: false
+      codeOwnerApprovalRequired: false
+
+    # Opt-in: assert a required action set is wired up. Off (no org policy).
+    workflowMustIncludeRequiredActions:
+      enabled: false
+      requiredGroups: []
+
+    # No `permissions: write-all`.
+    workflowMustNotGrantPermissionsWriteAll:
+      enabled: true
+
+    # No `uses:` referencing an archived upstream repo (needs API auth).
+    actionsMustNotBeArchived:
+      enabled: true
+
+    # No action referencing a version with a known CVE (needs API auth).
+    actionsMustNotCarryKnownCVEs:
+      enabled: true
+
+    # No debug-trace env (would dump masked secrets into the run log).
+    pipelineMustNotEnableDebugTrace:
+      enabled: true
+      forbiddenVariables:
+        - ACTIONS_STEP_DEBUG
+        - ACTIONS_RUNNER_DEBUG
