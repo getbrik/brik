@@ -46,6 +46,18 @@ Describe "brik infra"
       The output should include "$TARGET_DIR"
       The path "$TARGET_DIR/schemas/registry.schema.json" should be file
     End
+
+    It "scaffolds into a dedicated dir, not the project root"
+      init_default_dir() {
+        cd "$TARGET_DIR" || return 1
+        "$BRIK_BIN" infra init --profile p-local >/dev/null 2>&1 || return $?
+        # The referential lands in a dedicated subdir, never beside the code.
+        [[ -f "$TARGET_DIR/.brik/infra/referential.yml" && ! -f "$TARGET_DIR/referential.yml" ]] \
+          && printf 'isolated'
+      }
+      When call init_default_dir
+      The output should equal "isolated"
+    End
   End
 
   # Each scaffolded profile must pass its own validation: the scaffolds
@@ -55,6 +67,7 @@ Describe "brik infra"
       p-open
       p-entreprise
       p-lab
+      p-local
     End
 
     It "brik infra init --profile $1 produces a valid instance"

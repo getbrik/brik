@@ -1,0 +1,4 @@
+apiVersion: brik.dev/referential/v1
+kind: Referential
+profile: p-local
+description: Built-in default for containerized local execution - declares no endpoints, no credentials, no signing. Brik falls back to this on a bare host when no referential is configured, so a plain CI run needs zero setup; opting into package/promote/deploy/signing requires a real referential.

@@ -77,6 +77,7 @@ cli.stage.run() {
     # bypass). Inside a CI job or a brik container the verb executes
     # in-process: the caller IS the execution environment.
     if brik_host_local; then
+        cli.local_runner.default_infra
         cli.local_runner.setup_docker_env || return "$?"
         cli.local_runner.runtime brik.local.docker.run_single_stage "$stage_name"
         return "$?"
