@@ -34,10 +34,12 @@ cli.infra.run() {
 }
 
 # _cli.infra._init - scaffold a referential instance for a profile.
-# Usage: brik infra init [--profile p-open|p-entreprise|p-lab] [--dir <d>]
+# Usage: brik infra init [--profile p-open|p-entreprise|p-lab|local] [--dir <d>]
+# Default --dir is a dedicated subdir (.brik/infra) so the instance never
+# pollutes the project root.
 _cli.infra._init() {
     local profile="p-open"
-    local target_dir="."
+    local target_dir=".brik/infra"
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
@@ -58,13 +60,16 @@ _cli.infra._init() {
     done
 
     case "$profile" in
-        p-open|p-entreprise|p-lab) ;;
+        p-open|p-entreprise|p-lab|p-local) ;;
         *)
-            brik_usage_error "unknown profile: ${profile} (expected p-open, p-entreprise or p-lab)" || return "$?"
+            brik_usage_error "unknown profile: ${profile} (expected p-open, p-entreprise, p-lab or p-local)" || return "$?"
             ;;
     esac
 
-    pipeline.require_dir "$target_dir" || return "$?"
+    if ! mkdir -p "$target_dir"; then
+        brik_error "cannot create referential directory: ${target_dir}"
+        return "$BRIK_EXIT_INVALID_INPUT"
+    fi
     if [[ -f "${target_dir}/referential.yml" ]]; then
         brik_error "a referential instance already exists in ${target_dir}"
         return "$BRIK_EXIT_INVALID_INPUT"
@@ -120,6 +125,22 @@ _cli.infra._validate() {
 # Profile scaffolds. Placeholder hosts use .example / .lab names; secret
 # material is referenced (env://, bao://, file://), never inlined.
 # ---------------------------------------------------------------------------
+
+# p-local: the containerized-local posture. No endpoints, no credentials, no
+# signing - a plain CI run (build/lint/test) needs nothing. This is the
+# materializable twin of the built-in default Brik falls back to on a bare
+# host; extend it (add a Registry, a Signing key backend...) to opt into
+# package/promote/deploy/signing locally.
+_cli.infra._scaffold_p_local() {
+    local dir="$1"
+
+    cat > "${dir}/referential.yml" <<'YAML'
+apiVersion: brik.dev/referential/v1
+kind: Referential
+profile: p-local
+description: Containerized local execution - no endpoints, no credentials, no signing. Add endpoints/credentials/bindings to opt into package, promote, deploy or signing.
+YAML
+}
 
 _cli.infra._scaffold_p_open() {
     local dir="$1"

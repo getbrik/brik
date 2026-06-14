@@ -119,8 +119,9 @@ Options for status:
   --json                  Emit the three layers as a JSON document on stdout
 
 Options for infra init:
-  --profile <name>        Profile to scaffold: p-open (default), p-entreprise, p-lab
-  --dir <path>            Target directory (default: current directory)
+  --profile <name>        Profile to scaffold: p-open (default), p-entreprise,
+                          p-lab, p-local (empty local posture, no signing)
+  --dir <path>            Target directory (default: .brik/infra)
 
 Options for infra validate:
   --dir <path>            Referential instance to validate

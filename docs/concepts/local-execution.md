@@ -8,6 +8,31 @@ host needs `bash`, `git`, `jq`, `yq` and a reachable container engine
 (`docker`; `brik doctor` checks them), nothing else: the project toolchain
 lives in the stack images.
 
+## Zero-setup first run
+
+A plain CI run (`brik integrate`, `brik stage`) needs no configuration. When no
+referential is set (`BRIK_INFRA_DIR`/`BRIK_INFRA_REPO` both unset) on a bare
+host, Brik falls back to a built-in default instance (profile `p-local`,
+shipped at `share/infra/p-local/`) that declares no endpoints, no credentials
+and no signing. `init` and the planner still journal its fingerprint into
+`plan.json`, so plan reproducibility holds; `build`/`lint`/`test` run with no
+setup.
+
+The boundary is the referential itself: the moment a stage needs an endpoint or
+credential, it fails closed and asks for a real one.
+
+- **`build`/`lint`/`test`** reference nothing -> run on the default.
+- **`package`/`promote`/`deploy`/signing** resolve a Registry, a Git host, a
+  Signing backend... -> require a referential. Scaffold one with
+  `brik infra init` (writes to `.brik/infra/` by default; `--profile p-local`
+  starts from the empty local posture, other profiles add real endpoints).
+
+An explicit `BRIK_INFRA_DIR`/`BRIK_INFRA_REPO` always wins. In orchestrated CI
+the referential is mounted, so the default never applies. The **CD verbs**
+(`brik deploy`/`authorize`/`status`) always require an explicit referential -
+they never fall back to the default (you cannot deploy to a declared-nothing
+infrastructure).
+
 ## Execution model
 
 One run = one named workspace volume (`brik-run-<id>`):

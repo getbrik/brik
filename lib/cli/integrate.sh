@@ -88,6 +88,7 @@ cli.integrate.run() {
     # --auto-select is implicit here. Inside a CI job or a brik container
     # the verb executes in-process: the caller IS the execution environment.
     if brik_host_local; then
+        cli.local_runner.default_infra
         cli.local_runner.setup_docker_env || return "$?"
         local -a engine_flags=("${pipeline_flags[@]}")
         [[ -n "$plan_file" ]] && engine_flags+=(--plan "$plan_file")
