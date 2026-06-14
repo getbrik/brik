@@ -18,6 +18,32 @@ Describe "brik plan (CLI surface)"
   Before 'setup_ws'
   After 'cleanup_ws'
 
+  Describe "zero-ceremony (no referential configured)"
+    # brik plan runs the planner in-process on the host; on a bare host with
+    # no referential it must fall back to the bundled p-local default (same as
+    # brik integrate/stage), not fail with "no infrastructure referential
+    # configured". This Describe deliberately does NOT mock infra.
+    setup_bare() {
+      BARE_WS="$(mktemp -d)"
+      ( cd "$BARE_WS" && git init -q && git config user.email t@t \
+          && git config user.name t && : > marker && git add -A \
+          && git commit -q -m baseline )
+    }
+    cleanup_bare() { rm -rf "$BARE_WS"; }
+    Before 'setup_bare'
+    After 'cleanup_bare'
+
+    It "uses the bundled p-local default when no referential is configured"
+      plan_no_infra() {
+        unset BRIK_INFRA_DIR BRIK_INFRA_REPO GITLAB_CI JENKINS_URL BRIK_LOCAL_CONTAINER
+        "$BRIK_BIN" plan --workspace "$BARE_WS" --mode safe --explain
+      }
+      When call plan_no_infra
+      The status should equal 0
+      The output should include "Brik plan"
+    End
+  End
+
   Describe "default compute"
     It "writes plan.json to --out and prints the path"
       When run script "$BRIK_BIN" plan --workspace "$PLAN_WS" --mode safe \

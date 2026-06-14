@@ -45,6 +45,28 @@ Describe "brik init"
     End
   End
 
+  Describe "test framework detection (node)"
+    # A scaffolded brik.yml must pass the init stage's config-vs-project
+    # coherence check: a node project with a custom test script (node --test,
+    # vitest, mocha...) must not default to jest. init should pin
+    # test.framework: npm so `brik init && brik integrate` works out of the box.
+    setup_node_test() {
+      TEMP_DIR="$(mktemp -d)"
+      printf '{"name":"app","version":"1.0.0","scripts":{"test":"node --test"}}\n' \
+        > "${TEMP_DIR}/package.json"
+    }
+    cleanup_node_test() { rm -rf "$TEMP_DIR"; }
+    Before 'setup_node_test'
+    After 'cleanup_node_test'
+
+    It "pins test.framework to npm when package.json has a custom test script"
+      When run script "${BRIK_BIN}" init --stack node --platform gitlab --dir "${TEMP_DIR}" --non-interactive
+      The status should eq 0
+      The output should include "Created"
+      The contents of file "${TEMP_DIR}/brik.yml" should include "framework: npm"
+    End
+  End
+
   Describe "auto-detection from package.json"
     setup_node() {
       TEMP_DIR="$(mktemp -d)"

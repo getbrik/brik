@@ -97,12 +97,26 @@ _cli.init._generate_config() {
     local project_name="$2"
     local stack="$3"
 
+    # Honor a custom test script (node --test, vitest, mocha...) by pinning
+    # test.framework: npm. The node stack default is jest, so without this the
+    # scaffolded brik.yml fails the init stage's config-vs-project coherence
+    # check on any non-jest project -- i.e. `brik init && brik integrate` would
+    # break out of the box.
+    local test_block=""
+    if [[ "$stack" == "node" ]]; then
+        local pkg="${target_dir}/package.json"
+        if [[ -f "$pkg" ]] && command -v jq >/dev/null 2>&1 \
+            && jq -e '.scripts.test // empty' "$pkg" >/dev/null 2>&1; then
+            test_block=$'\n\ntest:\n  framework: npm'
+        fi
+    fi
+
     cat > "${target_dir}/brik.yml" <<YAML
 version: 1
 
 project:
   name: "${project_name}"
-  stack: ${stack}
+  stack: ${stack}${test_block}
 YAML
 }
 

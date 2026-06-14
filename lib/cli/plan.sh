@@ -48,6 +48,14 @@ cli.plan.run() {
         esac
     fi
 
+    # On a bare host with no referential configured, fall back to the bundled
+    # p-local default -- same as brik integrate/stage, so standalone `brik plan`
+    # is not gated behind `brik infra init`. No-op inside a CI job or a brik
+    # container (the referential is already provided there), so CD verbs that
+    # re-exec into a container keep their strict referential requirement.
+    brik.use cli.local_runner
+    cli.local_runner.default_infra
+
     local workspace="${BRIK_WORKSPACE:-$PWD}"
     local mode=""
     local out="" explain=false validate_only=false format=""
