@@ -25,6 +25,11 @@ each is governed by a JSON Schema (draft 2020-12) under `schemas/`:
 In each case the schema is not documentation *of* the contract; it **is** the
 contract.
 
+`brik.yml` and the referential are the two portable, user-facing declarations:
+the pipeline (*what* runs) and the infrastructure (*where* it runs, with which
+credentials and trust), neither tied to a CI platform. See
+[Architecture](architecture.md#why-brik) for that two-axis separation.
+
 ## Why it matters
 
 - **The document an auditor reads is the document the pipeline obeys.** What is
@@ -82,7 +87,7 @@ The schema families:
 - The generated `brik.yml` reference: [reference/configuration](../reference/configuration/README.md)
 - The pipeline manifests: [`lib/registry/manifests/`](../../lib/registry/manifests/)
 - The operator parameter manifest: [`lib/registry/pipeline-params.yml`](../../lib/registry/pipeline-params.yml)
-- The infrastructure referential: [manage credentials](../how-to/manage-credentials.md)
+- The infrastructure referential: [infrastructure referential reference](../reference/infrastructure-referential.md)
 
 ## Related
 

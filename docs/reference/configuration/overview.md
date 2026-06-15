@@ -18,6 +18,13 @@ Two consequences:
 - Removing or reordering pipeline stages is not configurable on
   purpose. Brik's value is the convention, not flexibility.
 
+`brik.yml` covers one axis of this separation, the pipeline. The other axis,
+the **infrastructure** (registries, git host, signing, deploy targets, and the
+credentials behind them), is declared separately in the
+[infrastructure referential](../infrastructure-referential.md), which keeps
+infrastructure config out of both `brik.yml` and the platform. See
+[Architecture](../../concepts/architecture.md#why-brik) for the two-axis model.
+
 ## Three-tier resolution
 
 Most `brik.yml` knobs follow the same precedence rule when several
