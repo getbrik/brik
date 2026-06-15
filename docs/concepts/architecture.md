@@ -22,6 +22,21 @@ Brik separates the concerns:
 
 One set of CI/CD functions. Any platform. No duplication.
 
+**Two portable declarations, neither holding orchestrator logic.** The same
+separation runs on two axes:
+
+- `brik.yml` declares the **pipeline**, *what* runs (build, test, scan, deploy),
+  separated from *how* it runs.
+- The [infrastructure referential](../reference/infrastructure-referential.md)
+  declares the **infrastructure**, *where* the pipeline lands and *with which
+  credentials and trust* (registries, git host, signing, deploy targets),
+  separated from the orchestrator that runs it.
+
+Both are portable: the same pair runs unchanged on a laptop, on GitLab, or on
+Jenkins, and the adapter only *executes* them. `brik.yml` keeps pipeline logic
+out of the platform; the referential keeps infrastructure config out of both the
+pipeline and the platform.
+
 ## Design principles
 
 These guide every implementation decision in Brik.

@@ -43,6 +43,7 @@ Install Brik and run your first pipeline.
 ### How-to: task guides
 
 - [Manage credentials](how-to/manage-credentials.md): credential indirection, the infrastructure referential, signing-credential isolation
+- [Choose an infrastructure profile](how-to/choose-infra-profile.md): pick and configure a referential posture (`p-open`, `p-entreprise`, `p-lab`, `p-local`)
 - [Configure org policy](how-to/configure-org-policy.md): the org-wide policy and referential (DSI / security teams)
 - [Accept a finding](how-to/accept-a-finding.md): accept a finding with traceability; the CD deployment gates
 - [Manage findings](how-to/manage-findings.md): the SARIF pipeline, presets, severity resolution
@@ -57,6 +58,7 @@ Install Brik and run your first pipeline.
 - [GitLab CI](reference/platforms/gitlab.md): the canonical GitLab integration reference
 - [Jenkins](reference/platforms/jenkins.md): the canonical Jenkins integration reference
 - [Pipeline report](reference/pipeline-report.md): the `aggregate-report.{json,md,html}` field contract
+- [Infrastructure referential](reference/infrastructure-referential.md): the document kinds and fields of the `BRIK_INFRA_DIR` tree
 
 ## For contributors
 

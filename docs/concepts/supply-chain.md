@@ -127,9 +127,9 @@ The provenance predicate CI emits carries a verifiable builder identity that
   (the exported public key) on the Signing endpoint and every verifier checks
   signatures without key access or a KMS round-trip.
 - Trust material, endpoints, and credential references live in the
-  [infrastructure referential](../how-to/manage-credentials.md); credentials are
-  references (`env://`, `file://`), never values, and Brik validates the
-  referential fail-closed at init and deploy.
+  [infrastructure referential](../reference/infrastructure-referential.md);
+  credentials are references (`env://`, `file://`), never values, and Brik
+  validates the referential fail-closed at init and deploy.
 
 ### Credential separation
 
@@ -150,5 +150,6 @@ invisible to it.
 
 - [Fixed flows](fixed-flows.md): where the gates sit in the CD flow
 - [Manage credentials](../how-to/manage-credentials.md): the infrastructure referential and credential scoping
+- [Choose an infrastructure profile](../how-to/choose-infra-profile.md): the signing and trust posture each profile wires
 - [Organisation policy](../how-to/configure-org-policy.md): enforcing gate requirements org-wide
 - [Data layout](data-layout.md): where evidence and journals live on disk

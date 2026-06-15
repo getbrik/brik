@@ -32,24 +32,16 @@ This separation means:
 ## Infrastructure referential
 
 The infrastructure referential (`BRIK_INFRA_DIR`) holds endpoints, credentials,
-policies, and trust material. It is **not** part of `brik.yml`; instead, it is
-a separate configuration tree mounted into every container:
+policies, and trust material. It is **not** part of `brik.yml`; it is a separate,
+schema-validated tree mounted read-only into every container at
+`/etc/brik/infra` and validated fail-closed at init and deploy. Its credentials
+are references (`env://`, `file://`, `bao://`), never inline values, so the
+indirection above applies to the referential too.
 
-- **Endpoints**: registry, git host, ArgoCD, Kubernetes, state-repo
-- **Credentials**: resolved via `env://` or `file://` references (never inline values)
-- **TLS posture**: system CA, custom CA bundle, or insecure (explicit and loud)
-- **Trust material**: signing keys, cosign verification keys, allowed signers for
-  evidence commits
-- **Policy**: org-wide findings allowlist and expiration
-
-Brik validates the referential **eagerly** at init and deploy. An invalid or
-missing referential fails closed. On local execution, the referential is mounted
-read-only at `/etc/brik/infra`; on CI platforms, it is delivered as a volume or
-injected via the shared library setup.
-
-For the full structure and validation rules, see
-[artifact attestation](../concepts/supply-chain.md) and
-[local execution](../concepts/local-execution.md).
+Scaffold one with `brik infra init --profile <name>` and pick a posture in
+[Choose an infrastructure profile](choose-infra-profile.md). For the document
+kinds and their fields, see the
+[infrastructure referential reference](../reference/infrastructure-referential.md).
 
 ---
 

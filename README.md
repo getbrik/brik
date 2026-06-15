@@ -114,6 +114,38 @@ You configure your project. You never write pipeline logic.
 > top-level section, each on its own page: purpose, behaviour, when it runs, and how to
 > configure it.
 
+## Two portable configurations
+
+Delivery splits into two declarations you author once, and neither is written in
+a platform's dialect:
+
+- **`brik.yml` is the pipeline**: *what* runs (build, test, scan, deploy) and the
+  project's intent (stack, thresholds, channels, environments).
+- **The [infrastructure referential](docs/reference/infrastructure-referential.md)
+  is the infrastructure**: *where* the pipeline lands and *with which credentials
+  and trust* (registries, git host, signing backend, deploy targets), kept out of
+  `brik.yml` and out of the platform.
+
+A platform, local, GitLab, or Jenkins, only *executes* the two. The same pair
+runs unchanged everywhere, so switching CI vendor, or reproducing the exact run
+on your laptop, changes nothing about what runs or where it lands.
+
+```mermaid
+flowchart TD
+    PIPE(["The pipeline<br/>(brik.yml)"]):::config
+    INFRA(["The infrastructure<br/>(referential)"]):::config
+    PLAT{{"Execution platform<br/>(local, GitLab, Jenkins)"}}:::platform
+    RUN("Identical CI/CD run"):::outcome
+
+    PIPE --> PLAT
+    INFRA --> PLAT
+    PLAT --> RUN
+
+    classDef config fill:#fde68a,stroke:#b45309,color:#1f2937
+    classDef platform fill:#bae6fd,stroke:#0369a1,color:#1f2937
+    classDef outcome fill:#bbf7d0,stroke:#15803d,color:#1f2937
+```
+
 ## Two flows, one configuration
 
 Brik is not one pipeline. It is **two fixed flows selected by the trigger**,
@@ -132,19 +164,22 @@ environment, any number of times, days later.
 
 ```mermaid
 flowchart LR
-    init["Init"] --> release["Release"]
-    release --> build["Build"]
-    build --> lint["Lint"]
-    build --> sast["SAST"]
-    build --> scan["Dep Scan"]
-    build --> test["Test"]
-    lint -. quality gate .-> package["Package"]
-    sast -. quality gate .-> package
-    scan -. quality gate .-> package
-    test --> package
-    package --> cscan["Container<br/>Scan"]
-    cscan --> promote["Promote"]
-    promote --> notify["Notify"]
+    init["Init"]:::stage --> release["Release"]:::stage --> build["Build"]:::stage
+    build --> lint["Lint"]:::stage
+    build --> sast["SAST"]:::stage
+    build --> scan["Dependency scan"]:::stage
+    build --> test["Test"]:::stage
+    lint --> qg
+    sast --> qg
+    scan --> qg
+    test --> qg
+    qg{"Quality gate"}:::gate --> package["Package"]:::stage
+    package --> cscan["Container scan"]:::stage
+    cscan --> promote["Promote"]:::stage
+    promote --> notify["Notify"]:::stage
+
+    classDef stage fill:#e2e8f0,stroke:#475569,color:#1f2937
+    classDef gate fill:#fecaca,stroke:#b91c1c,color:#1f2937
 ```
 
 The quality gate sits at Package: nothing is packaged unless tests
@@ -156,16 +191,20 @@ evidence* to the release channel.
 
 ```mermaid
 flowchart LR
-    resolve["Resolve<br/>version to digest"] --> gates["Gates<br/>digest, attestation,<br/>eligibility"]
-    gates --> deploy["Deploy<br/>pinned digest"]
-    deploy --> health["Rollout<br/>health"]
-    health --> readback["Read-back<br/>live state"]
-    readback --> journal["Journal<br/>deployed + validates_for"]
-    journal --> notify["Notify"]
+    resolve["Resolve<br/>(version to digest)"]:::stage --> gates
+    gates{"Fail-closed gates"}:::gate --> deploy["Deploy<br/>(pinned digest)"]:::stage
+    deploy --> health["Rollout health"]:::stage
+    health --> readback["Read-back<br/>(live state)"]:::stage
+    readback --> journal["Journal<br/>(deployed)"]:::stage
+    journal --> notify["Notify"]:::stage
+
+    classDef stage fill:#e2e8f0,stroke:#475569,color:#1f2937
+    classDef gate fill:#fecaca,stroke:#b91c1c,color:#1f2937
 ```
 
-Resolve the version to a digest, walk the fail-closed gates, deploy
-the pinned digest, read the live state back, and journal the result.
+Resolve the version to a digest, walk the fail-closed gates (digest,
+attestation, eligibility), deploy the pinned digest, read the live state back,
+and journal the result.
 `brik status --environment <e>` then reports the environment as three layers
 and flags any drift.
 
