@@ -69,4 +69,33 @@ Describe "brik help / dispatch parity"
       The output should include "Usage:"
     End
   End
+
+  Describe "two-word leaf subcommands answer --help"
+    # The leaf subcommands have their own option parsers, distinct from their
+    # parent verb. Each must honor --help with a usage block (exit 0) so the
+    # "every command is self-describing" promise holds at every depth.
+    It "prints usage and exits 0 for: infra init --help"
+      When run script "$BRIK_BIN" infra init --help
+      The status should eq 0
+      The output should include "Usage: brik infra init"
+    End
+
+    It "prints usage and exits 0 for: infra validate --help"
+      When run script "$BRIK_BIN" infra validate --help
+      The status should eq 0
+      The output should include "Usage: brik infra validate"
+    End
+
+    It "prints usage and exits 0 for: extension test --help"
+      When run script "$BRIK_BIN" extension test --help
+      The status should eq 0
+      The output should include "Usage: brik extension test"
+    End
+
+    It "prints usage and exits 0 for: plan gate --help"
+      When run script "$BRIK_BIN" plan gate --help
+      The status should eq 0
+      The output should include "Usage: brik plan gate"
+    End
+  End
 End

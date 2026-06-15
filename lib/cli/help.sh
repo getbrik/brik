@@ -36,6 +36,8 @@ Commands:
   validate         Validate brik.yml against the JSON Schema
   doctor           Check prerequisites (tools, stack detection)
   init             Scaffold brik.yml and platform bootstrap file
+  plan             Compute the per-stage run/skip plan (preview; --explain)
+  plan gate        Decide run/skip for one stage against the active plan
   stage            Execute a single pipeline stage locally (in its runner-class container)
   integrate        Execute the full CI pipeline locally (one container per stage)
   extension test   Validate an extension manifest+module against the contract
@@ -91,6 +93,21 @@ Options for integrate:
   --bind-mount            Mount the project dir live instead of copy-to-volume
                           (fast edit/inspect). Waives committed-state isolation:
                           untracked/dirty files visible, outputs land in the dir.
+
+Options for plan:
+  --explain               Print a human-readable table of the per-stage plan
+  --mode <name>           Planning mode: safe (default), balanced
+  --validate-only         Compute the plan, print nothing, exit non-zero on error
+  --out <path>            Write the machine-readable plan.json to this path
+  --with-release          Plan the release stage as included
+  --with-package          Plan the package stage as included
+  --with-deploy           Plan the deploy and notify stages as included
+  --workspace <path>      Path to project workspace (default: current directory)
+
+Options for plan gate:
+  (positional)            Stage id to decide run/skip for, against the active
+                          plan (BRIK_PLAN_FILE or the workspace plan).
+  --strict                Fail if no plan file is found (default: run the stage).
 
 Options for extension test:
   (positional)            Path to the extension directory (must contain
