@@ -19,6 +19,7 @@ _BRIK_REGISTRY_LOADER_LOADED=1
 _BRIK_REGISTRY_LOADER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 declare -gA _REGISTRY_STACK_DISPLAY_NAME=()
+declare -gA _REGISTRY_STACK_DETECT_AUTODETECT=()
 declare -gA _REGISTRY_STACK_MARKERS_ANY=()
 declare -gA _REGISTRY_STACK_MARKERS_GLOB=()
 declare -gA _REGISTRY_STACK_CACHE_PATHS=()
@@ -80,7 +81,8 @@ _registry._reset() {
   _REGISTRY_PROVIDER_IDS=()
   _REGISTRY_CACHE_PATH=""
   local var
-  for var in _REGISTRY_STACK_DISPLAY_NAME _REGISTRY_STACK_MARKERS_ANY \
+  for var in _REGISTRY_STACK_DISPLAY_NAME _REGISTRY_STACK_DETECT_AUTODETECT \
+             _REGISTRY_STACK_MARKERS_ANY \
              _REGISTRY_STACK_MARKERS_GLOB _REGISTRY_STACK_CACHE_PATHS \
              _REGISTRY_STACK_RUNNER_IMAGE _REGISTRY_STACK_RUNNER_DEFAULT_VERSION \
              _REGISTRY_STACK_RUNNER_VERSIONS _REGISTRY_STACK_MODULE \
@@ -159,6 +161,7 @@ _registry._load_stacks() {
     [[ -z "$id" ]] && continue
     case "$field" in
       display_name)    _REGISTRY_STACK_DISPLAY_NAME[$id]="$value" ;;
+      detect_autodetect) _REGISTRY_STACK_DETECT_AUTODETECT[$id]="$value" ;;
       markers_any)     _REGISTRY_STACK_MARKERS_ANY[$id]="$value" ;;
       markers_glob)    _REGISTRY_STACK_MARKERS_GLOB[$id]="$value" ;;
       cache_paths)     _REGISTRY_STACK_CACHE_PATHS[$id]="$value" ;;
@@ -182,6 +185,7 @@ _registry._load_stacks() {
     .stacks | to_entries[] | .key as $id | .value as $m | $m.spec as $s |
       "\($id)\t__id\t",
       "\($id)\tdisplay_name\t\($m.metadata.displayName // "")",
+      "\($id)\tdetect_autodetect\t\(if ($s.detect|has("autodetect")) then $s.detect.autodetect else true end)",
       "\($id)\tmarkers_any\t\($s.detect.markers.any // [] | join(":"))",
       "\($id)\tmarkers_glob\t\($s.detect.markers.glob // [] | join(":"))",
       "\($id)\tcache_paths\t\($s.cache.paths // [] | join(":"))",

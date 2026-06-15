@@ -28,6 +28,22 @@ Describe "stacks/_detect.sh (stack detection primitives)"
       The output should equal "dotnet"
     End
 
+    It "prefers the language stack over a Dockerfile (node + Dockerfile)"
+      # Regression: docker is a builder helper, not a project.stack. A
+      # Dockerfile must not shadow the real language marker, or
+      # `brik init` reports "unsupported stack: docker".
+      When call stacks.detect "$WORKSPACES/node-with-dockerfile"
+      The output should equal "node"
+    End
+
+    It "does not auto-detect docker as a project stack (Dockerfile only)"
+      # docker has autodetect:false in its manifest, so a bare Dockerfile
+      # yields no project.stack (the user must pick a language stack).
+      When call stacks.detect "$WORKSPACES/docker-simple"
+      The status should equal 1
+      The stderr should include "cannot detect stack"
+    End
+
     It "returns 1 for unknown workspace"
       When call stacks.detect "$WORKSPACES/unknown"
       The status should equal 1

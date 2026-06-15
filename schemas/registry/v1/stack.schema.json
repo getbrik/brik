@@ -65,6 +65,10 @@
             "markers"
           ],
           "properties": {
+            "autodetect": {
+              "type": "boolean",
+              "description": "Whether bare workspace auto-detection may select this stack as the project.stack (default true). Builder-helper stacks like docker set this false: they are valid in the registry but are never a project.stack, so a Dockerfile must not shadow the real language stack."
+            },
             "markers": {
               "type": "object",
               "additionalProperties": false,

@@ -149,6 +149,10 @@ registry.stack.detect() {
   local workspace="$1"
   local id marker glob
   for id in "${_REGISTRY_STACK_IDS[@]}"; do
+    # Skip builder-helper stacks (autodetect:false, e.g. docker): they are not
+    # valid project.stack values, so they must never win bare auto-detection
+    # and shadow the real language stack.
+    [[ "${_REGISTRY_STACK_DETECT_AUTODETECT[$id]:-true}" == "false" ]] && continue
     if [[ -n "${_REGISTRY_STACK_MARKERS_ANY[$id]:-}" ]]; then
       while IFS= read -r marker; do
         [[ -z "$marker" ]] && continue
