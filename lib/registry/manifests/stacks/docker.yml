@@ -6,6 +6,12 @@ metadata:
   owner: getbrik
 spec:
   detect:
+    # Docker is a builder helper, not a project.stack (the brik.yml
+    # project.stack enum excludes it). It must never be the result of bare
+    # workspace auto-detection, or a Dockerfile would shadow the real language
+    # stack (e.g. a node project with a Dockerfile). Markers are kept for
+    # documentation/impact; autodetect:false keeps it out of stacks.detect.
+    autodetect: false
     markers:
       any:
         - Dockerfile
