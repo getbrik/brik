@@ -57,6 +57,10 @@ _cli.infra._init() {
                 target_dir="$2"
                 shift 2
                 ;;
+            -h|--help)
+                brik_print_verb_help "infra init"
+                return 0
+                ;;
             *)
                 brik_usage_error "unknown option: $1" || return "$?"
                 ;;
@@ -102,6 +106,10 @@ _cli.infra._validate() {
                 brik_require_arg "--dir" "${2-}" || return "$?"
                 dir="$2"
                 shift 2
+                ;;
+            -h|--help)
+                brik_print_verb_help "infra validate"
+                return 0
                 ;;
             *)
                 brik_usage_error "unknown option: $1" || return "$?"

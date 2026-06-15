@@ -204,6 +204,7 @@ cli.plan.gate() {
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --strict) strict=true; shift ;;
+            -h|--help) brik_print_verb_help "plan gate"; return 0 ;;
             -*)       brik_usage_error "unknown option: $1" || return "$?" ;;
             *)        if [[ -z "$stage_id" ]]; then stage_id="$1"; shift
                       else brik_usage_error "unexpected argument: $1" || return "$?"; fi ;;

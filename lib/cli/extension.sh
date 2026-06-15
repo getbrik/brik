@@ -45,6 +45,7 @@ cli.extension.test() {
     local ext_dir=""
     while [[ $# -gt 0 ]]; do
         case "$1" in
+            -h|--help) brik_print_verb_help "extension test"; return 0 ;;
             -*) brik_usage_error "unknown option: $1" || return "$?" ;;
             *)  if [[ -z "$ext_dir" ]]; then ext_dir="$1"; shift
                 else brik_usage_error "unexpected argument: $1" || return "$?"; fi ;;
