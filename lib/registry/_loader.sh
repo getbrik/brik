@@ -56,13 +56,19 @@ declare -gA _REGISTRY_STAGE_IMPACT_USE_STACK_IMPACT=()
 
 declare -gA _REGISTRY_PROVIDER_DISPLAY_NAME=()
 declare -gA _REGISTRY_PROVIDER_CAPABILITY=()
+declare -gA _REGISTRY_PROVIDER_MODULE=()
+declare -gA _REGISTRY_PROVIDER_ENDPOINT_KIND=()
 declare -gA _REGISTRY_PROVIDER_BINDING=()
 declare -gA _REGISTRY_PROVIDER_CONTRACT=()
 declare -gA _REGISTRY_PROVIDER_TOOLS=()
 
+declare -gA _REGISTRY_CONTRACT_CAPABILITY=()
+declare -gA _REGISTRY_CONTRACT_OPS=()
+
 declare -ga _REGISTRY_STACK_IDS=()
 declare -ga _REGISTRY_STAGE_IDS=()
 declare -ga _REGISTRY_PROVIDER_IDS=()
+declare -ga _REGISTRY_CONTRACT_IDS=()
 
 _REGISTRY_CACHE_PATH=""
 
@@ -79,6 +85,7 @@ _registry._reset() {
   _REGISTRY_STACK_IDS=()
   _REGISTRY_STAGE_IDS=()
   _REGISTRY_PROVIDER_IDS=()
+  _REGISTRY_CONTRACT_IDS=()
   _REGISTRY_CACHE_PATH=""
   local var
   for var in _REGISTRY_STACK_DISPLAY_NAME _REGISTRY_STACK_DETECT_AUTODETECT \
@@ -101,8 +108,10 @@ _registry._reset() {
              _REGISTRY_STAGE_ALIASES _REGISTRY_STAGE_API_REQUIRED \
              _REGISTRY_STAGE_IMPACT_CHANGES _REGISTRY_STAGE_IMPACT_USE_STACK_IMPACT \
              _REGISTRY_PROVIDER_DISPLAY_NAME _REGISTRY_PROVIDER_CAPABILITY \
+             _REGISTRY_PROVIDER_MODULE _REGISTRY_PROVIDER_ENDPOINT_KIND \
              _REGISTRY_PROVIDER_BINDING _REGISTRY_PROVIDER_CONTRACT \
-             _REGISTRY_PROVIDER_TOOLS; do
+             _REGISTRY_PROVIDER_TOOLS \
+             _REGISTRY_CONTRACT_CAPABILITY _REGISTRY_CONTRACT_OPS; do
     eval "$var=()"
   done
 }
@@ -150,6 +159,7 @@ _registry._load() {
   _registry._load_stacks
   _registry._load_stages
   _registry._load_providers
+  _registry._load_contracts
 
   _BRIK_REGISTRY_LOADED=1
   return 0
@@ -211,12 +221,14 @@ _registry._load_providers() {
   while IFS=$'\t' read -r id field value; do
     [[ -z "$id" ]] && continue
     case "$field" in
-      display_name) _REGISTRY_PROVIDER_DISPLAY_NAME[$id]="$value" ;;
-      capability)   _REGISTRY_PROVIDER_CAPABILITY[$id]="$value" ;;
-      binding)      _REGISTRY_PROVIDER_BINDING[$id]="$value" ;;
-      contract)     _REGISTRY_PROVIDER_CONTRACT[$id]="$value" ;;
-      tools)        _REGISTRY_PROVIDER_TOOLS[$id]="$value" ;;
-      __id)         _REGISTRY_PROVIDER_IDS+=("$id") ;;
+      display_name)  _REGISTRY_PROVIDER_DISPLAY_NAME[$id]="$value" ;;
+      capability)    _REGISTRY_PROVIDER_CAPABILITY[$id]="$value" ;;
+      module)        _REGISTRY_PROVIDER_MODULE[$id]="$value" ;;
+      endpoint_kind) _REGISTRY_PROVIDER_ENDPOINT_KIND[$id]="$value" ;;
+      binding)       _REGISTRY_PROVIDER_BINDING[$id]="$value" ;;
+      contract)      _REGISTRY_PROVIDER_CONTRACT[$id]="$value" ;;
+      tools)         _REGISTRY_PROVIDER_TOOLS[$id]="$value" ;;
+      __id)          _REGISTRY_PROVIDER_IDS+=("$id") ;;
     esac
   done < <(jq -r '
     # KCOV_EXCL_START -- inline jq script body, not bash code
@@ -224,9 +236,30 @@ _registry._load_providers() {
       "\($id)\t__id\t",
       "\($id)\tdisplay_name\t\($m.metadata.displayName // "")",
       "\($id)\tcapability\t\($s.capability // "")",
+      "\($id)\tmodule\t\($s.module // "")",
+      "\($id)\tendpoint_kind\t\($s.endpoint_kind // "")",
       "\($id)\tbinding\t\($s.binding // "")",
       "\($id)\tcontract\t\($s.contract // "")",
       "\($id)\ttools\t\($s.tools // [] | map(.name + (if .min_version then ">=" + .min_version else "" end)) | join(":"))"
+    # KCOV_EXCL_STOP
+  ' "$_REGISTRY_CACHE_PATH")
+}
+
+_registry._load_contracts() {
+  local id field value
+  while IFS=$'\t' read -r id field value; do
+    [[ -z "$id" ]] && continue
+    case "$field" in
+      capability)          _REGISTRY_CONTRACT_CAPABILITY[$id]="$value" ;;
+      required_operations) _REGISTRY_CONTRACT_OPS[$id]="$value" ;;
+      __id)                _REGISTRY_CONTRACT_IDS+=("$id") ;;
+    esac
+  done < <(jq -r '
+    # KCOV_EXCL_START -- inline jq script body, not bash code
+    .contracts // {} | to_entries[] | .key as $id | .value as $m | $m.spec as $s |
+      "\($id)\t__id\t",
+      "\($id)\tcapability\t\($s.capability // "")",
+      "\($id)\trequired_operations\t\($s.required_operations // [] | join(":"))"
     # KCOV_EXCL_STOP
   ' "$_REGISTRY_CACHE_PATH")
 }

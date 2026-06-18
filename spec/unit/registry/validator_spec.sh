@@ -35,10 +35,10 @@ Describe "lib/registry/_validator.sh"
   End
 
   Describe "registry.validate_all_manifests"
-    It "passes on the 18 builtin manifests"
+    It "passes on the 19 builtin manifests (6 stacks + 12 stages + 1 contract)"
       When call registry.validate_all_manifests
       The status should be success
-      The output should include "validated: 18/18"
+      The output should include "validated: 19/19"
     End
   End
 

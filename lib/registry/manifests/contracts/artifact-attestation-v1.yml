@@ -1,0 +1,15 @@
+apiVersion: brik.dev/v1
+kind: Contract
+metadata:
+  id: artifact-attestation/v1
+  displayName: Artifact attestation contract v1
+  owner: getbrik
+spec:
+  capability: artifact-attestation
+  # A provider of this capability MUST expose these three operations as
+  # providers.<module>.<op>. Signatures are provider-agnostic; see
+  # docs/contracts/artifact-attestation-v1.md for the behavioural spec.
+  required_operations:
+    - available
+    - sign
+    - verify

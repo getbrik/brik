@@ -34,8 +34,8 @@ _validator._kind() {
     return $?
   }
   case "$kind" in
-    Stack|Stage|Provider) printf '%s' "$kind" ;;
-    *) _validator._fail "unknown kind in $file: $kind (expected Stack, Stage or Provider)"; return $? ;;
+    Stack|Stage|Provider|Contract) printf '%s' "$kind" ;;
+    *) _validator._fail "unknown kind in $file: $kind (expected Stack, Stage, Provider or Contract)"; return $? ;;
   esac
 }
 
@@ -46,6 +46,7 @@ _validator._schema() {
     Stack)    printf '%s/stack.schema.json' "$_BRIK_REGISTRY_SCHEMA_DIR" ;;
     Stage)    printf '%s/stage.schema.json' "$_BRIK_REGISTRY_SCHEMA_DIR" ;;
     Provider) printf '%s/provider.schema.json' "$_BRIK_REGISTRY_SCHEMA_DIR" ;;
+    Contract) printf '%s/contract.schema.json' "$_BRIK_REGISTRY_SCHEMA_DIR" ;;
     *) _validator._fail "no schema for kind=$kind"; return $? ;;
   esac
 }
@@ -96,7 +97,8 @@ registry.validate_manifest() {
 registry.validate_all_manifests() {
   local manifest_root="${1:-${_BRIK_REGISTRY_VALIDATOR_DIR}/manifests}"
   local failures=0 total=0 file
-  for file in "$manifest_root"/stacks/*.yml "$manifest_root"/stages/*.yml; do
+  for file in "$manifest_root"/stacks/*.yml "$manifest_root"/stages/*.yml \
+              "$manifest_root"/contracts/*.yml; do
     [[ -f "$file" ]] || continue
     total=$((total + 1))
     if registry.validate_manifest "$file" 2>/dev/null; then

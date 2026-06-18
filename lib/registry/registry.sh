@@ -392,6 +392,24 @@ registry.provider.binding() {
   printf '%s\n' "${_REGISTRY_PROVIDER_BINDING[$id]}"
 }
 
+# Print the lib/providers/ module exposing this provider's contract operations
+# (providers.<module>.<op>). verify_contract joins it against the contract's
+# required_operations to introspect provider conformance (D12 stage 1).
+registry.provider.module() {
+  _registry._load || return $?
+  local id="$1"; registry.provider.exists "$id" || return $?
+  printf '%s\n' "${_REGISTRY_PROVIDER_MODULE[$id]}"
+}
+
+# Print the infrastructure-referential endpoint kind this provider operates
+# against (Signing, Registry, ArgoCD, ...). The binding resolves
+# capability -> provider -> endpoint_kind -> endpoint.
+registry.provider.endpoint_kind() {
+  _registry._load || return $?
+  local id="$1"; registry.provider.exists "$id" || return $?
+  printf '%s\n' "${_REGISTRY_PROVIDER_ENDPOINT_KIND[$id]}"
+}
+
 registry.provider.contract() {
   _registry._load || return $?
   local id="$1"; registry.provider.exists "$id" || return $?
@@ -414,6 +432,41 @@ registry.provider.for_capability() {
     [[ "${_REGISTRY_PROVIDER_CAPABILITY[$id]}" == "$capability" ]] && printf '%s\n' "$id"
   done
   return 0
+}
+
+# --- Contract accessors ---
+#
+# A contract is the operation set every provider of a capability must
+# implement (fourth manifest family). brik codes once against the contract;
+# verify_contract introspects a provider's module against it (D12 stage 1).
+# The contract id is the versioned "<capability>/v<n>" string providers
+# reference via spec.contract.
+
+registry.contract.list() {
+  _registry._load || return $?
+  local id
+  for id in "${_REGISTRY_CONTRACT_IDS[@]}"; do printf '%s\n' "$id"; done
+}
+
+registry.contract.exists() {
+  _registry._load || return $?
+  local id="$1"
+  [[ -v _REGISTRY_CONTRACT_OPS[$id] ]] && return 0
+  return "$BRIK_EXIT_INVALID_INPUT"
+}
+
+# Print the capability this contract governs.
+registry.contract.capability() {
+  _registry._load || return $?
+  local id="$1"; registry.contract.exists "$id" || return $?
+  printf '%s\n' "${_REGISTRY_CONTRACT_CAPABILITY[$id]}"
+}
+
+# Print the operations a provider must expose, one per line.
+registry.contract.operations() {
+  _registry._load || return $?
+  local id="$1"; registry.contract.exists "$id" || return $?
+  _registry._explode "${_REGISTRY_CONTRACT_OPS[$id]:-}"
 }
 
 # --- Runner class accessors ---

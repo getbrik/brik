@@ -59,6 +59,20 @@ Describe "registry.provider accessors"
     End
   End
 
+  Describe "registry.provider.module"
+    It "shares the cosign module across the three attestation providers"
+      When call registry.provider.module cosign-kms-openbao
+      The output should equal "cosign"
+    End
+  End
+
+  Describe "registry.provider.endpoint_kind"
+    It "operates the cosign providers against the Signing endpoint kind"
+      When call registry.provider.endpoint_kind cosign-key
+      The output should equal "Signing"
+    End
+  End
+
   Describe "registry.provider.tools"
     It "derives the tool matrix entry for ssh-signing"
       When call registry.provider.tools ssh-signing

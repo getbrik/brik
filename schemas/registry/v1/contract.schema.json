@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://brik.dev/schemas/registry/v1/contract.schema.json",
+  "title": "Brik Capability Contract Manifest v1",
+  "description": "Declarative manifest describing a capability contract: the set of operations every provider of a capability must implement. brik codes once against the contract; providers are interchangeable as long as they satisfy it. The contract id (metadata.id) is the versioned string providers reference via spec.contract.",
+  "type": "object",
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "additionalProperties": false,
+  "properties": {
+    "apiVersion": {"type": "string", "const": "brik.dev/v1"},
+    "kind": {"type": "string", "const": "Contract"},
+    "metadata": {
+      "type": "object",
+      "required": ["id", "displayName"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "description": "Versioned contract id (<capability>/v<n>), the exact string providers reference via spec.contract.",
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*/v[0-9]+$"
+        },
+        "displayName": {"type": "string", "minLength": 1},
+        "owner": {"type": "string", "minLength": 1}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "required": ["capability", "required_operations"],
+      "additionalProperties": false,
+      "properties": {
+        "capability": {
+          "description": "Capability this contract governs. Must match the capability of every provider that references it.",
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$"
+        },
+        "required_operations": {
+          "description": "Operations a provider module must expose as providers.<module>.<op>. Introspected at bind time (presence-only, fail-closed); behaviour is asserted by the contract's conformance specs.",
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"}
+        }
+      }
+    }
+  }
+}
