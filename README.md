@@ -28,123 +28,219 @@
 
 ## The problem Brik solves
 
-Your CI/CD logic is business-critical code, yet it lives trapped in each
-platform's dialect. Every pipeline does the same handful of things: *build, test,
-scan, package, deploy, notify*. But the know-how that does them is written in *YAML*
-for one platform and in *Groovy* for the next. Change platforms, and you rewrite
-everything. That is the real cost of lock-in: not a licence fee, but losing your
-delivery methodology the day you migrate.
+Your CI/CD logic is business-critical code. Every pipeline does the same handful
+of things - *build, test, scan, package, deploy, notify* - and the know-how that
+does them is yours. Yet that know-how never becomes portable code. It stays
+trapped in each platform's dialect:
 
-Components and shared libraries organise that code, yet they make the logic
-*reusable, not portable*. The know-how stays written in the platform's native
-dialect. So the same intent leaks into vendor syntax, drifts as it is copied
-between projects, and cannot run on your laptop, where your machine executes
-different code than the platform does.
+- **Written in vendor syntax.** The same intent is *YAML* for one platform and
+  *Groovy* for the next, so your business logic is locked to a dialect instead of
+  living as code you own.
+- **Not reusable across platforms.** Change platforms and you rewrite everything.
+  The real cost of lock-in is not a licence fee - it is losing your delivery
+  methodology the day you migrate.
+- **Not runnable on your laptop.** Because the logic only exists in the platform's
+  native dialect, you cannot execute it locally. You debug it through the CI server,
+  one push at a time.
 
-**Brik inverts this. A platform should *execute* delivery logic, not *define* it.**
+## The inversion
 
-The logic lives in one portable place, and each platform becomes a thin adapter
-that runs it. **You describe your project, not the pipeline.**
+**A platform should *execute* delivery logic, not *define* it.**
 
-## What you write
+Brik turns the relationship around: the logic lives in one portable place, and
+each platform becomes a thin adapter that runs it. **You describe your project,
+not the pipeline.** The three sections below answer the three pains above, in
+order: you own the code, it runs everywhere, and it runs on your laptop.
 
-A fully-featured `brik.yml` for a deployable Node service, bringing CI, GitOps CD, and promotion gates into one file:
+## Configuration, not vendor syntax
+
+A `brik.yml` for a deployable Node service - CI, GitOps CD, and a promotion
+gate - describing **what** to run and **which** destinations to target, each by
+its authority and path. No vendor syntax, no URL schemes to trust, no secrets:
 
 ```yaml
 version: 1
 
 project:
   name: orders-api
-  stack: node                 # auto-detected; pin the toolchain when you need to
+  stack: node                              # auto-detected; pin the toolchain when you need to
   stack_version: "22"
 
+release:
+  strategy: semver
+  tag_prefix: v
+
+test:
+  framework: jest
+
 publish:
-  docker:
-    registry: registry.example.com
-    username_var: BRIK_PUBLISH_DOCKER_USER       # credentials are references,
-    password_var: BRIK_PUBLISH_DOCKER_PASSWORD   #   never values
+  docker:                                  # authority + path - never a scheme or a secret
+    registry: nexus.acme.test:8082         #   where to publish (host:port)
+    image: platform/orders-api             #   what to call it (repository path)
 
 artifacts:
-  channels:
-    release:                                     # CI publishes here; CD resolves a digest here
-      registry: registry.example.com/orders/orders-api
-  evidence:                                      # append-only journal: promotions + deployments
-    repo: https://git.example.com/orders/evidence.git
-    token_var: BRIK_GIT_TOKEN
+  evidence:                                # append-only journal: promotions + deployments
+    host: gitea.acme.test:3000
+    repo: platform/orders-evidence
+    branch: main
+    sign: true                             # sign each evidence commit
 
 deploy:
   environments:
     staging:
-      target: gitops                             # ArgoCD reconciles a config repo (pull-based)
-      controller: argocd
-      repo: https://git.example.com/orders/config-deploy.git
-      app_name: orders-staging
+      target: gitops                       # ArgoCD reconciles a config repo (pull-based)
       accepts_channel: release
-      config_ref: main                           # env config redeploys without a new version
-      validates_for: production                  # a green staging deploy grants production
+      validates_for: production            # a green staging deploy vouches for production
+      host: gitea.acme.test:3000           # config-repo authority
+      repo: platform/orders-config         #   path
+      path: k8s/staging                    #   manifests subfolder
+      app_name: orders-staging
       gates:
-        require_digest: true                     # never deploy a mutable tag
+        require_digest: true               # never deploy a mutable tag
     production:
       target: gitops
-      controller: argocd
-      repo: https://git.example.com/orders/config-deploy-prod.git
-      app_name: orders-prod
       accepts_channel: release
+      host: gitea.acme.test:3000
+      repo: platform/orders-config-prod
+      path: k8s/production
+      app_name: orders-prod
       gates:
         require_digest: true
-        require_attestation: true                        # verify the signed SBOM + SLSA provenance
+        require_attestation: true          # verify the signed SBOM + SLSA provenance
         requires_eligibility: [artifact_validated_for]   # staging vouched for this digest
 ```
 
-That single file is the entire delivery definition: the CI flow, the CD flow,
-the promotion chain between environments, and the gates that protect production.
-It is configuration, not code. There is no platform pipeline to author and keep
-in sync alongside it: no hand-written `.gitlab-ci.yml`, no custom-Groovy
-`Jenkinsfile`, no bash glue. The same file drives GitLab, Jenkins, and your
-laptop.
+That single file is the project's whole delivery *intent*: the CI flow, the CD
+flow, the promotion chain between environments, and the gates that protect
+production. It is configuration you own, not code locked to a vendor - no
+hand-written `.gitlab-ci.yml`, no custom-Groovy `Jenkinsfile`, no bash glue.
+
+Notice what is **not** there: no `https://`, no registry password, no
+`controller:`. Whether a destination is reached over TLS with which trust, which
+credential authenticates it, and which signing backend it uses are not the
+project's concern - that wiring lives in the **infrastructure referential**
+(next section). The `brik.yml` names destinations by authority and path; it
+never carries a secret, not even a secret's variable name.
 
 And it is as large as your project needs, no larger. Only `version` and
 `project.name` are required; the stack is auto-detected and every other field
-has a per-stack default. The rest is where you override what matters for *your*
-project, such as coverage thresholds, deploy targets, registries, and secrets.
-You configure your project. You never write pipeline logic.
+has a per-stack default. You configure your project. You never write pipeline
+logic.
 
-> [!TIP]
-> See the **[`brik.yml` reference](docs/reference/configuration/README.md)** for every
-> top-level section, each on its own page: purpose, behaviour, when it runs, and how to
-> configure it.
+> [!NOTE]
+> This shows Brik's **target configuration model** - the `brik.yml` ↔ referential
+> separation acted in design [#37](https://github.com/getbrik/brik/issues). The
+> shipped v0.7 schema is mid-migration to it and still accepts the older inline
+> form; see the **[`brik.yml` reference](docs/reference/configuration/README.md)**
+> for the fields validated today.
 
-## Two portable configurations
+## One definition, every platform
 
-Delivery splits into two declarations you author once, and neither is written in
-a platform's dialect:
-
-- **`brik.yml` is the pipeline**: *what* runs (build, test, scan, deploy) and the
-  project's intent (stack, thresholds, channels, environments).
-- **The [infrastructure referential](docs/reference/infrastructure-referential.md)
-  is the infrastructure**: *where* the pipeline lands and *with which credentials
-  and trust* (registries, git host, signing backend, deploy targets), kept out of
-  `brik.yml` and out of the platform.
-
-A platform, local, GitLab, or Jenkins, only *executes* the two. The same pair
-runs unchanged everywhere, so switching CI vendor, or reproducing the exact run
-on your laptop, changes nothing about what runs or where it lands.
+The `brik.yml` you just wrote runs **unchanged on every platform**. None of your
+delivery logic lives in the CI server: each platform is a thin **adapter** - a
+shared library that knows only how to hand Brik the platform's trigger and
+credentials and let it run. All the logic stays in Brik and in your `brik.yml`,
+so switching CI vendor, or reproducing the exact run on your laptop, changes
+nothing about what runs or where it lands.
 
 ```mermaid
-flowchart TD
-    PIPE(["The pipeline<br/>(brik.yml)"]):::config
-    INFRA(["The infrastructure<br/>(referential)"]):::config
-    PLAT{{"Execution platform<br/>(local, GitLab, Jenkins)"}}:::platform
-    RUN("Identical CI/CD run"):::outcome
+flowchart LR
+    subgraph repo["Source code"]
+        direction TB
+        APP["application code"]:::source
+        PIPE["brik.yml"]:::source
+    end
 
-    PIPE --> PLAT
-    INFRA --> PLAT
-    PLAT --> RUN
+    BRIK{{"Brik"}}:::tool
 
-    classDef config fill:#fde68a,stroke:#b45309,color:#1f2937
-    classDef platform fill:#bae6fd,stroke:#0369a1,color:#1f2937
-    classDef outcome fill:#bbf7d0,stroke:#15803d,color:#1f2937
+    repo --> BRIK
+
+    BRIK -- runs on --> GL["GitLab<br/>shared library + template"]:::platform
+    BRIK -- runs on --> JK["Jenkins<br/>shared library"]:::platform
+    BRIK -- runs on --> LO["Local<br/>brik integrate"]:::platform
+
+    GL --> RUN(["Identical CI/CD run"]):::outcome
+    JK --> RUN
+    LO --> RUN
+
+    classDef source fill:#f1f5f9,stroke:#cbd5e1,color:#334155
+    classDef tool fill:#334155,stroke:#1e293b,color:#f8fafc
+    classDef platform fill:#f8fafc,stroke:#cbd5e1,color:#334155
+    classDef outcome fill:#ecfdf5,stroke:#10b981,color:#065f46
+    style repo fill:#ffffff,stroke:#94a3b8,color:#475569
 ```
+
+Each platform ships as a small shared library you wire in once - and then forget:
+
+| Platform | Status | How it ships |
+|----------|--------|--------------|
+| **GitLab CI** | ✅ Functional | Shared library + pipeline template (`include:` one line) |
+| **Jenkins** | ✅ Functional | Jenkins Shared Library (works with Configuration-as-Code + Gitea) |
+| **GitHub Actions** | 🚧 Bootstrap shipped, reusable workflows in progress | `brik init --platform github` scaffolds today |
+| **Local CLI** | ✅ Functional | `brik integrate` |
+
+## The infrastructure referential
+
+The `brik.yml` is only one half of the picture. It names *what* runs and *which*
+destination it targets - by authority and path - then deliberately stops: no URL
+scheme, no credential, not even a secret's variable name.
+
+The other half - *how* each destination is reached and trusted - lives in a
+second file, the **infrastructure referential**. It holds the endpoints behind
+those names, the trust to reach them, and the credentials to use. Same friendly
+YAML, opposite concern: written **once for the whole platform** by whoever runs
+it, so every project reuses it and most teams never open it.
+
+```mermaid
+flowchart LR
+    PROJ["brik.yml<br/>what + which to run"]:::intent
+    REF["referential<br/>how to reach + trust"]:::wiring
+    BRIK{{"Brik"}}:::tool
+
+    PROJ --> BRIK
+    REF --> BRIK
+
+    classDef intent fill:#f1f5f9,stroke:#cbd5e1,color:#334155
+    classDef wiring fill:#eef2ff,stroke:#c7d2fe,color:#3730a3
+    classDef tool fill:#334155,stroke:#1e293b,color:#f8fafc
+```
+
+> [!TIP]
+> The referential declares endpoints, credentials, bindings, and policy - once
+> for the whole platform. See the
+> **[infrastructure referential reference](docs/reference/infrastructure-referential.md)**
+> for what goes in it and how to set one up.
+
+### Pluggable components, proven by contract
+
+Those capabilities the referential names - signing and attestation, the GitOps
+controller, the secret manager - are not hardwired to one tool. Each is served
+by an interchangeable **provider** behind a versioned **capability contract**:
+the operations Brik codes against, independent of the tool that implements them.
+Cosign provides artifact attestation today; the contract is what lets a
+different signer take its place without touching Brik's code. `brik provider
+test <id>` proves a provider honours that contract - its manifest, the required
+operations, and the infra-free unit obligations - and the
+[briklab](https://github.com/getbrik/briklab) suite proves the behavioural ones
+(fail-closed verification, signing-key confinement, no secret on the command
+line) end to end against real infrastructure.
+
+## Runs on your laptop too
+
+The laptop is not a second-class simulation of CI - it is the same execution.
+Brik runs the **same Bash code path** and the **same pinned runner images**
+locally that it runs on the platform, so `brik integrate` reproduces the full CI
+flow on your machine before you ever push.
+
+- **Same code, same images.** A stage runs the identical module and OCI image on
+  your laptop and in CI; there is no separate "local mode" that drifts.
+- **Divergences are declared, not silent.** Where a local run cannot match CI
+  (no signing backend, no remote registry), the difference is an explicit,
+  declared divergence rather than a quiet skip.
+
+> [!TIP]
+> See **[Local execution](docs/concepts/local-execution.md)** for how the local
+> code path and runner images stay identical to CI.
 
 ## Two flows, one configuration
 
@@ -178,8 +274,8 @@ flowchart LR
     cscan --> promote["Promote"]:::stage
     promote --> notify["Notify"]:::stage
 
-    classDef stage fill:#e2e8f0,stroke:#475569,color:#1f2937
-    classDef gate fill:#fecaca,stroke:#b91c1c,color:#1f2937
+    classDef stage fill:#f1f5f9,stroke:#cbd5e1,color:#334155
+    classDef gate fill:#334155,stroke:#1e293b,color:#f8fafc
 ```
 
 The quality gate sits at Package: nothing is packaged unless tests
@@ -198,8 +294,8 @@ flowchart LR
     readback --> journal["Journal<br/>(deployed)"]:::stage
     journal --> notify["Notify"]:::stage
 
-    classDef stage fill:#e2e8f0,stroke:#475569,color:#1f2937
-    classDef gate fill:#fecaca,stroke:#b91c1c,color:#1f2937
+    classDef stage fill:#f1f5f9,stroke:#cbd5e1,color:#334155
+    classDef gate fill:#334155,stroke:#1e293b,color:#f8fafc
 ```
 
 Resolve the version to a digest, walk the fail-closed gates (digest,
@@ -225,7 +321,6 @@ functional "what it does for you" to the configuration and the source of truth.
 | **Runner classes** | Each stage runs in a pinned, provable OCI image chosen by its declared class, the same image on your laptop and in CI. | [Runner classes](docs/concepts/runner-classes.md) |
 | **Supply-chain gates** | CI signs evidence; CD enforces three fail-closed gates (digest, attestation, eligibility) before deploying. | [Supply chain](docs/concepts/supply-chain.md) |
 | **Business vs technical** | A pure decision matrix separating "did it exit zero" from "does that block the release", so a daily pipeline neither cries wolf nor ships known-broken. | [Business outcome](docs/concepts/business-outcome.md) |
-| **Local execution** | The same Bash code path and runner images on your laptop, with divergences from CI declared, not silent. | [Local execution](docs/concepts/local-execution.md) |
 
 > [!TIP] 
 > For the layered architecture behind these, see [Architecture](docs/concepts/architecture.md).
@@ -244,15 +339,6 @@ functional "what it does for you" to the configuration and the source of truth.
 Each stack is itself a declarative manifest and ships with a runner image from
 [Brik images](https://github.com/getbrik/brik-images) (multi-arch, scanned,
 rebuilt weekly for CVE fixes).
-
-## Platform support
-
-| Platform | Status | How it ships |
-|----------|--------|--------------|
-| **GitLab CI** | ✅ Functional | Shared library + pipeline template (`include:` one line) |
-| **Jenkins** | ✅ Functional | Jenkins Shared Library (works with Configuration-as-Code + Gitea) |
-| **GitHub Actions** | 🚧 Bootstrap shipped, reusable workflows in progress | `brik init --platform github` scaffolds today |
-| **Local CLI** | ✅ Functional | `brik integrate` |
 
 ## Get started
 
@@ -279,9 +365,9 @@ brik integrate # run the full CI flow locally
 
 ## Quality, in numbers
 
-- ✅ **5100+** ShellSpec examples in the core suite, 0 failures, plus dedicated suites for the GitLab, Jenkins, and local adapters
+- ✅ **5300+** ShellSpec examples in the core suite, 0 failures, plus dedicated suites for the GitLab, Jenkins, and local adapters
 - ✅ **80%** Codecov gate on project and patch, enforced in CI
-- ✅ **22** live end-to-end scenarios against real GitLab and Jenkins instances in [briklab](https://github.com/getbrik/briklab): digest-pinned CD, signed-attestation keystones, promotion-chain refusals, channel immutability
+- ✅ **22** live end-to-end scenarios against real GitLab and Jenkins instances in [briklab](https://github.com/getbrik/briklab): digest-pinned CD, signed-attestation keystones with capability-contract conformance, promotion-chain refusals, channel immutability
 - ✅ **29** JSON Schemas govern every contract (config, referential, plan, journal events, reports), validated fail-closed at runtime
 - ✅ **Drift gates in CI**: the generated config reference, the compiled registry cache, and every platform parameter surface must all match their source of truth
 - ✅ **ShellCheck** clean on every file; **shellmetrics** tracks complexity, function count, and LLOC on every push to `main` (the badges above are live)

@@ -223,12 +223,17 @@ each capability. Required: `name`.
 | `endpoints` | `{ <endpoint-name>: <credential-name> }` | the credential each endpoint authenticates with |
 | `capabilities` | `{ <capability>: <provider> }` | which provider satisfies a capability |
 
-Capability vocabulary in the scaffolds:
+Capabilities and the providers that implement them (from the registry):
 
-| Capability | Providers |
-|------------|-----------|
-| `artifact-attestation` | `cosign-keyless` / `cosign-kms` / `cosign-key` |
-| `evidence-commit-signing` | `ssh-signing` |
+| Capability | Providers | Contract |
+|------------|-----------|----------|
+| `artifact-attestation` | `cosign-key` / `cosign-keyless` / `cosign-kms-openbao` | `artifact-attestation/v1` |
+| `evidence-commit-signing` | `ssh-signing` / `gitsign` | `evidence-commit-signing/v1` |
+| `evidence-transport` | `oras-transport` | `evidence-transport/v1` |
+
+Each capability is governed by a versioned **contract** its providers must
+satisfy; `brik provider test <id>` verifies a provider against that contract
+(its manifest, the required operations, and the infra-free unit obligations).
 
 ## TLS posture
 

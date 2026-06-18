@@ -19,18 +19,29 @@ The fixed flow is:
 
 ```
 Init -> Plan -> Release -> Build -> Lint||SAST||Scan||Test -> Package
-     -> Container Scan -> Deploy -> Notify
+     -> Container Scan -> Notify
 ```
+
+This is the event-driven **CI** flow: it builds and publishes one immutable,
+signed artifact and stops. It does **not** deploy. A deployment is a separate,
+decoupled **CD** run via [`brikDeploy`](#cd-explicit-deploy-brikdeploy)
+(`brik deploy`, parameterized by version + environment). `brikIntegrate` still
+carries a gated-off `deploy` stage behind the transitional `BRIK_WITH_DEPLOY`
+opt-in (skipped by default, slated for removal once CD fully leaves the CI
+flow); prefer `brikDeploy` for real deployments.
 
 All stage logic lives in portable Bash. The Groovy layer only handles SCM
 checkout, stash/unstash, `archiveArtifacts`, and the Notify `finally`
-orchestration. `shared-libs/jenkins/vars/` defines six small variables:
+orchestration. `shared-libs/jenkins/vars/` defines eight small variables -
+two entry points (`brikIntegrate` for CI, `brikDeploy` for CD) and six helpers:
 
 | Var | Responsibility |
 |-----|----------------|
-| `brikIntegrate` | Entry point. Declares `node {}`, runs SCM checkout, sets up helpers, runs the fixed flow plus Notify in `finally`. |
+| `brikIntegrate` | CI entry point. Declares `node {}`, runs SCM checkout, sets up helpers, runs the fixed flow plus Notify in `finally`. |
+| `brikDeploy` | **CD entry point (mode 2), intentionally separate from `brikIntegrate`.** Maps `BRIK_DEPLOY_VERSION` / `BRIK_DEPLOY_ENVIRONMENT` to a single `brik deploy` run and archives the evidence. See [CD: explicit deploy](#cd-explicit-deploy-brikdeploy). |
 | `brikStage` | Sources `jenkins-wrapper.sh` and dispatches to a portable Bash stage via `brik.jenkins.run_stage`. |
 | `brikRunStage` | Wraps `docker.image(image).inside(args) { brikStage(...) }` and injects `-e BRIK_RUNNER_IMAGE` so each fragment records its real execution image. |
+| `brikDriver` | Resolves each stage's runner image from the runner-class registry (`brikDriver.resolveImage`) - the single source shared with the GitLab adapter. |
 | `brikResolveHome` | Locates the Brik shared library inside `${WORKSPACE}@libs/`. |
 | `brikDockerArgs` | Builds the Docker run args (HOME redirection, JVM cache paths, memory cap, network attachment, `--env-file` for `NEXUS_` / `BRIK_` / `REGISTRY_` / `ARGOCD_` / `CARGO_` / `SSH_` vars). |
 | `brikReadDotenv` | Parses `.brik-logs/pipeline.env` so the controller can extract `BRIK_CI_IMAGE`, mirroring GitLab's dotenv contract (single-file, projected from the report env section). |
@@ -119,7 +130,9 @@ brikIntegrate(useDockerAgent: false)   // run on the agent instead of containers
 |-----------|------|---------|-------------|
 | `BRIK_DRY_RUN` | `booleanParam` | `false` | Skip destructive deploy actions (compose up, k8s apply, helm upgrade, argocd sync, rsync). Print what would run instead. |
 | `BRIK_TAG` | `stringParam` | `""` | Release tag for this build (e.g. `v0.1.0`). Leave empty for snapshot builds. Mirrors GitLab `CI_COMMIT_TAG`. |
-| `BRIK_WITH_DEPLOY` | `booleanParam` | `false` | Opt into the deploy stage. The planner skips deploy by default even on tag pushes; set to true to actually run it. |
+| `BRIK_DEPLOY_VERSION` | `stringParam` | `""` | CD input (mode 2). Artifact version to deploy. Set together with `BRIK_DEPLOY_ENVIRONMENT` to run an explicit CD deploy (`planType=deploy`). Mirrors the GitLab CD variable and the `brikDeploy` parameter. |
+| `BRIK_DEPLOY_ENVIRONMENT` | `stringParam` | `""` | CD input (mode 2). Target environment key from `deploy.environments`. Set together with `BRIK_DEPLOY_VERSION`. |
+| `BRIK_WITH_DEPLOY` | `booleanParam` | `false` | Transitional opt-in for the in-CI deploy stage (skipped by default). Prefer the dedicated `brikDeploy` CD job; slated for removal once CD fully leaves the CI flow. |
 
 **First-build gotcha**: Jenkins registers parameters declared via
 `properties([parameters([...])])` only *after* the first build of a job
@@ -128,6 +141,36 @@ runs. On a freshly-created job the UI shows "Build Now" instead of
 form for subsequent runs. If you provision jobs through Job DSL
 (Configuration-as-Code, seed job, `pipelineJob` script), redeclare the
 same parameters on the job itself to make them visible from creation.
+
+## CD: explicit deploy (`brikDeploy`)
+
+A deployment is **not** the CI flow. `brikDeploy` is a separate entry point - the
+Jenkins analogue of GitLab's `brik-deploy.yml` - that maps two inputs to a single
+`brik deploy` invocation:
+
+```groovy
+@Library('brik') _
+brikDeploy()
+```
+
+The `brik deploy` verb runs the decoupled CD flow: it resolves the version to a
+digest-pinned image in the channel the environment accepts, enforces the
+`require_digest` gate (and, when the environment declares them,
+`require_attestation` / `requires_eligibility`), resolves the deployment
+definition at the version's git ref, deploys the pinned digest, reads the live
+state back, and journals the result. All business logic stays in `lib/`; the var
+only maps parameters and archives the evidence.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `BRIK_DEPLOY_VERSION` | `stringParam` | `""` | Artifact version to deploy. Required. |
+| `BRIK_DEPLOY_ENVIRONMENT` | `stringParam` | `""` | Target environment key from `deploy.environments`. Required. |
+| `BRIK_DRY_RUN` | `booleanParam` | `false` | Rehearse: print destructive actions instead of running them. |
+| `brikHome` / `nodeLabel` / `timeoutMin` / `dockerNetwork` | - | auto / `''` (any) / `30` / auto | Same plumbing options as `brikIntegrate`. |
+
+The CD inputs mirror `lib/registry/pipeline-params.yml` (single source of truth)
+1:1 with the GitLab `BRIK_DEPLOY_*` variables; the parity is enforced by
+`spec/integration/adapter-parity/pipeline_params_parity_spec.sh`.
 
 ## Variable mapping
 
