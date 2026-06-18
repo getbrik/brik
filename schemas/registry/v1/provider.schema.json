@@ -25,6 +25,16 @@
       "additionalProperties": false,
       "properties": {
         "capability": {"type": "string", "pattern": "^[a-z][a-z0-9-]*$"},
+        "module": {
+          "description": "Module under lib/providers/ exposing the contract operations as providers.<module>.<op> (brik.use providers.<module>). Several providers of one capability may share a module when the implementing tool is the same (e.g. the three cosign-* providers share 'cosign'); the operative difference is driven by the referential, not the provider id.",
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$"
+        },
+        "endpoint_kind": {
+          "description": "Infrastructure-referential endpoint kind this provider operates against. Resolved by the binding (capability -> provider -> endpoint_kind -> endpoint).",
+          "type": "string",
+          "enum": ["ArgoCD", "GitHost", "K8sTarget", "Notification", "PackageRegistry", "Registry", "SecretManager", "Signing", "SshTarget"]
+        },
         "binding": {
           "description": "Which source binds this provider: the project (brik.yml), the environment (infrastructure referential) or the detected execution context (CI orchestrator).",
           "type": "string",

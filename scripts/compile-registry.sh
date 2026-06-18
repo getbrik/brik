@@ -170,6 +170,8 @@ trap 'rm -f "$tmp" "$raw"' EXIT
   _emit_kind stages "${manifest_dirs[@]}" || exit 1
   printf '\n  },\n  "providers": {\n'
   _emit_kind providers "${manifest_dirs[@]}" || exit 1
+  printf '\n  },\n  "contracts": {\n'
+  _emit_kind contracts "${manifest_dirs[@]}" || exit 1
   printf '\n  }\n}\n'
 } > "$raw"
 jq -S '.' "$raw" > "$tmp"
@@ -193,10 +195,12 @@ case "$mode" in
     n_stacks=$(jq -r '.stacks | length' "$output")
     n_stages=$(jq -r '.stages | length' "$output")
     n_providers=$(jq -r '.providers | length' "$output")
+    n_contracts=$(jq -r '.contracts | length' "$output")
     printf '[compile-registry] compiled %s\n' "$output"
     printf '[compile-registry]   stacks: %s\n' "$n_stacks"
     printf '[compile-registry]   stages: %s\n' "$n_stages"
     printf '[compile-registry]   providers: %s\n' "$n_providers"
+    printf '[compile-registry]   contracts: %s\n' "$n_contracts"
     printf '[compile-registry]   bytes:  %s\n' "$size"
     printf '[compile-registry]   sha256: %s\n' "$sha"
     ;;

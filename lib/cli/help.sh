@@ -41,6 +41,7 @@ Commands:
   stage            Execute a single pipeline stage locally (in its runner-class container)
   integrate        Execute the full CI pipeline locally (one container per stage)
   extension test   Validate an extension manifest+module against the contract
+  provider test    Verify a provider satisfies its capability contract (schema + introspection + unit conformance)
   deploy           Deploy a version to an environment (digest-pinned CD flow)
   promote          Promote a version between artifact channels (evidence carried)
   authorize        Grant a version the eligibility to deploy to an environment
@@ -112,6 +113,11 @@ Options for plan gate:
 Options for extension test:
   (positional)            Path to the extension directory (must contain
                           stacks/ or stages/ manifests, and lib/*.sh modules).
+
+Options for provider test:
+  (positional)            Provider id from the registry (e.g. cosign-key).
+                          Validates the manifest, introspects the contract
+                          operations, and runs infra-free unit conformance.
 
 Options for deploy:
   --version <v>           Artifact version to deploy (resolved to a digest in

@@ -6,6 +6,8 @@ metadata:
   owner: getbrik
 spec:
   capability: artifact-attestation
+  module: cosign
+  endpoint_kind: Signing
   binding: referential
   contract: artifact-attestation/v1
   tools:
