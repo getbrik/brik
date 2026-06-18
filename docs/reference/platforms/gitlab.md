@@ -42,6 +42,15 @@ flowchart LR
     deploy --> notify["brik-notify"]
 ```
 
+`brik-promote` and `brik-deploy` are part of the pipeline definition but
+**self-gate** via the plan, so a normal CI run does not deploy: `brik-promote`
+retags candidate -> release only on a tagged commit (and self-skips when
+promotion is not configured), and `brik-deploy` runs only when the CD inputs
+`BRIK_DEPLOY_VERSION` + `BRIK_DEPLOY_ENVIRONMENT` are set (selecting
+`planType=deploy`). An ordinary push/tag/MR run therefore ends at `brik-notify`
+having built and published one artifact, nothing deployed. For a deployment
+decoupled from CI, use the dedicated [CD pipeline](#cd-pipeline-brik-deployyml).
+
 The Init job emits `.brik-logs/pipeline.env` as a `reports: dotenv:` artifact
 (produced by the post-stage projection hook from the report env section), so
 downstream jobs receive `BRIK_CI_IMAGE` (the resolved
@@ -210,6 +219,12 @@ which is why these two are declared with the explicit object syntax.
 |----------|---------|------|-------------|
 | `BRIK_DRY_RUN` | `false` | enum (`false`, `true`) | Skip destructive deploy actions (compose up, k8s apply, helm upgrade, argocd sync, rsync). Print what would run instead. Mirrors the Jenkins `BRIK_DRY_RUN` `booleanParam`. |
 | `BRIK_TAG` | `""` | string | Release tag for this build (e.g. `v0.1.0`). Leave empty for snapshot builds. Mirrors `CI_COMMIT_TAG` semantics. |
+| `BRIK_DEPLOY_VERSION` | `""` | string | CD input (mode 2). Artifact version to deploy. Set **together with** `BRIK_DEPLOY_ENVIRONMENT` to run an explicit deploy (`planType=deploy`) instead of the CI flow. |
+| `BRIK_DEPLOY_ENVIRONMENT` | `""` | string | CD input (mode 2). Target environment key from `deploy.environments`. Set together with `BRIK_DEPLOY_VERSION`. |
+
+When both CD inputs are set on `brik-integrate.yml`, the run switches to an
+in-pipeline deploy; for a fully decoupled CD pipeline, use
+[`brik-deploy.yml`](#cd-pipeline-brik-deployyml) instead.
 
 The `options:` dropdown for `BRIK_DRY_RUN` requires GitLab >= 15.7. Earlier
 versions ignore the constraint and fall back to a free-form text field but
@@ -339,6 +354,33 @@ are intentionally not in the allow-list. Add them locally if the project needs t
 remove the existing entries without replacing the parity they provide
 (particularly the `schedule` and `web` entries: losing them breaks
 the on-call team's ability to re-run a pipeline manually).
+
+## CD pipeline (`brik-deploy.yml`)
+
+Deployments run from a **separate** template, `brik-deploy.yml`, decoupled in
+time from CI - build once, deploy that version to any environment, any number of
+times, later. Its `workflow:` creates a pipeline **only** when both
+`BRIK_DEPLOY_VERSION` and `BRIK_DEPLOY_ENVIRONMENT` are provided (the "Run
+pipeline" form or the pipelines API); without them, no pipeline is created.
+
+```yaml
+include:
+  - project: 'brik/gitlab-templates'
+    ref: v0.7.0
+    file: '/templates/brik-deploy.yml'
+```
+
+The single `brik-cd-deploy` job maps those inputs to `brik deploy`, which
+resolves the version to a digest-pinned ref in the channel the environment
+accepts, enforces the `require_digest` gate (plus `require_attestation` /
+`requires_eligibility` when the environment declares them), resolves the
+deployment definition at the version's git ref, deploys the pinned digest, reads
+the live state back, and journals the result. All business logic stays in
+`lib/`; the template only maps parameters to the verb.
+
+It is the GitLab twin of the Jenkins [`brikDeploy`](jenkins.md#cd-explicit-deploy-brikdeploy)
+var, kept 1:1 via `lib/registry/pipeline-params.yml` (single source of truth)
+and verified by `spec/integration/adapter-parity/pipeline_params_parity_spec.sh`.
 
 ## Anti-patterns checklist
 
