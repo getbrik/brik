@@ -486,6 +486,88 @@ YAML
         The output should include "--target gitops"
       End
     End
+
+    # T5b (PD3): with an infrastructure referential, the deploy environment's
+    # binding wires the git/argocd credentials and the argocd controller; the
+    # brik.yml *_token_var / controller fields are the legacy path. Deploy is
+    # environment-scoped, so credentials resolve per env (infra.credential_for).
+    Describe "with a referential (T5b/PD3)"
+      Include "$BRIK_HOME/lib/transverse/infra.sh"
+
+      setup_ref_deploy() {
+        cat > "$BRIK_CONFIG_FILE" <<'YAML'
+version: 1
+project:
+  name: test
+  stack: node
+deploy:
+  environments:
+    staging:
+      target: gitops
+      repo: https://gitlab.example.com/org/infra.git
+      path: services/api
+      app_name: api-staging
+YAML
+        config.read "$BRIK_CONFIG_FILE" >/dev/null 2>&1 || true
+
+        INFRA_DIR="$(mktemp -d)"
+        mkdir -p "$INFRA_DIR/endpoints" "$INFRA_DIR/credentials" "$INFRA_DIR/bindings"
+        printf 'apiVersion: brik.dev/referential/v1\nkind: Referential\nprofile: p-lab\n' \
+          > "$INFRA_DIR/referential.yml"
+        cat > "$INFRA_DIR/endpoints/forge.yml" <<'YAML'
+apiVersion: brik.dev/referential/v1
+kind: GitHost
+name: forge
+git_url: https://gitlab.example.com
+YAML
+        cat > "$INFRA_DIR/endpoints/argocd.yml" <<'YAML'
+apiVersion: brik.dev/referential/v1
+kind: ArgoCD
+name: argocd
+url: https://argocd.lab
+YAML
+        cat > "$INFRA_DIR/credentials/git.yml" <<'YAML'
+apiVersion: brik.dev/referential/v1
+kind: Credential
+name: git
+method: token
+token: env://GIT_TOKEN_REF
+YAML
+        cat > "$INFRA_DIR/credentials/argocd.yml" <<'YAML'
+apiVersion: brik.dev/referential/v1
+kind: Credential
+name: argocd
+method: token
+token: env://ARGOCD_TOKEN_REF
+YAML
+        cat > "$INFRA_DIR/bindings/staging.yml" <<'YAML'
+apiVersion: brik.dev/referential/v1
+kind: Binding
+name: staging
+endpoints:
+  forge: git
+  argocd: argocd
+YAML
+        export BRIK_INFRA_DIR="$INFRA_DIR"
+      }
+      cleanup_ref_deploy() { rm -rf "$INFRA_DIR"; unset BRIK_INFRA_DIR INFRA_DIR; }
+      Before 'setup_ref_deploy'
+      After 'cleanup_ref_deploy'
+
+      It "resolves git/auth token vars and the controller from the referential"
+        run_ref_deploy() {
+          brik.use() { :; }
+          deploy.gitops.run() { printf '%s ' "$@"; printf '\n'; return 0; }
+          local ctx
+          ctx="$(context.create "deploy")" 2>/dev/null || ctx="$(mktemp)"
+          stages.deploy "$ctx" 2>/dev/null
+        }
+        When call run_ref_deploy
+        The output should include "--git-token-var GIT_TOKEN_REF"
+        The output should include "--auth-token-var ARGOCD_TOKEN_REF"
+        The output should include "--controller https://argocd.lab"
+      End
+    End
   End
 
   Describe "with deploy.environments[].strategy"

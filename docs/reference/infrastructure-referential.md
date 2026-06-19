@@ -202,6 +202,8 @@ rejects a literal secret. Required: `name`, `method`, plus the method's fields.
 | `token` | `token` | `token` |
 | `basic` | `username`, `password` | `password` (username may be literal or a reference) |
 | `ssh-key` | `private_key` | `private_key` |
+| `mtls` | `client_cert`, `client_key` | both `client_cert` and `client_key` |
+| `workload-identity` | (none) | resolved from the ambient workload OIDC identity, no static secret |
 | `oidc` | (none) | resolved from the CI OIDC identity |
 | `none` | (none) | anonymous |
 

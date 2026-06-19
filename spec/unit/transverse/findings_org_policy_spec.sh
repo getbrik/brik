@@ -4,6 +4,25 @@ Describe "transverse/findings/org_policy.sh"
   Include "$BRIK_HOME/lib/pipeline/loader.sh"
   Include "$BRIK_HOME/lib/transverse/findings/org_policy.sh"
 
+  # Run <fn> with only <keep...> resolvable on PATH (essential coreutils plus
+  # the named tools), so dependency-probe branches can be exercised in-process.
+  with_only_tools() {
+    local keep_csv="$1"; shift
+    local sandbox; sandbox="$(mktemp -d)"
+    local cmd path
+    for cmd in mktemp mkdir rm cat printf date dirname sed grep ${keep_csv//,/ }; do
+      path="$(command -v "$cmd" 2>/dev/null)" && [[ -n "$path" ]] \
+        && ln -sf "$path" "${sandbox}/${cmd}"
+    done
+    local saved="$PATH" rc=0
+    PATH="$sandbox"
+    "$@"
+    rc=$?
+    PATH="$saved"
+    rm -rf "$sandbox"
+    return $rc
+  }
+
   jv_missing() { ! command -v jv >/dev/null 2>&1; }
   yq_missing() { ! command -v yq >/dev/null 2>&1; }
 
@@ -83,6 +102,28 @@ Describe "transverse/findings/org_policy.sh"
     End
   End
 
+  Describe "_org_policy._glob_to_regex"
+    Parameters
+      "src/*"        '^src/[^/]*$'
+      "src/?.txt"    '^src/[^/]\.txt$'
+      "a.b+c"        '^a\.b\+c$'
+      "lib/[gen]/x"  '^lib/\[gen\]/x$'
+      "a/**/b"       '^a/.*/b$'
+    End
+    It "translates glob $1 to anchored regex $2"
+      When call _org_policy._glob_to_regex "$1"
+      The output should equal "$2"
+    End
+  End
+
+  Describe "_org_policy._epoch_to_date"
+    It "renders an epoch as a UTC ISO date"
+      # 1700000000 == 2023-11-14 (UTC) on both GNU and BSD date.
+      When call _org_policy._epoch_to_date 1700000000
+      The output should equal "2023-11-14"
+    End
+  End
+
   Describe "org_policy.load"
     Skip if "yq missing" yq_missing
     Skip if "jv missing" jv_missing
@@ -90,6 +131,112 @@ Describe "transverse/findings/org_policy.sh"
     write_policy() {
       cat > "$POLICY_YAML"
     }
+
+    It "fails with BRIK_EXIT_IO_FAILURE when the cache directory cannot be created"
+      blocked_dir() {
+        # A regular file where org_policy.load needs a directory makes
+        # mkdir -p fail (the parent of .brik-logs is a file, not a dir).
+        printf 'x' > "${POLICY_DIR}/blocker"
+        export BRIK_POLICY_CACHE_PATH="${POLICY_DIR}/blocker/.brik-logs/policy.cache.json"
+        write_policy <<'YAML'
+allow:
+  cve: []
+YAML
+        export BRIK_POLICY_URL="file://${POLICY_YAML}"
+        org_policy.load "$BRIK_POLICY_URL"
+      }
+      When call blocked_dir
+      The status should equal 6
+      The stderr should include "cannot create cache directory"
+    End
+
+    It "fails with BRIK_EXIT_IO_FAILURE when the cache tmp file cannot be created"
+      readonly_dir() {
+        # The cache dir already exists (mkdir -p is a no-op) but is read-only,
+        # so mktemp "$cache.XXXXXX" inside it fails -- the tmp-file branch.
+        mkdir -p "${POLICY_DIR}/ro"
+        chmod 0555 "${POLICY_DIR}/ro"
+        export BRIK_POLICY_CACHE_PATH="${POLICY_DIR}/ro/policy.cache.json"
+        write_policy <<'YAML'
+allow:
+  cve: []
+YAML
+        export BRIK_POLICY_URL="file://${POLICY_YAML}"
+        org_policy.load "$BRIK_POLICY_URL"
+        local rc=$?
+        chmod 0755 "${POLICY_DIR}/ro"
+        return $rc
+      }
+      When call readonly_dir
+      The status should equal 6
+      The stderr should include "cannot create cache tmp file"
+    End
+
+    It "compiles regex for several path globs in one policy"
+      load_many_paths() {
+        write_policy <<'YAML'
+allow:
+  paths:
+    - glob: "src/*"
+      reason: "single segment"
+      expires: 2099-12-31
+    - glob: "vendor/**"
+      reason: "subtree"
+      expires: 2099-12-31
+YAML
+        export BRIK_POLICY_URL="file://${POLICY_YAML}"
+        export BRIK_POLICY_CACHE_PATH="$CACHE"
+        org_policy.load "$BRIK_POLICY_URL" >/dev/null 2>&1
+        jq -r '.path_globs | length' "$CACHE"
+      }
+      When call load_many_paths
+      The output should equal "2"
+    End
+
+    Describe "missing dependencies"
+      It "fails with BRIK_EXIT_MISSING_DEP when curl is unavailable"
+        no_curl() {
+          write_policy <<'YAML'
+allow:
+  cve: []
+YAML
+          export BRIK_POLICY_CACHE_PATH="$CACHE"
+          # yq and jq resolvable, curl deliberately absent.
+          with_only_tools "yq,jq" org_policy.load "file://${POLICY_YAML}"
+        }
+        When call no_curl
+        The status should equal 3
+        The stderr should include "curl not on PATH"
+      End
+
+      It "fails with BRIK_EXIT_MISSING_DEP when yq is unavailable"
+        no_yq() {
+          write_policy <<'YAML'
+allow:
+  cve: []
+YAML
+          export BRIK_POLICY_CACHE_PATH="$CACHE"
+          with_only_tools "curl,jq" org_policy.load "file://${POLICY_YAML}"
+        }
+        When call no_yq
+        The status should equal 3
+        The stderr should include "yq not on PATH"
+      End
+
+      It "fails with BRIK_EXIT_MISSING_DEP when jq is unavailable"
+        no_jq() {
+          write_policy <<'YAML'
+allow:
+  cve: []
+YAML
+          export BRIK_POLICY_CACHE_PATH="$CACHE"
+          with_only_tools "curl,yq" org_policy.load "file://${POLICY_YAML}"
+        }
+        When call no_jq
+        The status should equal 3
+        The stderr should include "jq not on PATH"
+      End
+    End
 
     Describe "with a valid file:// policy"
       It "writes a compiled cache JSON"
@@ -346,10 +493,62 @@ YAML
       The stderr should include "schema"
     End
 
+    It "echoes the off posture when declared"
+      posture() {
+        write_policy <<'YAML'
+state_repo_protection: off
+YAML
+        org_policy.state_repo_protection "file://${POLICY_YAML}"
+      }
+      When call posture
+      The output should equal "off"
+    End
+
+    It "requires a url (BRIK_EXIT_INVALID_INPUT)"
+      When call org_policy.state_repo_protection ""
+      The status should equal 2
+      The stderr should include "<url> is required"
+    End
+
+    It "fails closed on malformed YAML"
+      bad_yaml() {
+        printf 'state_repo_protection: : oops\n  nested: {' > "$POLICY_YAML"
+        org_policy.state_repo_protection "file://${POLICY_YAML}"
+      }
+      When call bad_yaml
+      The status should equal 7
+      The stderr should include "malformed YAML"
+    End
+
+    It "fails closed on a value outside the enum (bash enforcement)"
+      bad_value() {
+        # A syntactically valid policy whose value is rejected by the bash
+        # enum guard (exercises the default case independently of the schema).
+        printf 'state_repo_protection: loose\n' > "$POLICY_YAML"
+        org_policy.state_repo_protection "file://${POLICY_YAML}"
+      }
+      When call bad_value
+      The status should equal 7
+      The stderr should include "violates the policy schema"
+    End
+
     It "fails closed when the policy is unreachable (a governed project must not regress silently)"
       When call org_policy.state_repo_protection "file:///does/not/exist/policy.yml"
       The status should equal 7
       The stderr should include "cannot fetch"
+    End
+
+    It "fails with BRIK_EXIT_MISSING_DEP when a dependency is unavailable"
+      no_jq() {
+        write_policy <<'YAML'
+state_repo_protection: required
+YAML
+        with_only_tools "curl,yq" \
+          org_policy.state_repo_protection "file://${POLICY_YAML}"
+      }
+      When call no_jq
+      The status should equal 3
+      The stderr should include "jq not on PATH"
     End
   End
 

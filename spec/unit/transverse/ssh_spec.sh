@@ -190,4 +190,56 @@ SCRIPT
       End
     End
   End
+
+  # T3 (#39 P1): the connection identity (user, port) declared on the SshTarget
+  # must reach the transport. Applied regardless of the host-key stance.
+  Describe "transverse.ssh.host_opts (referential user/port)"
+    Include "$BRIK_PIPELINE_LIB/loader.sh"
+    Include "$BRIK_TRANSVERSE_LIB/env.sh"
+    Include "$BRIK_TRANSVERSE_LIB/config.sh"
+    Include "$BRIK_TRANSVERSE_LIB/infra.sh"
+
+    make_ssh_instance() {
+      INFRA_DIR="$(mktemp -d)"
+      mkdir -p "$INFRA_DIR/endpoints"
+      cat > "$INFRA_DIR/referential.yml" <<'YAML'
+apiVersion: brik.dev/referential/v1
+kind: Referential
+profile: p-lab
+YAML
+      cat > "$INFRA_DIR/endpoints/app.yml" <<'YAML'
+apiVersion: brik.dev/referential/v1
+kind: SshTarget
+name: app
+hosts: [app.lab]
+user: deploy
+port: 2222
+strict_host_key: false
+YAML
+      export BRIK_INFRA_DIR="$INFRA_DIR"
+    }
+    cleanup_ssh_instance() { rm -rf "$INFRA_DIR"; unset BRIK_INFRA_DIR INFRA_DIR; }
+    Before 'make_ssh_instance'
+    After 'cleanup_ssh_instance'
+
+    emit_opts() {
+      local -a opts=()
+      transverse.ssh.host_opts opts app.lab || return "$?"
+      printf '%s\n' "${opts[@]}"
+    }
+
+    It "applies the declared user as -o User="
+      When call emit_opts
+      The status should be success
+      The output should include "User=deploy"
+      The stderr should include "strict_host_key: false"
+    End
+
+    It "applies the declared port as -o Port="
+      When call emit_opts
+      The status should be success
+      The output should include "Port=2222"
+      The stderr should include "strict_host_key: false"
+    End
+  End
 End

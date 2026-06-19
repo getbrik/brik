@@ -373,13 +373,14 @@ deploy.argocd.status() {
 # Output: "sha256:<hex>" when the live image is digest-pinned, else "unknown".
 # Returns: 2 invalid input; 3 argocd/jq missing; 5 query/parse failed.
 deploy.argocd.get_deployed_digest() {
-    local app_name="" server="" auth_token_var=""
+    local app_name="" server="" auth_token_var="" hard_refresh="false"
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --app)            app_name="$2";       shift 2 ;;
             --server)         server="$2";         shift 2 ;;
             --auth-token-var) auth_token_var="$2"; shift 2 ;;
+            --hard-refresh)   hard_refresh="true"; shift ;;
             *) log.error "unknown option: $1"; return "$BRIK_EXIT_INVALID_INPUT" ;;
         esac
     done
@@ -389,7 +390,12 @@ deploy.argocd.get_deployed_digest() {
     pipeline.require_tool jq     || return "$BRIK_EXIT_MISSING_DEP"
     brik.use deployments._image_ref
 
+    # --hard-refresh forces ArgoCD to re-fetch the git repo before reporting,
+    # so a read-back run right after a gitops push sees the just-committed
+    # revision instead of ArgoCD's cached one (its poll is ~3min). Opt-in: the
+    # observational callers (brik status) read without mutating the refresh.
     local -a cmd=(argocd app get "$app_name" -o json)
+    [[ "$hard_refresh" == "true" ]] && cmd+=(--hard-refresh)
     _deploy.argocd._add_server_auth cmd "$server" "$auth_token_var" || return $?
 
     local raw_json image

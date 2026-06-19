@@ -16,6 +16,9 @@ Describe "transverse.promotion_journal"
   log.info()  { :; }
   log.warn()  { :; }
   log.error() { printf 'ERROR: %s\n' "$*" >&2; }
+  # No referential in this unit context: the state-repo token-var resolver is a
+  # legacy passthrough (echo the caller's fallback var, the second argument).
+  transverse.state_repo.token_var() { printf '%s' "${2:-}"; }
 
   Include "${BRIK_HOME}/lib/transverse/promotion_journal.sh"
 

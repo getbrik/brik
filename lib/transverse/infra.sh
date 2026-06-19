@@ -306,6 +306,31 @@ infra.policy_names() {
     return 0
 }
 
+# infra.capability_norm - normalize one Binding capability value to the single
+# internal shape {provider, endpoint}. A bare provider string and the object
+# form {provider, endpoint?} both collapse here, so a future consumer (D7/P-B,
+# wired in chantier #39 P2) reads one shape, never two. No runtime consumes it
+# yet; this is the read path, not the binding.
+# Usage: infra.capability_norm '<json-value>'
+# Returns: 2 empty; 7 not a provider string or {provider, ...} object.
+infra.capability_norm() {
+    local value="$1"
+    if [[ -z "$value" ]]; then
+        log.error "infra.capability_norm: a capability value is required"
+        return "$BRIK_EXIT_INVALID_INPUT"
+    fi
+
+    if ! printf '%s' "$value" | jq -ec '
+        if type == "string" then {provider: ., endpoint: null}
+        elif type == "object" and (.provider | type) == "string"
+        then {provider: .provider, endpoint: (.endpoint // null)}
+        else error("not a provider string or {provider, endpoint?} object") end
+    ' 2>/dev/null; then
+        log.error "infra.capability_norm: capability must be a provider string or {provider, endpoint?} object (got: ${value})"
+        return "$BRIK_EXIT_CONFIG_ERROR"
+    fi
+}
+
 # infra.credential_for - echo (as JSON) the credential an environment binds
 # for an endpoint. Unbound is an error: a deliberately anonymous endpoint
 # binds a credential with method 'none'.
@@ -331,6 +356,46 @@ infra.credential_for() {
     fi
 
     infra.credential "$cred"
+}
+
+# infra.credential_for_endpoint - echo (as JSON) the credential bound to an
+# endpoint, INDEPENDENTLY of any environment. CI-time consumers (docker push,
+# promote, channel, evidence) operate with no deploy environment selected, but
+# the credential must still come from the referential (no *_var in brik.yml).
+# Every binding that maps the endpoint must agree on the credential: a single
+# coherent name resolves, divergence across environments is a genuine CI-time
+# ambiguity and fails closed (never a guess). Unbound is an error.
+# Usage: infra.credential_for_endpoint <endpoint>
+# Returns: 2 no endpoint; 7 unbound or divergent; infra.root codes unconfigured.
+infra.credential_for_endpoint() {
+    local endpoint="$1"
+    if [[ -z "$endpoint" ]]; then
+        log.error "infra.credential_for_endpoint: an endpoint name is required"
+        return "$BRIK_EXIT_INVALID_INPUT"
+    fi
+
+    local root file cred creds=" "
+    root="$(infra.root)" || return "$?"
+    for file in "${root}/bindings"/*.yml "${root}/bindings"/*.yaml; do
+        [[ -f "$file" ]] || continue
+        cred="$(endpoint="$endpoint" yq '.endpoints[strenv(endpoint)] // ""' "$file")"
+        [[ -n "$cred" ]] || continue
+        [[ "$creds" == *" ${cred} "* ]] && continue
+        creds="${creds}${cred} "
+    done
+
+    # creds is " a b " for divergent, " a " for coherent, " " for unbound.
+    creds="${creds# }"; creds="${creds% }"
+    if [[ -z "$creds" ]]; then
+        log.error "no binding maps endpoint '${endpoint}' to a credential (CI-time resolution needs one)"
+        return "$BRIK_EXIT_CONFIG_ERROR"
+    fi
+    if [[ "$creds" == *" "* ]]; then
+        log.error "endpoint '${endpoint}' is bound to divergent credentials across environments (${creds// /, }) -- CI-time resolution is ambiguous; unify the binding or operate it per environment"
+        return "$BRIK_EXIT_CONFIG_ERROR"
+    fi
+
+    infra.credential "$creds"
 }
 
 # infra.endpoint_of_kind - echo (as JSON) the single endpoint of <kind>
@@ -401,6 +466,65 @@ infra.registry_for() {
     return "$BRIK_EXIT_CONFIG_ERROR"
 }
 
+# infra.evidence_token_var - echo the environment-variable NAME of the GitHost
+# token that authenticates against the evidence state-repo, resolved BY TARGET
+# (the repo's host) and INDEPENDENTLY of any deploy environment. The state-repo
+# is one per project and consumed from both CI (recording evidence) and CD
+# (reading journals/eligibility), so resolution must not depend on an
+# --environment selection (PD3). Matching is by hostname: a GitHost git_url is
+# often ssh:// while the repo URL is https://, and the port differs across
+# transports, so scheme, userinfo and port are stripped on both sides.
+#
+# Non-breaking: when no referential is configured, or no declared GitHost
+# serves the repo's host, this echoes nothing and returns 0 so the caller
+# keeps its legacy .artifacts.evidence.token_var. A declared GitHost whose
+# credential is unbound or divergent fails closed (the operator opted into
+# referential-managed credentials for this host). A credential with no token
+# (method none) also echoes nothing.
+# Usage: var="$(infra.evidence_token_var "$repo_url")" || return $?
+# Returns: 2 no repo URL; 7 unbound/divergent credential or non-env:// token.
+infra.evidence_token_var() {
+    local repo="$1"
+    if [[ -z "$repo" ]]; then
+        log.error "infra.evidence_token_var: an evidence repo URL is required"
+        return "$BRIK_EXIT_INVALID_INPUT"
+    fi
+    # Unconfigured referential: caller keeps the legacy token_var.
+    infra.root >/dev/null 2>&1 || return 0
+
+    # Hostname of the evidence repo: scheme, userinfo, port and path stripped.
+    local host="${repo#*://}"; host="${host##*@}"; host="${host%%/*}"; host="${host%%:*}"
+    [[ -n "$host" ]] || return 0
+
+    # Find the single GitHost whose api_url or git_url hostname matches.
+    local root file ghname="" url uhost
+    root="$(infra.root)" || return "$?"
+    for file in "${root}/endpoints"/*.yml "${root}/endpoints"/*.yaml; do
+        [[ -f "$file" ]] || continue
+        [[ "$(yq '.kind // ""' "$file")" == "GitHost" ]] || continue
+        for url in "$(yq '.api_url // ""' "$file")" "$(yq '.git_url // ""' "$file")"; do
+            [[ -n "$url" ]] || continue
+            uhost="${url#*://}"; uhost="${uhost##*@}"; uhost="${uhost%%/*}"; uhost="${uhost%%:*}"
+            if [[ "$uhost" == "$host" ]]; then
+                ghname="$(yq '.name // ""' "$file")"
+                break
+            fi
+        done
+        [[ -n "$ghname" ]] && break
+    done
+    # No declared GitHost for this host: caller keeps the legacy token_var.
+    [[ -n "$ghname" ]] || return 0
+
+    # Credential by target, environment-independent (fail-closed on a declared
+    # but unbound/divergent endpoint).
+    local cred tok
+    cred="$(infra.credential_for_endpoint "$ghname")" || return "$?"
+    tok="$(printf '%s' "$cred" | jq -r '.token // ""')"
+    # method none (or no token): nothing to forward.
+    [[ -n "$tok" ]] || return 0
+    infra.env_var_of_ref "$tok"
+}
+
 # infra.tls_ca - echo the CA bundle path for an endpoint (JSON document)
 # declaring tls.trust: custom-ca, resolved by the trust/ca/<hostname>/ca.crt
 # convention of the referential. Any other trust value echoes nothing. The
@@ -457,6 +581,27 @@ infra.ssh_target_for() {
 
     log.error "ssh host '${host}' is not declared in the referential (add an SshTarget endpoint)"
     return "$BRIK_EXIT_CONFIG_ERROR"
+}
+
+# infra.env_var_of_ref - echo the environment-variable NAME behind an env://
+# reference. Deploy/publish consumers hand a variable NAME to their tool (the
+# tool reads the value from the environment), so a file:// or bao:// secret -
+# which has no such name - fails closed rather than being silently dropped.
+# Usage: var="$(infra.env_var_of_ref "$ref")" || return $?
+# Returns: 2 empty; 7 non-env:// reference.
+infra.env_var_of_ref() {
+    local ref="$1"
+    if [[ -z "$ref" ]]; then
+        log.error "infra.env_var_of_ref: a reference is required"
+        return "$BRIK_EXIT_INVALID_INPUT"
+    fi
+    case "$ref" in
+        env://*) printf '%s' "${ref#env://}" ;;
+        *)
+            log.error "infra.env_var_of_ref: '${ref}' must be an env:// reference (a variable name is needed; file:// and bao:// have none)"
+            return "$BRIK_EXIT_CONFIG_ERROR"
+            ;;
+    esac
 }
 
 # infra.resolve_ref - resolve a by-reference value. References are the only
@@ -522,4 +667,44 @@ infra.fingerprint() {
         | LC_ALL=C sort -z \
         | xargs -0 sha256sum) \
         | sha256sum | cut -d' ' -f1
+}
+
+# infra.secret_vars - emit, as JSON {pipeline:[...], infra:[...]}, the names of
+# the environment variables an operator must provision for this referential,
+# derived BY TARGET (the operated endpoints' credentials) and INDEPENDENTLY of
+# any deploy environment (PD3): at CI time no environment is selected.
+#   pipeline-side - every env:// reference held by a Credential document (the
+#                   registry/git/signing credentials the pipeline consumes).
+#   infra-side    - the SecretManager bootstrap token (the env:// it
+#                   authenticates with): the one secret needed to reach the
+#                   manager that resolves every bao:// reference.
+# file:// references carry no variable; bao:// resolves through the manager and
+# is not an env var (both are skipped). Names are sorted and de-duplicated; a
+# name on the infra side is never repeated on the pipeline side.
+# Usage: infra.secret_vars
+# Returns: infra.root codes when unconfigured.
+infra.secret_vars() {
+    local root file ref
+    root="$(infra.root)" || return "$?"
+
+    local pipeline="" infra_side=""
+    # pipeline-side: every env:// scalar across the credential documents.
+    for file in "${root}/credentials"/*.yml "${root}/credentials"/*.yaml; do
+        [[ -f "$file" ]] || continue
+        while IFS= read -r ref; do
+            [[ "$ref" == env://* ]] && pipeline="${pipeline}${ref#env://}"$'\n'
+        done < <(yq -r '.. | select(tag == "!!str")' "$file" 2>/dev/null)
+    done
+    # infra-side: the SecretManager auth token, when it is an env:// reference.
+    for file in "${root}/endpoints"/*.yml "${root}/endpoints"/*.yaml; do
+        [[ -f "$file" ]] || continue
+        [[ "$(yq -r '.kind // ""' "$file")" == "SecretManager" ]] || continue
+        ref="$(yq -r '.auth.ref // ""' "$file")"
+        [[ "$ref" == env://* ]] && infra_side="${infra_side}${ref#env://}"$'\n'
+    done
+
+    jq -n --arg p "$pipeline" --arg i "$infra_side" '
+        ($i | split("\n") | map(select(length > 0)) | unique) as $ia |
+        ($p | split("\n") | map(select(length > 0)) | unique) as $pa |
+        { pipeline: ($pa - $ia), infra: $ia }'
 }

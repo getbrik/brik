@@ -267,6 +267,70 @@ EOF
     End
   End
 
+  # =========================================================================
+  # _channel._basic_credential / channel.scoped_docker_config -- referential
+  # credential resolution BY TARGET (PD3, T5e). The referential Registry
+  # credential supersedes the BRIK_REGISTRY_* env convention; absence falls
+  # back (non-breaking).
+  # =========================================================================
+  Describe "channel referential credential (T5e/PD3)"
+    bind_release_credential() {
+      mkdir -p "$CHAN_INFRA/credentials" "$CHAN_INFRA/bindings"
+      cat > "$CHAN_INFRA/credentials/registry-release-push.yml" <<'YAML'
+apiVersion: brik.dev/referential/v1
+kind: Credential
+name: registry-release-push
+method: basic
+username: env://REG_USER
+password: env://REG_PASS
+YAML
+      cat > "$CHAN_INFRA/bindings/e2e.yml" <<'YAML'
+apiVersion: brik.dev/referential/v1
+kind: Binding
+name: e2e
+endpoints:
+  registry-release: registry-release-push
+YAML
+    }
+
+    It "prefers the referential Registry credential (by target) over BRIK_REGISTRY_*"
+      from_referential() {
+        bind_release_credential
+        export DOCKER_CONFIG="$(mktemp -d)"
+        export BRIK_REGISTRY_USER="env-user" BRIK_REGISTRY_PASSWORD="env-pass"
+        export REG_USER="ref-user" REG_PASS="ref-pass"
+        _channel._basic_credential "registry.release"
+      }
+      When call from_referential
+      The output should equal "$(printf 'ref-user:ref-pass' | base64 | tr -d '\n')"
+    End
+
+    It "falls back to BRIK_REGISTRY_* when no Registry serves the host"
+      from_env_fallback() {
+        bind_release_credential
+        export DOCKER_CONFIG="$(mktemp -d)"
+        export BRIK_REGISTRY_USER="env-user" BRIK_REGISTRY_PASSWORD="env-pass"
+        export REG_USER="ref-user" REG_PASS="ref-pass"
+        _channel._basic_credential "registry.internal"
+      }
+      When call from_env_fallback
+      The output should equal "$(printf 'env-user:env-pass' | base64 | tr -d '\n')"
+    End
+
+    It "scopes a Docker config carrying the referential auth for the host"
+      scoped() {
+        bind_release_credential
+        export DOCKER_CONFIG="$(mktemp -d)"
+        export REG_USER="ref-user" REG_PASS="ref-pass"
+        local dir; dir="$(channel.scoped_docker_config "registry.release")"
+        jq -r '.auths["registry.release"].auth' "${dir}/config.json"
+        rm -rf "$dir"
+      }
+      When call scoped
+      The output should equal "$(printf 'ref-user:ref-pass' | base64 | tr -d '\n')"
+    End
+  End
+
   Describe "_channel._registry_digest input shape"
     BeforeEach 'mock.setup'
     AfterEach 'mock.cleanup'

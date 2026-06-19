@@ -243,6 +243,92 @@ YAML
       When call invoke
       The output should equal "2"
     End
+
+    # T5c (PD3): with a referential, the candidate/release registries match
+    # Registry endpoints by authority and the login credentials resolve BY
+    # TARGET (pkg.registry.resolve), with no release.*.docker.*_var in brik.yml.
+    Describe "via referential (T5c/PD3)"
+      Include "$BRIK_TRANSVERSE_LIB/infra.sh"
+      Include "$BRIK_PACKAGE_MANAGERS_LIB/_endpoint.sh"
+
+      setup_ref() {
+        INFRA_DIR="$(mktemp -d)"
+        mkdir -p "$INFRA_DIR/endpoints" "$INFRA_DIR/credentials" "$INFRA_DIR/bindings"
+        printf 'apiVersion: brik.dev/referential/v1\nkind: Referential\nprofile: p-lab\n' \
+          > "$INFRA_DIR/referential.yml"
+        cat > "$INFRA_DIR/endpoints/cand.yml" <<'YAML'
+apiVersion: brik.dev/referential/v1
+kind: Registry
+name: cand
+url: https://candidate.example.com
+tls:
+  trust: system
+YAML
+        cat > "$INFRA_DIR/endpoints/rel.yml" <<'YAML'
+apiVersion: brik.dev/referential/v1
+kind: Registry
+name: rel
+url: https://release.example.com
+tls:
+  trust: system
+YAML
+        cat > "$INFRA_DIR/credentials/cand-cred.yml" <<'YAML'
+apiVersion: brik.dev/referential/v1
+kind: Credential
+name: cand-cred
+method: basic
+username: env://CAND_USER
+password: env://CAND_PASS
+YAML
+        cat > "$INFRA_DIR/credentials/rel-cred.yml" <<'YAML'
+apiVersion: brik.dev/referential/v1
+kind: Credential
+name: rel-cred
+method: basic
+username: env://REL_USER
+password: env://REL_PASS
+YAML
+        cat > "$INFRA_DIR/bindings/ci.yml" <<'YAML'
+apiVersion: brik.dev/referential/v1
+kind: Binding
+name: ci
+endpoints:
+  cand: cand-cred
+  rel: rel-cred
+YAML
+        export BRIK_INFRA_DIR="$INFRA_DIR"
+      }
+      cleanup_ref() { rm -rf "$INFRA_DIR"; unset BRIK_INFRA_DIR INFRA_DIR; }
+      Before 'setup_ref'
+      After 'cleanup_ref'
+
+      It "logs in to both registries with credentials resolved by target"
+        cat > "$BRIK_CONFIG_FILE" <<'YAML'
+version: 1
+project:
+  name: t
+  stack: node
+release:
+  candidate:
+    docker:
+      registry: candidate.example.com
+      image: myteam/api
+  release:
+    docker:
+      registry: release.example.com
+      image: myteam/api
+YAML
+        invoke() {
+          export CAND_USER=cu CAND_PASS=cp REL_USER=ru REL_PASS=rp
+          stages.promote "$CTX_FILE" >/dev/null 2>&1
+          grep -q -- "--username cu" "$DOCKER_CALLS" \
+            && grep -q -- "--username ru" "$DOCKER_CALLS" \
+            && grep -c '^login ' "$DOCKER_CALLS"
+        }
+        When call invoke
+        The output should equal "2"
+      End
+    End
   End
 
   Describe "docker pull failure"

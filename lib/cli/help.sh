@@ -48,6 +48,7 @@ Commands:
   status           Report an environment as journal + desired + live, with drift
   infra init       Scaffold an infrastructure referential instance
   infra validate   Validate an infrastructure referential instance
+  infra secrets    List the env:// secrets an operator must provision
   self-update      Update brik to the latest version
   self-uninstall   Remove brik from your system
   version          Print brik version information
@@ -160,6 +161,12 @@ Options for infra init:
 Options for infra validate:
   --dir <path>            Referential instance to validate
                           (default: BRIK_INFRA_DIR or BRIK_INFRA_REPO)
+
+Options for infra secrets:
+  --dir <path>            Referential instance to read
+                          (default: BRIK_INFRA_DIR or BRIK_INFRA_REPO)
+  --json                  Emit a JSON object {pipeline:[...], infra:[...]}
+  --check                 Verify every required variable is set; fail closed if not
 
 Options for self-update:
   --channel <name>        Update channel: stable (default), edge

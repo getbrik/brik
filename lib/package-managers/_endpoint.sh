@@ -123,3 +123,68 @@ pkg.endpoint.resolve() {
         '{url: $url, method: $method, insecure: ($insecure == "true"),
           token_var: $token_var, username: $username, password_var: $password_var}'
 }
+
+# pkg.registry.resolve - echo (as JSON) the container-registry login contract
+# derived from the referential for a registry authority, or nothing when no
+# Registry endpoint matches that authority (legacy path; absence keeps the
+# BRIK_PUBLISH_DOCKER_*_VAR variables). The credential is resolved BY TARGET
+# (PD3): infra.credential_for_endpoint, environment-independent, since a CI
+# push selects no deploy environment. When the registry IS declared, the
+# referential is the source of truth from there on -- an unbound or
+# mis-resolved credential fails closed, never a silent legacy fallback.
+#
+# Output JSON: { method, insecure, username_var, password_var (method=basic) }
+# Fail-closed (CONFIG_ERROR): declared-but-unbound/divergent credential; a
+# credential method docker login cannot consume; a non-env:// reference.
+# Usage: ep="$(pkg.registry.resolve <authority>)" || return $?
+pkg.registry.resolve() {
+    local host="$1"
+    if [[ -z "$host" ]]; then
+        log.error "pkg.registry.resolve: a registry host is required"
+        return "$BRIK_EXIT_INVALID_INPUT"
+    fi
+
+    brik.use transverse.infra
+
+    # Unconfigured referential, or no Registry of this authority: legacy path.
+    infra.root >/dev/null 2>&1 || return 0
+    local ep
+    ep="$(infra.registry_for "$host" 2>/dev/null)" || return 0
+
+    # Re-derive the transport posture so docker logs the same insecure warning
+    # the package publishers do (infra.registry_for's own warning was silenced
+    # above to keep the no-match path quiet).
+    local url trust insecure="false"
+    url="$(printf '%s' "$ep" | jq -r '.url // ""')"
+    trust="$(printf '%s' "$ep" | jq -r '.tls.trust // "system"')"
+    if [[ "$url" == http://* ]]; then
+        log.warn "registry '${host}' is declared over plain http (legal but insecure)"
+        insecure="true"
+    elif [[ "$trust" == "insecure" ]]; then
+        log.warn "registry '${host}' is declared with tls.trust: insecure (legal but insecure)"
+        insecure="true"
+    fi
+
+    local name cred method username_var="" password_var=""
+    name="$(printf '%s' "$ep" | jq -r '.name')"
+    cred="$(infra.credential_for_endpoint "$name")" || return "$?"
+    method="$(printf '%s' "$cred" | jq -r '.method')"
+    case "$method" in
+        basic)
+            username_var="$(_pkg.endpoint._var_of_ref \
+                "$(printf '%s' "$cred" | jq -r '.username')" username)" || return "$?"
+            password_var="$(_pkg.endpoint._var_of_ref \
+                "$(printf '%s' "$cred" | jq -r '.password')" password)" || return "$?"
+            ;;
+        none) ;;
+        *)
+            log.error "Registry '${host}': credential method '${method}' is not usable by docker login (expected basic or none)"
+            return "$BRIK_EXIT_CONFIG_ERROR"
+            ;;
+    esac
+
+    jq -nc --arg method "$method" --arg insecure "$insecure" \
+        --arg username_var "$username_var" --arg password_var "$password_var" \
+        '{method: $method, insecure: ($insecure == "true"),
+          username_var: $username_var, password_var: $password_var}'
+}

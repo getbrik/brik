@@ -480,6 +480,26 @@ def call(Map params = [:]) {
                                 withEnv(signingEnv) {
                                     brikRunStage(image: image, stageName: sid, brikHome: brikHome, dockerArgs: signingDockerArgs)
                                 }
+                            } else if (sid == 'package' || sid == 'promote') {
+                                // package pushes the built image and promote retags
+                                // it candidate->release: both write to the registry,
+                                // so they need the WRITE identity. As with
+                                // container-scan, the read-only BRIK_REGISTRY_USER
+                                // casc global is re-injected by docker.inside() as a
+                                // trailing -e that beats any --env-file, so the
+                                // publish write identity must be remapped at the
+                                // withEnv level to win. Build/test/CD containers keep
+                                // the read-only brik-cd account.
+                                def publishEnv = []
+                                if (env.BRIK_PUBLISH_REGISTRY_USER) {
+                                    publishEnv << "BRIK_REGISTRY_USER=${env.BRIK_PUBLISH_REGISTRY_USER}"
+                                }
+                                if (env.BRIK_PUBLISH_REGISTRY_PASSWORD) {
+                                    publishEnv << "BRIK_REGISTRY_PASSWORD=${env.BRIK_PUBLISH_REGISTRY_PASSWORD}"
+                                }
+                                withEnv(publishEnv) {
+                                    brikRunStage(image: image, stageName: sid, brikHome: brikHome, dockerArgs: dockerArgs)
+                                }
                             } else {
                                 brikRunStage(image: image, stageName: sid, brikHome: brikHome, dockerArgs: dockerArgs)
                             }

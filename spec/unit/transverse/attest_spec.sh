@@ -37,6 +37,8 @@ Describe "transverse.attest"
     cosign() {
       printf '%s\n' "$*" >"$COSIGN_ARGS_FILE"
       printf 'BAO_ADDR=%s\n' "${BAO_ADDR:-}" >>"$COSIGN_ARGS_FILE"
+      printf 'BAO_CACERT=%s\n' "${BAO_CACERT:-}" >>"$COSIGN_ARGS_FILE"
+      printf 'BAO_SKIP_VERIFY=%s\n' "${BAO_SKIP_VERIFY:-}" >>"$COSIGN_ARGS_FILE"
       # Registry credentials must reach cosign through DOCKER_CONFIG, never the
       # argv (a --registry-password is visible in the process table). Record the
       # config auths so the spec can prove the credential travelled out of band.
@@ -218,6 +220,39 @@ YAML
       The contents of file "$COSIGN_ARGS_FILE" should include "--key openbao://brik-signing"
       The contents of file "$COSIGN_ARGS_FILE" should include "--tlog-upload=false"
       The contents of file "$COSIGN_ARGS_FILE" should include "BAO_ADDR=http://bao.lab:8200"
+    End
+
+    It "kms backend: maps the secret manager's tls.trust: insecure to BAO_SKIP_VERIFY"
+      printf '{}' >"${SHELLSPEC_TMPBASE}/sbom.json"
+      # The default kms fixture declares the SecretManager with tls.trust: insecure.
+      sign_kms() { use_kms_backend; attest.sign "$REF" --sbom "${SHELLSPEC_TMPBASE}/sbom.json"; }
+      When call sign_kms
+      The status should be success
+      The contents of file "$COSIGN_ARGS_FILE" should include "BAO_SKIP_VERIFY=true"
+    End
+
+    It "kms backend: honors the secret manager's tls.trust: custom-ca as BAO_CACERT"
+      printf '{}' >"${SHELLSPEC_TMPBASE}/sbom.json"
+      sign_kms_ca() {
+        use_kms_backend
+        cat > "$ATTEST_INFRA/endpoints/secret-manager.yml" <<'YAML'
+apiVersion: brik.dev/referential/v1
+kind: SecretManager
+name: secret-manager
+url: https://bao.lab:8200
+auth:
+  method: token
+  ref: env://ATTEST_SPEC_BAO_TOKEN
+tls:
+  trust: custom-ca
+YAML
+        mkdir -p "$ATTEST_INFRA/trust/ca/bao.lab"
+        printf 'FAKE-CA\n' > "$ATTEST_INFRA/trust/ca/bao.lab/ca.crt"
+        attest.sign "$REF" --sbom "${SHELLSPEC_TMPBASE}/sbom.json"
+      }
+      When call sign_kms_ca
+      The status should be success
+      The contents of file "$COSIGN_ARGS_FILE" should include "BAO_CACERT=$ATTEST_INFRA/trust/ca/bao.lab/ca.crt"
     End
 
     It "key backend: refuses (7) a bao:// key reference (kms is the OpenBAO path)"
@@ -536,6 +571,274 @@ YAML
     It "propagates a cosign verification failure (fail-closed)"
       cosign() { return 1; }
       When call attest.verify "$REF" --identity 'x' --issuer 'y'
+      The status should be failure
+      The stderr should include "did not verify"
+    End
+
+    It "dry-run does not invoke cosign"
+      unset BRIK_COSIGN_KEY
+      When call attest.verify "$REF" --identity 'x' --issuer 'y' --dry-run
+      The status should be success
+      The contents of file "$COSIGN_ARGS_FILE" should equal ""
+    End
+
+    It "fails closed (2) on an unknown option"
+      When call attest.verify "$REF" --bogus x
+      The status should equal 2
+      The stderr should include "unknown option"
+    End
+
+    It "fails closed (2) when the ref is missing"
+      When call attest.verify
+      The status should equal 2
+      The stderr should include "image reference is required"
+    End
+  End
+
+  Describe "attest.sign error paths"
+    It "fails closed (2) on an unknown option"
+      printf '{}' >"${SHELLSPEC_TMPBASE}/sbom.json"
+      When call attest.sign "$REF" --sbom "${SHELLSPEC_TMPBASE}/sbom.json" --bogus x
+      The status should equal 2
+      The stderr should include "unknown option"
+    End
+
+    It "fails closed (2) when the ref is missing"
+      When call attest.sign
+      The status should equal 2
+      The stderr should include "image reference is required"
+    End
+
+    It "fails closed (2) when --sbom is missing"
+      When call attest.sign "$REF"
+      The status should equal 2
+      The stderr should include "--sbom is required"
+    End
+
+    It "fails closed (6) when the SBOM file does not exist"
+      unset BRIK_COSIGN_KEY
+      When call attest.sign "$REF" --sbom "${SHELLSPEC_TMPBASE}/missing-sbom.json"
+      The status should equal 6
+      The stderr should include "SBOM file not found"
+    End
+
+    It "fails closed (5) when cosign fails to attach the SBOM attestation"
+      unset BRIK_COSIGN_KEY
+      printf '{}' >"${SHELLSPEC_TMPBASE}/sbom.json"
+      cosign() { return 1; }
+      When call attest.sign "$REF" --sbom "${SHELLSPEC_TMPBASE}/sbom.json"
+      The status should equal 5
+      The stderr should include "failed to attach the SBOM attestation"
+    End
+
+    It "fails closed (6) when the provenance file does not exist"
+      unset BRIK_COSIGN_KEY
+      printf '{}' >"${SHELLSPEC_TMPBASE}/sbom.json"
+      When call attest.sign "$REF" --sbom "${SHELLSPEC_TMPBASE}/sbom.json" \
+        --provenance "${SHELLSPEC_TMPBASE}/missing-prov.json"
+      The status should equal 6
+      The stderr should include "provenance file not found"
+    End
+
+    It "fails closed (5) when cosign fails to attach the provenance attestation"
+      unset BRIK_COSIGN_KEY
+      printf '{}' >"${SHELLSPEC_TMPBASE}/sbom.json"
+      printf '{}' >"${SHELLSPEC_TMPBASE}/prov.json"
+      # First cosign call (SBOM) succeeds, second (provenance) fails.
+      cosign() {
+        printf '%s\n' "$*" >>"$COSIGN_ARGS_FILE"
+        [[ "$*" == *slsaprovenance1* ]] && return 1
+        return 0
+      }
+      When call attest.sign "$REF" --sbom "${SHELLSPEC_TMPBASE}/sbom.json" \
+        --provenance "${SHELLSPEC_TMPBASE}/prov.json"
+      The status should equal 5
+      The stderr should include "failed to attach the provenance attestation"
+    End
+
+    It "attaches both the SBOM and the SLSA provenance attestation"
+      unset BRIK_COSIGN_KEY
+      printf '{}' >"${SHELLSPEC_TMPBASE}/sbom.json"
+      printf '{}' >"${SHELLSPEC_TMPBASE}/prov.json"
+      cosign() { printf '%s\n' "$*" >>"$COSIGN_ARGS_FILE"; return 0; }
+      When call attest.sign "$REF" --sbom "${SHELLSPEC_TMPBASE}/sbom.json" \
+        --provenance "${SHELLSPEC_TMPBASE}/prov.json"
+      The status should be success
+      The contents of file "$COSIGN_ARGS_FILE" should include "--type cyclonedx"
+      The contents of file "$COSIGN_ARGS_FILE" should include "--type slsaprovenance1"
+    End
+  End
+
+  Describe "_attest._backend_args branches"
+    # rekor-private sign appends --rekor-url; unknown backend / unknown KMS URI
+    # and the unsupported plain key reference are the remaining error branches.
+    It "key backend: rejects (7) an unsupported key reference scheme"
+      printf '{}' >"${SHELLSPEC_TMPBASE}/sbom.json"
+      sign_bad_key() {
+        use_key_backend
+        yq -i '.key = "vault:///secret/cosign"' "$ATTEST_INFRA/endpoints/signing.yml"
+        attest.sign "$REF" --sbom "${SHELLSPEC_TMPBASE}/sbom.json"
+      }
+      When call sign_bad_key
+      The status should equal 7
+      The stderr should include "unsupported key reference"
+      The contents of file "$COSIGN_ARGS_FILE" should equal ""
+    End
+
+    It "fails closed (7) on an unknown signing backend in the referential"
+      printf '{}' >"${SHELLSPEC_TMPBASE}/sbom.json"
+      sign_bad_backend() {
+        yq -i '.backend = "magic"' "$ATTEST_INFRA/endpoints/signing.yml"
+        attest.sign "$REF" --sbom "${SHELLSPEC_TMPBASE}/sbom.json"
+      }
+      When call sign_bad_backend
+      The status should equal 7
+      The stderr should include "unknown signing backend"
+    End
+
+    It "rekor-private sign passes the declared --rekor-url"
+      printf '{}' >"${SHELLSPEC_TMPBASE}/sbom.json"
+      sign_rekor_private() {
+        cat > "$ATTEST_INFRA/endpoints/signing.yml" <<'YAML'
+apiVersion: brik.dev/referential/v1
+kind: Signing
+name: signing
+backend: keyless
+transparency: rekor-private
+rekor_url: https://rekor.lab:3000
+YAML
+        attest.sign "$REF" --sbom "${SHELLSPEC_TMPBASE}/sbom.json"
+      }
+      When call sign_rekor_private
+      The status should be success
+      The contents of file "$COSIGN_ARGS_FILE" should include "--rekor-url https://rekor.lab:3000"
+    End
+
+    It "verify passes --trusted-root when the Signing endpoint declares one"
+      verify_troot() {
+        cat > "$ATTEST_INFRA/endpoints/signing.yml" <<'YAML'
+apiVersion: brik.dev/referential/v1
+kind: Signing
+name: signing
+backend: key
+key: env://COSIGN_PUBLIC_KEY
+transparency: none
+trusted_root: trust/trusted_root.json
+YAML
+        mkdir -p "$ATTEST_INFRA/trust" && : > "$ATTEST_INFRA/trust/trusted_root.json"
+        attest.verify "$REF"
+      }
+      When call verify_troot
+      The status should be success
+      The contents of file "$COSIGN_ARGS_FILE" should include "--trusted-root $ATTEST_INFRA/trust/trusted_root.json"
+    End
+
+    It "kms backend: rejects (7) an unsupported KMS URI scheme"
+      sign_bad_kms() {
+        cat > "$ATTEST_INFRA/endpoints/signing.yml" <<'YAML'
+apiVersion: brik.dev/referential/v1
+kind: Signing
+name: signing
+backend: kms
+kms_uri: awskms://alias/cosign
+transparency: none
+YAML
+        cat > "$ATTEST_INFRA/endpoints/secret-manager.yml" <<'YAML'
+apiVersion: brik.dev/referential/v1
+kind: SecretManager
+name: secret-manager
+url: http://bao.lab:8200
+auth:
+  method: token
+  ref: env://ATTEST_SPEC_BAO_TOKEN
+tls:
+  trust: system
+YAML
+        export ATTEST_SPEC_BAO_TOKEN="t0ken"
+        printf '{}' >"${SHELLSPEC_TMPBASE}/sbom.json"
+        attest.sign "$REF" --sbom "${SHELLSPEC_TMPBASE}/sbom.json"
+      }
+      When call sign_bad_kms
+      The status should equal 7
+      The stderr should include "unsupported KMS URI"
+    End
+
+    It "kms backend: maps the hashivault:// alias to VAULT_ADDR/VAULT_TOKEN"
+      # The recorder only echoes BAO_*, so prove the wiring by exporting a
+      # marker file the cosign stub writes when VAULT_ADDR is set.
+      sign_hashivault() {
+        cat > "$ATTEST_INFRA/endpoints/signing.yml" <<'YAML'
+apiVersion: brik.dev/referential/v1
+kind: Signing
+name: signing
+backend: kms
+kms_uri: hashivault://brik-signing
+transparency: none
+YAML
+        cat > "$ATTEST_INFRA/endpoints/secret-manager.yml" <<'YAML'
+apiVersion: brik.dev/referential/v1
+kind: SecretManager
+name: secret-manager
+url: https://vault.lab:8200
+auth:
+  method: token
+  ref: env://ATTEST_SPEC_BAO_TOKEN
+tls:
+  trust: system
+YAML
+        export ATTEST_SPEC_BAO_TOKEN="t0ken"
+        printf '{}' >"${SHELLSPEC_TMPBASE}/sbom.json"
+        cosign() {
+          printf '%s\n' "$*" >"$COSIGN_ARGS_FILE"
+          printf 'VAULT_ADDR=%s\n' "${VAULT_ADDR:-}" >>"$COSIGN_ARGS_FILE"
+          return 0
+        }
+        attest.sign "$REF" --sbom "${SHELLSPEC_TMPBASE}/sbom.json"
+      }
+      When call sign_hashivault
+      The status should be success
+      The contents of file "$COSIGN_ARGS_FILE" should include "--key hashivault://brik-signing"
+      The contents of file "$COSIGN_ARGS_FILE" should include "VAULT_ADDR=https://vault.lab:8200"
+    End
+  End
+
+  Describe "attest.provenance_predicate / verify_provenance error paths"
+    It "provenance_predicate fails closed (2) on an unknown option"
+      When call attest.provenance_predicate --bogus x
+      The status should equal 2
+      The stderr should include "unknown option"
+    End
+
+    It "verify_provenance fails closed (2) on an unknown option"
+      When call attest.verify_provenance "$REF" --expect-version 1.0.0 --bogus x
+      The status should equal 2
+      The stderr should include "unknown option"
+    End
+
+    It "verify_provenance fails closed (2) when --expect-version is missing"
+      When call attest.verify_provenance "$REF"
+      The status should equal 2
+      The stderr should include "are required"
+    End
+
+    It "verify_provenance dry-run short-circuits before parsing a payload"
+      vp_dry() {
+        unset BRIK_COSIGN_KEY
+        attest.verify_provenance "$REF" --expect-version 1.0.0 \
+          --identity 'https://ci/.*' --issuer 'https://issuer' --dry-run
+      }
+      When call vp_dry
+      The status should be success
+    End
+
+    It "verify_provenance propagates a verification failure from attest.verify"
+      vp_fail() {
+        unset BRIK_COSIGN_KEY
+        cosign() { return 1; }
+        attest.verify_provenance "$REF" --expect-version 1.0.0 \
+          --identity 'https://ci/.*' --issuer 'https://issuer'
+      }
+      When call vp_fail
       The status should be failure
       The stderr should include "did not verify"
     End

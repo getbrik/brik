@@ -217,3 +217,80 @@ exit 0'
     End
   End
 End
+
+# T5a (PD3): docker login credentials come from the referential, resolved BY
+# TARGET (the registry authority), with no *_var in brik.yml. Isolated in its
+# own Describe so the legacy-path tests above keep running with pkg.registry.
+# resolve undefined (declare -f guard -> legacy).
+Describe "publish/docker.sh referential login (PD3)"
+  Include "$BRIK_PIPELINE_LIB/logging.sh"
+  Include "$BRIK_PIPELINE_LIB/error.sh"
+  Include "$BRIK_PIPELINE_LIB/tools.sh"
+  Include "$BRIK_TRANSVERSE_LIB/secrets.sh"
+  Include "$BRIK_TRANSVERSE_LIB/env.sh"
+  Include "$BRIK_TRANSVERSE_LIB/infra.sh"
+  Include "$BRIK_PACKAGE_MANAGERS_LIB/_endpoint.sh"
+  Include "$BRIK_PACKAGE_MANAGERS_LIB/docker.sh"
+  Include "$BRIK_HOME/spec/support/mock_helper.sh"
+
+  brik.use() { :; }
+
+  setup_ref() {
+    mock.setup
+    TEST_WS="$(mktemp -d)"
+    MOCK_LOG="${TEST_WS}/mock_docker.log"
+    mock.create_logging "docker" "$MOCK_LOG"
+    mock.activate
+    mock.infra.setup
+    mkdir -p "$BRIK_INFRA_DIR/endpoints" "$BRIK_INFRA_DIR/credentials" \
+             "$BRIK_INFRA_DIR/bindings"
+    cat > "$BRIK_INFRA_DIR/endpoints/oci.yml" <<'YAML'
+apiVersion: brik.dev/referential/v1
+kind: Registry
+name: oci
+url: http://nexus.lab:8082
+tls:
+  trust: system
+YAML
+    cat > "$BRIK_INFRA_DIR/credentials/registry.yml" <<'YAML'
+apiVersion: brik.dev/referential/v1
+kind: Credential
+name: registry
+method: basic
+username: env://OCI_USER
+password: env://OCI_PASS
+YAML
+    cat > "$BRIK_INFRA_DIR/bindings/ci.yml" <<'YAML'
+apiVersion: brik.dev/referential/v1
+kind: Binding
+name: ci
+endpoints:
+  oci: registry
+YAML
+    export OCI_USER="ciuser" OCI_PASS="cipass"
+  }
+  cleanup_ref() {
+    mock.cleanup
+    mock.infra.teardown
+    unset OCI_USER OCI_PASS 2>/dev/null
+    rm -rf "$TEST_WS"
+  }
+  Before 'setup_ref'
+  After 'cleanup_ref'
+
+  It "logs in using credentials resolved from the referential (no *_var passed)"
+    invoke() {
+      pkg.docker.publish --image "myapp" --tags "v1.0.0" \
+        --registry "nexus.lab:8082" 2>/dev/null || return 1
+      grep -q "docker login" "$MOCK_LOG" && grep -q -- "--username ciuser" "$MOCK_LOG"
+    }
+    When call invoke
+    The status should be success
+  End
+
+  It "warns the registry is plain http"
+    When call pkg.docker.publish --image "myapp" --tags "v1.0.0" --registry "nexus.lab:8082"
+    The status should be success
+    The stderr should include "plain http"
+  End
+End

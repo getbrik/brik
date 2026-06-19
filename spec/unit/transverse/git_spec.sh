@@ -121,6 +121,26 @@ Describe "git.sh"
         The status should be success
         The stderr should include "already at HEAD"
       End
+
+      It "fails when pushing a newly created tag with no origin"
+        # Exercises the new-tag push branch (68-70): tag is created but
+        # 'git push origin' fails because no 'origin' remote exists.
+        When call git.tag "v8.0.0" --push
+        The status should equal "$BRIK_EXIT_EXTERNAL_FAIL"
+        The stderr should include "failed to push tag"
+      End
+
+      It "fails when pushing an existing-at-HEAD tag with no origin"
+        # Exercises the existing-tag push failure branch (44-46): tag already
+        # at HEAD, --push given, but the push fails (no origin remote).
+        verify_existing_push_fail() {
+          git.tag "v9.0.0" 2>/dev/null
+          git.tag "v9.0.0" --push
+        }
+        When call verify_existing_push_fail
+        The status should equal "$BRIK_EXIT_EXTERNAL_FAIL"
+        The stderr should include "failed to push existing tag"
+      End
     End
   End
 
@@ -241,6 +261,20 @@ Describe "git.sh"
       The status should be success
       The output should include "CI Bot <ci@noreply>"
     End
+
+    It "returns 2 for an unknown option"
+      # Exercises the unknown-option branch (130-131).
+      When call transverse.git.commit_all "msg" --badopt
+      The status should equal "$BRIK_EXIT_INVALID_INPUT"
+      The stderr should include "unknown option"
+    End
+
+    It "fails on a clean tree with --fail-if-empty"
+      # Exercises the fail-if-empty branch (145-146): clean tree + flag.
+      When call transverse.git.commit_all "noop" --fail-if-empty
+      The status should equal "$BRIK_EXIT_EXTERNAL_FAIL"
+      The stderr should include "no changes"
+    End
   End
 
   Describe "transverse.git.clone_shallow"
@@ -294,6 +328,13 @@ Describe "git.sh"
       The status should not be success
       The stderr should include "git clone failed"
     End
+
+    It "returns 2 for an unknown option"
+      # Exercises the unknown-option branch (178).
+      When call transverse.git.clone_shallow "file:///x" "/tmp/brik-csh2-$$" --badopt
+      The status should equal "$BRIK_EXIT_INVALID_INPUT"
+      The stderr should include "unknown option"
+    End
   End
 
   Describe "transverse.git.push_branch"
@@ -339,6 +380,65 @@ Describe "git.sh"
       The status should be success
       The stderr should include "[dry-run]"
     End
+
+    It "pushes an explicitly named branch to origin"
+      # Exercises the explicit-branch branch (222): push_cmd += origin <branch>.
+      run_push_named() {
+        printf 'named\n' >> file.txt
+        git add file.txt
+        git commit -q -m "named change"
+        transverse.git.push_branch main 2>/dev/null
+        git -C "$REMOTE_DIR" log --oneline -1
+      }
+      When call run_push_named
+      The status should be success
+      The output should include "named change"
+    End
+  End
+
+  Describe "transverse.git.push_branch (error and arg paths)"
+    Before 'setup_enrich_repo'
+    After 'cleanup_enrich_repo'
+
+    It "returns 2 for an unknown dashed option"
+      # Exercises the -* unknown-option branch (206-207).
+      When call transverse.git.push_branch --badopt
+      The status should equal "$BRIK_EXIT_INVALID_INPUT"
+      The stderr should include "unknown option"
+    End
+
+    It "redacts credentials and fails when push fails"
+      # Exercises the failure branch (229-232) including the sed credential
+      # redaction: there is no 'origin' remote so the push fails.
+      run_push_fail() {
+        git remote add origin "https://user:secret@example.invalid/repo.git"
+        transverse.git.push_branch
+      }
+      When call run_push_fail
+      The status should equal "$BRIK_EXIT_EXTERNAL_FAIL"
+      The stderr should include "git push failed"
+      The stderr should not include "secret"
+    End
+
+    It "stops option parsing at -- and treats the rest as a branch"
+      # Exercises the '--' terminator branch (205): after '--', 'main' is
+      # consumed as the positional branch name.
+      run_push_terminator() {
+        REMOTE_DIR="$(mktemp -d)"
+        git -C "$REMOTE_DIR" init -q --bare -b main
+        git remote add origin "$REMOTE_DIR"
+        git push -q -u origin main
+        printf 'term\n' >> file.txt
+        git add file.txt
+        git commit -q -m "term change"
+        transverse.git.push_branch -- main 2>/dev/null
+        git -C "$REMOTE_DIR" log --oneline -1
+        rm -rf "$REMOTE_DIR"
+      }
+      When call run_push_terminator
+      The status should be success
+      The output should include "term change"
+    End
   End
 
   Describe "transverse.git.latest_tag"
@@ -380,6 +480,47 @@ Describe "git.sh"
     It "returns non-zero when there are no tags"
       When call transverse.git.latest_tag
       The status should not be success
+    End
+
+    It "returns 2 for an unknown option"
+      # Exercises the unknown-option branch (248).
+      When call transverse.git.latest_tag --badopt
+      The status should equal "$BRIK_EXIT_INVALID_INPUT"
+      The stderr should include "unknown option"
+    End
+  End
+
+  Describe "transverse.git.worktree_at / worktree_remove"
+    Before 'setup_enrich_repo'
+    After 'cleanup_enrich_repo'
+
+    It "materializes a ref into a detached worktree and removes it"
+      # Exercises worktree_at success (289-290) + worktree_remove (300-304).
+      run_worktree() {
+        local wt
+        wt="$(transverse.git.worktree_at "$GIT_DIR" HEAD)"
+        # The worktree path must exist and contain the committed file.
+        [[ -f "$wt/file.txt" ]] && printf 'present\n'
+        transverse.git.worktree_remove "$GIT_DIR" "$wt"
+        # After removal the parent temp dir must be gone.
+        [[ ! -d "$wt" ]] && printf 'removed\n'
+      }
+      When call run_worktree
+      The status should be success
+      The output should include "present"
+      The output should include "removed"
+    End
+
+    It "worktree_remove is a no-op for an empty path"
+      # Exercises the empty-path early return (301).
+      When call transverse.git.worktree_remove "$GIT_DIR" ""
+      The status should be success
+    End
+
+    It "worktree_at returns non-zero for an invalid ref"
+      # Exercises the failure path (292-293): rm -rf parent + external-fail.
+      When call transverse.git.worktree_at "$GIT_DIR" "does-not-exist-ref"
+      The status should equal "$BRIK_EXIT_EXTERNAL_FAIL"
     End
   End
 

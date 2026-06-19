@@ -352,6 +352,7 @@ cli.deploy.run() {
             if [[ "$(config.get '.artifacts.evidence.sign' 'false' 2>/dev/null || printf 'false')" == "true" ]]; then
                 local ev_token_var ev_clone ev_rc=0
                 ev_token_var="$(config.get '.artifacts.evidence.token_var' '' 2>/dev/null || printf '')"
+                ev_token_var="$(transverse.state_repo.token_var "$ev_repo" "$ev_token_var")" || return "$?"
                 ev_clone="$(mktemp -d)" || return "${BRIK_EXIT_IO_FAILURE}"
                 local -a _ev_clone_args=("$ev_repo" "$ev_clone")
                 [[ -n "${ev_branch:-}" ]] && _ev_clone_args+=(--branch "$ev_branch")
@@ -472,6 +473,7 @@ cli.deploy.run() {
         el_sign="$(config.get '.artifacts.evidence.sign' 'false' 2>/dev/null || printf 'false')"
 
         brik.use transverse.state_repo
+        el_token_var="$(transverse.state_repo.token_var "$el_repo" "$el_token_var")" || return "$?"
         local el_clone el_rc=0
         el_clone="$(mktemp -d)" || return "${BRIK_EXIT_IO_FAILURE}"
         local -a _el_clone_args=("$el_repo" "$el_clone")

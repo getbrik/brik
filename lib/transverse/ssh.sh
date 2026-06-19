@@ -24,6 +24,16 @@ transverse.ssh.host_opts() {
     local target
     target="$(infra.ssh_target_for "$host")" || return "$?"
 
+    # Connection identity declared on the SshTarget. Applied as ssh -o options
+    # (so they reach both the rsync transport and a direct ssh restart) and
+    # before the host-key stance below, so they hold even when strict checking
+    # is opted out. Absent fields leave ssh's own defaults in place.
+    local _user _port
+    _user="$(printf '%s' "$target" | jq -r '.user // ""')"
+    _port="$(printf '%s' "$target" | jq -r '.port // ""')"
+    [[ -n "$_user" ]] && _ssh_opts+=(-o "User=${_user}")
+    [[ -n "$_port" ]] && _ssh_opts+=(-o "Port=${_port}")
+
     # jq's // treats false as empty, so probe the opt-out with an explicit
     # equality test instead of a default.
     if [[ "$(printf '%s' "$target" | jq -r 'if .strict_host_key == false then "false" else "true" end')" == "false" ]]; then

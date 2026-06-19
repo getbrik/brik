@@ -193,6 +193,8 @@ _stages.container_scan._record_evidence() {
     fi
     _branch="$(config.get '.artifacts.evidence.branch' '' 2>/dev/null || printf '')"
     _token_var="$(config.get '.artifacts.evidence.token_var' '' 2>/dev/null || printf '')"
+    brik.use transverse.state_repo
+    _token_var="$(transverse.state_repo.token_var "$_repo" "$_token_var")" || return "$?"
     _sign="$(config.get '.artifacts.evidence.sign' 'false' 2>/dev/null || printf 'false')"
 
     local _digest="${ref#*@}"

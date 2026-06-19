@@ -22,6 +22,26 @@ _BRIK_STAGE_PROMOTE_LOADED=1
 # Args: $1 registry, $2 username_var name, $3 password_var name.
 _promote.docker_login() {
     local registry="$1" username_var="$2" password_var="$3"
+
+    # Referential absorption (T5c/PD3): a Registry endpoint matching this
+    # authority supplies the login identity by target (same primitive as the
+    # docker publisher); the release.*.docker.*_var fields remain the legacy
+    # path without one. Declared-but-unbound fails closed inside the resolver.
+    brik.use package-managers._endpoint 2>/dev/null || true
+    if [[ -n "$registry" ]] && declare -f pkg.registry.resolve >/dev/null 2>&1; then
+        local _ep
+        _ep="$(pkg.registry.resolve "$registry")" || return "$?"
+        if [[ -n "$_ep" ]]; then
+            case "$(jq -r '.method' <<<"$_ep")" in
+                basic)
+                    username_var="$(jq -r '.username_var' <<<"$_ep")"
+                    password_var="$(jq -r '.password_var' <<<"$_ep")"
+                    ;;
+                none) username_var=""; password_var="" ;;
+            esac
+        fi
+    fi
+
     [[ -z "$username_var" || -z "$password_var" ]] && return 0
     brik.use transverse.secrets
     brik.use transverse.env

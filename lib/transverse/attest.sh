@@ -108,12 +108,29 @@ _attest._kms_env() {
     url="$(printf '%s' "$sm" | jq -r '.url')"
     token="$(infra.resolve_ref "$(printf '%s' "$sm" | jq -r '.auth.ref')")" || return "$?"
 
+    local prefix
     case "$uri" in
-        openbao://*)    export BAO_ADDR="$url" BAO_TOKEN="$token" ;;
-        hashivault://*) export VAULT_ADDR="$url" VAULT_TOKEN="$token" ;;
+        openbao://*)    export BAO_ADDR="$url" BAO_TOKEN="$token"; prefix="BAO" ;;
+        hashivault://*) export VAULT_ADDR="$url" VAULT_TOKEN="$token"; prefix="VAULT" ;;
         *)
             log.error "attest: unsupported KMS URI '${uri}' (expected openbao:// or hashivault://)"
             return "$BRIK_EXIT_CONFIG_ERROR"
+            ;;
+    esac
+
+    # Honor the secret manager's declared TLS posture for the KMS connection:
+    # custom-ca passes the bundle to the driver (BAO_CACERT/VAULT_CACERT),
+    # insecure maps to skip-verify (legal but noisy), system leaves defaults.
+    local _trust _ca
+    _trust="$(printf '%s' "$sm" | jq -r '.tls.trust // "system"')"
+    case "$_trust" in
+        custom-ca)
+            _ca="$(infra.tls_ca "$sm")" || return "$?"
+            export "${prefix}_CACERT=${_ca}"
+            ;;
+        insecure)
+            log.warn "secret manager is declared with tls.trust: insecure (legal but insecure)"
+            export "${prefix}_SKIP_VERIFY=true"
             ;;
     esac
 

@@ -328,6 +328,273 @@ YAML
   End
 
   # =========================================================================
+  # infra.env_var_of_ref - echo the variable NAME behind an env:// reference
+  # =========================================================================
+  Describe "infra.env_var_of_ref"
+    It "echoes the variable name behind an env:// ref"
+      When call infra.env_var_of_ref "env://GIT_TOKEN"
+      The output should equal "GIT_TOKEN"
+    End
+
+    It "fails closed (7) for a non-env:// ref (no variable name to hand over)"
+      When call infra.env_var_of_ref "file://trust/token"
+      The status should equal 7
+      The stderr should include "env://"
+    End
+
+    It "requires a ref (2)"
+      When call infra.env_var_of_ref ""
+      The status should equal 2
+      The stderr should include "required"
+    End
+  End
+
+  # =========================================================================
+  # infra.credential_for_endpoint (PD3) - CI-time, environment-independent
+  # =========================================================================
+  Describe "infra.credential_for_endpoint"
+    Before 'make_instance'
+    After 'cleanup_instance'
+
+    # Add a second binding that maps the same endpoint to the same credential:
+    # a consistent, environment-independent resolution.
+    add_consistent_binding() {
+      cat > "$INFRA_DIR/bindings/prod.yml" <<'YAML'
+apiVersion: brik.dev/referential/v1
+kind: Binding
+name: prod
+endpoints:
+  registry-candidate: registry-push
+YAML
+    }
+
+    # A divergent second binding: same endpoint, different credential. CI-time
+    # resolution is genuinely ambiguous and must fail closed.
+    add_divergent_binding() {
+      cat > "$INFRA_DIR/credentials/registry-prod.yml" <<'YAML'
+apiVersion: brik.dev/referential/v1
+kind: Credential
+name: registry-prod
+method: basic
+username: env://BRIK_REGISTRY_USER
+password: env://BRIK_REGISTRY_PASSWORD
+YAML
+      cat > "$INFRA_DIR/bindings/prod.yml" <<'YAML'
+apiVersion: brik.dev/referential/v1
+kind: Binding
+name: prod
+endpoints:
+  registry-candidate: registry-prod
+YAML
+    }
+
+    It "resolves the credential bound to an endpoint, env-independently"
+      resolve() { add_consistent_binding; infra.credential_for_endpoint registry-candidate; }
+      When call resolve
+      The output should include '"name": "registry-push"'
+      The output should include '"method": "basic"'
+    End
+
+    It "resolves from a single binding too"
+      When call infra.credential_for_endpoint registry-candidate
+      The output should include '"name": "registry-push"'
+    End
+
+    It "fails closed (7) when environments bind divergent credentials"
+      diverge() { add_divergent_binding; infra.credential_for_endpoint registry-candidate; }
+      When call diverge
+      The status should equal 7
+      The stderr should include "registry-candidate"
+      The stderr should include "divergent"
+    End
+
+    It "fails closed (7) when no binding maps the endpoint"
+      When call infra.credential_for_endpoint argocd
+      The status should equal 7
+      The stderr should include "argocd"
+    End
+
+    It "requires an endpoint name (2)"
+      When call infra.credential_for_endpoint ""
+      The status should equal 2
+      The stderr should include "required"
+    End
+  End
+
+  # =========================================================================
+  # infra.evidence_token_var (PD3, T5d) - the state-repo GitHost token var,
+  # resolved by target (the evidence repo's host), environment-independent.
+  # =========================================================================
+  Describe "infra.evidence_token_var"
+    Before 'make_instance'
+    After 'cleanup_instance'
+
+    # Declare a GitHost serving gitea.lab + a token credential, and bind it.
+    add_githost() {
+      cat > "$INFRA_DIR/endpoints/git.yml" <<'YAML'
+apiVersion: brik.dev/referential/v1
+kind: GitHost
+name: git
+product: gitea
+api_url: https://gitea.lab
+git_url: ssh://git@gitea.lab:22
+tls:
+  trust: system
+YAML
+      cat > "$INFRA_DIR/credentials/git-token.yml" <<'YAML'
+apiVersion: brik.dev/referential/v1
+kind: Credential
+name: git-token
+method: token
+token: env://BRIK_GIT_TOKEN
+YAML
+      cat > "$INFRA_DIR/bindings/e2e.yml" <<'YAML'
+apiVersion: brik.dev/referential/v1
+kind: Binding
+name: e2e
+endpoints:
+  registry-candidate: registry-push
+  git: git-token
+YAML
+    }
+
+    It "resolves the GitHost token var by target, env-independently"
+      resolve() { add_githost; infra.evidence_token_var "https://gitea.lab/brik/brik-state.git"; }
+      When call resolve
+      The output should equal "BRIK_GIT_TOKEN"
+    End
+
+    It "matches the host even when the repo URL declares a port"
+      resolve() { add_githost; infra.evidence_token_var "https://gitea.lab:443/brik/brik-state.git"; }
+      When call resolve
+      The output should equal "BRIK_GIT_TOKEN"
+    End
+
+    It "echoes nothing (legacy fallback) when no referential is configured"
+      no_infra() { unset BRIK_INFRA_DIR; infra.evidence_token_var "https://gitea.lab/brik/state.git"; }
+      When call no_infra
+      The output should equal ""
+      The status should equal 0
+    End
+
+    It "echoes nothing (legacy fallback) when no GitHost matches the repo host"
+      resolve() { add_githost; infra.evidence_token_var "https://other.example/brik/state.git"; }
+      When call resolve
+      The output should equal ""
+      The status should equal 0
+    End
+
+    It "fails closed (7) when the GitHost is declared but its credential is unbound"
+      # GitHost present, but no binding maps it: a genuine config gap, not a
+      # reason to silently fall back to a brik.yml token_var.
+      unbound() {
+        cat > "$INFRA_DIR/endpoints/git.yml" <<'YAML'
+apiVersion: brik.dev/referential/v1
+kind: GitHost
+name: git
+product: gitea
+api_url: https://gitea.lab
+git_url: https://gitea.lab
+tls:
+  trust: system
+YAML
+        infra.evidence_token_var "https://gitea.lab/brik/state.git"
+      }
+      When call unbound
+      The status should equal 7
+      The stderr should include "git"
+    End
+
+    It "requires a repo URL (2)"
+      When call infra.evidence_token_var ""
+      The status should equal 2
+      The stderr should include "required"
+    End
+  End
+
+  # =========================================================================
+  # infra.capability_norm (D11) - single read path, object output
+  # =========================================================================
+  Describe "infra.capability_norm"
+    norm() { infra.capability_norm "$1"; }
+
+    It "normalizes a scalar provider string to {provider, endpoint:null}"
+      When call norm '"cosign-keyless"'
+      The output should equal '{"provider":"cosign-keyless","endpoint":null}'
+    End
+
+    It "normalizes an object {provider, endpoint} unchanged"
+      When call norm '{"provider":"cosign-keyless","endpoint":"signing"}'
+      The output should equal '{"provider":"cosign-keyless","endpoint":"signing"}'
+    End
+
+    It "fills endpoint:null when the object omits endpoint"
+      When call norm '{"provider":"cosign-keyless"}'
+      The output should equal '{"provider":"cosign-keyless","endpoint":null}'
+    End
+
+    It "rejects (7) an object without a provider"
+      When call norm '{"endpoint":"signing"}'
+      The status should equal 7
+      The stderr should include "provider"
+    End
+
+    It "rejects (7) a non string/object value"
+      When call norm '42'
+      The status should equal 7
+      The stderr should include "provider string or {provider, endpoint?}"
+    End
+
+    It "rejects (2) an empty value"
+      When call norm ''
+      The status should equal 2
+      The stderr should include "required"
+    End
+  End
+
+  # =========================================================================
+  # Binding.capabilities accepts both forms (schema, D11)
+  # =========================================================================
+  Describe "Binding.capabilities both forms validate"
+    Before 'make_instance'
+    After 'cleanup_instance'
+
+    # Rewrite the binding with capabilities in either form and run the full
+    # referential validation (schema included). Capabilities are not
+    # reference-checked (only .endpoints is), so the endpoint string in the
+    # object form is a pattern-validated label, not a declared endpoint.
+    bind_capabilities() {
+      cat > "$INFRA_DIR/bindings/e2e.yml" <<YAML
+apiVersion: brik.dev/referential/v1
+kind: Binding
+name: e2e
+endpoints:
+  registry-candidate: registry-push
+capabilities:
+${1}
+YAML
+      infra.validate
+    }
+
+    It "accepts the scalar provider form"
+      Skip if "no JSON Schema validator" validator_missing
+      When call bind_capabilities "  artifact-attestation: cosign-keyless"
+      The status should equal 0
+    End
+
+    It "accepts the object {provider, endpoint} form"
+      Skip if "no JSON Schema validator" validator_missing
+      cap_object() {
+        bind_capabilities "  artifact-attestation:
+    provider: cosign-keyless
+    endpoint: signing"
+      }
+      When call cap_object
+      The status should equal 0
+    End
+  End
+
+  # =========================================================================
   # infra.tls_ca
   # =========================================================================
   Describe "infra.tls_ca"

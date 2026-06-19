@@ -238,3 +238,184 @@ drift.has_consumer() {
 
   return 1
 }
+
+# ---------------------------------------------------------------------------
+# Referential-schema liveness helpers (P-F, chantier #39 P1/T1)
+#
+# The referential schemas (schemas/referential/v1/*.json) are not consumed via
+# config.get / BRIK_* exports; their leaves are read with jq from the endpoint /
+# credential doc that infra.* returns. These helpers extend the drift detector
+# to those schemas and replace the ad-hoc allowlist with two in-schema markers:
+#   "x-informational": true  - field intentionally not consumed (e.g. profile)
+#   "deprecated": true        - field on its way out (exempt during the window)
+# Both markers propagate from an ancestor object to all of its leaves.
+# ---------------------------------------------------------------------------
+
+# drift.walk_annotated <schema_path>
+# Like drift.walk_leaves, but emits "path<TAB>info<TAB>dep" per leaf where the
+# info/dep columns are "info"/"dep" when the leaf (or an ancestor) carries the
+# x-informational / deprecated marker, "-" otherwise. Sorted by path.
+drift.walk_annotated() {
+  local schema_path="$1"
+  if [[ -z "$schema_path" || ! -f "$schema_path" ]]; then
+    printf 'drift.walk_annotated: schema file not found: %s\n' "$schema_path" >&2
+    return 1
+  fi
+
+  jq -r '
+    . as $root |
+    ($root["$defs"] // {}) as $defs |
+
+    def resolve_ref:
+      . as $r | ($defs[ $r | ltrimstr("#/$defs/") ]) // {};
+
+    def is_scalar:
+      (type == "object") and (
+        has("enum") or has("const") or
+        (
+          has("type") and
+          (.type | (. == "string" or . == "integer" or . == "boolean" or . == "number")) and
+          (has("properties") | not) and
+          (has("additionalProperties") | not) and
+          (has("items") | not)
+        )
+      );
+
+    # Emit "pathinfodep"; the SOH separators become TABs in shell.
+    def emit($path; $i; $d):
+      "\($path)\(if $i then "info" else "-" end)\(if $d then "dep" else "-" end)";
+
+    # Three accumulators: path string + two inherited booleans. Only scalars are
+    # passed as arguments (never the node, which stays as .), so jq 1.6 scoping
+    # is safe (same constraint as the single-arg drift.walk_leaves above).
+    def walk($path; $info; $dep):
+      ((.["x-informational"] == true) or $info) as $i |
+      ((.deprecated == true) or $dep) as $d |
+      if type != "object" then emit($path; $i; $d)
+      elif has("$ref") then (.["$ref"] | resolve_ref | walk($path; $i; $d))
+      elif is_scalar then emit($path; $i; $d)
+      elif has("properties") then
+        .properties | to_entries[] | (.key as $k | .value | walk($path + "." + $k; $i; $d))
+      elif has("additionalProperties") and
+           ((.additionalProperties | type) == "object") and
+           ((.additionalProperties | has("type")) or
+            (.additionalProperties | has("$ref")) or
+            (.additionalProperties | has("properties"))) then
+        .additionalProperties | walk($path + ".<key>"; $i; $d)
+      elif has("items") and
+           ((.items | type) == "object") and
+           ((.items | has("properties")) or
+            (.items | has("$ref")) or
+            (.items | has("type") and .items.type == "object")) then
+        .items | walk($path + "[]"; $i; $d)
+      else
+        if $path != "" then emit($path; $i; $d) else empty end
+      end;
+
+    walk(""; false; false)
+  ' "$schema_path" 2>/dev/null | tr '\001' '\t' | sort
+}
+
+# drift.is_informational <schema_path> <dot_path>
+# 0 if the leaf (or an ancestor) carries "x-informational": true, else 1.
+drift.is_informational() {
+  local schema_path="$1" dot_path="$2" flag
+  flag="$(drift.walk_annotated "$schema_path" | awk -F'\t' -v p="$dot_path" '$1 == p {print $2}')"
+  [[ "$flag" == "info" ]]
+}
+
+# drift.is_deprecated <schema_path> <dot_path>
+# 0 if the leaf (or an ancestor) carries "deprecated": true, else 1.
+drift.is_deprecated() {
+  local schema_path="$1" dot_path="$2" flag
+  flag="$(drift.walk_annotated "$schema_path" | awk -F'\t' -v p="$dot_path" '$1 == p {print $3}')"
+  [[ "$flag" == "dep" ]]
+}
+
+# drift.has_infra_consumer <dot_path> <lib_dir>
+# 0 if a jq/yq read of the leaf field exists in lib_dir. Referential leaves are
+# read by their JSON field name (e.g. jq -r '.kms_uri'), so the detector matches
+# the last path segment as a field access. Coarse on purpose: it errs toward
+# "consumed", which is correct for a guard whose job is to surface clearly-dead
+# fields (the ones with zero reads anywhere).
+drift.has_infra_consumer() {
+  local dot_path="$1" lib_dir="$2" last
+  if [[ -z "$lib_dir" || ! -d "$lib_dir" ]]; then
+    return 1
+  fi
+  last="${dot_path##*.}"      # last dotted segment
+  last="${last%\[\]}"         # drop a trailing [] (array-of-objects leaf)
+  if [[ "$last" == "<key>" ]]; then
+    local trimmed="${dot_path%.<key>}"
+    last="${trimmed##*.}"
+  fi
+  [[ -z "$last" ]] && return 1
+  # ".<field>" followed by a non-identifier char or end-of-line; \b avoided for
+  # BSD/GNU grep portability.
+  grep -rqE "\.${last}([^A-Za-z0-9_]|\$)" "$lib_dir" --include='*.sh' 2>/dev/null
+}
+
+# drift.pending_leaves <schema_path>
+# Emit one dot-path per leaf whose node (or an ancestor) carries the
+# "x-pending" marker. x-pending means the schema is ahead of the runtime: the
+# field is declared and will be wired by a named task, so the liveness guard
+# exempts it but keeps the backlog small and visible.
+drift.pending_leaves() {
+  local schema_path="$1"
+  if [[ -z "$schema_path" || ! -f "$schema_path" ]]; then
+    printf 'drift.pending_leaves: schema file not found: %s\n' "$schema_path" >&2
+    return 1
+  fi
+
+  jq -r '
+    . as $root |
+    ($root["$defs"] // {}) as $defs |
+
+    def resolve_ref:
+      . as $r | ($defs[ $r | ltrimstr("#/$defs/") ]) // {};
+
+    def is_scalar:
+      (type == "object") and (
+        has("enum") or has("const") or
+        (
+          has("type") and
+          (.type | (. == "string" or . == "integer" or . == "boolean" or . == "number")) and
+          (has("properties") | not) and
+          (has("additionalProperties") | not) and
+          (has("items") | not)
+        )
+      );
+
+    def walk($path; $pend):
+      ((.["x-pending"] != null) or $pend) as $p |
+      if type != "object" then (if $p then $path else empty end)
+      elif has("$ref") then (.["$ref"] | resolve_ref | walk($path; $p))
+      elif is_scalar then (if $p then $path else empty end)
+      elif has("properties") then
+        .properties | to_entries[] | (.key as $k | .value | walk($path + "." + $k; $p))
+      elif has("additionalProperties") and
+           ((.additionalProperties | type) == "object") and
+           ((.additionalProperties | has("type")) or
+            (.additionalProperties | has("$ref")) or
+            (.additionalProperties | has("properties"))) then
+        .additionalProperties | walk($path + ".<key>"; $p)
+      elif has("items") and
+           ((.items | type) == "object") and
+           ((.items | has("properties")) or
+            (.items | has("$ref")) or
+            (.items | has("type") and .items.type == "object")) then
+        .items | walk($path + "[]"; $p)
+      else
+        if ($p and $path != "") then $path else empty end
+      end;
+
+    walk(""; false)
+  ' "$schema_path" 2>/dev/null | sort -u
+}
+
+# drift.is_pending <schema_path> <dot_path>
+# 0 if the leaf (or an ancestor) carries an "x-pending" marker, else 1.
+drift.is_pending() {
+  local schema_path="$1" dot_path="$2"
+  drift.pending_leaves "$schema_path" | grep -qxF "$dot_path"
+}
