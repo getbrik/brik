@@ -10,7 +10,8 @@
     "version": {
       "description": "Schema version for brik.yml. Must be 1.",
       "type": "integer",
-      "const": 1
+      "const": 1,
+      "x-informational": true
     },
     "project": {
       "description": "Project identity and metadata. Required. Provides the name, optional stack hint, and optional monorepo root.",
@@ -119,7 +120,8 @@
             },
             "token_var": {
               "examples": ["BRIK_GIT_TOKEN"], "description": "Name of the environment variable holding the write token for the evidence repo (resolved indirectly, never inlined).",
-              "type": "string"
+              "type": "string",
+              "deprecated": true
             },
             "sign": {
               "description": "When true, sign the evidence commit (git commit -S) in addition to the attestations on the digest.",
@@ -260,13 +262,15 @@
                   "type": "string",
                   "minLength": 1,
                   "examples": ["BRIK_CANDIDATE_DOCKER_USER"],
-                  "description": "Name of the environment variable holding the username for the candidate Docker registry (the value is never stored in brik.yml). The promote stage logs in with it before pulling the candidate. Omit for an anonymous-pull candidate registry."
+                  "description": "Name of the environment variable holding the username for the candidate Docker registry (the value is never stored in brik.yml). The promote stage logs in with it before pulling the candidate. Omit for an anonymous-pull candidate registry.",
+                  "deprecated": true
                 },
                 "password_var": {
                   "type": "string",
                   "minLength": 1,
                   "examples": ["BRIK_CANDIDATE_DOCKER_PASSWORD"],
-                  "description": "Name of the environment variable holding the password/token for the candidate Docker registry. The promote stage logs in with it before pulling the candidate."
+                  "description": "Name of the environment variable holding the password/token for the candidate Docker registry. The promote stage logs in with it before pulling the candidate.",
+                  "deprecated": true
                 }
               }
             }
@@ -298,13 +302,15 @@
                   "type": "string",
                   "minLength": 1,
                   "examples": ["BRIK_RELEASE_DOCKER_USER"],
-                  "description": "Name of the environment variable holding the username for the release Docker registry (the value is never stored in brik.yml). The promote stage logs in with it before pushing the promoted image. Omit if the release registry needs no auth."
+                  "description": "Name of the environment variable holding the username for the release Docker registry (the value is never stored in brik.yml). The promote stage logs in with it before pushing the promoted image. Omit if the release registry needs no auth.",
+                  "deprecated": true
                 },
                 "password_var": {
                   "type": "string",
                   "minLength": 1,
                   "examples": ["BRIK_RELEASE_DOCKER_PASSWORD"],
-                  "description": "Name of the environment variable holding the password/token for the release Docker registry. The promote stage logs in with it before pushing the promoted image."
+                  "description": "Name of the environment variable holding the password/token for the release Docker registry. The promote stage logs in with it before pushing the promoted image.",
+                  "deprecated": true
                 }
               }
             }
@@ -828,7 +834,8 @@
             "token_var": {
               "examples": ["NPM_TOKEN"], "description": "Name of the environment variable holding the npm auth token. Never put the token value here.",
               "type": "string",
-              "minLength": 1
+              "minLength": 1,
+              "deprecated": true
             }
           }
         },
@@ -862,13 +869,15 @@
               "description": "Name of the environment variable holding the registry username.",
               "type": "string",
               "minLength": 1,
-              "examples": ["BRIK_PUBLISH_DOCKER_USER"]
+              "examples": ["BRIK_PUBLISH_DOCKER_USER"],
+              "deprecated": true
             },
             "password_var": {
               "description": "Name of the environment variable holding the registry password or token.",
               "type": "string",
               "minLength": 1,
-              "examples": ["BRIK_PUBLISH_DOCKER_PASSWORD"]
+              "examples": ["BRIK_PUBLISH_DOCKER_PASSWORD"],
+              "deprecated": true
             }
           }
         },
@@ -885,12 +894,14 @@
             "username_var": {
               "description": "Name of the environment variable holding the repository username.",
               "type": "string",
-              "minLength": 1
+              "minLength": 1,
+              "deprecated": true
             },
             "password_var": {
               "description": "Name of the environment variable holding the repository password.",
               "type": "string",
-              "minLength": 1
+              "minLength": 1,
+              "deprecated": true
             }
           }
         },
@@ -908,7 +919,8 @@
             "token_var": {
               "description": "Name of the environment variable holding the PyPI API token.",
               "type": "string",
-              "minLength": 1
+              "minLength": 1,
+              "deprecated": true
             }
           }
         },
@@ -929,7 +941,8 @@
             "token_var": {
               "description": "Name of the environment variable holding the registry API token.",
               "type": "string",
-              "minLength": 1
+              "minLength": 1,
+              "deprecated": true
             }
           }
         },
@@ -947,7 +960,8 @@
             "token_var": {
               "description": "Name of the environment variable holding the NuGet token or API key.",
               "type": "string",
-              "minLength": 1
+              "minLength": 1,
+              "deprecated": true
             }
           }
         }
@@ -1047,12 +1061,14 @@
         "git_token_var": {
           "description": "Name of the environment variable that contains the token used to push to the `repo` GitOps repository (e.g. `GIT_TOKEN`). Brik resolves the value indirectly at deploy time and embeds it into the clone URL. Applies to `target: gitops` only.",
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "deprecated": true
         },
         "auth_token_var": {
           "description": "Name of the environment variable that contains the auth token used to drive the GitOps `controller` (e.g. `ARGOCD_TOKEN`). Brik resolves the value indirectly at deploy time and passes it to the controller adapter. Falls back to the controller's default env var (`ARGOCD_AUTH_TOKEN` for argocd) when not set. Applies when `controller: argocd`.",
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "deprecated": true
         },
         "chart": {
           "description": "Helm chart path or repository reference for the helm target (e.g. ./charts/myapp or oci://registry/chart).",

@@ -206,6 +206,33 @@ stages.deploy() {
 
         local deploy_args=(--target "$target" --env "$env_name")
         local _v
+
+        # Referential absorption (T5b/PD3): the deploy environment's binding
+        # wires the git/argocd credentials and the argocd controller. Deploy is
+        # environment-scoped, so credentials resolve per env (infra.credential_for
+        # over the single GitHost/ArgoCD endpoint). The brik.yml git_token_var /
+        # auth_token_var / controller fields remain the legacy path without a
+        # referential; when present, the referential takes precedence.
+        local _ref_git_token_var="" _ref_auth_token_var="" _ref_controller=""
+        brik.use transverse.infra 2>/dev/null || true
+        if declare -f infra.root >/dev/null 2>&1 && infra.root >/dev/null 2>&1; then
+            local _ep _name _cred _tok
+            if _ep="$(infra.endpoint_of_kind GitHost 2>/dev/null)"; then
+                _name="$(printf '%s' "$_ep" | jq -r '.name')"
+                if _cred="$(infra.credential_for "$env_name" "$_name" 2>/dev/null)"; then
+                    _tok="$(printf '%s' "$_cred" | jq -r '.token // ""')"
+                    [[ -n "$_tok" ]] && _ref_git_token_var="$(infra.env_var_of_ref "$_tok" 2>/dev/null)" || _ref_git_token_var=""
+                fi
+            fi
+            if _ep="$(infra.endpoint_of_kind ArgoCD 2>/dev/null)"; then
+                _ref_controller="$(printf '%s' "$_ep" | jq -r '.url // ""')"
+                _name="$(printf '%s' "$_ep" | jq -r '.name')"
+                if _cred="$(infra.credential_for "$env_name" "$_name" 2>/dev/null)"; then
+                    _tok="$(printf '%s' "$_cred" | jq -r '.token // ""')"
+                    [[ -n "$_tok" ]] && _ref_auth_token_var="$(infra.env_var_of_ref "$_tok" 2>/dev/null)" || _ref_auth_token_var=""
+                fi
+            fi
+        fi
         # --namespace is only consumed by the k8s/helm/compose targets.
         # gitops and ssh reject unknown options, and a workflow profile injects
         # a k8s-centric `namespace` default into every env -- forwarding it to a
@@ -221,7 +248,7 @@ stages.deploy() {
         _v="$(transverse.env.resolve_indirect "$manifest_var")";     [[ -n "$_v" ]] && deploy_args+=(--manifest "$_v")
         _v="$(transverse.env.resolve_indirect "$repo_var")";         [[ -n "$_v" ]] && deploy_args+=(--repo "$_v")
         _v="$(transverse.env.resolve_indirect "$path_var")";         [[ -n "$_v" ]] && deploy_args+=(--path "$_v")
-        _v="$(transverse.env.resolve_indirect "$controller_var")";   [[ -n "$_v" ]] && deploy_args+=(--controller "$_v")
+        _v="$(transverse.env.resolve_indirect "$controller_var")";   [[ -n "$_ref_controller" ]] && _v="$_ref_controller"; [[ -n "$_v" ]] && deploy_args+=(--controller "$_v")
         _v="$(transverse.env.resolve_indirect "$app_name_var")";     [[ -n "$_v" ]] && deploy_args+=(--app-name "$_v")
         _v="$(transverse.env.resolve_indirect "$chart_var")";        [[ -n "$_v" ]] && deploy_args+=(--chart "$_v")
         _v="$(transverse.env.resolve_indirect "$release_name_var")"; [[ -n "$_v" ]] && deploy_args+=(--release "$_v")
@@ -230,8 +257,8 @@ stages.deploy() {
         _v="$(transverse.env.resolve_indirect "$compose_file_var")"; [[ -n "$_v" ]] && deploy_args+=(--file "$_v")
         _v="$(transverse.env.resolve_indirect "$remote_path_var")";  [[ -n "$_v" ]] && deploy_args+=(--path "$_v")
         _v="$(transverse.env.resolve_indirect "$source_var")";        [[ -n "$_v" ]] && deploy_args+=(--source "$_v")
-        _v="$(transverse.env.resolve_indirect "$git_token_var_var")"; [[ -n "$_v" ]] && deploy_args+=(--git-token-var "$_v")
-        _v="$(transverse.env.resolve_indirect "$auth_token_var_var")"; [[ -n "$_v" ]] && deploy_args+=(--auth-token-var "$_v")
+        _v="$(transverse.env.resolve_indirect "$git_token_var_var")"; [[ -n "$_ref_git_token_var" ]] && _v="$_ref_git_token_var"; [[ -n "$_v" ]] && deploy_args+=(--git-token-var "$_v")
+        _v="$(transverse.env.resolve_indirect "$auth_token_var_var")"; [[ -n "$_ref_auth_token_var" ]] && _v="$_ref_auth_token_var"; [[ -n "$_v" ]] && deploy_args+=(--auth-token-var "$_v")
         _v="$(transverse.env.resolve_indirect "$restart_cmd_var")";  [[ -n "$_v" ]] && deploy_args+=(--restart-cmd "$_v")
         # CD flow: inject the digest-pinned image ref resolved by `brik deploy`
         # so the target deploys exactly that digest (require_digest).

@@ -1500,6 +1500,52 @@ SCRIPT
   End
 
   # ---------------------------------------------------------------------------
+  # deploy.argocd.get_deployed_digest - optional --hard-refresh
+  # ---------------------------------------------------------------------------
+  Describe "deploy.argocd.get_deployed_digest - --hard-refresh"
+    setup_gdd_hr() {
+      mock.setup
+      TEST_WS="$(mktemp -d)"
+      MOCK_LOG="${TEST_WS}/mock_argocd.log"
+      export MOCK_LOG
+      local mock_script="${MOCK_BIN}/argocd"
+      cat > "$mock_script" <<SCRIPT
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "${MOCK_LOG}"
+if [[ "\$*" == *"app get"* ]]; then
+  cat <<'JSON'
+{ "status": { "summary": { "images": ["nexus.test/app@sha256:abc"] } } }
+JSON
+fi
+SCRIPT
+      chmod +x "$mock_script"
+      mock.activate
+      unset BRIK_DRY_RUN 2>/dev/null
+    }
+    cleanup_gdd_hr() { mock.cleanup; unset BRIK_DRY_RUN 2>/dev/null; rm -rf "$TEST_WS"; }
+    Before 'setup_gdd_hr'
+    After 'cleanup_gdd_hr'
+
+    It "appends --hard-refresh to argocd app get when requested"
+      hr() {
+        deploy.argocd.get_deployed_digest --app my-app --hard-refresh >/dev/null 2>&1
+        grep -q -- "--hard-refresh" "$MOCK_LOG"
+      }
+      When call hr
+      The status should be success
+    End
+
+    It "omits --hard-refresh by default (status stays observational)"
+      no_hr() {
+        deploy.argocd.get_deployed_digest --app my-app >/dev/null 2>&1
+        ! grep -q -- "--hard-refresh" "$MOCK_LOG"
+      }
+      When call no_hr
+      The status should be success
+    End
+  End
+
+  # ---------------------------------------------------------------------------
   # deploy.argocd.deploy - integration tests
   # ---------------------------------------------------------------------------
   Describe "deploy.argocd.deploy - dry-run integration"

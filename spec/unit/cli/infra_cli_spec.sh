@@ -81,6 +81,75 @@ Describe "brik infra"
     End
   End
 
+  # brik infra secrets -- derive the env:// variables an operator must provision,
+  # BY TARGET (the operated endpoints' credentials), not by --environment (PD3).
+  # pipeline-side = credential refs; infra-side = the SecretManager bootstrap
+  # token. file:// has no variable; bao:// resolves through the manager (ignored).
+  Describe "brik infra secrets"
+    It "lists the pipeline-side env:// secrets (file:// excluded)"
+      secrets_lab() {
+        "$BRIK_BIN" infra init --profile p-lab --dir "$TARGET_DIR" >/dev/null 2>&1 || return $?
+        "$BRIK_BIN" infra secrets --dir "$TARGET_DIR"
+      }
+      When call secrets_lab
+      The status should be success
+      The output should include "BRIK_REGISTRY_USER"
+      The output should include "BRIK_REGISTRY_PASSWORD"
+      The output should include "BRIK_GIT_TOKEN"
+      # evidence-signing is file:// in p-lab -> no environment variable.
+      The output should not include "evidence_signing_key"
+    End
+
+    It "classifies the SecretManager bootstrap token as infra-side (bao:// creds ignored)"
+      secrets_ent() {
+        "$BRIK_BIN" infra init --profile p-entreprise --dir "$TARGET_DIR" >/dev/null 2>&1 || return $?
+        "$BRIK_BIN" infra secrets --dir "$TARGET_DIR" --json | jq -c '{p: (.pipeline | length), i: .infra}'
+      }
+      When call secrets_ent
+      The status should be success
+      # p-entreprise credentials are all bao:// -> nothing pipeline-side; only the
+      # OpenBAO bootstrap token is an env var.
+      The output should equal '{"p":0,"i":["BAO_TOKEN"]}'
+    End
+
+    It "emits a JSON object with sorted pipeline and infra arrays (--json)"
+      secrets_json() {
+        "$BRIK_BIN" infra init --profile p-lab --dir "$TARGET_DIR" >/dev/null 2>&1 || return $?
+        "$BRIK_BIN" infra secrets --dir "$TARGET_DIR" --json | jq -r '.pipeline | join(",")'
+      }
+      When call secrets_json
+      The output should equal "BRIK_GIT_TOKEN,BRIK_REGISTRY_PASSWORD,BRIK_REGISTRY_USER"
+    End
+
+    It "--check fails closed (4) when an expected variable is unset"
+      check_missing() {
+        "$BRIK_BIN" infra init --profile p-lab --dir "$TARGET_DIR" >/dev/null 2>&1 || return $?
+        unset BRIK_REGISTRY_USER BRIK_REGISTRY_PASSWORD BRIK_GIT_TOKEN
+        "$BRIK_BIN" infra secrets --dir "$TARGET_DIR" --check
+      }
+      When call check_missing
+      The status should equal 4
+      The stderr should include "BRIK_GIT_TOKEN"
+    End
+
+    It "--check succeeds when every expected variable is set"
+      check_ok() {
+        "$BRIK_BIN" infra init --profile p-lab --dir "$TARGET_DIR" >/dev/null 2>&1 || return $?
+        export BRIK_REGISTRY_USER=u BRIK_REGISTRY_PASSWORD=p BRIK_GIT_TOKEN=t
+        "$BRIK_BIN" infra secrets --dir "$TARGET_DIR" --check
+      }
+      When call check_ok
+      The status should be success
+      The output should include "set"
+    End
+
+    It "fails closed (4) without --dir or BRIK_INFRA_DIR"
+      When run script "$BRIK_BIN" infra secrets
+      The status should equal 4
+      The stderr should include "brik infra init"
+    End
+  End
+
   Describe "brik infra validate"
     It "fails closed (4) without --dir, BRIK_INFRA_DIR or BRIK_INFRA_REPO"
       When run script "$BRIK_BIN" infra validate

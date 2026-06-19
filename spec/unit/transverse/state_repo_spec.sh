@@ -113,6 +113,75 @@ YAML
   End
 
   # =========================================================================
+  # transverse.state_repo.token_var (PD3, T5d)
+  # =========================================================================
+  Describe "transverse.state_repo.token_var"
+    setup_githost_token() {
+      TV_INFRA="$(mktemp -d)"
+      mkdir -p "$TV_INFRA/endpoints" "$TV_INFRA/credentials" "$TV_INFRA/bindings"
+      printf 'apiVersion: brik.dev/referential/v1\nkind: Referential\nprofile: p-lab\n' \
+        > "$TV_INFRA/referential.yml"
+      cat > "$TV_INFRA/endpoints/git.yml" <<'YAML'
+apiVersion: brik.dev/referential/v1
+kind: GitHost
+name: git
+product: gitea
+api_url: https://gitea.lab
+git_url: ssh://git@gitea.lab:22
+tls:
+  trust: system
+YAML
+      cat > "$TV_INFRA/credentials/git-token.yml" <<'YAML'
+apiVersion: brik.dev/referential/v1
+kind: Credential
+name: git-token
+method: token
+token: env://BRIK_GIT_TOKEN
+YAML
+      cat > "$TV_INFRA/bindings/e2e.yml" <<'YAML'
+apiVersion: brik.dev/referential/v1
+kind: Binding
+name: e2e
+endpoints:
+  git: git-token
+YAML
+      export BRIK_INFRA_DIR="$TV_INFRA"
+    }
+    cleanup_githost_token() { rm -rf "$TV_INFRA"; unset BRIK_INFRA_DIR TV_INFRA; }
+    Before 'setup_githost_token'
+    After 'cleanup_githost_token'
+
+    It "prefers the referential GitHost token var (by target) over the legacy var"
+      When call transverse.state_repo.token_var "https://gitea.lab/brik/state.git" "LEGACY_TOKEN"
+      The status should be success
+      The output should equal "BRIK_GIT_TOKEN"
+    End
+
+    It "falls back to the legacy var when no GitHost serves the repo host"
+      When call transverse.state_repo.token_var "https://github.com/org/repo.git" "LEGACY_TOKEN"
+      The status should be success
+      The output should equal "LEGACY_TOKEN"
+    End
+
+    It "falls back to the legacy var when no referential is configured"
+      no_infra() { unset BRIK_INFRA_DIR; transverse.state_repo.token_var "https://gitea.lab/brik/state.git" "LEGACY_TOKEN"; }
+      When call no_infra
+      The status should be success
+      The output should equal "LEGACY_TOKEN"
+    End
+
+    It "fails closed (7) when the GitHost is declared but its credential is unbound"
+      unbound() {
+        rm "$TV_INFRA/bindings/e2e.yml"
+        transverse.state_repo.token_var "https://gitea.lab/brik/state.git" "LEGACY_TOKEN"
+      }
+      When call unbound
+      The status should equal 7
+      The stderr should include "git"
+    End
+  End
+
+  # =========================================================================
   # transverse.state_repo.clone
   # =========================================================================
   Describe "transverse.state_repo.clone"

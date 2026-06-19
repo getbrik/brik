@@ -17,8 +17,8 @@
       "required": ["trust"],
       "additionalProperties": false
     },
-    "referrers": { "type": "boolean" },
-    "zone": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" }
+    "referrers": { "type": "boolean", "deprecated": true },
+    "zone": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$", "deprecated": true }
   },
   "required": ["apiVersion", "kind", "name", "url", "tls"],
   "additionalProperties": false

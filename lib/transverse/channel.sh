@@ -82,13 +82,39 @@ _channel._docker_auth() {
     printf '%s' "$b64"
 }
 
+# _channel._referential_credential - echo the base64 user:pass for <host> from
+# the infrastructure referential, resolved BY TARGET (the Registry endpoint
+# whose authority matches the host) and INDEPENDENTLY of any environment (PD3):
+# channel ops run in the CD flow with no deploy environment selected. Best
+# effort: no referential, no Registry for the host, an unbound/divergent or
+# non-basic credential all return non-zero so the caller falls through to the
+# Docker store or the BRIK_REGISTRY_* convention (anonymous reads stay legal).
+# A basic credential resolves its username/password references to values.
+_channel._referential_credential() {
+    local host="$1" ep name cred user pass
+    brik.use transverse.infra
+    infra.root >/dev/null 2>&1 || return 1
+    ep="$(infra.registry_for "$host" 2>/dev/null)" || return 1
+    name="$(printf '%s' "$ep" | jq -r '.name')"
+    cred="$(infra.credential_for_endpoint "$name" 2>/dev/null)" || return 1
+    [[ "$(printf '%s' "$cred" | jq -r '.method')" == "basic" ]] || return 1
+    user="$(infra.resolve_ref "$(printf '%s' "$cred" | jq -r '.username')")" || return 1
+    pass="$(infra.resolve_ref "$(printf '%s' "$cred" | jq -r '.password')")" || return 1
+    printf '%s:%s' "$user" "$pass" | base64 | tr -d '\n'
+}
+
 # _channel._basic_credential - echo the base64 user:pass to authenticate to
-# <host>. Prefers the Docker credential store (what `docker login` writes);
-# falls back to the BRIK_REGISTRY_USER/PASSWORD convention already used by the
-# deploy targets (lib/deployments/compose.sh), gated on BRIK_REGISTRY_HOST so
-# those creds never reach an unrelated registry. Non-zero when none is found.
+# <host>. Prefers the referential Registry credential resolved by target (PD3),
+# then the Docker credential store (what `docker login` writes), then the
+# BRIK_REGISTRY_USER/PASSWORD convention used by the deploy targets
+# (lib/deployments/compose.sh), gated on BRIK_REGISTRY_HOST so those creds
+# never reach an unrelated registry. Non-zero when none is found.
 _channel._basic_credential() {
     local host="$1" b64
+    if b64="$(_channel._referential_credential "$host")"; then
+        printf '%s' "$b64"
+        return 0
+    fi
     if b64="$(_channel._docker_auth "$host")"; then
         printf '%s' "$b64"
         return 0
@@ -120,10 +146,10 @@ channel.scoped_docker_config() {
         printf '{}' >"${dir}/config.json"
     fi
     for host in "$@"; do
-        if [[ -n "${BRIK_REGISTRY_USER:-}" && -n "${BRIK_REGISTRY_PASSWORD:-}" \
-              && ( -z "${BRIK_REGISTRY_HOST:-}" || "${BRIK_REGISTRY_HOST}" == "$host" ) ]]; then
-            local b64 merged
-            b64="$(printf '%s:%s' "$BRIK_REGISTRY_USER" "$BRIK_REGISTRY_PASSWORD" | base64 | tr -d '\n')"
+        # One credential source for every host: referential by target (PD3),
+        # then the prior docker login, then the BRIK_REGISTRY_* convention.
+        local b64 merged
+        if b64="$(_channel._basic_credential "$host")"; then
             merged="$(jq --arg h "$host" --arg a "$b64" \
                 '.auths = (.auths // {}) | .auths[$h].auth = $a' "${dir}/config.json" 2>/dev/null)" \
                 && printf '%s' "$merged" >"${dir}/config.json"

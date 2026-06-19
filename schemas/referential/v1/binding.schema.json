@@ -15,8 +15,22 @@
     },
     "capabilities": {
       "type": "object",
+      "x-pending": "Declared but not consumed at runtime yet; wired in chantier #39 P2 (D7/P-B). The object-form normalizer infra.capability_norm exists (T4) but no pipeline runtime reads .capabilities yet.",
       "propertyNames": { "pattern": "^[a-z0-9][a-z0-9-]*$" },
-      "additionalProperties": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" }
+      "additionalProperties": {
+        "oneOf": [
+          { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+          {
+            "type": "object",
+            "properties": {
+              "provider": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+              "endpoint": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" }
+            },
+            "required": ["provider"],
+            "additionalProperties": false
+          }
+        ]
+      }
     }
   },
   "required": ["apiVersion", "kind", "name"],

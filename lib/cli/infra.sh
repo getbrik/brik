@@ -28,11 +28,15 @@ cli.infra.run() {
             shift
             _cli.infra._validate "$@"
             ;;
+        secrets)
+            shift
+            _cli.infra._secrets "$@"
+            ;;
         "")
-            brik_usage_error "infra requires a subcommand: init or validate"
+            brik_usage_error "infra requires a subcommand: init, validate or secrets"
             ;;
         *)
-            brik_usage_error "unknown infra subcommand: ${sub} (expected init or validate)"
+            brik_usage_error "unknown infra subcommand: ${sub} (expected init, validate or secrets)"
             ;;
     esac
 }
@@ -130,6 +134,77 @@ _cli.infra._validate() {
     fi
 
     printf '%s\n' "${root} is valid"
+    return "$BRIK_EXIT_OK"
+}
+
+# _cli.infra._secrets - list the environment variables an operator must
+# provision for this referential, derived BY TARGET (the operated endpoints'
+# credentials), not by --environment (PD3): at CI time no deploy environment is
+# selected. Default lists them grouped (pipeline-side vs infra-side bootstrap);
+# --json emits the machine-readable object; --check verifies each is set and
+# fails closed (4) on the first missing one (a preflight gate).
+# Usage: brik infra secrets [--dir <d>] [--json|--check]
+_cli.infra._secrets() {
+    local dir="" mode="list"
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --dir)
+                brik_require_arg "--dir" "${2-}" || return "$?"
+                dir="$2"
+                shift 2
+                ;;
+            --json)  mode="json";  shift ;;
+            --check) mode="check"; shift ;;
+            -h|--help)
+                brik_print_verb_help "infra secrets"
+                return 0
+                ;;
+            *)
+                brik_usage_error "unknown option: $1" || return "$?"
+                ;;
+        esac
+    done
+
+    brik.use transverse.infra
+
+    [[ -n "$dir" ]] && export BRIK_INFRA_DIR="$dir"
+
+    local data
+    data="$(infra.secret_vars)" || return "$?"
+
+    case "$mode" in
+        json)
+            printf '%s\n' "$data"
+            ;;
+        check)
+            local missing="" var
+            while IFS= read -r var; do
+                [[ -z "$var" ]] && continue
+                [[ -n "${!var:-}" ]] || missing="${missing}${var} "
+            done < <(printf '%s' "$data" | jq -r '.pipeline[], .infra[]')
+            if [[ -n "$missing" ]]; then
+                brik_error "missing required secret variable(s): ${missing% }"
+                return "$BRIK_EXIT_INVALID_ENV"
+            fi
+            brik_print "all required secret variables are set"
+            ;;
+        *)
+            local var
+            brik_print "Pipeline-side secrets (operated endpoint credentials):"
+            while IFS= read -r var; do
+                [[ -n "$var" ]] && brik_print "  - ${var}"
+            done < <(printf '%s' "$data" | jq -r '.pipeline[]')
+            [[ "$(printf '%s' "$data" | jq -r '.pipeline | length')" == "0" ]] \
+                && brik_print "  (none)"
+            brik_print "Infra-side secrets (bootstrap):"
+            while IFS= read -r var; do
+                [[ -n "$var" ]] && brik_print "  - ${var}"
+            done < <(printf '%s' "$data" | jq -r '.infra[]')
+            [[ "$(printf '%s' "$data" | jq -r '.infra | length')" == "0" ]] \
+                && brik_print "  (none)"
+            ;;
+    esac
     return "$BRIK_EXIT_OK"
 }
 

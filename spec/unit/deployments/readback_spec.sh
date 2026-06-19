@@ -45,6 +45,23 @@ Describe "deployments/readback.sh - deployed digest read-back"
     End
   End
 
+  Describe "gitops/argocd read-back forces a hard refresh"
+    # ArgoCD reconciles git by ~3min poll; the read-back window is shorter, so
+    # the live query must hard-refresh the app to pick up the just-pushed commit
+    # (otherwise the read-back races the poll and times out against a stale
+    # revision). See the lab convergence finding.
+    It "passes --hard-refresh to deploy.argocd.get_deployed_digest"
+      run_it() {
+        export BRIK_DEPLOY_STAGING_APP_NAME="brik-e2e-cd"
+        deploy.argocd.get_deployed_digest() { printf '%s' "$*" > "${CAP}/argocd_args"; printf '%s' "$DIGEST"; }
+        deploy.readback.live_digest --env staging --target gitops --controller argocd >/dev/null
+        grep -q -- "--hard-refresh" "${CAP}/argocd_args"
+      }
+      When call run_it
+      The status should be success
+    End
+  End
+
   Describe "mismatch is observed, never fatal (P0)"
     It "records match=false and warns when live != resolved"
       run_it() {

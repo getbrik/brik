@@ -8,7 +8,7 @@
     "apiVersion": { "const": "brik.dev/referential/v1" },
     "kind": { "const": "Referential" },
     "profile": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
-    "description": { "type": "string" }
+    "description": { "type": "string", "x-informational": true }
   },
   "required": ["apiVersion", "kind", "profile"],
   "additionalProperties": false

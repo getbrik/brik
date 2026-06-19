@@ -394,6 +394,8 @@ JSON
             esac
           }
           evidence.build() { printf '{}'; }
+          # No referential here: the token-var resolver is a legacy passthrough.
+          transverse.state_repo.token_var() { printf '%s' "${2:-}"; }
           # publish runs on the right of a pipe (subshell) in the module, so
           # record the repo it was called with to a file.
           REPO_REC="$(mktemp)"

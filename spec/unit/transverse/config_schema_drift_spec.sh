@@ -2,8 +2,10 @@
 # config_schema_drift_spec.sh - Schema-runtime drift detector
 #
 # Asserts that every leaf in schemas/config/v1/brik.schema.json has a
-# runtime consumer in lib/ (config.get call or BRIK_* export), or is
-# listed in the allowlist as a known inert field.
+# runtime consumer in lib/ (config.get call or BRIK_* export), or carries
+# an in-schema marker ("x-informational": true for an intentionally inert
+# field, "deprecated": true for a field on its way out). The former
+# allowlist file is replaced by these markers (see _drift_helpers.sh).
 
 Describe "drift.walk_leaves"
   setup() {
@@ -133,37 +135,24 @@ Describe "drift.has_consumer"
 End
 
 Describe "schema-runtime drift detector"
-  It "every schema leaf has a runtime consumer in lib/ or is allowlisted"
+  It "every schema leaf has a runtime consumer in lib/, or is x-informational / deprecated"
     check_all_leaves() {
       . "${BRIK_HOME}/spec/unit/transverse/_drift_helpers.sh"
-      local allowlist="${BRIK_HOME}/spec/unit/transverse/_drift_allowlist.txt"
       local lib_dir="${BRIK_HOME}/lib"
-      local missing=0
-      local missing_list=""
+      local leaf info dep missing=0 missing_list=""
 
-      while IFS= read -r leaf; do
+      # Exemption is read from in-schema markers (no allowlist file): a leaf is
+      # exempt when it (or an ancestor) is "x-informational": true (intentionally
+      # not consumed) or "deprecated": true (on its way out). walk_annotated
+      # emits "path<TAB>info<TAB>dep" in one pass, so no per-leaf re-walk.
+      while IFS="$(printf '\t')" read -r leaf info dep; do
         [[ -z "$leaf" ]] && continue
-
-        # Check allowlist (skip comment and blank lines; strip inline comments)
-        local allowed=0
-        while IFS= read -r allow_line; do
-          [[ "$allow_line" =~ ^[[:space:]]*# ]] && continue
-          [[ -z "$allow_line" ]] && continue
-          local allow_path
-          allow_path="$(printf '%s' "$allow_line" | sed 's/[[:space:]]*#.*//' | tr -d '[:space:]')"
-          if [[ "$allow_path" == "$leaf" ]]; then
-            allowed=1
-            break
-          fi
-        done < "$allowlist"
-
-        [[ "$allowed" -eq 1 ]] && continue
-
+        [[ "$info" == "info" || "$dep" == "dep" ]] && continue
         if ! drift.has_consumer "$leaf" "$lib_dir"; then
           missing=$((missing + 1))
           missing_list="${missing_list}  MISSING: ${leaf}\n"
         fi
-      done < <(drift.walk_leaves "$BRIK_SCHEMA")
+      done < <(drift.walk_annotated "$BRIK_SCHEMA")
 
       if [[ "$missing" -gt 0 ]]; then
         printf 'Schema-runtime drift detected (%d leaf(s) without consumer):\n' "$missing"
@@ -176,18 +165,23 @@ Describe "schema-runtime drift detector"
     The status should equal 0
   End
 
-  It "allowlist stays small (at most 10 entries)"
-    check_allowlist_size() {
-      local allowlist="${BRIK_HOME}/spec/unit/transverse/_drift_allowlist.txt"
-      local count
-      count="$(grep -cv '^[[:space:]]*#\|^[[:space:]]*$' "$allowlist" 2>/dev/null || printf '0')"
-      if [[ "$count" -gt 10 ]]; then
-        printf 'Allowlist has %d entries (limit 10). Improve the detector.\n' "$count"
+  It "x-informational config leaves stay few and are listed"
+    list_informational() {
+      . "${BRIK_HOME}/spec/unit/transverse/_drift_helpers.sh"
+      local leaf info dep total=0
+      while IFS="$(printf '\t')" read -r leaf info dep; do
+        [[ "$info" == "info" ]] || continue
+        total=$((total + 1))
+        printf '  INFORMATIONAL: %s\n' "$leaf"
+      done < <(drift.walk_annotated "$BRIK_SCHEMA")
+      if [[ "$total" -gt 10 ]]; then
+        printf 'Too many x-informational config leaves (%d, limit 10). Improve the detector.\n' "$total"
         return 1
       fi
       return 0
     }
-    When call check_allowlist_size
+    When call list_informational
     The status should equal 0
+    The output should include "INFORMATIONAL: .version"
   End
 End

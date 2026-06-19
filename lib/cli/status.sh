@@ -119,6 +119,7 @@ cli.status.run() {
         local ev_branch ev_token_var ev_sign ev_clone ev_rc=0
         ev_branch="$(config.get '.artifacts.evidence.branch' '' 2>/dev/null || printf '')"
         ev_token_var="$(config.get '.artifacts.evidence.token_var' '' 2>/dev/null || printf '')"
+        ev_token_var="$(transverse.state_repo.token_var "$ev_repo" "$ev_token_var")" || return "$?"
         ev_sign="$(config.get '.artifacts.evidence.sign' 'false' 2>/dev/null || printf 'false')"
         ev_clone="$(mktemp -d)" || return "${BRIK_EXIT_IO_FAILURE}"
         local -a _clone_args=("$ev_repo" "$ev_clone")

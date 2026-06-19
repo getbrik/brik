@@ -354,6 +354,8 @@ deployment_journal.record_deployment() {
     local branch token_var sign
     branch="$(config.get '.artifacts.evidence.branch' '' 2>/dev/null || printf '')"
     token_var="$(config.get '.artifacts.evidence.token_var' '' 2>/dev/null || printf '')"
+    brik.use transverse.state_repo
+    token_var="$(transverse.state_repo.token_var "$repo" "$token_var")" || return "$?"
     sign="$(config.get '.artifacts.evidence.sign' 'false' 2>/dev/null || printf 'false')"
 
     local -a pub=(--repo "$repo")

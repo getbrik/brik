@@ -20,6 +20,9 @@ Describe "transverse.deployment_journal"
   log.info()  { :; }
   log.warn()  { :; }
   log.error() { printf 'ERROR: %s\n' "$*" >&2; }
+  # No referential in this unit context: the state-repo token-var resolver is a
+  # legacy passthrough (echo the caller's fallback var, the second argument).
+  transverse.state_repo.token_var() { printf '%s' "${2:-}"; }
 
   # The real config.get drives definition_hash (it reads the workspace
   # brik.yml through yq); the record_deployment group overrides it per-example.

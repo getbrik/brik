@@ -39,6 +39,25 @@ pkg.docker.publish() {
 
     pipeline.require_tool docker || return "$BRIK_EXIT_MISSING_DEP"
 
+    # Referential absorption (PD3): a Registry endpoint matching this authority
+    # is the source of truth for the login identity, resolved BY TARGET (env
+    # independent, no deploy environment at push time); the
+    # BRIK_PUBLISH_DOCKER_*_VAR variables remain the legacy path without one.
+    brik.use package-managers._endpoint 2>/dev/null || true
+    if [[ -n "$registry" ]] && declare -f pkg.registry.resolve >/dev/null 2>&1; then
+        local _ep
+        _ep="$(pkg.registry.resolve "$registry")" || return "$?"
+        if [[ -n "$_ep" ]]; then
+            case "$(jq -r '.method' <<<"$_ep")" in
+                basic)
+                    username_var="$(jq -r '.username_var' <<<"$_ep")"
+                    password_var="$(jq -r '.password_var' <<<"$_ep")"
+                    ;;
+                none) username_var=""; password_var="" ;;
+            esac
+        fi
+    fi
+
     # Default tags to BRIK_APP_VERSION if not specified
     if [[ -z "$tags" ]]; then
         tags="${BRIK_APP_VERSION:-${BRIK_COMMIT_SHORT_SHA:-latest}}"

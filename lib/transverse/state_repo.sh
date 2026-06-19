@@ -76,6 +76,29 @@ _transverse.state_repo._ca_for_url() {
     infra.tls_ca "$ghost"
 }
 
+# transverse.state_repo.token_var - echo the effective environment-variable
+# NAME of the token that authenticates against the state-repo at <repo_url>.
+# Prefers the referential GitHost credential resolved BY TARGET (the repo's
+# host) and INDEPENDENTLY of any deploy environment (PD3): the state-repo is
+# one per project and consumed from both CI and CD, so resolution must not
+# hinge on an --environment selection. Falls back to <legacy_var> (the
+# brik.yml .artifacts.evidence.token_var) when no referential is configured or
+# no declared GitHost serves the host. A GitHost declared for the host but
+# whose credential is unbound or divergent fails closed (the operator opted
+# into referential-managed credentials for it). This is the single adapter the
+# evidence store and both journals share, so they wire to one shape.
+# Usage: tv="$(transverse.state_repo.token_var "$repo" "$legacy")" || return $?
+# Returns: the resolver's codes (7 unbound/divergent/non-env:// token).
+transverse.state_repo.token_var() {
+    local repo="$1" legacy="${2:-}" ref=""
+    if [[ -n "$repo" ]]; then
+        brik.use transverse.infra
+        ref="$(infra.evidence_token_var "$repo")" || return "$?"
+    fi
+    [[ -n "$ref" ]] && { printf '%s' "$ref"; return 0; }
+    printf '%s' "$legacy"
+}
+
 # Clone a state-repo branch (shallow), injecting an indirect token when given.
 # Credentials are masked in all log output.
 # Usage: transverse.state_repo.clone <repo_url> <dest>

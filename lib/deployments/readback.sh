@@ -39,7 +39,10 @@ _deploy.readback._live() {
             [[ -z "$app" ]] && { printf 'unknown'; return 0; }
             declare -f deploy.argocd.get_deployed_digest >/dev/null 2>&1 \
                 || brik.use deployments.argocd
-            local -a a=(--app "$app")
+            # Hard-refresh so ArgoCD re-fetches the just-pushed gitops commit
+            # instead of its cached revision (poll ~3min); otherwise the
+            # read-back races the poll and times out against the stale digest.
+            local -a a=(--app "$app" --hard-refresh)
             [[ -n "$auth" ]] && a+=(--auth-token-var "$auth")
             deploy.argocd.get_deployed_digest "${a[@]}" 2>/dev/null || printf 'unknown'
             ;;
