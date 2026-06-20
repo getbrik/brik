@@ -5,7 +5,7 @@
 # Init stage: detect stack, validate config, setup environment.
 # Usage: stages.init <context_file>
 stages.init() {
-    # context_file positionally passed by stage.run; unused here after §4.2
+    # context_file positionally passed by stage.run; unused here
     # migration (detected stack now lands in the pipeline report's business
     # section via report.record).
     # shellcheck disable=SC2034
@@ -346,11 +346,11 @@ _stages.init._record_env_section() {
     _stack_default="$(_stages.init._resolve_runner_image)"
     export BRIK_CI_IMAGE="$_stack_default"
 
-    # Runner image map (Lot 3 of chantier 20260526). Each runner_class
+    # Runner image map. Each runner_class
     # declared in lib/registry/runner_classes.yml is exposed as a CI
     # variable so downstream GitLab jobs can substitute ${BRIK_IMG_<CLASS>}
     # in their image: directive without hardcoding the OCI path. The
-    # Jenkins adapter (Lot 4) consumes the same SoT via
+    # Jenkins adapter consumes the same SoT via
     # brikDriver.resolveImage. BRIK_IMG_STACK aliases BRIK_CI_IMAGE for
     # symmetric naming with the other classes.
     #
@@ -366,8 +366,7 @@ _stages.init._record_env_section() {
     # dotenv_variables PlanLimit is 20, hit as soon as release adds
     # BRIK_NEXT_VERSION. briklab raises this to 50 in
     # scripts/lib/setup/gitlab.sh::configure_dotenv_limit. Adopters
-    # consuming Brik with a stock GitLab must apply the same bump
-    # (documented in chantier 20260526).
+    # consuming Brik with a stock GitLab must apply the same bump.
     # Load the registry module that maps runner_class -> image. A silent
     # load failure here defeats the whole BRIK_RUNNER_CLASSES_FILE override
     # (every BRIK_IMG_* ends up empty and stages fall back to the default
@@ -414,7 +413,7 @@ _stages.init._record_env_section() {
     _kv BRIK_GIT_USER_EMAIL "${BRIK_GIT_USER_EMAIL:-brik-ci@brik.local}"
     _kv BRIK_GIT_USER_NAME  "${BRIK_GIT_USER_NAME:-Brik CI}"
 
-    # Release state (Phase 9.A). The planner stamps the same three values
+    # Release state. The planner stamps the same three values
     # into plan.json's release block; init mirrors them into the dotenv so
     # downstream stages (package, deploy, future promote) can read them as
     # CI variables without re-reading brik.yml or running git describe.
@@ -424,7 +423,7 @@ _stages.init._record_env_section() {
     _kv BRIK_IS_CANDIDATE    "$(release.compute_is_candidate)"
 
     # Package / deploy gating (placeholder values that downstream CI rules
-    # can read; chantier 9.B/E will refine these into the promote contract).
+    # can read; later refined into the promote contract).
     _kv BRIK_PACKAGE_ENABLED "$(_stages.init._has_block '.package')"
     _kv BRIK_DEPLOY_ENABLED  "$(_stages.init._has_block '.deploy')"
 

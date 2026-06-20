@@ -3,10 +3,10 @@
 # @description Container scan stage - post-package container image scanning.
 # Runs in the scanner image after the package stage produces an image.
 #
-# Design note (Decision X7, Phase 4.5 Lot 7):
+# Design note:
 # stages.container_scan delegates to verify.scan.run --scans container rather
 # than inlining grype/dockle invocations. Rationale:
-#   1. "One scanner per stage" (final-plan §6.12) is already satisfied because
+#   1. "One scanner per stage" is already satisfied because
 #      stages.container_scan invokes verify.scan.container.run for exactly one
 #      scanner category.
 #   2. verify.scan.run centralises scanner resolution (tier 1 command override,
@@ -21,7 +21,7 @@
 # Container scan stage: scan a built container image for vulnerabilities.
 # Usage: stages.container_scan <context_file>
 stages.container_scan() {
-    # context_file positionally passed by stage.run; unused here after §4.2
+    # context_file positionally passed by stage.run; unused here
     # migration (pipeline.run records tech.status from rc; config-skip path
     # uses report.record directly).
     # shellcheck disable=SC2034

@@ -3,7 +3,7 @@
 # @module runner-images
 # @description Resolve runner image references via the registry.
 #
-# As of v0.6 (chantier 20260518 D.2.3), language-stack image versions are
+# As of v0.6, language-stack image versions are
 # declared in lib/registry/manifests/stacks/*.yml (spec.runner.{image,
 # defaultVersion, versions}) and consumed via registry.stack.runner_image
 # and registry.stack.runner_versions.

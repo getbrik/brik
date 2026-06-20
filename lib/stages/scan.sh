@@ -8,7 +8,7 @@ brik.use "_deps"
 # Scan stage: run dependency and secret scans via verify.scan.run facade.
 # Usage: stages.scan <context_file>
 stages.scan() {
-    # context_file positionally passed by stage.run; unused here after §4.2
+    # context_file positionally passed by stage.run; unused here
     # migration (pipeline.run records tech.status from rc).
     # shellcheck disable=SC2034
     local context_file="$1"
@@ -34,7 +34,7 @@ stages.scan() {
         brik.use verify.scan.scan
     fi
 
-    # Pipeline-report enrichment (chantier 20260502 L2.C.3). business.deps.*
+    # Pipeline-report enrichment. business.deps.*
     # and business.secret.* parsing (osv-scanner JSON, gitleaks JSON, SBOM)
     # is deferred to a follow-up that needs runner-output parsing.
     if command -v jq >/dev/null 2>&1; then
@@ -50,8 +50,8 @@ stages.scan() {
     verify.scan.run "${BRIK_WORKSPACE}" --scans "deps,secret" --severity "$severity"
     local _verify_rc=$?
 
-    # Pipeline-report business.* enrichment (chantier 20260502 L2.C.3 absorbed
-    # into L4): aggregate the deps SARIF, SBOM, and secret SARIF outputs into
+    # Pipeline-report business.* enrichment (absorbed into the L4 backend):
+    # aggregate the deps SARIF, SBOM, and secret SARIF outputs into
     # business.deps.{vulnerabilities, affected_packages, sbom_path},
     # business.secret.{findings_count, report}, and business.report rollup.
     _scan._record_business 2>/dev/null || true

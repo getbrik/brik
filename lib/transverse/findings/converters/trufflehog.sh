@@ -2,7 +2,7 @@
 # shellcheck source-path=SCRIPTDIR
 # @module transverse.findings.converters.trufflehog
 # @requires jq
-# @description trufflehog NDJSON -> SARIF 2.1.0 converter (chantier 20260508 P5).
+# @description trufflehog NDJSON -> SARIF 2.1.0 converter.
 #   trufflehog v3 emits one JSON object per line (NDJSON), e.g.:
 #     {"SourceMetadata":{"Data":{"Filesystem":{"file":"src/secrets.py","line":12}}},
 #      "DetectorName":"AWS","Verified":true,"Raw":"AKIA...","Redacted":"AKIA[REDACTED]"}

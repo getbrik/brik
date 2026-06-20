@@ -1,6 +1,5 @@
 # Brik GitLab - hidden template factoring out the script + artifacts
-# contract shared by every standard stage job (Lot 3 of chantier
-# 20260526_pipeline-invariants-centralization.md).
+# contract shared by every standard stage job.
 #
 # Each jobs/<id>.yml extends this template and only declares its own
 # image, stage, BRIK_STAGE_ID variable, and needs[]. The plan gate and

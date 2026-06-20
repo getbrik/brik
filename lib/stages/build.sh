@@ -5,7 +5,7 @@
 # Build stage: compile/build via brik-lib.
 # Usage: stages.build <context_file>
 stages.build() {
-    # context_file positionally passed by stage.run; unused here after §4.2
+    # context_file positionally passed by stage.run; unused here
     # migration (pipeline.run records tech.status from rc).
     # shellcheck disable=SC2034
     local context_file="$1"

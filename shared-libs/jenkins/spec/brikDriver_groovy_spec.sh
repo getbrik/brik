@@ -1,6 +1,5 @@
 #shellcheck shell=bash
-# Contract for shared-libs/jenkins/vars/brikDriver.groovy (Lot 4 of
-# chantier 20260526_pipeline-invariants-centralization.md).
+# Contract for shared-libs/jenkins/vars/brikDriver.groovy.
 #
 # brikDriver factors out the per-stage orchestration that used to live as
 # imperative `runStageWithPlan('Foo', 'foo') {...}` calls in
@@ -61,7 +60,7 @@ Describe "shared-libs/jenkins/vars/brikIntegrate.groovy - Lot 4 refactor"
   GROOVY="${BRIK_HOME}/shared-libs/jenkins/vars/brikIntegrate.groovy"
 
   Describe "hardcoded runStageWithPlan calls have been removed"
-    # Lot 4 replaces these imperative calls with a loop over brikDriver.
+    # brikDriver replaces these imperative calls with a loop.
     Parameters
       "Release"
       "Build"
@@ -96,10 +95,10 @@ Describe "shared-libs/jenkins/vars/brikIntegrate.groovy - Lot 4 refactor"
 
   Describe "file size budget"
     # Pre-refactor: 518 lines. Post-refactor the file stays in the same
-    # ballpark (~520) because Lot 4 only targets the per-stage block;
+    # ballpark (~520) because the driver only targets the per-stage block;
     # the setup/cleanup infrastructure (cleanWs rescue, credential
     # resolution, container-id resolution, deploy chown helper) is
-    # Jenkins-specific and stays in place. The real Lot 4 win is
+    # Jenkins-specific and stays in place. The real win is
     # qualitative (no hardcoded stage list), enforced by the grep
     # asserts above. This budget catches an accidental ballooning of
     # the file without demanding an arbitrary reduction.

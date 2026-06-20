@@ -25,7 +25,7 @@ _BRIK_MODULE_TRANSVERSE_FINDINGS_AGGREGATE_LOADED=1
 #
 # Recorded shape (L4 v1, preserved verbatim for backward compatibility with
 # Jenkins Warnings NG and the GitLab Ultimate SARIF overlay; L4 v2 adds
-# failing/ignored/expiring_soon on top of these in P2/P3):
+# failing/ignored/expiring_soon on top of these):
 #
 #   business.findings = { total: int,
 #                         by_severity: { critical, high, medium, low, info },
@@ -64,7 +64,7 @@ findings.aggregate() {
         || printf '{"critical":0,"high":0,"medium":0,"low":0,"info":0}')"
     cwe="$(sarif.extract_cwe "$sarif_path" 2>/dev/null || printf '[]')"
 
-    # L4 v2 enrichment (chantier 20260508 P2): failing vs ignored split,
+    # L4 v2 enrichment: failing vs ignored split,
     # ignored breakdown by brikSource and by severity. Counts are derived
     # from result.suppressions[]: a result with at least one suppression
     # entry counts as ignored; the brikSource on the first entry decides
@@ -134,13 +134,13 @@ findings.aggregate() {
 }
 
 # Merge per-stage SARIF documents into a single pipeline-level
-# brik-artifacts/aggregate.sarif (chantier 20260508 P6.A). Walks every
+# brik-artifacts/aggregate.sarif. Walks every
 # subdirectory of brik-artifacts/ and picks one source SARIF per stage:
 #
 #   1. findings.sarif (post-policy, preferred) -- the document the policy
 #      gate already annotated, so the aggregate inherits the suppressions.
 #   2. otherwise the first <tool>.sarif we find -- raw tool output, used
-#      when the stage runs in pre-P4 compatibility mode.
+#      when the stage runs in pre-aggregation compatibility mode.
 #
 # Both cases preserve runs[] verbatim so consumers (Jenkins Warnings NG,
 # GitLab Ultimate overlay, gl-sast-report exporter) keep identifying the

@@ -5,7 +5,7 @@
 # Deploy stage: iterate over configured environments and deploy.
 # Usage: stages.deploy <context_file>
 stages.deploy() {
-    # context_file positionally passed by stage.run; unused here after §4.2
+    # context_file positionally passed by stage.run; unused here
     # migration (pipeline.run records tech.status from rc; config-skip path
     # uses report.record directly).
     # shellcheck disable=SC2034

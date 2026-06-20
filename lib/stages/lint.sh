@@ -8,7 +8,7 @@ brik.use "_deps"
 # Lint stage: run code quality checks (lint, format, type_check) via brik-lib.
 # Usage: stages.lint <context_file>
 stages.lint() {
-    # context_file positionally passed by stage.run; unused here after §4.2
+    # context_file positionally passed by stage.run; unused here
     # migration (report.record replaces context.set for status markers).
     # shellcheck disable=SC2034
     local context_file="$1"
@@ -54,7 +54,7 @@ stages.lint() {
     local checks_csv
     checks_csv="$(IFS=','; printf '%s' "${checks[*]}")"
 
-    # Pipeline-report enrichment (chantier 20260502 L2.C.3). business.violations
+    # Pipeline-report enrichment. business.violations
     # parsing and report_path/fix_applied fields require runner-output parsing
     # and are deferred to a follow-up.
     if command -v jq >/dev/null 2>&1; then
@@ -89,8 +89,8 @@ stages.lint() {
     verify.run "${BRIK_WORKSPACE}" --checks "$checks_csv"
     local _verify_rc=$?
 
-    # Pipeline-report business.* enrichment (chantier 20260502 L2.C.3 absorbed
-    # into L4): aggregate any per-check SARIF outputs the verify helpers
+    # Pipeline-report business.* enrichment (absorbed into the L4 backend):
+    # aggregate any per-check SARIF outputs the verify helpers
     # produced under ${BRIK_WORKSPACE}/brik-artifacts/lint/<check>.sarif into the canonical
     # business.violations.{total, by_severity, by_check} object.
     _lint._record_business "${checks[@]}" 2>/dev/null || true

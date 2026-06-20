@@ -291,7 +291,6 @@ config.validate_coherence() {
     local workspace="$BRIK_WORKSPACE"
 
     # Cross-block coherence rules (run regardless of stack auto-detection).
-    # All four rules originate from chantier 6 §2.12.
     local errors=0
 
     # Rule 1: build.<stack>_version was removed in favour of project.stack_version.

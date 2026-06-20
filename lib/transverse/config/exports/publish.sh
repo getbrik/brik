@@ -28,7 +28,7 @@ config.export_publish_vars() {
     [[ -n "$val" ]] && export BRIK_PUBLISH_NPM_TOKEN_VAR="$val"
 
     # docker -- fall back to package.docker.image when publish.docker.image
-    # is absent (single source of truth, see chantier 12 §3.4).
+    # is absent (single source of truth).
     val="$(config.get '.publish.docker.image' '')"
     [[ -z "$val" ]] && val="$(config.get '.package.docker.image' '')"
     [[ -n "$val" ]] && export BRIK_PUBLISH_DOCKER_IMAGE="$val"

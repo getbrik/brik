@@ -7,8 +7,8 @@
 [[ -n "${_BRIK_STACKS_DEPS_LOADED:-}" ]] && return 0
 _BRIK_STACKS_DEPS_LOADED=1
 
-# Source the registry to aggregate cache paths from stack manifests
-# (D.2.2 of the architecture refactor chantier). The registry is the
+# Source the registry to aggregate cache paths from stack manifests.
+# The registry is the
 # source of truth for spec.cache.paths per stack.
 # shellcheck source=../registry/registry.sh
 . "${BASH_SOURCE[0]%/*}/../registry/registry.sh"

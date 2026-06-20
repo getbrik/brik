@@ -19,10 +19,10 @@ _BRIK_MODULE_TRANSVERSE_FINDINGS_POLICY_LOADED=1
 # Apply the active built-in policy preset to a SARIF document. The preset
 # is read from BRIK_QUALITY_FINDINGS_POLICY (default pragmatic); the
 # severity floor is read from BRIK_SECURITY_SEVERITY_THRESHOLD (default
-# high). P3 will layer the organization allowlist from BRIK_POLICY_URL on
-# top of the preset output.
+# high). The organization allowlist from BRIK_POLICY_URL layers on top of
+# the preset output.
 #
-# Preset matrix (chantier 20260508 A2):
+# Preset matrix:
 #   pragmatic  : ignore severity<floor (below-severity), then fixState=
 #                not-fixed (no-upstream-fix), then fixState=wont-fix
 #                (vendor-wont-fix); fail the rest.
@@ -74,7 +74,7 @@ findings.apply_policy() {
             ;;
     esac
 
-    # Resolve the org policy cache (chantier 20260508 P3 D5). Mirrors
+    # Resolve the org policy cache. Mirrors
     # org_policy.cache_path so callers do not need to source the loader
     # module just to read the cache. When BRIK_POLICY_CACHE_PATH is unset,
     # falls back to the canonical brik-artifacts location.
@@ -195,7 +195,7 @@ findings.apply_policy() {
                   else null end)
               end);
 
-        # Built-in classification (chantier 20260508 P2 matrix). Returns the
+        # Built-in classification matrix. Returns the
         # full brikSource tag, e.g. "policy.built-in.below-severity".
         def builtin_classify($r; $sarif):
           severity_of_result($r; $sarif) as $sev
@@ -216,7 +216,7 @@ findings.apply_policy() {
             end) as $r2
           | if $r2 != null then ("policy.built-in." + $r2) else null end;
 
-        # Classify a result. Hierarchy (chantier Hierarchie d application):
+        # Classify a result. Hierarchy (highest precedence first):
         #   1. Native suppressions[] -> respect, never touch.
         #   2. Org policy (CVE allowlist, then path allowlist) -> tag.
         #   3. Built-in preset -> tag.

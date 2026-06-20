@@ -308,8 +308,8 @@ infra.policy_names() {
 
 # infra.capability_norm - normalize one Binding capability value to the single
 # internal shape {provider, endpoint}. A bare provider string and the object
-# form {provider, endpoint?} both collapse here, so a future consumer (D7/P-B,
-# wired in chantier #39 P2) reads one shape, never two. No runtime consumes it
+# form {provider, endpoint?} both collapse here, so a future consumer reads
+# one shape, never two. No runtime consumes it
 # yet; this is the read path, not the binding.
 # Usage: infra.capability_norm '<json-value>'
 # Returns: 2 empty; 7 not a provider string or {provider, ...} object.

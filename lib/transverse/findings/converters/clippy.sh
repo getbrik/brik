@@ -2,7 +2,7 @@
 # shellcheck source-path=SCRIPTDIR
 # @module transverse.findings.converters.clippy
 # @requires jq
-# @description clippy NDJSON -> SARIF 2.1.0 converter (chantier 20260508 P5).
+# @description clippy NDJSON -> SARIF 2.1.0 converter.
 #   `cargo clippy --message-format=json` emits NDJSON. Diagnostics carry
 #   reason="compiler-message"; we keep only those whose code starts with
 #   "clippy::" so dependency warnings and pure rustc diagnostics stay out

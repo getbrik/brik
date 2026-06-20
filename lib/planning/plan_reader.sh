@@ -2,7 +2,7 @@
 # @module planning/plan_reader
 # @requires jq
 # @description Consumer API for a serialized plan.json. Used by
-#   pipeline.run (D.4.8 gatekeeper), adapters (GitLab child, Jenkins,
+#   pipeline.run (the plan gatekeeper), adapters (GitLab child, Jenkins,
 #   local wrapper), and brik plan --explain.
 #
 # Default policy when no plan file exists: every stage should run. This
@@ -122,13 +122,13 @@ pipeline.plan.fingerprint() {
     jq -r '.fingerprint // ""' "$plan_file" 2>/dev/null
 }
 
-# Phase 9.A release accessors. Same resolution as the other readers:
+# Release accessors. Same resolution as the other readers:
 # explicit plan_file > BRIK_PLAN_FILE > .brik-logs/plan.json. Empty
 # stdout with rc=0 when no plan exists (backward-compat default).
 
 # Print the git-workflow profile (trunk-based|git-flow|github-flow|none)
 # the planner stamped into the plan. Adapters branch on this to decide
-# candidate vs release routing for the promote stage (Phase 9.B-E).
+# candidate vs release routing for the promote stage.
 #
 # Usage: pipeline.plan.release_profile [<plan_file>]
 pipeline.plan.release_profile() {

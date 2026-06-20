@@ -2,7 +2,7 @@
 # shellcheck source-path=SCRIPTDIR
 # @module transverse.findings.converters.junit
 # @requires yq, jq
-# @description JUnit XML -> SARIF 2.1.0 converter (chantier 20260508 P5).
+# @description JUnit XML -> SARIF 2.1.0 converter.
 #   Emits one SARIF result per non-passing testcase:
 #     - <failure> / <error> -> kind="fail",   level="error"
 #     - <skipped>           -> kind="review", level="note"

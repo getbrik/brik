@@ -18,10 +18,10 @@
 _BRIK_MODULE_TRANSVERSE_FINDINGS_GATE_LOADED=1
 
 # Run a stage's tool SARIF through the unified ingest -> policy ->
-# aggregate pipeline (chantier 20260508 P4). This is the single
-# integration point every SARIF-native verify stage calls after the
-# tool finishes; it preserves the chantier D6 layout (tool SARIF kept
-# verbatim, post-policy SARIF written next to it as findings.sarif).
+# aggregate pipeline. This is the single integration point every
+# SARIF-native verify stage calls after the tool finishes; it preserves
+# the two-file layout (tool SARIF kept verbatim, post-policy SARIF
+# written next to it as findings.sarif).
 #
 # Behaviour:
 #   - tool_sarif missing                  -> silent no-op (return 0).

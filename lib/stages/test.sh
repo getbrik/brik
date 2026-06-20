@@ -7,7 +7,7 @@ brik.use "_deps"
 # Test stage: run tests via stack-specific modules.
 # Usage: stages.test <context_file>
 stages.test() {
-    # context_file positionally passed by stage.run; unused here after §4.2
+    # context_file positionally passed by stage.run; unused here
     # migration (pipeline.run records tech.status from rc).
     # shellcheck disable=SC2034
     local context_file="$1"
@@ -87,7 +87,7 @@ stages.test() {
         (cd "${BRIK_WORKSPACE}" && brik.coverage.summary) || true
         # Record coverage in business section so consumers don't need to
         # re-parse the report file. line_pct only for now; branch_pct is
-        # deferred (chantier 20260502 L2.C.2 follow-up).
+        # deferred.
         local _cov_dir="${BRIK_TEST_COVERAGE_DIR:-brik-artifacts/test/coverage}"
         [[ "$_cov_dir" != /* ]] && _cov_dir="${BRIK_WORKSPACE:-.}/${_cov_dir}"
         local _cov_pct _cov_branch

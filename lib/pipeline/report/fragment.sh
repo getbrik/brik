@@ -160,12 +160,12 @@ report.write_fragment() {
 #   - Files lacking the fragment signature (.stage and .schema_version) are
 #     silently skipped (forward-compat with arbitrary brik-artifacts/ content).
 #   - Files with schema_version not in {"1.0","1.1"} are warn-and-skipped
-#     (decision 7: forward-compat with future v2 fragments). v1.0 stays
-#     readable through the chantier 11 transition window so archived
-#     fragments and external producers keep aggregating cleanly while
-#     they migrate; the runtime itself emits v1.1.
+#     (forward-compat with future v2 fragments). v1.0 stays readable
+#     during the transition window so archived fragments and external
+#     producers keep aggregating cleanly while they migrate; the runtime
+#     itself emits v1.1.
 #
-# Pipeline metadata sources (decision 5: env-first in v1):
+# Pipeline metadata sources (env-first in v1):
 #   - pipeline.id        := BRIK_RUN_ID
 #   - pipeline.platform  := BRIK_PLATFORM (default "local")
 #   - pipeline.project   := BRIK_PROJECT_NAME (default "unnamed")
@@ -242,10 +242,10 @@ report.aggregate_fragments() {
     local pipeline_context="snapshot"
     [[ -n "${BRIK_COMMIT_TAG:-}" ]] && pipeline_context="release"
 
-    # Findings policy projection (chantier 20260508 P1.5 / P3.F). The active
-    # built-in preset comes from BRIK_QUALITY_FINDINGS_POLICY (export config
-    # flow), with pragmatic as the documented default. P3 layers the org
-    # policy cache on top: a non-null preset_override in the cache wins over
+    # Findings policy projection. The active built-in preset comes from
+    # BRIK_QUALITY_FINDINGS_POLICY (export config flow), with pragmatic as
+    # the documented default. The org policy cache layers on top: a non-null
+    # preset_override in the cache wins over
     # the project preset and flips source to "org-policy". The cache also
     # carries url + loaded_at + expiring_soon entries that surface alongside
     # the active preset for the operator.
@@ -345,9 +345,9 @@ report.aggregate_fragments() {
         frags_json='[]'
     fi
 
-    # Note: the synthetic skip-fragments branch (Lot 2 of chantier
-    # 20260526) was removed in Lot 5 because every stage now produces a
-    # fragment on disk -- either via the plan-gate (run or skip) or via
+    # Note: the synthetic skip-fragments branch was removed because every
+    # stage now produces a fragment on disk -- either via the plan-gate (run
+    # or skip) or via
     # the stage body. GitLab's .brik-stage template sources the gate as
     # the first script step; the Jenkins brikDriver loop calls
     # `brik plan gate` for every stage in the registry list. So `$frags`
@@ -465,7 +465,7 @@ report.aggregate_fragments() {
     # Stamp the canonical per-stage lifecycle and synthesize entries for
     # planned-run stages that never produced a fragment (blocked by an upstream
     # failure), so the aggregate is complete. The renderers begin consuming
-    # stages[].lifecycle in Phase 2; until then this is additive data. Non-fatal.
+    # stages[].lifecycle once the renderers migrate; until then this is additive data. Non-fatal.
     _report._stamp_lifecycle "$backend" 2>/dev/null || \
         log.warn "could not stamp stage lifecycle (non-fatal)"
 
@@ -603,7 +603,7 @@ _report._stamp_lifecycle() {
                                 else . end)
             elif $p.lifecycle == "running"
             # In-flight stage: leave it ABSENT from stages[] so the renderers
-            # not yet migrated to read .lifecycle (Phase 2) keep detecting it as
+            # not yet migrated to read .lifecycle keep detecting it as
             # RUNNING via its absence. Synthesizing a status:skipped placeholder
             # here would flip it to SKIPPED in the terminal recap.
             then .
@@ -616,7 +616,7 @@ _report._stamp_lifecycle() {
         # Keep summary.stages consistent with the final stages[] after
         # synthesis (the counts were computed before synthesized entries
         # existed). Legacy status semantics are preserved here; the lifecycle
-        # buckets are introduced when the renderers migrate (Phase 2).
+        # buckets are introduced when the renderers migrate.
         | .summary.stages = {
             total:   (.stages | length),
             passed:  ([.stages[] | select((.tech.status // .status) == "success")] | length),

@@ -483,7 +483,7 @@ notify.send() {
 
 # Usage: stages.notify <context_file>
 stages.notify() {
-    # context_file positionally passed by stage.run; unused here after §4.2
+    # context_file positionally passed by stage.run; unused here
     # step 7 (dead BRIK_PIPELINE_STATUS read replaced by aggregate-report.json
     # query).
     # shellcheck disable=SC2034
@@ -510,8 +510,8 @@ stages.notify() {
     local _ci_fragments_dir="${BRIK_WORKSPACE:-}/brik-artifacts"
     if [[ -n "${BRIK_WORKSPACE:-}" ]] && \
        _notify._is_ci_aggregation_mode "$_ci_fragments_dir"; then
-        # Write notify's own fragment BEFORE aggregating (I10 of the
-        # chantier 20260526). Without this, the aggregator sees no notify
+        # Write notify's own fragment BEFORE aggregating. Without this,
+        # the aggregator sees no notify
         # fragment and the render falls back to "RUNNING" (because notify
         # is the in-flight stage at render time) -- producing the orphan
         # row observed on GitLab pipeline #3715 and the entirely-missing
@@ -533,8 +533,8 @@ stages.notify() {
             log.warn "fragment aggregation failed (non-fatal)"
     fi
 
-    # Pipeline-level SARIF aggregation + GitLab non-Ultimate exporter
-    # (chantier 20260508 P6.E). Both are best-effort: a missing module or
+    # Pipeline-level SARIF aggregation + GitLab non-Ultimate exporter.
+    # Both are best-effort: a missing module or
     # an upstream stage that did not emit SARIF leaves the existing
     # notify behaviour intact. The aggregate lands at
     # brik-artifacts/aggregate.sarif and the GitLab report at

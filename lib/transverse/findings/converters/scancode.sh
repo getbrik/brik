@@ -2,7 +2,7 @@
 # shellcheck source-path=SCRIPTDIR
 # @module transverse.findings.converters.scancode
 # @requires jq
-# @description scancode-toolkit JSON -> SARIF 2.1.0 converter (chantier 20260508 P5).
+# @description scancode-toolkit JSON -> SARIF 2.1.0 converter.
 #   scancode --json-pp emits a wrapper with files[]:
 #     {
 #       "headers": [...],

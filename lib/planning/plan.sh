@@ -206,7 +206,7 @@ plan.compute() {
         IFS=$'\t' read -r _ from to <<<"$meta"
     fi
 
-    # Release state (Phase 9.A). The same compute that stages.init uses
+    # Release state. The same compute that stages.init uses
     # for the dotenv; emitted here so plan_writer can stamp them into the
     # plan.json release block. BRIK_CONFIG_FILE may be unset when the
     # planner runs outside of a workspace (e.g. `brik plan --workspace`

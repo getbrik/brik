@@ -4,7 +4,7 @@
 # @description Lazy loader for the registry. Reads cache/registry.json once
 # via two jq invocations and populates bash associative arrays. Subsequent
 # accesses via lib/registry/registry.sh are pure shell (no fork) - cf.
-# ADR-001 (eval-cache pattern) and the A.5 perf bench (18.6x speedup over
+# ADR-001 (eval-cache pattern) and the perf bench (18.6x speedup over
 # yq-runtime, 11.6x over jq-cache).
 #
 # Public load function: _registry._load (idempotent).

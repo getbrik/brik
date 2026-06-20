@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # @module cli.provider
-# @description CLI entrypoint for `brik provider test <id>` (D12 stage 2,
-#   unit conformance). Proves, without real infrastructure, that a provider
+# @description CLI entrypoint for `brik provider test <id>` (unit
+#   conformance). Proves, without real infrastructure, that a provider
 #   satisfies its capability contract:
 #
-#   1. The provider exists in the registry (unknown id -> CONFIG_ERROR; C8).
+#   1. The provider exists in the registry (unknown id -> CONFIG_ERROR).
 #   2. Its builtin manifest validates against
 #      schemas/registry/v1/provider.schema.json.
 #   3. Runtime introspection: providers.verify_contract proves the module
-#      exposes every operation the contract requires (presence-only, Phase 2).
+#      exposes every operation the contract requires (presence-only).
 #   4. Capability unit conformance: if the provider module declares
 #      providers.<module>.conformance_unit, run its infra-free obligations
 #      (cosign: C1 -- signing a mutable tag is refused with INVALID_INPUT).

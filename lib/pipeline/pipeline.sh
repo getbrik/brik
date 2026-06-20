@@ -174,7 +174,7 @@ _pipeline._stamp_pipeline_source() {
 # Returns 0 (true) if the stage should be skipped, 1 otherwise.
 #
 # The gate.mode + gate.opt_in_flag mapping comes from the registry stage
-# manifest (D.3 of the architecture refactor chantier). Blocking stages
+# manifest. Blocking stages
 # always run; opt_in stages skip unless the CLI flag named in
 # spec.gate.opt_in_flag was provided. The mapping from a flag string
 # (e.g. "--with-release") to the local boolean stays a CLI-input concern.
@@ -298,7 +298,7 @@ pipeline.run() {
     local stage stage_start_ms stage_end_ms duration_ms rc
 
     for stage in "${stages[@]}"; do
-        # Plan-driven gatekeeper (D.4 of the architecture refactor chantier).
+        # Plan-driven gatekeeper.
         # When a plan.json exists and pipeline.plan.should_run returns false,
         # the stage is recorded as a not-applicable skip BEFORE we touch
         # stage.dispatch. The dispatcher stays a pure name->function mapper

@@ -398,7 +398,7 @@ cli.deploy.run() {
         return "${BRIK_EXIT_CONFIG_ERROR}"
     fi
 
-    # Attestation gate (require_attestation, design 6.9): verify the signed
+    # Attestation gate (require_attestation): verify the signed
     # SBOM attestation on the resolved digest, then the SLSA provenance with
     # the deploy expectations -- the version being deployed (a grant on a
     # version name alone could be replayed against another artifact), the
@@ -446,7 +446,7 @@ cli.deploy.run() {
         log.info "attestation verified for ${pinned}"
     fi
 
-    # Eligibility gate (requires_eligibility, design 6.9): every configured
+    # Eligibility gate (requires_eligibility): every configured
     # PromotionJournal event type must exist for the resolved digest and this
     # environment. Attestation is not eligibility: the former travels with
     # the artifact (where it comes from), the latter is a posterior decision

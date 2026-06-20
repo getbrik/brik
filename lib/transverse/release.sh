@@ -43,7 +43,7 @@ release.compute_profile() {
 #   2. Otherwise emit "0.0.0" -- a placeholder that downstream jobs see
 #      as "no release ever cut yet", consistent with semver baseline.
 #
-# Phase 9.A scope: best-effort tag-based compute. Per the chantier,
+# Scope: best-effort tag-based compute. By design,
 # version.next_semver (auto-bump from conventional commits) is a separate
 # follow-up; this helper stays read-only against existing tags.
 #
@@ -72,7 +72,7 @@ release.compute_version() {
 }
 
 # 1 when BRIK_COMMIT_TAG is non-empty (release tag push), 0 otherwise.
-# Phase 9.B-E will extend this to profile-specific candidate detection
+# A later change will extend this to profile-specific candidate detection
 # (e.g. trunk-based -> 1 on every default-branch push) by branching on
 # release.compute_profile.
 #

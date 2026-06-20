@@ -54,7 +54,7 @@ findings.from_sarif() {
 # Convert a non-SARIF tool output to SARIF via a named converter. Each
 # tool ships its own jq/xq pipeline under transverse/findings/converters/
 # and exposes findings.converters.<tool>.to_sarif <input> <output>. The
-# function name keeps "from_json" for chantier continuity even though
+# function name keeps "from_json" for backward continuity even though
 # some converters (e.g. junit) read XML -- "JSON" stands for the family
 # of structured tool outputs, not the wire format.
 #

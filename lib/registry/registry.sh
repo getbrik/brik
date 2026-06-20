@@ -3,7 +3,7 @@
 # @module registry/registry
 # @description Public API of the Brik registry. All consumers read stack and
 # stage metadata through these accessors instead of hardcoded lists.
-# Cf. ADR-001 (manifest format) and the A.5 perf bench (eval-cache pattern).
+# Cf. ADR-001 (manifest format) and the perf bench (eval-cache pattern).
 
 [[ -n "${_BRIK_REGISTRY_LOADED_API:-}" ]] && return 0
 _BRIK_REGISTRY_LOADED_API=1
@@ -394,7 +394,7 @@ registry.provider.binding() {
 
 # Print the lib/providers/ module exposing this provider's contract operations
 # (providers.<module>.<op>). verify_contract joins it against the contract's
-# required_operations to introspect provider conformance (D12 stage 1).
+# required_operations to introspect provider conformance.
 registry.provider.module() {
   _registry._load || return $?
   local id="$1"; registry.provider.exists "$id" || return $?
@@ -438,7 +438,7 @@ registry.provider.for_capability() {
 #
 # A contract is the operation set every provider of a capability must
 # implement (fourth manifest family). brik codes once against the contract;
-# verify_contract introspects a provider's module against it (D12 stage 1).
+# verify_contract introspects a provider's module against it.
 # The contract id is the versioned "<capability>/v<n>" string providers
 # reference via spec.contract.
 

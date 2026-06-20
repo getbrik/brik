@@ -20,7 +20,7 @@ _BRIK_MODULE_TRANSVERSE_FINDINGS_ORG_POLICY_LOADED=1
 
 # Resolve the compiled cache path. Honors BRIK_POLICY_CACHE_PATH override
 # so tests and CI artifacts can target a deterministic location; falls
-# back to the canonical brik-artifacts layout per chantier D5.
+# back to the canonical brik-artifacts layout.
 org_policy.cache_path() {
     if [[ -n "${BRIK_POLICY_CACHE_PATH:-}" ]]; then
         printf '%s' "$BRIK_POLICY_CACHE_PATH"

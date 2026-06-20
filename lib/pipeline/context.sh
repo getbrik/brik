@@ -59,7 +59,7 @@ context.create() {
 
 # Private: get a value from the context file.
 # Prints the value on stdout. Returns 1 if key not found.
-# §4.2 step 7: privatized. Only stage.sh + summary.sh call this (lifecycle
+# Privatized. Only stage.sh + summary.sh call this (lifecycle
 # keys). External callers must go through report.record / report JSON
 # instead (aggregate-report.json is the public aggregated store).
 _context._get() {

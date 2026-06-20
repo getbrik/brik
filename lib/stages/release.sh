@@ -5,7 +5,7 @@
 # Release stage: compute version from git tags, optionally generate changelog and tag.
 # Usage: stages.release <context_file>
 stages.release() {
-    # context_file positionally passed by stage.run; unused here after §4.2
+    # context_file positionally passed by stage.run; unused here
     # migration (app_version now lands in the pipeline report's business
     # section via report.record; cross-stage sharing via pipeline.env.set).
     # shellcheck disable=SC2034
@@ -69,8 +69,7 @@ stages.release() {
     export BRIK_APP_VERSION="$current_version"
     # No bump engine yet; previous_version and new_version stay equal until
     # a real version.next call lands. bump_type captures whether a release
-    # was driven by an explicit BRIK_TAG or no bump at all (chantier
-    # 20260502 L2.C.1, open question 2).
+    # was driven by an explicit BRIK_TAG or no bump at all.
     report.record "release" "business" "previous_version" "$current_version" 2>/dev/null || true
     report.record "release" "business" "new_version" "$current_version" 2>/dev/null || true
     local _bump_type="none"

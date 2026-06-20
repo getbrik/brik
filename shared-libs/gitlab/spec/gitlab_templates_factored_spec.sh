@@ -1,6 +1,6 @@
 #shellcheck shell=bash
-# Contract for the factored GitLab templates introduced in Lot 3 of
-# docs/chantiers/20260526_pipeline-invariants-centralization.md.
+# Contract for the factored GitLab templates: the shared script and
+# artifacts contract centralized into the hidden _brik-stage.yml template.
 #
 # Invariants:
 #   I3 - image per stage is resolved from a single SoT (runner_classes.yml)
@@ -130,7 +130,7 @@ Describe "shared-libs/gitlab/templates - factored Lot 3"
 
     It "job brik-$1 declares image from the init dotenv contract"
       Skip if "yq not installed" yq_missing
-      # Two valid forms after Lot 3 of chantier 20260526:
+      # Two valid forms:
       #   ${BRIK_IMG_<CLASS>} for static classes (base, analysis,
       #     scanner, deploy)
       #   ${BRIK_CI_IMAGE} for the dynamic stack class (legacy name,
