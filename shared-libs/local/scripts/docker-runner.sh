@@ -36,6 +36,7 @@ _BRIK_LOCAL_DOCKER_RUNNER_LOADED=1
 _BRIK_LOCAL_DOCKER_WORK="/work"
 _BRIK_LOCAL_DOCKER_BRIK_HOME="/opt/brik"
 _BRIK_LOCAL_DOCKER_INFRA="/etc/brik/infra"
+_BRIK_LOCAL_DOCKER_POLICY="/etc/brik/policy"
 _BRIK_LOCAL_DOCKER_HOME="/work/.brik-home"
 _BRIK_LOCAL_DOCKER_SOCKET="/var/run/docker.sock"
 
@@ -349,6 +350,19 @@ _brik.local.docker.common_run_args() {
     [[ -n "${BRIK_LOG_LEVEL:-}" ]] && printf '%s\n' "-e" "BRIK_LOG_LEVEL"
     [[ -n "${BRIK_DRY_RUN:-}" ]]   && printf '%s\n' "-e" "BRIK_DRY_RUN"
 
+    # Ambient pipeline variables that the CI adapters inject as job variables
+    # and brik reads inside the stage. They are NOT referential credentials, so
+    # the local engine forwards them by name to mirror the orchestrators:
+    #   BRIK_COMMIT_TAG  the release-context signal (set from a tag-push event,
+    #                    or locally by `brik integrate --release`); without it a
+    #                    local run is always snapshot and never cuts a release.
+    #   COSIGN_PASSWORD  the signing-key passphrase (a key backend names the key
+    #                    file; the passphrase travels as a variable). Forwarded
+    #                    even when empty (the common lab passphrase) so signing
+    #                    does not block on a non-interactive password prompt.
+    [[ -n "${BRIK_COMMIT_TAG:-}" ]] && printf '%s\n' "-e" "BRIK_COMMIT_TAG"
+    [[ -n "${COSIGN_PASSWORD+x}" ]] && printf '%s\n' "-e" "COSIGN_PASSWORD"
+
     if [[ -n "${BRIK_INFRA_DIR:-}" ]]; then
         printf '%s\n' \
             "-v" "${BRIK_INFRA_DIR}:${_BRIK_LOCAL_DOCKER_INFRA}:ro" \
@@ -358,6 +372,15 @@ _brik.local.docker.common_run_args() {
             printf '%s\n' "-e" "$var"
         done < <(_brik.local.docker.env_ref_vars)
         _brik.local.docker.add_host_args
+    fi
+
+    # The org policy is owned by the organization (the DSI), not the infra
+    # referential: the referential only names it (a Policy document whose url
+    # points at /etc/brik/policy/...). The CI runners mount the policy there;
+    # the local engine mirrors that mount from BRIK_POLICY_DIR so a referential
+    # Policy resolves identically on a bare host.
+    if [[ -n "${BRIK_POLICY_DIR:-}" ]]; then
+        printf '%s\n' "-v" "${BRIK_POLICY_DIR}:${_BRIK_LOCAL_DOCKER_POLICY}:ro"
     fi
     return 0
 }
