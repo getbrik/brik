@@ -12,6 +12,10 @@ spec:
     before: [deploy]
   runner:
     class: scanner
+    # Scans the freshly built image from the local daemon. Without the docker
+    # socket the scanner falls back to pulling the artifact from the registry,
+    # which fails on a custom-ca registry the runner image does not trust.
+    docker: true
   gate:
     mode: opt_in
     opt_in_flag: --with-package
