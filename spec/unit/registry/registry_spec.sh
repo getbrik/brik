@@ -559,9 +559,12 @@ Describe "lib/registry/registry.sh"
       The status should be success
     End
 
-    It "container-scan does NOT need the engine (registry-side scan)"
+    It "container-scan needs the engine (scans the freshly built local image)"
+      # Without the docker socket the scanner falls back to pulling the
+      # artifact from the registry, which fails on a custom-ca registry the
+      # runner image does not trust; scanning the local daemon image avoids it.
       When call registry.stage.needs_docker container-scan
-      The status should be failure
+      The status should be success
     End
 
     It "init does NOT need the engine"
