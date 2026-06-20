@@ -20,6 +20,8 @@ cli.integrate.run() {
     local dry_run=""
     local plan_file=""
     local auto_select=false
+    local release_mode=false
+    local release_tag=""
     local -a pipeline_flags=()
 
     workspace="$(pwd)"
@@ -49,6 +51,16 @@ cli.integrate.run() {
                 auto_select=true
                 shift
                 ;;
+            --release)
+                release_mode=true
+                shift
+                ;;
+            --tag)
+                brik_require_arg "--tag" "${2-}" || return "$?"
+                release_tag="$2"
+                release_mode=true
+                shift 2
+                ;;
             --continue-on-error|--with-release|--with-package|--with-deploy)
                 pipeline_flags+=("$1")
                 shift
@@ -74,6 +86,23 @@ cli.integrate.run() {
 
     if [[ -z "$config_path" ]]; then
         config_path="${workspace}/${BRIK_DEFAULT_CONFIG}"
+    fi
+
+    # Release context. The CI adapters set BRIK_COMMIT_TAG from a tag-push
+    # event; locally the operator asks for a release with --release (the tag
+    # at HEAD) or --tag <version> (explicit). Exporting BRIK_COMMIT_TAG makes
+    # the planner and every stage resolve context=release, and pulls in the
+    # release + package stages so the run produces a publishable artifact.
+    if [[ "$release_mode" == "true" ]]; then
+        if [[ -z "$release_tag" ]]; then
+            release_tag="$(git -C "$workspace" describe --tags --exact-match HEAD 2>/dev/null || true)"
+            if [[ -z "$release_tag" ]]; then
+                brik_error "--release requires a tag at HEAD; tag the commit or pass --tag <version>"
+                return "${BRIK_EXIT_INVALID_INPUT}"
+            fi
+        fi
+        export BRIK_COMMIT_TAG="$release_tag"
+        pipeline_flags+=(--with-release --with-package)
     fi
 
     export BRIK_PROJECT_DIR="${workspace}"

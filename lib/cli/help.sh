@@ -87,6 +87,11 @@ Options for integrate:
                           helm upgrade, argocd sync, rsync). Print what would run
                           instead. Exports BRIK_DRY_RUN=true.
   --continue-on-error     Continue pipeline despite stage failure
+  --release               Cut a release: enter release context for the tag at
+                          HEAD (or --tag), implying --with-release and
+                          --with-package. Mirrors a CI tag-push pipeline.
+  --tag <version>         Release tag/version for --release (default: the tag
+                          at HEAD). Sets BRIK_COMMIT_TAG.
   --with-release          Include the release stage
   --with-package          Include the package stage
   --with-deploy           Include deploy and notify stages

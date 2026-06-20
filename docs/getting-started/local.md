@@ -307,6 +307,49 @@ referential; they never use the bare-host default. See the
 for the document kinds and [credentials](../how-to/manage-credentials.md) for how
 credentials resolve.
 
+### Provide the pipeline secrets
+
+The referential names *which* credentials each endpoint uses by environment
+variable (`env://NAME`), never their values. List the variables a run needs, and
+fail closed before running if any is missing:
+
+```bash
+export BRIK_INFRA_DIR=.brik/infra
+brik infra secrets            # the pipeline-side and infra-side variables to set
+brik infra secrets --check    # exits non-zero on the first one that is unset
+```
+
+Export those variables from your secret store, then run. The values stay in your
+environment and are forwarded to the stage containers by name, never on the
+command line. The cosign signing-key passphrase travels the same way, as
+`COSIGN_PASSWORD` (set it to an empty string when the key has no passphrase).
+
+### Point at the org policy (if the referential declares one)
+
+A `Policy` document in the referential names an org policy that lives **outside**
+the referential (the organization owns it, not the infrastructure). The CI
+runners mount it at `/etc/brik/policy`; locally, point `BRIK_POLICY_DIR` at the
+directory that holds it:
+
+```bash
+export BRIK_POLICY_DIR=/path/to/policy   # holds brik-policy.yml
+```
+
+### Cut a release locally
+
+A plain `brik integrate` runs in snapshot context. To cut a release (compute the
+version, publish the artifact to the release channel, record evidence) the way a
+CI tag-push does, pass `--release`:
+
+```bash
+git tag v1.2.3
+brik integrate --release             # uses the tag at HEAD
+brik integrate --release --tag v1.2.3  # or name the version explicitly
+```
+
+`--release` enters release context and implies `--with-release --with-package`,
+so the run produces the artifact a later `brik deploy --version v1.2.3` resolves.
+
 ## CLI reference
 
 Every command accepts `--help`.
