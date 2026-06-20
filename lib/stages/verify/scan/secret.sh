@@ -82,7 +82,7 @@ verify.scan.secret.run() {
         sarif="$sarif" sarif_dir="$sarif_dir") || _scan_rc=$?
 
     # Run the SARIF (when present) through the unified ingest -> policy ->
-    # aggregate pipeline (chantier 20260508 P4). findings.scan_gate falls
+    # aggregate pipeline. findings.scan_gate falls
     # back to the original tool rc when no SARIF was produced (e.g.
     # trufflehog path which has no native SARIF until the P5 converter).
     if ! declare -f findings.scan_gate >/dev/null 2>&1; then

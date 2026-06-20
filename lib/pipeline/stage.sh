@@ -103,8 +103,7 @@ _helpers.set_if_unset() {
 _pipeline.detect_metadata() {
     # TODO: extend with BRIK_PROJECT_NAME from CI_PROJECT_NAME (GitLab) /
     # JOB_NAME (Jenkins). Currently sourced from .project.name in brik.yml
-    # only (lib/transverse/config.sh). Tracked under chantier
-    # 20260502_pipeline-report-followups Phase B.3 audit.
+    # only (lib/transverse/config.sh).
     _helpers.set_if_unset BRIK_PIPELINE_ID    "${CI_PIPELINE_ID:-}"   "${BUILD_TAG:-}"  "${BUILD_NUMBER:-}"
     _helpers.set_if_unset BRIK_PIPELINE_URL   "${CI_PIPELINE_URL:-}"  "${BUILD_URL:-}"
     _helpers.set_if_unset BRIK_COMMIT_SHA     "${CI_COMMIT_SHA:-}"    "${GIT_COMMIT:-}"
@@ -374,8 +373,8 @@ _stage._finalize_fragment() {
 
     # Per-stage dry-run marker. Stamps tech.dry_run=true on stages declared
     # as destructive in their manifest (spec.dry_run.destructive: true).
-    # The list comes from the registry (D.3 of the architecture refactor
-    # chantier); centralising the stamp here means renderers can rely on
+    # The list comes from the registry; centralising the stamp here means
+    # renderers can rely on
     # the field being present for every impacted stage without each stage
     # having to remember to record it. report.record is an upsert so a
     # stage that records the field itself stays back-compat.
@@ -640,8 +639,8 @@ stage.dispatch() {
     _report_path="$(_brik.log_dir._resolve)/aggregate-report.json"
     [[ -f "$_report_path" ]] || report.init >/dev/null 2>&1 || true
 
-    # Resolve <stage_name> -> <logic_function> via the registry (D.3 of the
-    # architecture refactor chantier). The registry is the source of truth
+    # Resolve <stage_name> -> <logic_function> via the registry. The
+    # registry is the source of truth
     # for stage IDs, aliases (e.g. quality -> lint, security -> scan), and
     # their Bash logic function name. Adding a builtin stage means publishing
     # a manifest + module, no change here.

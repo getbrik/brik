@@ -8,8 +8,8 @@
 [[ -n "${_BRIK_TRANSVERSE_ARTIFACT_LOADED:-}" ]] && return 0
 _BRIK_TRANSVERSE_ARTIFACT_LOADED=1
 
-# Source the registry to read stack-specific artifact patterns from manifests
-# (D.2.6 of the architecture refactor chantier). The registry is the source
+# Source the registry to read stack-specific artifact patterns from manifests.
+# The registry is the source
 # of truth for spec.artifacts.{output_dirs, patterns}.
 # shellcheck source=../registry/registry.sh
 . "${BASH_SOURCE[0]%/*}/../registry/registry.sh"

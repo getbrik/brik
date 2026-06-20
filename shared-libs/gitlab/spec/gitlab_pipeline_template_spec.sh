@@ -23,7 +23,7 @@ Describe "shared-libs/gitlab templates - classic plan-aware pipeline"
       Skip if "yq not installed" yq_missing
       first_include() { yq -r '.include[0].local' "$PIPELINE"; }
       When call first_include
-      # Lot 3 of chantier 20260526: _brik-stage.yml carries the factored
+      # _brik-stage.yml carries the factored
       # script + artifacts contract and must be loaded before any job
       # that references it via extends:.
       The output should equal "/templates/_brik-stage.yml"
@@ -71,7 +71,7 @@ Describe "shared-libs/gitlab templates - classic plan-aware pipeline"
     End
   End
 
-  # After Lot 3 of chantier 20260526 the gate is factored into the hidden
+  # The gate is factored into the hidden
   # template .brik-stage. Standard jobs inherit it; package overrides
   # script (Docker install) but still calls the gate as its first step;
   # init/notify also inherit the gate but it's a no-op for them (always-on

@@ -12,8 +12,7 @@
 #               (treated as has_fix by business.evaluate, i.e. BLOCK in
 #               release context)
 #
-# Heuristics dispatched by stage name (master pipeline-behavior-model
-# sub-chantier 13):
+# Heuristics dispatched by stage name:
 #   - container-scan : grype properties.fixState
 #                      fixed     -> has_fix
 #                      not-fixed -> no_fix

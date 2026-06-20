@@ -122,7 +122,7 @@ plan_writer.from_stream() {
             '{source:$s, from_ref:$fr, to_ref:$t, files:$f}')"
     fi
 
-    # Phase 9.A release block. is_candidate is "0"/"1" in the stream so
+    # Release block. is_candidate is "0"/"1" in the stream so
     # it survives the TAB-delimited transport; jq normalizes it back to
     # a JSON boolean here so the schema enforces type=boolean.
     local release_obj

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # @module stages.promote
-# @description Phase 9.B Docker promote. Moves a candidate image from
+# @description Docker promote. Moves a candidate image from
 #   release.candidate.docker.registry to release.release.docker.registry
 #   on a release context. The candidate is identified by digest; the
 #   release ref is tagged with the project version (BRIK_PROJECT_VERSION)

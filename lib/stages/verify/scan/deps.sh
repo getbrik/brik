@@ -17,8 +17,8 @@ brik.use verify.scan._scan
 # sarif --output-file). The run that decides pass/fail is the run that writes
 # the report, so the report can never disagree with the verdict and -- unlike
 # a second, rc-gated osv-scanner invocation -- it can never write a clean
-# report that masks a tool failure (chantier 20260508 P4 HIGH 1 / chantier #24
-# Phase 3). grype keeps its dir-mode table pass (no native SARIF here).
+# report that masks a tool failure. grype keeps its dir-mode table pass
+# (no native SARIF here).
 transverse.tools.register sec_deps osv-scanner osv-scanner "osv-scanner scan --format sarif --output-file {output} ." 10
 transverse.tools.register sec_deps grype       grype       "grype dir:{workspace}"                                    20
 
@@ -97,7 +97,7 @@ verify.scan.deps.run() {
 #   2. packages scanned, vulnerabilities    -> valid SARIF, results > 0  -> fail (rc 10)
 #   3. no valid SARIF produced and not a "no package sources" skip -> the tool
 #      failed before reporting -> tech.tool_error + fail, NEVER a silent
-#      "0 findings" success (chantier #24 Phase 3, council case 3).
+#      "0 findings" success.
 _verify.scan.deps._run_osv() {
     local workspace="$1" rel="$2" sarif="$3"
     local scan_output="" scan_rc=0
@@ -131,7 +131,7 @@ _verify.scan.deps._run_osv() {
     # from a benign no-op using the exit status as the corroborating signal:
     #   - non-zero exit -> osv-scanner failed before reporting (crash, OOM,
     #     bad invocation). Surface a tool error -- NEVER a silent "0 findings"
-    #     success (council case 3). A real vulnerability run that somehow left
+    #     success. A real vulnerability run that somehow left
     #     no SARIF also exits non-zero, so it is caught here, not masked.
     #   - zero exit -> the tool ran and reported success but emitted no report
     #     (e.g. a stubbed scanner). There is nothing to gate on; treat it as a

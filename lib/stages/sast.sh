@@ -6,7 +6,7 @@
 # SAST stage: run SAST, license, and IaC scans via verify.scan.run facade.
 # Usage: stages.sast <context_file>
 stages.sast() {
-    # context_file positionally passed by stage.run; unused here after §4.2
+    # context_file positionally passed by stage.run; unused here
     # migration (pipeline.run records tech.status from rc).
     # shellcheck disable=SC2034
     local context_file="$1"
@@ -40,7 +40,7 @@ stages.sast() {
         brik.use verify.scan.scan
     fi
 
-    # Lazy load of the unified findings module (chantier 20260508 P1.6 / P4).
+    # Lazy load of the unified findings module.
     # Tests Include findings.sh directly so this brik.use is a no-op there;
     # in prod it pulls the module on first SAST run. Failures of brik.use
     # are intentionally not suppressed -- a missing module would surface a
@@ -49,7 +49,7 @@ stages.sast() {
         brik.use transverse.findings
     fi
 
-    # Pipeline-report enrichment (chantier 20260502 L2.C.3). business.findings
+    # Pipeline-report enrichment. business.findings
     # parsing (semgrep JSON, etc.) is deferred to a follow-up that needs
     # runner-output parsing.
     report.record "sast" "tech" "tool" "$BRIK_SECURITY_SAST_TOOL" 2>/dev/null || true
@@ -62,7 +62,7 @@ stages.sast() {
     local _verify_rc=$?
 
     # Run the SARIF through the unified ingest -> policy -> aggregate
-    # pipeline (chantier 20260508 P4). The recorded L4 v1 shape
+    # pipeline. The recorded L4 v1 shape
     # (business.findings.{total, by_severity, cwe} + business.report.{format,
     # path}) is preserved verbatim so Jenkins Warnings NG and the GitLab
     # Ultimate SARIF overlay keep working unchanged; L4 v2 fields

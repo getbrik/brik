@@ -70,8 +70,8 @@ variables:
   #
   # The other image classes (analysis/scanner/deploy) are NOT declared
   # here: they are posted by init as BRIK_IMG_ANALYSIS/SCANNER/DEPLOY,
-  # sourced from lib/registry/runner_classes.yml (single SoT, Lot 3 of
-  # chantier 20260526). Downstream jobs use ${BRIK_IMG_<CLASS>} directly.
+  # sourced from lib/registry/runner_classes.yml (single SoT). Downstream
+  # jobs use ${BRIK_IMG_<CLASS>} directly.
   BRIK_CI_IMAGE: "ghcr.io/getbrik/brik-runner-base:latest"
   BRIK_IMG_BASE: "ghcr.io/getbrik/brik-runner-base:latest"
   # User-overridable pipeline inputs. The long form (value/description/options)

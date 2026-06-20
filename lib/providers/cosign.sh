@@ -9,8 +9,8 @@
 # module: the implementing tool is the same cosign binary and the operative
 # difference (local key vs keyless Fulcio/Rekor vs OpenBAO KMS) is driven by
 # the Signing referential that attest.* already reads -- not by the provider
-# id. Provider-id-driven selection lands with P-A2/P-B; it is out of D12 scope.
-# D12 only proves that this provider satisfies the artifact-attestation/v1
+# id. Provider-id-driven selection is a later change; out of scope here.
+# This provider is only verified against the artifact-attestation/v1
 # contract (presence of the required operations + behavioural conformance).
 
 # Guard against double-sourcing.
@@ -38,7 +38,7 @@ providers.cosign.verify() {
 }
 
 # providers.cosign.conformance_unit - infra-free unit obligations for the
-# artifact-attestation contract (D12 stage 2). Run by `brik provider test`.
+# artifact-attestation contract. Run by `brik provider test`.
 #
 # Covers C1: signing a mutable (non-digest-pinned) tag must be refused with
 # INVALID_INPUT -- the digest precondition fires before any tool, registry or

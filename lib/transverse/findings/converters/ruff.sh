@@ -2,7 +2,7 @@
 # shellcheck source-path=SCRIPTDIR
 # @module transverse.findings.converters.ruff
 # @requires jq
-# @description ruff JSON -> SARIF 2.1.0 converter (chantier 20260508 P5).
+# @description ruff JSON -> SARIF 2.1.0 converter.
 #   ruff's --output-format=json emits a top-level array of findings:
 #     [
 #       {
@@ -20,7 +20,7 @@
 #
 #   Native SARIF support is available since ruff 0.6.0. This converter
 #   stays as a fallback for environments that consume the JSON shape
-#   (older versions, custom CI wrappers, ...) per chantier P5 #15.
+#   (older versions, custom CI wrappers, ...).
 
 # Guard against double-sourcing.
 [[ -n "${_BRIK_MODULE_TRANSVERSE_FINDINGS_CONVERTERS_RUFF_LOADED:-}" ]] && return 0

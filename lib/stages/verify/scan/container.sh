@@ -79,7 +79,7 @@ verify.scan.container.run() {
     fi
 
     # Process the SARIF through the unified ingest -> policy -> aggregate
-    # pipeline and gate on business.findings.failing (chantier 20260508 P4).
+    # pipeline and gate on business.findings.failing.
     # Dockle is the only registered tool without SARIF output today; in that
     # branch findings.scan_gate falls back to the tool exit code 0 (we just
     # validated the tool ran cleanly) and the stage trivially passes.

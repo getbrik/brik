@@ -2,7 +2,7 @@
 # shellcheck source-path=SCRIPTDIR
 # @module transverse.findings.exporters.gitlab
 # @requires jq
-# @description SARIF -> GitLab gl-sast-report.json exporter (chantier P6.D).
+# @description SARIF -> GitLab gl-sast-report.json exporter.
 #   Converts the pipeline-level aggregate SARIF (or any SARIF document) into
 #   the gl-sast-report.json v15 schema consumed by non-Ultimate GitLab MR
 #   widgets. Ultimate instances surface SARIF directly via the SARIF overlay
@@ -78,7 +78,7 @@ findings.exporters.gitlab.from_sarif() {
 
         # Build a per-run rules-by-id index so we can resolve severity and
         # CWE tags out of tool.driver.rules when the result is sparse
-        # (grype 0.111+ behaviour, see chantier P4.G).
+        # (grype 0.111+ behaviour).
         def rules_index($run):
           ($run.tool.driver.rules // [])
           | map({key: (.id // ""), value: .})

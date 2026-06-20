@@ -25,7 +25,7 @@ Describe "shared-libs/gitlab templates - brik-artifacts paths"
     [[ "$(yq -r ".${job_key}.extends" "$file")" == ".brik-stage" ]]
   }
 
-  # After Lot 3 of chantier 20260526, the artifacts contract
+  # The artifacts contract
   # (brik-artifacts/ paths, when=always, expire_in 1 week) lives in the
   # hidden .brik-stage template. Each stage job either inherits it via
   # extends: .brik-stage (no local artifacts: override) OR overrides it

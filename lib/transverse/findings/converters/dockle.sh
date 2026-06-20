@@ -2,7 +2,7 @@
 # shellcheck source-path=SCRIPTDIR
 # @module transverse.findings.converters.dockle
 # @requires jq
-# @description dockle JSON -> SARIF 2.1.0 converter (chantier 20260508 P5).
+# @description dockle JSON -> SARIF 2.1.0 converter.
 #   dockle -f json emits a wrapper object:
 #     {
 #       "summary": { "fatal": 0, "warn": 1, "info": 0, "skip": 0, "pass": 11 },

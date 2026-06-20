@@ -32,7 +32,7 @@ _report._render_aggregate_md() {
     _stage_order="$(_report._stage_order)"
     # KCOV_EXCL_START  -- jq script body is not bash code
     jq -r --arg stage_order "$_stage_order" "${_BRIK_JQ_DURATION_DEFS}"'
-        # ----- Phase 2 helpers --------------------------------------------
+        # ----- Helpers ----------------------------------------------------
         # Stage execution order: sourced from registry.stage.list when the
         # registry is loaded (single source of truth), else the documented
         # fixed-flow fallback (see _report._stage_order). Stages not on the
@@ -117,7 +117,7 @@ _report._render_aggregate_md() {
             else (($e - $b) * 1000)
             end;
 
-        # ----- Findings management sections (P6.B, unchanged) -------------
+        # ----- Findings management sections -------------------------------
         def by_sev_summary($bs):
           [
             (if ($bs.critical // 0) > 0 then "C:\($bs.critical)" else empty end),
@@ -214,10 +214,10 @@ _report._render_aggregate_md() {
               ""
             end;
 
-        # ----- Phase 2: Top findings (most severe) ------------------------
+        # ----- Top findings (most severe) ---------------------------------
         # Aggregates business.findings.items[] across all stages, sorts by
         # severity desc + score desc, caps at 20 rows. Auto-skips when no
-        # stage carries items (back-compat for builds before Phase 1).
+        # stage carries items (back-compat for builds that predate findings items).
         def render_top_findings:
           [.stages[]? | (.business.findings.items // [])[]] as $all
           | if ($all | length) == 0 then empty
@@ -241,7 +241,7 @@ _report._render_aggregate_md() {
               ""
             end;
 
-        # ----- Phase 2: stages table (ordered, glyphed, human, linked) ----
+        # ----- Stages table (ordered, glyphed, human, linked) -------------
         # Columns:
         #   Stage     -- stage id (init, build, lint, ...)
         #   Status    -- canonical lifecycle stamped at aggregation
@@ -279,7 +279,7 @@ _report._render_aggregate_md() {
              )),
           "";
 
-        # ----- Phase 2: business as flat dotted scalars -------------------
+        # ----- Business as flat dotted scalars ----------------------------
         # Per stage: walk paths to scalars, skip array-index paths, skip the
         # findings sub-tree (covered by Failing/Ignored/Top sections above),
         # render "- **dotted.key:** value". Skips stages with empty business.

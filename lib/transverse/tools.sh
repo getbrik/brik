@@ -2,7 +2,7 @@
 # @module transverse.tools
 # @description Centralized 3-tier tool registry.
 #
-# Promoted from lib/stages/verify/_tools.sh (Phase 4 refactor, §11.5). The
+# Promoted from lib/stages/verify/_tools.sh. The
 # registry is now a transverse primitive reusable by verify stages, stack
 # detection, and deploy workflows.
 #

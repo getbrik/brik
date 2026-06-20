@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # shellcheck source-path=SCRIPTDIR
 # @module providers/_verify_contract
-# @description Runtime contract introspection (D12 stage 1). At bind time,
+# @description Runtime contract introspection. At bind time,
 # fail-closed, prove that a provider's module exposes every operation its
 # capability contract requires.
 #
@@ -14,8 +14,8 @@
 # STRICTLY PRESENCE-ONLY: this never invokes an operation and never asserts
 # any behaviour (fail-closed vs best-effort, signature, side effects). Keeping
 # it presence-only is what makes the framework nature-agnostic, so the single
-# artifact-attestation pilot cannot freeze its own semantics into D12. Unit
-# obligations (stage 2) and behavioural conformance (stage 3) live elsewhere.
+# artifact-attestation pilot cannot freeze its own semantics into the
+# framework. Unit obligations and behavioural conformance live elsewhere.
 
 [[ -n "${_BRIK_PROVIDERS_VERIFY_CONTRACT_LOADED:-}" ]] && return 0
 _BRIK_PROVIDERS_VERIFY_CONTRACT_LOADED=1

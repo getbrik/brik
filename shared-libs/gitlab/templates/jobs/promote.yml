@@ -1,4 +1,4 @@
-# Brik Promote Stage (Phase 9.B)
+# Brik Promote Stage
 # Re-tags the candidate Docker image to the release registry. The
 # registry manifest gates this stage on gate.contexts=[release], so the
 # planner marks it skip on snapshot pipelines; the inherited gate then

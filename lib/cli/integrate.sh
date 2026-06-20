@@ -105,7 +105,7 @@ cli.integrate.run() {
         return "$?"
     fi
 
-    # Plan-driven mode (D.5a of the architecture refactor chantier).
+    # Plan-driven mode.
     # --plan points pipeline.plan.gate at an existing plan.json.
     # --auto-select runs the planner first and points the gate at the
     # freshly-written file. --plan takes precedence when both are set.

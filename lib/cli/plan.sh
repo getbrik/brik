@@ -37,8 +37,8 @@ cli.plan.run() {
     fi
 
     # Sub-command dispatch. The default sub-command "compute" is implicit
-    # (no first arg) for backward compat with the v0.6 contract documented
-    # in D.4.7. The "gate" sub-command was added in D.5b to support
+    # (no first arg) for backward compat with the v0.6 contract. The
+    # "gate" sub-command was added to support
     # adapters that orchestrate stages outside of pipeline.run (Jenkins
     # Groovy, GitLab YAML); it returns 0=run, 1=skip and records the
     # skip fragment so the aggregate-report still sees the stage.
@@ -190,7 +190,7 @@ cli.plan.run() {
 #   2  -> usage error (no stage id, missing plan when --strict)
 #
 # When BRIK_PLAN_FILE is unset or empty, the gate returns 0 (run) so a
-# pre-D.4 setup or a misconfigured CI still behaves like v0.5.x.
+# a legacy setup or a misconfigured CI still behaves like v0.5.x.
 # Pass --strict to error out on a missing plan instead (callers that
 # *require* a plan to exist).
 #

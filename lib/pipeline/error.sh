@@ -14,8 +14,8 @@ _BRIK_ERROR_LOADED=1
 [[ -z "${_BRIK_LOGGING_LOADED:-}" ]] && . "${BASH_SOURCE[0]%/*}/logging.sh"
 
 # Note: BRIK_DEFAULT_LOG_DIR (an old escape hatch for the legacy
-# /tmp/brik/logs default) was removed in chantier pipeline-layout-unification
-# Phase 4. Use _brik.log_dir._resolve in lib/pipeline/logging.sh, which
+# /tmp/brik/logs default) was removed during the pipeline-layout
+# unification. Use _brik.log_dir._resolve in lib/pipeline/logging.sh, which
 # derives BRIK_LOG_DIR from BRIK_WORKSPACE (or falls back to /tmp/brik/logs
 # when no workspace is set, e.g. during pre-init Jenkins agent setup).
 

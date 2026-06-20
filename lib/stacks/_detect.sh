@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # @module stacks._detect
 # @description Stack detection from workspace markers and framework names.
-# As of v0.6 (chantier 20260518 D.2.1), the detection rules are read from
+# As of v0.6, the detection rules are read from
 # the registry (lib/registry/manifests/stacks/*.yml) rather than hardcoded.
 # Public API and behavior are strictly identical to v0.5.0:
 #   stacks.detect <workspace>           -> prints stack id, rc=0 on match,

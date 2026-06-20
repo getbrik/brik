@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # @module cli.extension
 # @description CLI entrypoint for `brik extension test <path>`.
-#   Per ADR-002 (contract testing) and chantier V.2, a Brik extension
+#   Per ADR-002 (contract testing), a Brik extension
 #   ships a directory with stacks/ and stages/ manifests plus an
 #   optional lib/ tree of Bash modules. This command runs the contract
 #   harness so an author can verify their extension before publishing.
@@ -186,7 +186,7 @@ cli.extension.test() {
     }
     cli.extension._check_compile
 
-    # Dry-call (ADR-002 mécanisme 1 critère 3). For each function listed
+    # Dry-call (ADR-002). For each function listed
     # in spec.api.required, source the extension's lib/*.sh in a subshell
     # with a stub report.record + log.* (so the call is observable and
     # silent), invoke the function with a minimal workspace fixture, and

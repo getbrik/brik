@@ -6,7 +6,7 @@
 # Single source of truth for the cycle of life of a stage in the aggregate
 # report. report.aggregate_fragments stamps stages[].lifecycle +
 # lifecycle_reason from this function. The HTML, terminal, and notify-recap
-# renderers are migrated to consume that field in Phase 2 (until then they keep
+# renderers are migrated to consume that field once renderers migrate (until then they keep
 # their own classification); centralizing the rule here is what lets that
 # migration remove their historical divergence.
 
@@ -49,7 +49,7 @@ _report._classify_lifecycle() {
         # The stage ran and recorded a fragment: classify from its own
         # technical + business outcome. tech_status is authoritative for
         # failure; business.status promotes a technically-green stage to
-        # 'warning' (degraded but non-blocking, per the chantier #1 matrix).
+        # 'warning' (degraded but non-blocking, per the lifecycle matrix).
         if [[ "$tech_status" == "failed" ]]; then
             lifecycle="failed";  reason="stage failed"
         elif [[ "$tech_status" == "skipped" ]]; then
@@ -67,7 +67,7 @@ _report._classify_lifecycle() {
     else
         # No fragment on disk. Distinguish in-flight (running) from
         # planner-skip, upstream-blocked (not_run), not-reached, and absent.
-        # Precedence (council amendment): running > skip > upstream > run.
+        # Precedence: running > skip > upstream > run.
         if [[ "$is_current_stage" == "true" ]]; then
             lifecycle="running"; reason="in flight"
         elif [[ "$plan_decision" == "skip" ]]; then
