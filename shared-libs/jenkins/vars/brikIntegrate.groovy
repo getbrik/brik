@@ -84,45 +84,38 @@ def call(Map params = [:]) {
 
         ansiColor('xterm') {
         timeout(time: timeoutMinutes, unit: 'MINUTES') {
-            // Rescue any root-owned files left over from a prior aborted
-            // build before cleanWs runs. The deploy stage runs as root
-            // (brik-runner-deploy lacks a uid-1000 user) and writes
-            // .ssh/.kube into the workspace. The post-deploy chown at
-            // the end of runInDeploy normally restores ownership, but
-            // if the build crashed mid-deploy or the user aborted it,
-            // those root-owned paths persist and the next cleanWs --
-            // running as the jenkins uid -- cannot delete them, which
-            // wedges the project until manual intervention. Chown the
-            // entire workspace via a throwaway alpine container so the
-            // next cleanWs always has permission to proceed.
+            // Rescue root-owned files left by a prior aborted build before
+            // cleanWs runs. The deploy stage runs as root (brik-runner-deploy
+            // has no uid-1000 user) and writes .ssh/.kube into the workspace;
+            // runInDeploy normally chowns them back, but a crash or abort
+            // mid-deploy leaves them root-owned, and the next cleanWs (running
+            // as the jenkins uid) cannot delete them -- wedging the project
+            // until manual intervention. Chown the whole workspace via a
+            // throwaway alpine container so cleanWs can always proceed.
             def rescueUid = sh(script: 'id -u', returnStdout: true).trim()
             def rescueGid = sh(script: 'id -g', returnStdout: true).trim()
-            // Drop .ssh / .kube outright before chown: the deploy stage
-            // leaves an ssh-agent unix domain socket under .ssh/agent/ that
-            // Jenkins' cleanWs (Java File.delete) refuses to remove and wedges
-            // the next build. These dirs only hold transient credentials
-            // materialised at deploy time, so wiping them between builds is
-            // safe.
+            // Drop .ssh / .kube before chown: the deploy stage leaves an
+            // ssh-agent unix socket under .ssh/agent/ that cleanWs (Java
+            // File.delete) refuses to remove, wedging the next build. These
+            // dirs hold only transient deploy-time credentials, so wiping
+            // them between builds is safe.
             //
-            // Mount caveat: Jenkins runs as a docker-out-of-docker container,
-            // so a plain -v "${WORKSPACE}:/ws" asks the HOST daemon to bind a
-            // path that only exists inside the Jenkins container -- the host
-            // sees nothing and creates an empty dir, leaving the real
-            // workspace untouched. Use --volumes-from on the Jenkins container
-            // so the alpine helper sees the same /var/jenkins_home tree.
+            // Mount caveat: Jenkins is a docker-out-of-docker container, so
+            // -v "${WORKSPACE}:/ws" asks the HOST daemon to bind a path that
+            // exists only inside the Jenkins container -- it silently creates
+            // an empty dir instead. Use --volumes-from on the Jenkins
+            // container so the alpine helper sees the same /var/jenkins_home.
             //
-            // Container id resolution: /proc/self/cgroup is "0::/" under
-            // Docker Desktop's cgroup v2 unified hierarchy, so the legacy
-            // cgroup parse no longer yields an id. Query the docker socket
-            // for the container that matches our /etc/hostname (set by
-            // docker-compose's hostname:). Returns empty if not found, in
-            // which case the cleanup degrades to a best-effort no-op via
-            // the `|| true` guards.
+            // Container id resolution: under cgroup v2 /proc/self/cgroup is
+            // "0::/", so the legacy cgroup parse yields no id. Query the
+            // docker socket for the container carrying the jenkins compose
+            // service label instead. Returns empty if not found, in which
+            // case the cleanup degrades to a best-effort no-op via the
+            // `|| true` guards.
             //
-            // Quoting note: each docker command goes on its own line --
-            // Groovy's """...""" interpolation strips embedded single quotes,
-            // so an alpine "sh -c '...'" wrapper would collapse to a single
-            // bare token. Each line is one argv chain, no nested quoting.
+            // Quoting note: each docker command is its own line -- Groovy's
+            // """...""" strips embedded single quotes, so an "sh -c '...'"
+            // wrapper would collapse to one bare token. One argv chain per line.
             def jenkinsContainer = sh(
                 script: 'docker ps --no-trunc --filter "label=com.docker.compose.service=jenkins" --format "{{.ID}}" | head -1',
                 returnStdout: true
@@ -137,20 +130,16 @@ def call(Map params = [:]) {
             }
             // Selective cleanup: drop build outputs and materialised dep
             // trees (node_modules, .venv, ...), keep tool-level caches
-            // (.npm, .m2, .cache/pip, ...) so the install step on the
-            // next build stays fast. Materialised installs are the output
-            // of `npm ci` / `pip install` and must be regenerated when
-            // their inputs change; keeping them across builds requires
-            // every consumer to detect drift, which is a leaky contract.
-            //
-            // EXCLUDE patterns below mirror the top-level directories
-            // emitted by lib/stacks/_deps.sh::stacks.cache_paths. The
-            // master cannot source bash before cleanWs (the brik library
-            // is resolved later by brikResolveHome), so the list is kept
-            // inline. Drift against the canonical SoT is caught by
-            // spec/integration/cache_paths_parity_spec.sh.
-            // .git/** is excluded too (not part of stacks.cache_paths --
-            // it's an unconditional protection for the SCM metadata).
+            // (.npm, .m2, .cache/pip, ...) so the next build's install stays
+            // fast -- the materialised trees are regenerated from their
+            // inputs anyway, so keeping them across builds is a leaky
+            // contract. The EXCLUDE patterns mirror the top-level dirs from
+            // lib/stacks/_deps.sh::stacks.cache_paths; the master cannot
+            // source bash before cleanWs (brikResolveHome runs later), so the
+            // list is inline, with drift caught by
+            // spec/integration/cache_paths_parity_spec.sh. .git/** is also
+            // excluded -- not a cache path, but unconditional protection for
+            // the SCM metadata.
             cleanWs(
                 deleteDirs: true,
                 patterns: [
@@ -289,13 +278,12 @@ def call(Map params = [:]) {
                 stashBrikArtifacts(name)
             }
 
-            // Plan-driven gate helper (D.5b of the architecture refactor
-            // chantier). Returns true when the stage should run, false when
-            // the plan said skip. On skip, `brik plan gate` has already
-            // recorded the per-stage fragment so the aggregate-report
-            // surfaces the stage as a not-applicable skip with reason.
-            // When BRIK_PLAN_FILE is unset (legacy pipelines), the gate
-            // returns true and the stage runs as before.
+            // Plan-driven gate helper. Returns true when the stage should
+            // run, false when the plan said skip. On skip, `brik plan gate`
+            // has already recorded the per-stage fragment so the
+            // aggregate-report surfaces the stage as a not-applicable skip
+            // with reason. When BRIK_PLAN_FILE is unset (legacy pipelines),
+            // the gate returns true and the stage runs as before.
             def planSaysRun = { stageId ->
                 if (!env.BRIK_PLAN_FILE?.trim()) {
                     return true
@@ -365,8 +353,8 @@ def call(Map params = [:]) {
                     }
                 }
 
-                // Plan stage (D.5b). Produces .brik-logs/plan.json and
-                // points the gate helpers at it via BRIK_PLAN_FILE.
+                // Plan stage. Produces .brik-logs/plan.json and points the
+                // gate helpers at it via BRIK_PLAN_FILE.
                 runStageWithReporting('Plan') {
                     def tagSet = (env.BRIK_TAG?.trim() || env.TAG_NAME?.trim()) as boolean
                     def planOpts = []
@@ -388,18 +376,19 @@ def call(Map params = [:]) {
                     }
                 }
 
-                // Generic stage iteration driven by `brik registry stages`
-                // (Lot 4 of chantier 20260526). The driver returns the
-                // 12 stages of the fixed flow in topological order with
-                // their runner_class, parallel_group, and needs. We
-                // iterate, batching consecutive stages of the same
+                // Generic stage iteration driven by `brik registry stages`,
+                // the single source of truth for the stage list -- so adding
+                // a stage to the registry needs no edit here. The driver
+                // returns the 12 stages of the fixed flow in topological
+                // order with their runner_class, parallel_group, and needs.
+                // We iterate, batching consecutive stages of the same
                 // parallel_group (currently only 'verify': lint/sast/scan/test)
-                // into a single parallel{} block. init, plan, and notify
-                // are handled out-of-band (init/plan already ran above;
-                // notify is in the finally block below). Stage-specific
-                // pre-work that does NOT fit the generic loop -- the
-                // verify post-block (junit + recordIssues), the deploy
-                // kubeconfig prep -- is dispatched inline by id.
+                // into a single parallel{} block. init, plan, and notify are
+                // handled out-of-band (init/plan already ran above; notify is
+                // in the finally block below). Stage-specific pre-work that
+                // does NOT fit the generic loop -- the verify post-block
+                // (junit + recordIssues), the deploy kubeconfig prep -- is
+                // dispatched inline by id.
                 def stages = brikDriver.stagesList(brikHome)
                 def stashCallback = { sid -> stashBrikArtifacts(sid) }
                 def i = 0
@@ -532,12 +521,11 @@ def call(Map params = [:]) {
                             return [decision: parts[0] ?: 'unknown',
                                     reason:   parts.length > 1 ? parts[1] : '']
                         }
-                        // Unstash list derived from the registry (Lot 4 of
-                        // chantier 20260526). Adding a stage to the
-                        // registry now propagates here automatically; no
-                        // more hardcoded list to forget like the original
-                        // omission of promote that triggered the chantier.
-                        // notify is excluded: it is THIS stage so no stash
+                        // Unstash list derived from the registry, so a new
+                        // stage propagates here automatically -- no hardcoded
+                        // list to forget (an earlier omission of promote here
+                        // silently dropped its artifacts from the aggregate).
+                        // notify is excluded: it is THIS stage, so no stash
                         // exists yet.
                         brikDriver.stagesList(brikHome).collect { it.id }
                             .findAll { it != 'notify' }
