@@ -316,6 +316,33 @@ exit \"\${MOCK_DOCKER_RC:-0}\"
       The output should include "-e BRIK_INFRA_DIR=/etc/brik/infra"
     End
 
+    It "mounts the org policy read-only when BRIK_POLICY_DIR is set"
+      # The org policy is owned by the organization, not the infrastructure
+      # referential: the orchestrators mount it at /etc/brik/policy and the
+      # local engine mirrors that mount, independently of BRIK_INFRA_DIR.
+      check_policy() {
+        local policy_dir
+        policy_dir="$(mktemp -d)"
+        BRIK_POLICY_DIR="$policy_dir" \
+          brik.local.docker.run_stage_container "123-9" "init" >/dev/null 2>&1
+        local args
+        args="$(mock.call_args "docker")"
+        rm -rf "$policy_dir"
+        printf '%s' "$args"
+      }
+      When call check_policy
+      The output should include ":/etc/brik/policy:ro"
+    End
+
+    It "mounts no policy when BRIK_POLICY_DIR is unset"
+      check_no_policy() {
+        brik.local.docker.run_stage_container "123-9" "init" >/dev/null 2>&1
+        mock.call_args "docker"
+      }
+      When call check_no_policy
+      The output should not include "/etc/brik/policy"
+    End
+
     It "forwards host env vars referenced as env:// by the referential credentials"
       check_env_refs() {
         local infra_dir
@@ -363,6 +390,21 @@ exit \"\${MOCK_DOCKER_RC:-0}\"
       When call check_passthrough
       The output should include "-e BRIK_LOG_LEVEL"
       The output should include "-e BRIK_DRY_RUN"
+    End
+
+    It "forwards the ambient pipeline vars BRIK_COMMIT_TAG and COSIGN_PASSWORD (even empty)"
+      # These mirror the CI job variables: the release-context signal and the
+      # signing-key passphrase. COSIGN_PASSWORD is forwarded even when empty
+      # (the common lab passphrase), by name only so the value never lands in
+      # the docker argv.
+      check_ambient() {
+        BRIK_COMMIT_TAG=v1.2.3 COSIGN_PASSWORD="" \
+          brik.local.docker.run_stage_container "123-9" "init" >/dev/null 2>&1
+        mock.call_args "docker"
+      }
+      When call check_ambient
+      The output should include "-e BRIK_COMMIT_TAG"
+      The output should include "-e COSIGN_PASSWORD"
     End
 
     It "rejects a config file living outside the project directory"
