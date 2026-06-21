@@ -77,7 +77,7 @@ findings.apply_policy() {
     # Resolve the org policy cache. Mirrors
     # org_policy.cache_path so callers do not need to source the loader
     # module just to read the cache. When BRIK_POLICY_CACHE_PATH is unset,
-    # falls back to the canonical brik-artifacts location.
+    # falls back to the canonical .brik-logs location.
     local cache_path="${BRIK_POLICY_CACHE_PATH:-${BRIK_WORKSPACE:-/tmp/brik}/.brik-logs/policy.cache.json}"
     local cve_allowlist='[]'
     local path_globs='[]'
