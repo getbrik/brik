@@ -29,7 +29,7 @@
 ## The problem Brik solves
 
 Your CI/CD logic is business-critical code. Every pipeline does the same handful
-of things - *build, test, scan, package, deploy, notify* - and the know-how that
+of things (*build, test, scan, package, deploy, notify*) and the know-how that
 does them is yours. Yet that know-how never becomes portable code. It stays
 trapped in each platform's dialect:
 
@@ -37,7 +37,7 @@ trapped in each platform's dialect:
   *Groovy* for the next, so your business logic is locked to a dialect instead of
   living as code you own.
 - **Not reusable across platforms.** Change platforms and you rewrite everything.
-  The real cost of lock-in is not a licence fee - it is losing your delivery
+  The real cost of lock-in is not a licence fee; it is losing your delivery
   methodology the day you migrate.
 - **Not runnable on your laptop.** Because the logic only exists in the platform's
   native dialect, you cannot execute it locally. You debug it through the CI server,
@@ -47,15 +47,25 @@ trapped in each platform's dialect:
 
 **A platform should *execute* delivery logic, not *define* it.**
 
-Brik turns the relationship around: the logic lives in one portable place, and
-each platform becomes a thin adapter that runs it. **You describe your project,
-not the pipeline.** The three sections below answer the three pains above, in
-order: you own the code, it runs everywhere, and it runs on your laptop.
+Brik turns the relationship around. **Brik is the portable core** that holds
+your delivery logic (the fixed CI/CD flows). The platform that triggers a run and
+the infrastructure that run reaches both sit outside it, as interchangeable
+**adapters**; the file you write, the `brik.yml`, configures the core itself.
+Switch GitLab for Jenkins, or one signer for another, and the core never changes. **You
+describe your project, not the pipeline.** The sections below answer the three
+pains above, in order: you own the code, it runs everywhere, and it runs on your
+laptop.
 
 ## Configuration, not vendor syntax
 
-A `brik.yml` for a deployable Node service - CI, GitOps CD, and a promotion
-gate - describing **what** to run and **which** destinations to target, each by
+The `brik.yml` is the interface between Brik and the CI orchestrator that drives
+it (GitLab, Jenkins, or your laptop). It defines the **CI/CD pipeline**: the
+flows, the stages, and the destinations they target. The orchestrator only
+triggers Brik and hands it credentials; the pipeline itself lives here, written
+once and identical on every platform.
+
+A `brik.yml` for a deployable Node service (CI, GitOps CD, and a promotion
+gate) describing **what** to run and **which** destinations to target, each by
 its authority and path. No vendor syntax, no URL schemes to trust, no secrets:
 
 ```yaml
@@ -74,7 +84,7 @@ test:
   framework: jest
 
 publish:
-  docker:                                  # authority + path - never a scheme or a secret
+  docker:                                  # authority + path, never a scheme or a secret
     registry: nexus.acme.test:8082         #   where to publish (host:port)
     image: platform/orders-api             #   what to call it (repository path)
 
@@ -112,13 +122,13 @@ deploy:
 
 That single file is the project's whole delivery *intent*: the CI flow, the CD
 flow, the promotion chain between environments, and the gates that protect
-production. It is configuration you own, not code locked to a vendor - no
-hand-written `.gitlab-ci.yml`, no custom-Groovy `Jenkinsfile`, no bash glue.
+production. It is configuration you own, not code locked to a vendor (no
+hand-written `.gitlab-ci.yml`, no custom-Groovy `Jenkinsfile`, no bash glue).
 
 Notice what is **not** there: no `https://`, no registry password, no
 `controller:`. Whether a destination is reached over TLS with which trust, which
 credential authenticates it, and which signing backend it uses are not the
-project's concern - that wiring lives in the **infrastructure referential**
+project's concern: that wiring lives in the **infrastructure referential**
 (next section). The `brik.yml` names destinations by authority and path; it
 never carries a secret, not even a secret's variable name.
 
@@ -128,18 +138,16 @@ has a per-stack default. You configure your project. You never write pipeline
 logic.
 
 > [!NOTE]
-> This shows Brik's **target configuration model** - the `brik.yml` ↔ referential
-> separation acted in design [#37](https://github.com/getbrik/brik/issues). The
-> shipped v0.7 schema is mid-migration to it and still accepts the older inline
-> form; see the **[`brik.yml` reference](docs/reference/configuration/README.md)**
-> for the fields validated today.
+> This shows Brik's **target configuration model**. For the exact fields the
+> shipped schema validates today, see the
+> **[`brik.yml` reference](docs/reference/configuration/README.md)**.
 
 ## One definition, every platform
 
 The `brik.yml` you just wrote runs **unchanged on every platform**. None of your
-delivery logic lives in the CI server: each platform is a thin **adapter** - a
+delivery logic lives in the CI server: each platform is a thin **adapter** (a
 shared library that knows only how to hand Brik the platform's trigger and
-credentials and let it run. All the logic stays in Brik and in your `brik.yml`,
+credentials and let it run). All the logic stays in Brik and in your `brik.yml`,
 so switching CI vendor, or reproducing the exact run on your laptop, changes
 nothing about what runs or where it lands.
 
@@ -170,7 +178,7 @@ flowchart LR
     style repo fill:#ffffff,stroke:#94a3b8,color:#475569
 ```
 
-Each platform ships as a small shared library you wire in once - and then forget:
+Each platform ships as a small shared library you wire in once and then forget:
 
 | Platform | Status | How it ships |
 |----------|--------|--------------|
@@ -182,52 +190,91 @@ Each platform ships as a small shared library you wire in once - and then forget
 ## The infrastructure referential
 
 The `brik.yml` is only one half of the picture. It names *what* runs and *which*
-destination it targets - by authority and path - then deliberately stops: no URL
+destination it targets (by authority and path), then deliberately stops: no URL
 scheme, no credential, not even a secret's variable name.
 
-The other half - *how* each destination is reached and trusted - lives in a
-second file, the **infrastructure referential**. It holds the endpoints behind
-those names, the trust to reach them, and the credentials to use. Same friendly
-YAML, opposite concern: written **once for the whole platform** by whoever runs
-it, so every project reuses it and most teams never open it.
+The other half (*how* each destination is reached and trusted) lives in a
+second file, the **infrastructure referential**: the interface between Brik and
+the CI/CD toolchain infrastructure. It defines the access to each component of
+that infra (protocol, endpoints, credentials, tokens, signing backends) behind
+the names the `brik.yml` uses. Same friendly YAML, opposite concern: written
+**once for the whole platform** by whoever runs it, so every project reuses it
+and most teams never open it.
+
+Seen together, the two files are Brik's **ports** in the ports-and-adapters
+sense. Brik is the domain core; it owns the fixed CI/CD flows and exposes two
+ports. The `brik.yml` is the **driving port** (the CI orchestrator calls in
+through it). The referential is the **driven port** (Brik reaches out through it
+to the infrastructure). The CI platforms from the previous section are the
+**driving adapters**; the registries, GitOps controllers, and signing backends
+are the **driven adapters**, each interchangeable, and the core never names a
+vendor.
 
 ```mermaid
 flowchart LR
-    PROJ["brik.yml<br/>what + which to run"]:::intent
-    REF["referential<br/>how to reach + trust"]:::wiring
-    BRIK{{"Brik"}}:::tool
+    subgraph DRIVE["Driving adapters"]
+        direction TB
+        GL["GitLab<br/>shared library"]:::adapter
+        JK["Jenkins<br/>shared library"]:::adapter
+        LO["Local<br/>brik integrate"]:::adapter
+    end
 
-    PROJ --> BRIK
-    REF --> BRIK
+    subgraph CORE["Brik (domain core)"]
+        direction TB
+        PPORT(["brik.yml<br/>driving port<br/>what + which"]):::port
+        ENGINE{{"Brik<br/>fixed CI/CD flows"}}:::tool
+        IPORT(["referential<br/>driven port<br/>how + trust"]):::port
+        PPORT --> ENGINE --> IPORT
+    end
 
-    classDef intent fill:#f1f5f9,stroke:#cbd5e1,color:#334155
-    classDef wiring fill:#eef2ff,stroke:#c7d2fe,color:#3730a3
+    subgraph DRIVEN["Driven adapters"]
+        direction TB
+        REG["container registry"]:::adapter
+        GO["GitOps controller"]:::adapter
+        SEC["secret manager"]:::adapter
+        SIGN["signing backend"]:::adapter
+    end
+
+    GL --> PPORT
+    JK --> PPORT
+    LO --> PPORT
+    IPORT --> REG
+    IPORT --> GO
+    IPORT --> SEC
+    IPORT --> SIGN
+
+    classDef adapter fill:#f8fafc,stroke:#cbd5e1,color:#334155
+    classDef port fill:#eef2ff,stroke:#c7d2fe,color:#3730a3
     classDef tool fill:#334155,stroke:#1e293b,color:#f8fafc
+    style CORE fill:#f8fafc,stroke:#94a3b8,color:#475569
+    style DRIVE fill:#ffffff,stroke:#e2e8f0,color:#64748b
+    style DRIVEN fill:#ffffff,stroke:#e2e8f0,color:#64748b
 ```
 
 > [!TIP]
-> The referential declares endpoints, credentials, bindings, and policy - once
-> for the whole platform. See the
+> The referential declares endpoints, credentials, bindings, and policy (once
+> for the whole platform). See the
 > **[infrastructure referential reference](docs/reference/infrastructure-referential.md)**
 > for what goes in it and how to set one up.
 
 ### Pluggable components, proven by contract
 
-Those capabilities the referential names - signing and attestation, the GitOps
-controller, the secret manager - are not hardwired to one tool. Each is served
-by an interchangeable **provider** behind a versioned **capability contract**:
-the operations Brik codes against, independent of the tool that implements them.
+Those capabilities the referential names (signing and attestation, the GitOps
+controller, the secret manager) are the core's **driven adapters**, and none is
+hardwired to one tool. Each is served by an interchangeable **provider** behind a
+versioned **capability contract**: the operations Brik codes against, independent
+of the tool that implements them.
 Cosign provides artifact attestation today; the contract is what lets a
 different signer take its place without touching Brik's code. `brik provider
-test <id>` proves a provider honours that contract - its manifest, the required
-operations, and the infra-free unit obligations - and the
+test <id>` proves a provider honours that contract (its manifest, the required
+operations, and the infra-free unit obligations) and the
 [briklab](https://github.com/getbrik/briklab) suite proves the behavioural ones
 (fail-closed verification, signing-key confinement, no secret on the command
 line) end to end against real infrastructure.
 
 ## Runs on your laptop too
 
-The laptop is not a second-class simulation of CI - it is the same execution.
+The laptop is not a second-class simulation of CI; it is the same execution.
 Brik runs the **same Bash code path** and the **same pinned runner images**
 locally that it runs on the platform, so `brik integrate` reproduces the full CI
 flow on your machine before you ever push.
@@ -237,6 +284,20 @@ flow on your machine before you ever push.
 - **Divergences are declared, not silent.** Where a local run cannot match CI
   (no signing backend, no remote registry), the difference is an explicit,
   declared divergence rather than a quiet skip.
+- **Profiles choose how much infrastructure is in reach.** The referential is
+  selected as a **profile** for the context it runs in. The built-in `p-local`
+  default declares no endpoints, no credentials and no signing, so `build`,
+  `lint` and `test` run with zero setup; the moment a stage needs a real
+  registry or a signing key, it fails closed instead of inventing one. Richer
+  profiles wire in real endpoints for an orchestrated platform or a fuller local
+  setup.
+
+A profile is just a different set of **driven adapters** behind the same driven
+port: the core and your `brik.yml` never change, only how much of the toolchain a
+given audience or execution platform (your laptop versus the CI orchestrator)
+is allowed to reach. That is what lets a local run take a deliberately degraded
+posture, with no credentials to push an image or deploy to production, while CI
+runs the full one from the same commit.
 
 > [!TIP]
 > See **[Local execution](docs/concepts/local-execution.md)** for how the local
@@ -374,9 +435,9 @@ brik integrate # run the full CI flow locally
 
 ## Related projects
 
-- [brik-images](https://github.com/getbrik/brik-images) - official Docker images for Brik runners. Multi-arch, scanned, rebuilt weekly.
-- [briklab](https://github.com/getbrik/briklab) - local Docker infrastructure for testing Brik pipelines against real GitLab and Jenkins.
-- [homebrew-tap](https://github.com/getbrik/homebrew-tap) - the Homebrew tap for `brew install brik`.
+- [brik-images](https://github.com/getbrik/brik-images): official Docker images for Brik runners. Multi-arch, scanned, rebuilt weekly.
+- [briklab](https://github.com/getbrik/briklab): local Docker infrastructure for testing Brik pipelines against real GitLab and Jenkins.
+- [homebrew-tap](https://github.com/getbrik/homebrew-tap): the Homebrew tap for `brew install brik`.
 
 ## Transparency notice
 
