@@ -8,7 +8,7 @@
     "apiVersion": { "const": "brik.dev/referential/v1" },
     "kind": { "const": "K8sTarget" },
     "name": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
-    "kubeconfig": { "type": "string", "pattern": "^(env|file|bao)://.+", "x-pending": "K8sTarget not implemented at runtime yet; wired in chantier #39 P2 (D5)." },
+    "kubeconfig": { "type": "string", "pattern": "^(env|file|bao)://.+", "x-pending": "K8sTarget not implemented at runtime yet." },
     "context": { "type": "string" }
   },
   "required": ["apiVersion", "kind", "name", "kubeconfig"],

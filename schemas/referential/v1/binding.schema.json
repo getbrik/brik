@@ -15,7 +15,7 @@
     },
     "capabilities": {
       "type": "object",
-      "x-pending": "Declared but not consumed at runtime yet; wired in chantier #39 P2 (D7/P-B). The object-form normalizer infra.capability_norm exists (T4) but no pipeline runtime reads .capabilities yet.",
+      "x-pending": "Declared but not consumed at runtime yet. The object-form normalizer infra.capability_norm exists, but no pipeline runtime reads .capabilities yet.",
       "propertyNames": { "pattern": "^[a-z0-9][a-z0-9-]*$" },
       "additionalProperties": {
         "oneOf": [
