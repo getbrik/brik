@@ -15,24 +15,16 @@ publish:
     registry: https://registry.npmjs.org
     tag: latest
     access: public
-    token_var: NPM_TOKEN
   docker:
     registry: ghcr.io
     tags:
       - latest
-    username_var: BRIK_PUBLISH_DOCKER_USER
-    password_var: BRIK_PUBLISH_DOCKER_PASSWORD
   maven:
     repository: https://nexus.example.com/repository/maven-releases/
-    username_var: BRIK_MAVEN_USER
-    password_var: BRIK_MAVEN_PASSWORD
   pypi:
     repository: https://upload.pypi.org/legacy/
-    token_var: PYPI_TOKEN
   cargo:
     registry: crates-io
     index: sparse+https://nexus.example.com/repository/brik-cargo/
-    token_var: CARGO_REGISTRY_TOKEN
   nuget:
     source: https://api.nuget.org/v3/index.json
-    token_var: NUGET_API_KEY

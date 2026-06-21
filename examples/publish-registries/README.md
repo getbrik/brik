@@ -24,5 +24,7 @@ brik validate --config examples/publish-registries/brik.yml
 - [`package`](../../docs/reference/configuration/package.md) - the image to publish
 
 > [!TIP]
-> Credentials are always referenced by environment-variable name
-> (`token_var` / `username_var` / `password_var`), never inlined as values.
+> Publishing credentials are not set in `brik.yml`: it names only the registry
+> (authority and path). The infrastructure referential binds each registry
+> endpoint to a credential. See
+> [credentials](../../docs/how-to/manage-credentials.md).
