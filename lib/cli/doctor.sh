@@ -66,9 +66,10 @@ doctor.run() {
         failed=$((failed + 1))
     fi
 
-    for tool_name in yq jq; do
+    for tool_name in git yq jq; do
         local tool_hint=""
         case "$tool_name" in
+            git) tool_hint="https://git-scm.com/" ;;
             yq) tool_hint="https://github.com/mikefarah/yq" ;;
             jq) tool_hint="https://jqlang.github.io/jq/" ;;
         esac

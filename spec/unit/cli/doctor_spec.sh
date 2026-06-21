@@ -16,6 +16,11 @@ Describe "brik doctor"
       The output should include "bash"
     End
 
+    It "checks git availability"
+      When run script "${BRIK_BIN}" doctor
+      The output should include "git"
+    End
+
     It "checks yq availability"
       When run script "${BRIK_BIN}" doctor
       The output should include "yq"
