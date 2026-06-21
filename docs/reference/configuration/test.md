@@ -114,9 +114,9 @@ Coverage report configuration. Gated by the parent `reports.enabled` toggle.
 
   Coverage report format.
 
-  - **`lcov`**: stack default for node and rust
-  - **`cobertura`**: stack default for python and dotnet
-  - **`jacoco`**: stack default for java
+  - **`lcov`**: available value; no stack produces it by default
+  - **`cobertura`**: produced by node, rust, python and dotnet
+  - **`jacoco`**: produced by java
   - **`auto`** (default): let Brik pick the format from the stack
 
 - **`test.reports.coverage.output_dir`**
@@ -192,7 +192,7 @@ Each stack accepts a closed set of framework names; the dispatcher rejects any o
 | `python` | `pytest` | `cobertura` |
 | `java` | `junit` (Maven) | `jacoco` |
 | `rust` | `cargo` | `cobertura` (when `cargo-llvm-cov` is available) |
-| `dotnet` | `xunit` | `cobertura` |
+| `dotnet` | `dotnet` | `cobertura` |
 
 `test.command` (Tier 1) wins over `test.framework` (Tier 2), which wins over the stack default (Tier 3).
 

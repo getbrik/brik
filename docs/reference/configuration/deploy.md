@@ -315,8 +315,8 @@ The fields below are common to every environment; the target-specific fields
 
 | Target | Fields |
 |--------|--------|
-| `ssh` | `host`, `remote_path`, `restart_cmd`, `compose_file` (when copying a compose stack), `source` |
-| `compose` | `compose_file`, `source` |
+| `ssh` | `host`, `remote_path`, `restart_cmd`, `source` |
+| `compose` | `compose_file`, `source`, and `host` + `remote_path` to deploy remotely over SSH |
 | `k8s` | `namespace`, `manifest` |
 | `helm` | `namespace`, `chart`, `release_name`, `values` |
 | `gitops` | `repo`, `path`, `controller`, `app_name`, `source`, `git_token_var`, `auth_token_var` |

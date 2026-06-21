@@ -425,9 +425,9 @@
                   "type": "string",
                   "enum": ["lcov", "cobertura", "jacoco", "auto"],
                   "x-enumDescriptions": {
-                    "lcov": "stack default for node and rust",
-                    "cobertura": "stack default for python and dotnet",
-                    "jacoco": "stack default for java",
+                    "lcov": "available value; no stack produces it by default",
+                    "cobertura": "produced by node, rust, python and dotnet",
+                    "jacoco": "produced by java",
                     "auto": "let Brik pick the format from the stack"
                   },
                   "default": "auto"

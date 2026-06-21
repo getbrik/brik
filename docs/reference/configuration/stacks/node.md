@@ -20,7 +20,7 @@ With nothing else, Brik:
 - runs `<pm> run build` if a `build` script exists;
 - runs `npm test` if `scripts.test` is set, otherwise `npx jest`;
 - runs `eslint` and `prettier` for the lint sub-stage;
-- emits an `lcov` coverage report when `test.reports.enabled: true`.
+- emits a `cobertura` coverage report when `test.reports.enabled: true`.
 
 ## Typical brik.yml
 
