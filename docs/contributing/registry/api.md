@@ -67,10 +67,45 @@ accessors operate on in-memory arrays.
 | `registry.stage.gate_opt_in_flag <id>` | `--with-...` | `spec.gate.opt_in_flag`. |
 | `registry.stage.gate_contexts <id>` | one context per line | `spec.gate.contexts`. |
 | `registry.stage.is_destructive <id>` | rc=0 if true | Reads `spec.dry_run.destructive`. |
+| `registry.stage.needs_docker <id>` | rc=0 if true | Reads `spec.runner.docker`; the local containerized runner mounts the docker socket into these stages (e.g. package). |
 | `registry.stage.aliases <id>` | one alias per line | `metadata.aliases`. |
 | `registry.stage.api_required <id>` | one function per line | `spec.api.required`. |
 | `registry.stage.impact_changes <id>` | one glob per line | `spec.impact.changes`. |
 | `registry.stage.impact_use_stack_impact <id>` | `source` / `test` / `build` | `spec.impact.use_stack_impact`. |
+
+## Provider accessors
+
+A provider is an interchangeable implementation of a capability (signing,
+GitOps, ...), described by a manifest (the third manifest family). The binding
+axis says which source selects it: the project (`brik.yml`), the environment
+(infrastructure referential), or the detected execution context.
+
+| Function | Returns | Notes |
+|---|---|---|
+| `registry.provider.list` | one id per line | Every declared provider id. |
+| `registry.provider.exists <id>` | rc=0 if exists | rc=`INVALID_INPUT` otherwise. |
+| `registry.provider.display_name <id>` | string | `metadata.displayName`. |
+| `registry.provider.capability <id>` | capability name | The capability this provider implements. |
+| `registry.provider.binding <id>` | binding axis | Which source selects it (project / environment / context). |
+| `registry.provider.module <id>` | dotted module | The `lib/providers/` module exposing the contract operations (`providers.<module>.<op>`). |
+| `registry.provider.endpoint_kind <id>` | endpoint kind | The referential endpoint kind it operates against (`Signing`, `Registry`, `ArgoCD`, ...). |
+| `registry.provider.contract <id>` | contract id | The `<capability>/v<n>` contract it honours. |
+| `registry.provider.tools <id>` | one `name[>=min]` per line | Tools the provider requires; the source the runner-image tool matrix derives from. |
+| `registry.provider.for_capability <capability>` | one id per line | Every provider implementing `<capability>`. |
+
+## Contract accessors
+
+A contract is the operation set every provider of a capability must implement
+(the fourth manifest family). Brik codes once against the contract;
+`verify_contract` introspects a provider's module against it. The contract id is
+the versioned `<capability>/v<n>` string providers reference via `spec.contract`.
+
+| Function | Returns | Notes |
+|---|---|---|
+| `registry.contract.list` | one id per line | Every declared contract id. |
+| `registry.contract.exists <id>` | rc=0 if exists | rc=`INVALID_INPUT` otherwise. |
+| `registry.contract.capability <id>` | capability name | The capability this contract governs. |
+| `registry.contract.operations <id>` | one operation per line | The operations a provider must expose. |
 
 ## Runner-class accessors
 
