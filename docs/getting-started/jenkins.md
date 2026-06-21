@@ -32,8 +32,9 @@ unclassified:
 ```
 
 The brik repo contains both the runtime and the shared library, so no separate
-clone is needed: Jenkins clones the library into `${WORKSPACE}@libs/brik/` and
-uses that path as `BRIK_HOME`.
+clone is needed: Jenkins clones the library into a hash-named directory under
+`${WORKSPACE}@libs/`, and the library resolves its own path there and uses it as
+`BRIK_HOME`.
 
 ## 2. Add a `Jenkinsfile`
 
@@ -43,6 +44,10 @@ Add a two-line `Jenkinsfile` to your project root:
 @Library('brik') _
 brikIntegrate()
 ```
+
+This `Jenkinsfile` is the Jenkins adapter wiring: a thin entry point that hands
+your run to Brik. It carries no delivery logic of its own; the pipeline itself
+is defined by the `brik.yml` you add next, identical on every platform.
 
 ## 3. Add a `brik.yml`
 
@@ -70,13 +75,16 @@ Once CI is working, to use the **CD flow** with attestation verification:
 
 1. Create an infrastructure referential with endpoints, credentials, policies,
    and trust material. See [artifact attestation](../concepts/supply-chain.md).
-2. Store the referential on a path Jenkins can mount into containers
-   (a shared volume, a Git repo, etc.).
-3. Pass `brikInfraDir` to `brikIntegrate()`:
+2. Mount the referential at `/etc/brik/infra` in the Jenkins controller
+   container. There is no `brikIntegrate()` parameter for it: the shared library
+   discovers the host source of that mount and forwards it read-only into every
+   stage container (brik validates the referential at init).
+
+The `Jenkinsfile` stays the same two lines:
 
 ```groovy
 @Library('brik') _
-brikIntegrate(brikInfraDir: '/path/to/infra-referential')
+brikIntegrate()
 ```
 
 The deploy job resolves versions to digests, verifies attestations, and checks

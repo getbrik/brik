@@ -35,27 +35,30 @@ git add -A
 git commit -m "Initial commit"
 git remote add origin http://your-gitlab.example.com/brik/gitlab-templates.git
 git push -u origin main
-git tag v0.7.0
+git tag v0.7.0          # pin to the Brik release you pushed in step 1
 git push origin v0.7.0
 ```
 
 ## 3. Add the bootstrap file to your project
 
-Add a `.gitlab-ci.yml` to your project root:
+Add a `.gitlab-ci.yml` to your project root. This file is the GitLab adapter
+wiring: a thin entry point that hands your run to Brik. It carries no delivery
+logic of its own; the pipeline itself is defined by the `brik.yml` you add next
+(step 4), identical on every platform.
 
 ```yaml
 include:
   - project: 'brik/gitlab-templates'
-    ref: v0.7.0
+    ref: v0.7.0                          # the gitlab-templates tag from step 2
     file: '/templates/brik-integrate.yml'
 ```
 
-This is a single classic pipeline: a `brik-plan` job computes the
-execution plan, then every stage job consults it and skips itself when
-the plan marks the stage not-applicable: a docs-only commit shows the
-skipped stages as green "skipped (per plan)" jobs without running their
-work. See [platforms/gitlab.md](../reference/platforms/gitlab.md) for the full
-job graph.
+On GitLab this materializes as a single classic pipeline: a `brik-plan` job
+computes the execution plan, then every stage job consults it and skips itself
+when the plan marks the stage not-applicable; for example, a docs-only commit
+shows the skipped stages as green "skipped (per plan)" jobs without running
+their work. See [platforms/gitlab.md](../reference/platforms/gitlab.md) for the
+full job graph.
 
 ## 4. Add a `brik.yml`
 

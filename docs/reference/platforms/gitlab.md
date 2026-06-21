@@ -97,10 +97,11 @@ the value flows through the dotenv promotion, not through the file. The
 file is preserved primarily as a debugging artifact and as the canonical
 mechanism on Jenkins/local where no dotenv-promotion exists.
 
-**Every job template declares `reports.dotenv: .brik-logs/pipeline.env`.**
-A single job missing the declaration drops its keys from the CI variable
-merge in downstream jobs. The parity is enforced statically by
-`spec/integration/gitlab_dotenv_parity_spec.sh`.
+**Every stage-job template declares `reports.dotenv: .brik-logs/pipeline.env`.**
+(The `brik-plan` job is exempt: it produces only `plan.json`, never
+`pipeline.env`.) A single stage job missing the declaration drops its keys from
+the CI variable merge in downstream jobs. The parity is enforced statically by
+`spec/integration/adapter-parity/gitlab_dotenv_parity_spec.sh`.
 
 ### needs ordering matters
 
@@ -257,7 +258,7 @@ hardcodes the cobertura defaults:
 ```yaml
 coverage_report:
   coverage_format: cobertura
-  path: coverage/coverage.xml
+  path: brik-artifacts/test/coverage/coverage.xml
 ```
 
 Out of the box:
