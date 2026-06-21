@@ -66,7 +66,8 @@ once and identical on every platform.
 
 A `brik.yml` for a deployable Node service (CI, GitOps CD, and a promotion
 gate) describing **what** to run and **which** destinations to target, each by
-its authority and path. No vendor syntax, no URL schemes to trust, no secrets:
+its endpoint (a registry repository or a clonable git URL). No vendor pipeline
+syntax, no credentials, no secrets:
 
 ```yaml
 version: 1
@@ -79,19 +80,35 @@ project:
 release:
   strategy: semver
   tag_prefix: v
+  candidate:
+    docker:                                # CI publishes every build to the candidate channel
+      registry: registry.candidate.example.com
+      image: orders/orders-api
+  release:
+    docker:                                # promote retags into the release channel on a tag
+      registry: registry.release.example.com
+      image: orders/orders-api
 
 test:
   framework: jest
 
+package:
+  docker:
+    image: registry.candidate.example.com/orders/orders-api
+    dockerfile: Dockerfile
+
 publish:
-  docker:                                  # authority + path, never a scheme or a secret
-    registry: nexus.acme.test:8082         #   where to publish (host:port)
-    image: platform/orders-api             #   what to call it (repository path)
+  docker:
+    registry: registry.candidate.example.com
 
 artifacts:
+  channels:                                # named registry endpoints the CD flow resolves against
+    candidate:
+      registry: registry.candidate.example.com/orders/orders-api
+    release:
+      registry: registry.release.example.com/orders/orders-api
   evidence:                                # append-only journal: promotions + deployments
-    host: gitea.acme.test:3000
-    repo: platform/orders-evidence
+    repo: https://git.example.com/orders/orders-evidence.git
     branch: main
     sign: true                             # sign each evidence commit
 
@@ -101,18 +118,18 @@ deploy:
       target: gitops                       # ArgoCD reconciles a config repo (pull-based)
       accepts_channel: release
       validates_for: production            # a green staging deploy vouches for production
-      host: gitea.acme.test:3000           # config-repo authority
-      repo: platform/orders-config         #   path
-      path: k8s/staging                    #   manifests subfolder
+      repo: https://git.example.com/orders/orders-config.git
+      path: k8s/staging                    #   manifests subfolder in that repo
+      controller: argocd
       app_name: orders-staging
       gates:
         require_digest: true               # never deploy a mutable tag
     production:
       target: gitops
       accepts_channel: release
-      host: gitea.acme.test:3000
-      repo: platform/orders-config-prod
+      repo: https://git.example.com/orders/orders-config-prod.git
       path: k8s/production
+      controller: argocd
       app_name: orders-prod
       gates:
         require_digest: true
@@ -125,12 +142,12 @@ flow, the promotion chain between environments, and the gates that protect
 production. It is configuration you own, not code locked to a vendor (no
 hand-written `.gitlab-ci.yml`, no custom-Groovy `Jenkinsfile`, no bash glue).
 
-Notice what is **not** there: no `https://`, no registry password, no
-`controller:`. Whether a destination is reached over TLS with which trust, which
-credential authenticates it, and which signing backend it uses are not the
-project's concern: that wiring lives in the **infrastructure referential**
-(next section). The `brik.yml` names destinations by authority and path; it
-never carries a secret, not even a secret's variable name.
+Notice what is **not** there: no registry password, no SSH key, no signing
+backend. A destination is named by its endpoint, but which credential
+authenticates it, which trust verifies its TLS, and which signing backend
+attests it are not the project's concern: that wiring lives in the
+**infrastructure referential** (next section). The `brik.yml` names destinations;
+it never carries a secret, not even a secret's variable name.
 
 And it is as large as your project needs, no larger. Only `version` and
 `project.name` are required; the stack is auto-detected and every other field
@@ -138,9 +155,10 @@ has a per-stack default. You configure your project. You never write pipeline
 logic.
 
 > [!NOTE]
-> This shows Brik's **target configuration model**. For the exact fields the
-> shipped schema validates today, see the
-> **[`brik.yml` reference](docs/reference/configuration/README.md)**.
+> This config validates against the shipped schema as-is. For every field and
+> its per-stack defaults, see the
+> **[`brik.yml` reference](docs/reference/configuration/README.md)**, and
+> [`examples/`](examples/) for runnable per-stack and CD configs.
 
 ## One definition, every platform
 
@@ -190,8 +208,8 @@ Each platform ships as a small shared library you wire in once and then forget:
 ## The infrastructure referential
 
 The `brik.yml` is only one half of the picture. It names *what* runs and *which*
-destination it targets (by authority and path), then deliberately stops: no URL
-scheme, no credential, not even a secret's variable name.
+destination it targets (by endpoint), then deliberately stops: no credential,
+not even a secret's variable name.
 
 The other half (*how* each destination is reached and trusted) lives in a
 second file, the **infrastructure referential**: the interface between Brik and
