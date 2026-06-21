@@ -6,6 +6,7 @@
 
 Format: `<notion>.<submodule>.<verb>` (convention layout.md).
 
+<!-- BEGIN AUTO-GENERATED: public-api -->
 | Function| Source file |
 |---|---|
 | `banner.brik` | `pipeline/banner.sh:25` |
@@ -66,44 +67,51 @@ Format: `<notion>.<submodule>.<verb>` (convention layout.md).
 | `_pipeline._compute_business_summary` | `pipeline/pipeline.sh:77` |
 | `_pipeline._stamp_context` | `pipeline/pipeline.sh:106` |
 | `_pipeline._stamp_dry_run` | `pipeline/pipeline.sh:130` |
-| `_pipeline._should_skip` | `pipeline/pipeline.sh:159` |
-| `pipeline.run` | `pipeline/pipeline.sh:195` |
-| `_pipeline._archive_report` | `pipeline/pipeline.sh:358` |
-| `_report._backend_path` | `pipeline/report.sh:30` |
-| `_report._require_jq` | `pipeline/report.sh:37` |
-| `report.init` | `pipeline/report.sh:49` |
-| `report.record` | `pipeline/report.sh:97` |
-| `report.record_object` | `pipeline/report.sh:132` |
-| `report.has_status` | `pipeline/report.sh:172` |
-| `report.read` | `pipeline/report.sh:199` |
-| `_report._append_json` | `pipeline/report.sh:240` |
-| `_report._append_json_object` | `pipeline/report.sh:292` |
-| `report.write_fragment` | `pipeline/report.sh:364` |
-| `report.aggregate_fragments` | `pipeline/report.sh:491` |
-| `_report._enrich_findings_items` | `pipeline/report.sh:794` |
-| `_report._render_aggregate_md` | `pipeline/report.sh:869` |
-| `report.render` | `pipeline/report.sh:1213` |
-| `report.render_terminal` | `pipeline/report.sh:1334` |
-| `report.render_aggregate_terminal` | `pipeline/report.sh:1430` |
-| `_report._render_md` | `pipeline/report.sh:1635` |
+| `_pipeline._stamp_pipeline_source` | `pipeline/pipeline.sh:154` |
+| `_pipeline._should_skip` | `pipeline/pipeline.sh:183` |
+| `pipeline.run` | `pipeline/pipeline.sh:219` |
+| `_pipeline._archive_report` | `pipeline/pipeline.sh:383` |
+| `report.write_fragment` | `pipeline/report/fragment.sh:53` |
+| `report.aggregate_fragments` | `pipeline/report/fragment.sh:180` |
+| `_report._ancestors_map` | `pipeline/report/fragment.sh:497` |
+| `_report._stamp_lifecycle` | `pipeline/report/fragment.sh:524` |
+| `_report._enrich_findings_items` | `pipeline/report/fragment.sh:641` |
+| `_report._stage_order` | `pipeline/report/fragment.sh:717` |
+| `_report._classify_lifecycle` | `pipeline/report/lifecycle.sh:38` |
+| `_report._render_aggregate_md` | `pipeline/report/render_md.sh:29` |
+| `report.render` | `pipeline/report/render_md.sh:362` |
+| `_report._render_md` | `pipeline/report/render_md.sh:460` |
+| `report.render_terminal` | `pipeline/report/render_terminal.sh:48` |
+| `report.render_aggregate_terminal` | `pipeline/report/render_terminal.sh:144` |
+| `_report._backend_path` | `pipeline/report/store.sh:27` |
+| `_report._require_jq` | `pipeline/report/store.sh:34` |
+| `report.init` | `pipeline/report/store.sh:46` |
+| `report.record` | `pipeline/report/store.sh:96` |
+| `report.record_object` | `pipeline/report/store.sh:131` |
+| `report.has_status` | `pipeline/report/store.sh:171` |
+| `report.read` | `pipeline/report/store.sh:198` |
+| `_report._append_json` | `pipeline/report/store.sh:239` |
+| `_report._append_json_object` | `pipeline/report/store.sh:291` |
 | `_report._render_html_head` | `pipeline/report_html/head.sh:17` |
 | `_report._render_html` | `pipeline/report_html/render.sh:35` |
 | `_report._render_html_tail` | `pipeline/report_html/tail.sh:15` |
-| `runner.resolve_image` | `pipeline/runner-images.sh:37` |
+| `runner.base_image` | `pipeline/runner-images.sh:44` |
+| `runner.resolve_image` | `pipeline/runner-images.sh:53` |
+| `runner.resolve_stack_or_base` | `pipeline/runner-images.sh:88` |
 | `_stage._load_runtime` | `pipeline/stage.sh:19` |
 | `_helpers.epoch_ms` | `pipeline/stage.sh:55` |
 | `_helpers.set_if_unset` | `pipeline/stage.sh:75` |
 | `_pipeline.detect_metadata` | `pipeline/stage.sh:103` |
-| `_pipeline._normalize_remote_url` | `pipeline/stage.sh:215` |
-| `stage.create_log_file` | `pipeline/stage.sh:249` |
-| `stage.with_logging` | `pipeline/stage.sh:269` |
-| `stage.execute` | `pipeline/stage.sh:285` |
-| `stage.cleanup` | `pipeline/stage.sh:318` |
-| `_stage._finalize_fragment` | `pipeline/stage.sh:344` |
-| `_stage._record_business` | `pipeline/stage.sh:405` |
-| `_stage.run._project_env` | `pipeline/stage.sh:477` |
-| `stage.run` | `pipeline/stage.sh:506` |
-| `stage.dispatch` | `pipeline/stage.sh:607` |
+| `_pipeline._normalize_remote_url` | `pipeline/stage.sh:221` |
+| `stage.create_log_file` | `pipeline/stage.sh:255` |
+| `stage.with_logging` | `pipeline/stage.sh:275` |
+| `stage.execute` | `pipeline/stage.sh:291` |
+| `stage.cleanup` | `pipeline/stage.sh:324` |
+| `_stage._finalize_fragment` | `pipeline/stage.sh:350` |
+| `_stage._record_business` | `pipeline/stage.sh:411` |
+| `_stage.run._project_env` | `pipeline/stage.sh:483` |
+| `stage.run` | `pipeline/stage.sh:512` |
+| `stage.dispatch` | `pipeline/stage.sh:613` |
 | `summary.build` | `pipeline/summary.sh:22` |
 | `summary.write_json` | `pipeline/summary.sh:110` |
 | `summary.print_human` | `pipeline/summary.sh:121` |
@@ -113,7 +121,8 @@ Format: `<notion>.<submodule>.<verb>` (convention layout.md).
 
 ## Total
 
-**102 unique public functions** in notion `execution`.
+**109 unique public functions** in notion `execution`.
+<!-- END AUTO-GENERATED -->
 
 ## Outputs publiés (observés sur campagne v0.6.0)
 

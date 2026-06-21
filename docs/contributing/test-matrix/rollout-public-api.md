@@ -6,11 +6,13 @@
 
 Format: `<notion>.<submodule>.<verb>` (convention layout.md).
 
+<!-- BEGIN AUTO-GENERATED: public-api -->
 | Function| Source file |
 |---|---|
 | `rollout.health.check` | `rollout/health.sh:19` |
 | `_rollout.health._url_status_check` | `rollout/health.sh:69` |
 | `rollout.health.wait` | `rollout/health.sh:82` |
+| `rollout.health.k8s_wait` | `rollout/health.sh:132` |
 | `rollout.profile.resolve` | `rollout/profile.sh:24` |
 | `rollout.profile.merge` | `rollout/profile.sh:51` |
 | `rollout.strategy.run` | `rollout/strategy.sh:30` |
@@ -24,4 +26,5 @@ Format: `<notion>.<submodule>.<verb>` (convention layout.md).
 
 ## Total
 
-**13 unique public functions** in notion `rollout`.
+**14 unique public functions** in notion `rollout`.
+<!-- END AUTO-GENERATED -->
