@@ -7,6 +7,119 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+150 commits since 0.7.0.
+
+This cycle splits delivery into two decoupled flows and makes the second one
+real. CI (`brik integrate`) still builds and signs one immutable artifact; a new
+**CD flow** (`brik deploy`) consumes an artifact that already exists, proves it
+against fail-closed gates, and deploys a digest-pinned image, decoupled in time
+from the build. A new **infrastructure referential** holds every endpoint,
+credential, and trust material behind the names `brik.yml` uses, so the project
+config never carries a secret. Brik also becomes a **first-class local
+runtime**, running each stage in its pinned runner-class container on your
+laptop. A large documentation overhaul accompanies the change.
+
+### Added
+
+- **CD flow (`brik deploy`)** -- a decoupled CD verb that resolves a version to
+  a digest in the channel the environment accepts, deploys a digest-pinned image
+  across all five targets (k8s, helm, compose, ssh, gitops), reads the live
+  digest back, and journals the result. Adds an `on_health_failure` policy and
+  resolves the environment definition at a declared `config_ref`, independent of
+  the artifact version.
+- **Deploy plan-kind** (`planType=deploy`) -- the planner emits a deploy plan;
+  CI stages outside the deploy subset self-skip so `brik plan gate` returns skip.
+- **CD verbs** -- `brik promote` (copy an image *and* its signed evidence graph
+  to another channel, proven on the destination), `brik authorize` (append a
+  digest-bound release grant to the promotion journal), and `brik status`
+  (report an environment as three layers -- journal, desired, live -- with drift
+  verdicts).
+- **Supply-chain attestation** -- sign image evidence with cosign at the digest;
+  attach a CycloneDX SBOM and SLSA provenance as OCI referrers; record build
+  evidence and verify it before deploying; freeze the brik builder-identity
+  convention in the provenance.
+- **Fail-closed CD gates** -- `require_attestation` (the signed SBOM + provenance
+  on the digest) and `requires_eligibility` (a signed grant in the promotion
+  journal), alongside `require_digest`.
+- **Append-only journals** -- a PromotionJournal (`artifact_promoted` /
+  `artifact_validated_for` / `artifact_authorized_for`) and a DeploymentJournal
+  (`deployed`) live in a per-project state repo, optionally ssh-signed with the
+  referential's key and branch-protected; a successful deploy on an environment
+  that declares `validates_for` auto-emits the eligibility grant for the next
+  environment in the chain.
+- **Infrastructure referential** (new notion) -- the driven port that holds the
+  Registry, GitHost, Signing, SecretManager, ArgoCD, K8sTarget, SshTarget,
+  PackageRegistry, Notification, Credential, Binding and Policy documents. It is
+  mandatory at init and pinned into `plan.json`; the signing backend, package
+  registries and notification webhook all resolve through it; supports
+  `tls.trust: custom-ca`.
+- **Provider manifest family and capability contracts** -- interchangeable
+  providers behind versioned contracts, proven by `brik provider test`.
+- **First-class local execution** -- each stage runs in its runner-class
+  container locally, the same images as CI; a bundled `p-local` default
+  referential gives zero-ceremony local CI; `--platform` pins the container
+  architecture for parity; `--bind-mount` iterates on live files;
+  `brik integrate --release` cuts a local release run; the verify group runs
+  independently, matching CI.
+- **Adapters** -- a `pipeline-params` single source of truth with a
+  cross-adapter parity gate, a GitLab CD pipeline template
+  (`pipeline-deploy.yml`), and a Jenkins `brikDeploy` entry point. Structured CD
+  notifications carry build projections and a retention declaration.
+- **Config schema** -- artifact channels and deploy gates; trigger-source
+  recording with cross-adapter parity.
+
+### Changed
+
+- The CI and CD entry points are named `brik integrate` and `brik deploy` -- two
+  fixed flows, decoupled in time.
+- `require_provenance` is replaced by the `require_attestation` gate.
+- The local CLI surface is made honest: every command (including two-word
+  subcommands) answers `--help`, `brik init` infers the node test framework, and
+  `brik plan` runs with zero ceremony.
+- Signing credentials are confined to the signing phase, CI and CD credentials
+  are scoped by phase, and registry credentials are kept out of the process
+  table.
+- `docker` is never auto-detected as a project stack.
+
+### Deprecated
+
+- **Inline credential fields in `brik.yml`** (`token_var`, `username_var`,
+  `password_var`, `git_token_var`, `auth_token_var`): credentials now resolve
+  from the infrastructure referential, which binds each endpoint to a credential.
+  `brik.yml` names only the registry/repo (authority and path); the example
+  configs no longer carry the inline variables.
+
+### Fixed
+
+- Deploy fails closed when a compose file ignores the pinned image ref; the
+  `--namespace` flag is scoped to the k8s/helm/compose targets.
+- Resolution worktrees are cleaned on every exit path; clone credentials are
+  redacted and git tokens are injected into plain-HTTP URLs too.
+- The `validates_for` read-back converges before the verdict; a reproducible
+  re-run of a build converges as a no-op.
+- Local-key signatures stay off the public transparency log; cosign reaches
+  insecure and authenticated registries; only the digest pushed this run is
+  attested.
+- Container-scan scans the freshly built image; `brik doctor` probes git as a
+  host prerequisite; the aggressive planner-mode error code is rc=2; the rollout
+  profile merge uses a busybox-compatible `mktemp` template.
+
+### Documentation
+
+- The README is rewritten as a user- and concept-first landing page that frames
+  `brik.yml` and the referential as hexagonal ports and adapters, and presents
+  the two flows as one whole.
+- The documentation is reorganized by audience (Diataxis), with a generated
+  per-field config reference (co-located examples), new concept pages, a
+  supply-chain model page, and dedicated reference pages for artifacts, the
+  pipeline, the infrastructure referential and the pipeline report.
+- A documentation-accuracy pass validates the getting-started, reference, how-to
+  and contributing docs against the code (platform guides, per-stack coverage
+  formats, the policy-cache path, registry manifest fields, CLI exit codes); the
+  public API surface tables are now generated from source
+  (`scripts/gen-public-api.sh`).
+- Examples are redesigned as documented references and schema fixtures.
+
 ## [0.7.0] - 2026-06-03
 
 67 commits since 0.6.0.
@@ -713,6 +826,10 @@ fixtures:
 - `briklab.sh test --jenkins --complete` : **5/5 PASS** (node, python, java, rust, dotnet)
 - `briklab.sh test --gitlab --complete`  : **5/5 PASS**
 
+[Unreleased]: https://github.com/getbrik/brik/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/getbrik/brik/compare/v0.6.0...v0.7.0
+[0.6.0]: https://github.com/getbrik/brik/compare/v0.5.0...v0.6.0
+[0.5.0]: https://github.com/getbrik/brik/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/getbrik/brik/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/getbrik/brik/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/getbrik/brik/releases/tag/v0.2.0
