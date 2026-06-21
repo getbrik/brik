@@ -1,7 +1,7 @@
 # Brik Domain Layout
 
-The `lib/` tree is organized around **eleven notions** that form Brik's domain
-vocabulary. Ten map to a directory under `lib/`; one (execution environment)
+The `lib/` tree is organized around **twelve notions** that form Brik's domain
+vocabulary. Eleven map to a directory under `lib/`; one (execution environment)
 maps to `shared-libs/`. Functions are named `<notion>.<submodule>.<verb>`
 (e.g. `stages.build`, `stacks.node.build`, `transverse.wait.until`,
 `cli.validate.run`).
@@ -101,6 +101,10 @@ mindmap
       Coverage-as-finding
       Org policy
 
+    Providers
+      Cosign attestation
+      Contract verification
+
     CLI
       validate
       doctor
@@ -131,7 +135,7 @@ Notes on the mindmap:
 - **CLI** is not part of the domain notions; it is a command layer that sits
   above the notions and delegates into them.
 
-## The Eleven Notions (table)
+## The Twelve Notions (table)
 
 | #  | Notion               | Directory                       | Responsibility                                                                  |
 |----|----------------------|---------------------------------|---------------------------------------------------------------------------------|
@@ -145,7 +149,8 @@ Notes on the mindmap:
 | 8  | Rollout              | `lib/rollout/`                  | Post-deploy rollout semantics (`health`, `strategy`, `profile`).                |
 | 9  | Findings             | `lib/transverse/findings*`      | Quality data normalization: SARIF pivot, non-SARIF converters, platform-aware exporters, fix-classification, severity normalization, coverage-as-finding, org policy resolution. Physically nested under `transverse/` for now; promotion to a top-level `lib/findings/` is left for a follow-up to avoid a mass rename of `transverse.findings.*` callers. |
 | 10 | Planning             | `lib/planning/`                 | Stage-selection planning: `plan` (build the selection plan), `impact` (path-change impact analysis), `plan_reader` / `plan_writer` (read and emit `plan.json`). |
-| 11 | Registry             | `lib/registry/`                 | Stage and stack manifests (`manifests/stages/`, `manifests/stacks/`) plus their loader, validator, and cache: the declarative source for gate modes and runner classes. |
+| 11 | Registry             | `lib/registry/`                 | Stage, stack, provider, and contract manifests (`manifests/{stages,stacks,providers,contracts}/`) plus their loader, validator, and cache: the declarative source for gate modes and runner classes. |
+| 12 | Providers            | `lib/providers/`                | Runtime implementations of capability providers behind their versioned contracts (e.g. `cosign` for artifact attestation), plus contract introspection: a provider is bound per capability and proven by `brik provider test`. |
 
 Plus one CLI-only directory not part of the domain notions but kept under `lib/`
 for consistency with the loader:
