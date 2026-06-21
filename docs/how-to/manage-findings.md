@@ -174,7 +174,7 @@ brik-artifacts/
 | referential `Policy` document | none | Fetches the org policy at init; fail-closed when unreachable |
 | `BRIK_SECURITY_SEVERITY_THRESHOLD` | `high` | Severity floor used by `apply_policy` |
 | `BRIK_FINDINGS_EXPIRING_SOON_DAYS` | `30` | Window for `findings.expiring_soon` warnings at init |
-| `BRIK_POLICY_CACHE_PATH` | `${BRIK_WORKSPACE}/brik-artifacts/.policy.cache.json` | Compiled-policy cache location |
+| `BRIK_POLICY_CACHE_PATH` | `${BRIK_WORKSPACE}/.brik-logs/policy.cache.json` | Compiled-policy cache location |
 
 ## Expiring-soon notice
 
