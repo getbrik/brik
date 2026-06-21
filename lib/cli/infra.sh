@@ -414,7 +414,7 @@ endpoints:
   registry-release: registry-push
   git-host: git-api
 capabilities:
-  artifact-attestation: cosign-kms
+  artifact-attestation: cosign-kms-openbao
   evidence-commit-signing: ssh-signing
 YAML
 }
