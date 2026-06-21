@@ -43,6 +43,12 @@ regen-docs: ## Regenerate the auto-managed Quick reference tables from the schem
 check-docs-drift: ## Verify the auto-managed tables match the schema (CI gate)
 	./scripts/gen-config-reference.sh --check
 
+regen-public-api: ## Regenerate the public API surface tables from the source tree
+	./scripts/gen-public-api.sh --apply --all
+
+check-public-api: ## Verify the public API surface tables match the source (advisory; line refs are volatile)
+	./scripts/gen-public-api.sh --check
+
 check: lint coverage validate validate-schemas validate-docs check-docs-drift ## Full pre-commit gate (lint + coverage + validate + schemas + docs + drift)
 
 install: ## Install brik symlink into /usr/local/bin (dev mode)

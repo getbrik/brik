@@ -6,6 +6,7 @@
 
 Format: `<notion>.<submodule>.<verb>` (convention layout.md).
 
+<!-- BEGIN AUTO-GENERATED: public-api -->
 | Function| Source file |
 |---|---|
 | `stacks.cache_paths` | `stacks/_deps.sh:38` |
@@ -41,3 +42,4 @@ Format: `<notion>.<submodule>.<verb>` (convention layout.md).
 ## Total
 
 **29 unique public functions** in notion `stacks`.
+<!-- END AUTO-GENERATED -->

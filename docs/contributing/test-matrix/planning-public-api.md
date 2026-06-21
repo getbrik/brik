@@ -6,6 +6,7 @@
 
 Format: `<notion>.<submodule>.<verb>` (convention layout.md).
 
+<!-- BEGIN AUTO-GENERATED: public-api -->
 | Function| Source file |
 |---|---|
 | `impact.match_one` | `planning/impact.sh:32` |
@@ -13,10 +14,10 @@ Format: `<notion>.<submodule>.<verb>` (convention layout.md).
 | `impact.stage_patterns` | `planning/impact.sh:66` |
 | `impact.stage_is_impacted` | `planning/impact.sh:103` |
 | `impact.stage_matched_globs` | `planning/impact.sh:128` |
-| `plan.stages.ordered` | `planning/plan.sh:22` |
-| `plan.dag.edges` | `planning/plan.sh:31` |
-| `plan.decide` | `planning/plan.sh:68` |
-| `plan.compute` | `planning/plan.sh:126` |
+| `plan.stages.ordered` | `planning/plan.sh:24` |
+| `plan.dag.edges` | `planning/plan.sh:33` |
+| `plan.decide` | `planning/plan.sh:70` |
+| `plan.compute` | `planning/plan.sh:128` |
 | `_plan_reader._resolve_path` | `planning/plan_reader.sh:22` |
 | `pipeline.plan.should_run` | `planning/plan_reader.sh:47` |
 | `pipeline.plan.reason` | `planning/plan_reader.sh:67` |
@@ -28,11 +29,12 @@ Format: `<notion>.<submodule>.<verb>` (convention layout.md).
 | `pipeline.plan.release_version` | `planning/plan_reader.sh:146` |
 | `pipeline.plan.is_candidate` | `planning/plan_reader.sh:158` |
 | `plan_writer.from_stream` | `planning/plan_writer.sh:21` |
-| `plan_writer.write` | `planning/plan_writer.sh:170` |
+| `plan_writer.write` | `planning/plan_writer.sh:192` |
 
 ## Total
 
 **21 unique public functions** in notion `planning`.
+<!-- END AUTO-GENERATED -->
 
 ## Outputs publiés (observés sur campagne v0.6.0)
 

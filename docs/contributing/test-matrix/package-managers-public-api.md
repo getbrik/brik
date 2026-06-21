@@ -6,16 +6,21 @@
 
 Format: `<notion>.<submodule>.<verb>` (convention layout.md).
 
+<!-- BEGIN AUTO-GENERATED: public-api -->
 | Function| Source file |
 |---|---|
+| `_pkg.endpoint._var_of_ref` | `package-managers/_endpoint.sh:21` |
+| `pkg.endpoint.resolve` | `package-managers/_endpoint.sh:45` |
+| `pkg.registry.resolve` | `package-managers/_endpoint.sh:140` |
 | `pkg.cargo.publish` | `package-managers/cargo.sh:16` |
 | `pkg.docker.publish` | `package-managers/docker.sh:15` |
 | `pkg.maven.publish` | `package-managers/maven.sh:15` |
 | `pkg.npm.publish` | `package-managers/npm.sh:14` |
 | `pkg.nuget.publish` | `package-managers/nuget.sh:14` |
 | `pkg.pypi.publish` | `package-managers/pypi.sh:15` |
-| `_pkg._pypi_cleanup_env` | `package-managers/pypi.sh:138` |
+| `_pkg._pypi_cleanup_env` | `package-managers/pypi.sh:163` |
 
 ## Total
 
-**7 unique public functions** in notion `package-managers`.
+**10 unique public functions** in notion `package-managers`.
+<!-- END AUTO-GENERATED -->

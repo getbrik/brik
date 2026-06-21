@@ -6,43 +6,51 @@
 
 Format: `<notion>.<submodule>.<verb>` (convention layout.md).
 
+<!-- BEGIN AUTO-GENERATED: public-api -->
 | Function| Source file |
 |---|---|
 | `stages.build` | `stages/build.sh:7` |
 | `_stages.build._record_artifact` | `stages/build.sh:94` |
 | `stages.container_scan` | `stages/container_scan.sh:23` |
+| `_stages.container_scan._sign_evidence` | `stages/container_scan.sh:125` |
+| `_stages.container_scan._record_evidence` | `stages/container_scan.sh:185` |
 | `stages.deploy` | `stages/deploy.sh:7` |
 | `stages.init` | `stages/init.sh:7` |
-| `_stages.init._resolve_git_identity` | `stages/init.sh:138` |
-| `_stages.init._warn_legacy_enabled_keys` | `stages/init.sh:164` |
-| `_stages.init._resolve_runner_image` | `stages/init.sh:181` |
-| `_stages.init._collect_prereqs` | `stages/init.sh:204` |
-| `_stages.init._collect_tool_versions` | `stages/init.sh:219` |
-| `_stages.init._build_commit_object` | `stages/init.sh:252` |
-| `_stages.init._build_pipeline_ref_object` | `stages/init.sh:285` |
-| `_stages.init._has_block` | `stages/init.sh:302` |
-| `_stages.init._record_env_section` | `stages/init.sh:314` |
-| `_stages.init._load_org_policy` | `stages/init.sh:389` |
-| `_stages.init._record_expiring_soon` | `stages/init.sh:416` |
+| `_stages.init._resolve_git_identity` | `stages/init.sh:151` |
+| `_stages.init._warn_legacy_enabled_keys` | `stages/init.sh:177` |
+| `_stages.init._resolve_runner_image` | `stages/init.sh:197` |
+| `_stages.init._collect_prereqs` | `stages/init.sh:221` |
+| `_stages.init._collect_tool_versions` | `stages/init.sh:236` |
+| `_stages.init._build_commit_object` | `stages/init.sh:269` |
+| `_stages.init._build_pipeline_ref_object` | `stages/init.sh:302` |
+| `_stages.init._has_block` | `stages/init.sh:319` |
+| `_stages.init._record_env_section` | `stages/init.sh:331` |
+| `_stages.init._load_org_policy` | `stages/init.sh:446` |
+| `_stages.init._record_expiring_soon` | `stages/init.sh:488` |
 | `stages.lint` | `stages/lint.sh:10` |
 | `_lint._record_business` | `stages/lint.sh:105` |
 | `_notify._is_ci_aggregation_mode` | `stages/notify.sh:29` |
 | `_notify._build_notify_metadata` | `stages/notify.sh:60` |
-| `_notify._inject_notify_metadata` | `stages/notify.sh:117` |
-| `_notify._should_send` | `stages/notify.sh:159` |
-| `notify.slack` | `stages/notify.sh:173` |
-| `notify.email` | `stages/notify.sh:240` |
-| `notify.webhook` | `stages/notify.sh:293` |
-| `notify.send` | `stages/notify.sh:354` |
-| `stages.notify` | `stages/notify.sh:394` |
-| `_notify._merge_findings_pipeline` | `stages/notify.sh:589` |
-| `_notify._export_gitlab_sast` | `stages/notify.sh:610` |
+| `_notify._inject_notify_metadata` | `stages/notify.sh:122` |
+| `_notify._should_send` | `stages/notify.sh:164` |
+| `_notify._webhook_endpoint` | `stages/notify.sh:181` |
+| `notify.slack` | `stages/notify.sh:213` |
+| `notify.email` | `stages/notify.sh:280` |
+| `notify.webhook_configured` | `stages/notify.sh:333` |
+| `notify.webhook` | `stages/notify.sh:345` |
+| `notify.send` | `stages/notify.sh:445` |
+| `stages.notify` | `stages/notify.sh:485` |
+| `_notify._merge_findings_pipeline` | `stages/notify.sh:685` |
+| `_notify._export_gitlab_sast` | `stages/notify.sh:706` |
 | `stages.package` | `stages/package.sh:7` |
-| `_stages.package._parse_registry` | `stages/package.sh:181` |
-| `stages.promote` | `stages/promote.sh:19` |
+| `_stages.package._record_pushed_image` | `stages/package.sh:182` |
+| `_stages.package._parse_registry` | `stages/package.sh:210` |
+| `_promote.docker_login` | `stages/promote.sh:23` |
+| `_promote.channels` | `stages/promote.sh:70` |
+| `stages.promote` | `stages/promote.sh:129` |
 | `stages.release` | `stages/release.sh:7` |
-| `_stages.release._prepare` | `stages/release.sh:93` |
-| `_stages.release._finalize` | `stages/release.sh:200` |
+| `_stages.release._prepare` | `stages/release.sh:92` |
+| `_stages.release._finalize` | `stages/release.sh:199` |
 | `stages.sast` | `stages/sast.sh:8` |
 | `stages.scan` | `stages/scan.sh:10` |
 | `_scan._record_business` | `stages/scan.sh:65` |
@@ -60,12 +68,15 @@ Format: `<notion>.<submodule>.<verb>` (convention layout.md).
 | `verify.format.run` | `stages/verify/format.sh:15` |
 | `verify.lint.run` | `stages/verify/lint.sh:15` |
 | `_verify._scan._run` | `stages/verify/scan/_scan.sh:23` |
+| `_verify.scan._flag_tool_error` | `stages/verify/scan/_scan.sh:83` |
 | `_verify.scan.container._build_grype_command` | `stages/verify/scan/container.sh:20` |
 | `verify.scan.container.run` | `stages/verify/scan/container.sh:29` |
-| `verify.scan.deps.run` | `stages/verify/scan/deps.sh:20` |
-| `_verify.scan.deps._write_empty_reports` | `stages/verify/scan/deps.sh:145` |
-| `_verify.scan.deps._emit_reports` | `stages/verify/scan/deps.sh:160` |
-| `_verify.scan.deps._emit_sbom` | `stages/verify/scan/deps.sh:178` |
+| `verify.scan.deps.run` | `stages/verify/scan/deps.sh:27` |
+| `_verify.scan.deps._run_osv` | `stages/verify/scan/deps.sh:101` |
+| `_verify.scan.deps._run_table` | `stages/verify/scan/deps.sh:187` |
+| `_verify.scan.deps._write_empty_reports` | `stages/verify/scan/deps.sh:233` |
+| `_verify.scan.deps._log_findings` | `stages/verify/scan/deps.sh:252` |
+| `_verify.scan.deps._emit_sbom` | `stages/verify/scan/deps.sh:275` |
 | `verify.scan.iac.run` | `stages/verify/scan/iac.sh:20` |
 | `verify.scan.license.run` | `stages/verify/scan/license.sh:19` |
 | `_verify.scan.sast._build_command` | `stages/verify/scan/sast.sh:26` |
@@ -79,7 +90,8 @@ Format: `<notion>.<submodule>.<verb>` (convention layout.md).
 
 ## Total
 
-**68 unique public functions** in notion `stages`.
+**78 unique public functions** in notion `stages`.
+<!-- END AUTO-GENERATED -->
 
 ## Outputs publiés (observés sur campagne v0.6.0)
 
