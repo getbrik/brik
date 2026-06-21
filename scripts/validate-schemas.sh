@@ -131,6 +131,51 @@ while IFS= read -r schema; do
     pass=$((pass + 1))
 done < <(find "$SCHEMAS_DIR" -type f -name '*.schema.json' | LC_ALL=C sort)
 
+# Vendored third-party schemas under schemas/external/ are pinned by content in
+# SCHEMAS.sha256 so a copy cannot drift unnoticed (these files are not rewritten
+# and carry no $schema/$id we author). Enforce that manifest: every recorded
+# digest matches, and no external schema file is left unpinned.
+external_dir="${SCHEMAS_DIR}/external"
+checksum_file="${external_dir}/SCHEMAS.sha256"
+if [[ ! -f "$checksum_file" ]]; then
+    printf '[validate-schemas] FAIL schemas/external/SCHEMAS.sha256: missing checksum manifest\n' >&2
+    fail=$((fail + 1))
+    fail_files+=("schemas/external/SCHEMAS.sha256")
+else
+    sha_cmd=()
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha_cmd=(sha256sum)
+    elif command -v shasum >/dev/null 2>&1; then
+        sha_cmd=(shasum -a 256)
+    fi
+
+    if [[ "${#sha_cmd[@]}" -eq 0 ]]; then
+        printf '[validate-schemas] FAIL schemas/external/SCHEMAS.sha256: no sha256 tool (sha256sum or shasum) on PATH\n' >&2
+        fail=$((fail + 1))
+        fail_files+=("schemas/external/SCHEMAS.sha256")
+    elif ( cd "$external_dir" && "${sha_cmd[@]}" -c SCHEMAS.sha256 ) >/dev/null 2>&1; then
+        printf '[validate-schemas] OK   schemas/external/SCHEMAS.sha256 (vendored digests match)\n'
+        pass=$((pass + 1))
+    else
+        printf '[validate-schemas] FAIL schemas/external/SCHEMAS.sha256: vendored external schema digests do not match\n' >&2
+        ( cd "$external_dir" && "${sha_cmd[@]}" -c SCHEMAS.sha256 ) 2>&1 \
+            | grep -vi ': OK$' | sed 's/^/[validate-schemas]   /' >&2 || true
+        fail=$((fail + 1))
+        fail_files+=("schemas/external/SCHEMAS.sha256")
+    fi
+
+    # No external schema may ship unpinned: every *.json under external/ must
+    # have a line in the manifest.
+    while IFS= read -r ext_file; do
+        ext_base="$(basename "$ext_file")"
+        if ! grep -qE "  ${ext_base}\$" "$checksum_file"; then
+            printf '[validate-schemas] FAIL schemas/external/%s: not pinned in SCHEMAS.sha256\n' "$ext_base" >&2
+            fail=$((fail + 1))
+            fail_files+=("schemas/external/${ext_base}")
+        fi
+    done < <(find "$external_dir" -maxdepth 1 -type f -name '*.json' | LC_ALL=C sort)
+fi
+
 printf '\n[validate-schemas] %d passed, %d failed (validator=%s)\n' "$pass" "$fail" "$validator"
 if [[ "$fail" -gt 0 ]]; then
     printf '[validate-schemas] failed files:\n' >&2
