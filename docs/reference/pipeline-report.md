@@ -219,10 +219,11 @@ Skipped environments (failing `when`, missing target) are excluded from
 
 ### `notify`
 
-`notify` is a meta-stage that produces the report itself, so it never emits a
-per-stage fragment into `stages[]`. After the aggregate is built, `stages.notify`
-patches it in place with a top-level `pipeline.notify` block and re-renders the
-HTML. The notify job log remains the source of truth for actual delivery.
+`notify` is the meta-stage that builds the aggregate report. It still records
+its own per-stage fragment, so `notify` appears in `stages[]` like any other
+stage; it then patches the aggregate in place with a top-level `pipeline.notify`
+block and re-renders the HTML. The notify job log remains the source of truth
+for actual delivery.
 
 ## Top-level `pipeline.notify`
 

@@ -86,6 +86,7 @@ The schemas are the source of truth: [`schemas/referential/v1/`](../../schemas/r
   endpoints/             # one document per endpoint (Registry, GitHost, Signing, ...)
   credentials/           # Credential documents (references only, never values)
   bindings/              # which credential serves which endpoint + capabilities
+  policies/              # optional org Policy documents (kind: Policy)
   trust/                 # signing keys, verification keys, allowed signers
   schemas/               # a copy of the v1 schemas, for offline validation
 ```
@@ -122,8 +123,8 @@ The OCI registry for container artifacts. Required: `name`, `url`, `tls`.
 |-------|------|-------|
 | `url` | string | registry base URL |
 | `tls.trust` | enum | `system` / `custom-ca` / `insecure` |
-| `referrers` | boolean | the registry supports the OCI referrers API (evidence graph) |
-| `zone` | string | the channel zone this registry serves (`candidate` / `release`) |
+| `referrers` | boolean | (deprecated) the registry supports the OCI referrers API (evidence graph) |
+| `zone` | string | (deprecated) free-form channel-zone name for this registry |
 
 ### PackageRegistry (`kind: PackageRegistry`)
 
@@ -160,7 +161,7 @@ The cosign signing posture for evidence and attestations. Required: `name`,
 | `key` | string | private-key reference when `backend: key` (e.g. `file://trust/cosign.key`) |
 | `kms_uri` | string | KMS key URI when `backend: kms` (e.g. `openbao://brik-signing`) |
 | `verification_key` | string | exported public key used on verify; lets verifiers check signatures without the private key or a KMS round-trip |
-| `fulcio_url`, `rekor_url`, `trusted_root`, `signing_config` | string | private-Sigstore overrides (for `rekor-private`) |
+| `fulcio_url`, `rekor_url`, `trusted_root`, `signing_config` | string | private-Sigstore overrides (for `rekor-private`); `fulcio_url` and `signing_config` are deprecated |
 
 ### SecretManager (`kind: SecretManager`)
 
@@ -170,7 +171,7 @@ A secret manager (OpenBAO) backing `bao://` references. Required: `name`, `url`,
 | Field | Type | Notes |
 |-------|------|-------|
 | `url` | string | manager base URL |
-| `auth.method` | enum | `token` |
+| `auth.method` | enum | `token` (deprecated) |
 | `auth.ref` | string | `env://` or `file://` reference to the auth token |
 | `transit_mount` | string | the Transit mount used for `kms` signing (optional) |
 | `tls.trust` | enum | `system` / `custom-ca` / `insecure` |
@@ -204,7 +205,7 @@ rejects a literal secret. Required: `name`, `method`, plus the method's fields.
 | `ssh-key` | `private_key` | `private_key` |
 | `mtls` | `client_cert`, `client_key` | both `client_cert` and `client_key` |
 | `workload-identity` | (none) | resolved from the ambient workload OIDC identity, no static secret |
-| `oidc` | (none) | resolved from the CI OIDC identity |
+| `oidc` | (none) | (deprecated) resolved from the CI OIDC identity |
 | `none` | (none) | anonymous |
 
 Reference schemes (matched by `^(env|file|bao)://`):
@@ -224,6 +225,9 @@ each capability. Required: `name`.
 |-------|-------|---------|
 | `endpoints` | `{ <endpoint-name>: <credential-name> }` | the credential each endpoint authenticates with |
 | `capabilities` | `{ <capability>: <provider> }` | which provider satisfies a capability |
+
+The `capabilities` map is declared and structurally validated, but no pipeline
+runtime reads it yet to select a provider during a run.
 
 Capabilities and the providers that implement them (from the registry):
 
