@@ -49,16 +49,16 @@ brik-artifacts/sast/findings.sarif        # OK (depth 2)
 brik-artifacts/sast/sast.sarif            # OK (raw tool output)
 brik-artifacts/test/junit.xml             # OK
 brik-artifacts/test/coverage/coverage.xml # OK: coverage/ is a legitimate
-                                          # multi-output directory (cobertura
-                                          # XML + lcov + HTML report)
+                                          # multi-output directory (a coverage
+                                          # tool may drop more than one file)
 .brik-logs/init.log                       # OK
 .brik-logs/policy.cache.json              # OK
 ```
 
 The `test/coverage/` subdirectory is an exception that proves the rule:
-it exists because coverage tools (nyc, coverage.py, jacoco, cargo-llvm-cov,
-dotnet) emit several formats (Cobertura XML, lcov.info, HTML browser,
-text-summary) and must point them all at one directory.
+it exists because a coverage tool (jest, coverage.py, jacoco, cargo-llvm-cov,
+dotnet) can drop more than one file alongside the canonical report Brik
+collects (cobertura `coverage.xml`, or `jacoco.xml` for java).
 
 ## SARIF naming convention
 

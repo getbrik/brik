@@ -20,7 +20,7 @@ With nothing else, Brik:
   for the test reports flow);
 - runs `clippy` for the lint sub-stage;
 - runs `rustfmt` for formatting;
-- emits an `lcov` coverage report (via `cargo-llvm-cov`) when
+- emits a `cobertura` coverage report (via `cargo-llvm-cov`) when
   `test.reports.enabled: true`.
 
 ## Typical brik.yml

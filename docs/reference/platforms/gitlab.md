@@ -265,14 +265,16 @@ Out of the box:
 
 | Stack | Coverage format produced | GitLab badge |
 |-------|--------------------------|--------------|
-| python (pytest-cov) | cobertura -> `coverage/coverage.xml` | works |
-| dotnet (XPlat Code Coverage) | cobertura -> `coverage/<guid>/coverage.cobertura.xml` | flatten or override path |
+| node (jest / vitest) | cobertura -> `brik-artifacts/test/coverage/coverage.xml` | works |
+| python (pytest-cov) | cobertura -> `brik-artifacts/test/coverage/coverage.xml` | works |
+| rust (cargo-llvm-cov) | cobertura -> `brik-artifacts/test/coverage/coverage.xml` | works |
+| dotnet (XPlat Code Coverage) | cobertura -> `brik-artifacts/test/coverage/coverage.xml` | works |
 | java (jacoco) | jacoco -> `brik-artifacts/test/coverage/jacoco.xml` | override format to jacoco |
-| node (jest --coverage) | lcov -> `coverage/lcov.info` | override or accept no badge |
-| rust (cargo-llvm-cov) | lcov -> `coverage/lcov.info` | override or accept no badge |
 
-Stacks where the badge does not match still archive their coverage files and the
-pipeline stays green; only the inline MR-diff badge is missing.
+Every stack flattens its coverage to the template's cobertura path, so the
+inline MR-diff badge works out of the box, except java: its jacoco output needs
+the project-level override below. A stack still archives its coverage files and
+the pipeline stays green regardless.
 
 ### Coverage percentage badge (automatic)
 
