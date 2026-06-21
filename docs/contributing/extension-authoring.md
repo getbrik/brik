@@ -16,7 +16,7 @@ Five checks, all of which must pass for the command to exit 0:
 
 | # | Check | What it verifies |
 |---|---|---|
-| 1 | Schema | Every `<ext>/stacks/*.yml` validates against `schemas/registry/v1/stack.schema.json`; same for `stages/*.yml`. |
+| 1 | Schema | Every `<ext>/stacks/*.yml` validates against `schemas/registry/v1/stack.schema.json`; same for `stages/*.yml` and `providers/*.yml` against their schemas. |
 | 2 | API symbols | Every function listed in a manifest's `spec.api.required` is defined somewhere under `<ext>/lib/` or the brik builtin `lib/`. |
 | 3 | No-exit | Stage modules under `<ext>/lib/stages/*.sh` contain no top-level `exit ` calls. Stages run inside `stage.run`, which traps non-zero `return` values; an `exit` would skip the orchestrator's finally block. |
 | 4 | Compile | `BRIK_REGISTRY_EXTENSIONS_DIRS=<ext> compile-registry.sh` produces a merged cache with no id collision against builtins. |
@@ -28,7 +28,7 @@ Exit codes:
 |---|---|
 | 0 | every check passed |
 | 2 | one or more checks failed (`BRIK_EXIT_INVALID_INPUT`) |
-| 69 | dependency missing (`jv` / `check-jsonschema` / `yq` / `jq` not on PATH) |
+| 3 | dependency missing (`jv` / `check-jsonschema` / `yq` / `jq` not on PATH) |
 
 ## Extension directory layout
 

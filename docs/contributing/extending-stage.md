@@ -31,7 +31,7 @@ change touches the stage entry point, every platform adapter, and the schema.
 ## Repository layout
 
 The stage files live in `lib/stages/`; the rest of the runtime is organized by
-the nine domain notions (see [layout.md](layout.md)). The annotated tree:
+the twelve domain notions (see [layout.md](layout.md)). The annotated tree:
 
 ```
 brik/
@@ -71,6 +71,6 @@ The `verify/` directory is internal implementation, not a CI-visible stage:
 ## See also
 
 - [Stage lifecycle](stage-lifecycle.md): what `stage.run` wraps your stage with
-- [Layout](layout.md): the nine domain notions in detail
+- [Layout](layout.md): the twelve domain notions in detail
 - [Extending a stack](extending-stack.md): the more common extension
 - [Architecture](../concepts/architecture.md): why the flow is fixed

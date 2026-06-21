@@ -138,6 +138,7 @@ a code is a planner change, not an adapter change.
 | `no-impact` | `balanced` mode, declared globs but no changed file matched. |
 | `no-impact-declared` | `balanced` mode, stage neither declares own globs nor inherits from the stack (conservative run). |
 | `no-diff` | Cold start: `changes.source=none`, conservative run. |
+| `not-in-deploy-plan` | Deploy plan: a CI stage outside the deploy subset, force-skipped so its `brik plan gate` returns skip. |
 | `plan-test` | Reserved for adapter tests. Not emitted by the planner. |
 
 ## DAG block
