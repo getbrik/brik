@@ -115,15 +115,13 @@ storage footprint of every CI runner.
 
 ## spec.frameworks
 
-Maps user-declared framework hints (in `brik.yml` `test.framework`,
-`build.tool`, etc.) to the stack that handles them.
+Maps a user-declared `test.framework` hint (in `brik.yml`) to the stack
+that handles it.
 
 ```yaml
 frameworks:
   test:
     jest:  {stack: node}
-    npm:   {stack: node}
-  build:
     npm:   {stack: node}
 ```
 

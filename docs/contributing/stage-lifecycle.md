@@ -14,7 +14,7 @@ flowchart TD
     B --> C["hook.pre_stage"]
     C -->|abort| Z["summary.build -> _stage._finalize_fragment<br/>-> _stage.run._project_env -> stage.cleanup -> return"]
     C -->|continue| D["stage.with_logging<br/>-> stage.execute (the logic function)"]
-    D --> E["context.set BRIK_FINISHED_AT"]
+    D --> E["_context._set BRIK_FINISHED_AT"]
     E --> F["hook.on_success OR hook.on_failure<br/>(best effort)"]
     F --> G["hook.post_stage<br/>(best effort)"]
     G --> H["summary.build"]

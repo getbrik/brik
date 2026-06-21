@@ -27,7 +27,7 @@ your `PATH` (for example `~/.local/bin/jv`).
 | `make validate-docs` | Validate every fenced `yaml` block under `docs/configuration/` |
 | `make regen-docs` | Regenerate the auto-managed Quick reference tables from the schema |
 | `make check-docs-drift` | Verify the auto-managed tables match the schema (CI gate) |
-| `make check` | Full pre-commit gate: `lint + coverage + validate + validate-docs + check-docs-drift` |
+| `make check` | Full pre-commit gate: `lint + coverage + validate + validate-schemas + validate-docs + check-docs-drift` |
 | `make metrics` | Run shellmetrics on production scripts |
 | `make install` / `make uninstall` | Symlink `bin/brik` into `/usr/local/bin` (dev mode) |
 | `make clean` | Remove the generated `coverage/` directory |

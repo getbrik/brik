@@ -96,6 +96,7 @@ closed set:
 | `no-impact` | skip | balanced | impact globs declared but no changed file matched |
 | `no-impact-declared` | run | balanced | stage has no impact globs (conservative run) |
 | `no-diff` | run | balanced | `changes.source=none` (cold start) |
+| `not-in-deploy-plan` | skip | (deploy plan) | CI stage outside the deploy subset, force-skipped |
 | `plan-test` | run/skip | (test fixture) | reserved for hand-crafted adapter tests |
 
 ## Picking a mode for a new project

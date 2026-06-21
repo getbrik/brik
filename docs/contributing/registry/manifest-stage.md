@@ -19,7 +19,7 @@ spec:
   module: stages.my_stage          # Bash module path
   function: stages.my_stage         # function to invoke
   placement:
-    slot: lint                      # logical position in the fixed flow
+    slot: verify                    # logical position in the fixed flow
     after: [build]
     before: [package]
   runner:
@@ -72,7 +72,7 @@ Where the stage sits in the fixed flow.
 
 ```yaml
 placement:
-  slot: lint                       # logical group (governs parallelism)
+  slot: verify                     # logical group (governs parallelism)
   after: [build]
   before: [package]
   group: verify                    # optional, for the "Verify" umbrella in GitLab
@@ -80,7 +80,7 @@ placement:
 
 | Field | Semantics |
 |---|---|
-| `slot` | Conceptual position. The compiler uses it as a coarse rank; `after`/`before` refine it. Slot names mirror the fixed flow (`init`, `release`, `build`, `lint`, `sast`, `scan`, `test`, `package`, `container-scan`, `deploy`, `notify`). |
+| `slot` | Conceptual position. The compiler uses it as a coarse rank; `after`/`before` refine it. Slot names come from the schema enum (`init`, `release`, `pre-build`, `build`, `post-build`, `verify`, `pre-package`, `package`, `post-package`, `pre-deploy`, `deploy`, `post-deploy`, `notify`); the four quality stages share `slot: verify`. |
 | `after` | List of stage ids this stage must follow. |
 | `before` | List of stage ids this stage must precede. |
 | `group` | Logical bundle. GitLab maps groups to umbrella jobs (the four verify-stage stages share `group: verify`). |
@@ -129,12 +129,12 @@ Whether the stage runs by default.
 gate:
   mode: opt_in                     # blocking | opt_in
   opt_in_flag: --with-release      # required when mode = opt_in
-  contexts: [release]              # optional, restricts to listed contexts
+  contexts: [release]              # required, restricts to listed contexts
 ```
 
 | `mode` | Behaviour |
 |---|---|
-| `blocking` | Stage runs whenever the current `context` matches `contexts` (or unconditionally if `contexts` is empty). |
+| `blocking` | Stage runs whenever the current `context` matches one of `contexts` (which is required and non-empty; a stage that should always run lists every context, e.g. `[snapshot, release]`). |
 | `opt_in` | Stage is skipped unless the planner is called with `opt_in_flag` (e.g. `--with-release`) OR `BRIK_WITH_<NAME>=true` is set. |
 
 `contexts` lists the pipeline contexts that allow the stage. The
