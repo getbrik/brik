@@ -1,5 +1,9 @@
 # Sprint S2 Purity Audit
 
+> Historical record. The `spec/_legacy/` tree this audit classified has since
+> been migrated into `spec/unit/` and `spec/integration/`; the paths below no
+> longer exist.
+
 Static audit of `brik/spec/_legacy/` specs against the L1 purity criterion:
 "A spec must run inside a minimal Alpine container (bash + jq + yq +
 ShellSpec). If it invokes `docker`, `kubectl`, `grype`, `npm`, etc., it
