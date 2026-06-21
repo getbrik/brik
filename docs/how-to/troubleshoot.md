@@ -11,9 +11,9 @@ Brik needs `yq` and `jq` on every runner.
   fails, the runner has no internet access: use a `brik-runner-*` image (which
   ships `yq`, `jq`, `git`, `bash` preinstalled) or mirror the images to a
   reachable registry.
-- **Jenkins**: with Docker agents (the default) `yq` and `jq` are preinstalled
-  in the runner images. Without Docker agents (`useDockerAgent: false`), install
-  `yq` and `jq` on the agent node.
+- **Jenkins**: every stage runs in a `brik-runner` container where `yq` and `jq`
+  are preinstalled. The agent node still needs `yq`, `jq`, and `git` for the
+  planner, which runs directly on the agent.
 - **Local**: run `brik doctor` to see which tools are missing; see
   [getting-started/local.md](../getting-started/local.md#install).
 

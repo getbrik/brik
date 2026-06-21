@@ -13,8 +13,8 @@
  *                     (default: auto-detected from the Jenkins container)
  *
  * Fixed flow:
- *   Init -> Release -> Build -> Lint||SAST||Scan||Test -> Package
- *        -> Container Scan -> Deploy -> Notify
+ *   Init -> Plan -> Release -> Build -> Lint||SAST||Scan||Test -> Package
+ *        -> Container Scan -> Deploy (gated off by default) -> Notify (finally)
  *
  * All business logic lives in portable Bash stages (lib/stages/). This
  * Groovy file is a thin orchestrator: every stage runs inside a

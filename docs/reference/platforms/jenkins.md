@@ -52,9 +52,8 @@ two entry points (`brikIntegrate` for CI, `brikDeploy` for CD) and six helpers:
 
 ## Runner images
 
-With `useDockerAgent: true` (the default), each stage runs inside a Docker
-container. The Init stage reads `project.stack` and `project.stack_version` from
-`brik.yml` to resolve the stack image:
+Each stage runs inside a Docker container. The Init stage reads `project.stack`
+and `project.stack_version` from `brik.yml` to resolve the stack image:
 
 | Stack | Resolved image |
 |-------|----------------|
@@ -78,8 +77,9 @@ To override every image at once (mirror / private registry), pass
 brik library root is resolved to absolute before it reaches the stage
 containers. See [runner-classes.md](../../concepts/runner-classes.md).
 
-If `stack` is unset or unrecognized, no image is resolved and stages run
-directly on the Jenkins agent (same as `useDockerAgent: false`).
+If `stack` is unset or unrecognized, the stack image falls back to
+`ghcr.io/getbrik/brik-runner-base:latest`, so the stack-class stages still run
+in the base container.
 
 ## Stage selection
 
@@ -108,18 +108,12 @@ unconditional flow (`BRIK_PLAN_FILE` unset means every gate returns true).
 | `brikHome` | auto-detected | Path to the Brik shared library |
 | `nodeLabel` | `''` (any) | Jenkins agent label |
 | `timeoutMin` | `60` | Pipeline timeout in minutes |
-| `useDockerAgent` | `true` | Run stages in `brik-runner` Docker containers |
 | `dockerNetwork` | auto-detected | Docker network for runner containers |
 
 There is no parameter for the infrastructure referential: mount it at
 `/etc/brik/infra` in the Jenkins controller container, and the shared
 library discovers the host source of that mount and forwards it read-only
 into every stage container (brik validates it eagerly at init).
-
-```groovy
-@Library('brik') _
-brikIntegrate(useDockerAgent: false)   // run on the agent instead of containers
-```
 
 ### Job parameters (user-overridable inputs)
 
@@ -189,21 +183,22 @@ The CD inputs mirror `lib/registry/pipeline-params.yml` (single source of truth)
 
 ### BRIK_HOME
 
-Jenkins clones Global Libraries into `${WORKSPACE}@libs/brik/`. The brik repo
-contains both the runtime and the shared library, so that path is used directly
-as `BRIK_HOME`, no extra clone.
+Jenkins clones Global Libraries into a hash-named directory under
+`${WORKSPACE}@libs/`. The brik repo contains both the runtime and the shared
+library, so `brikResolveHome` scans those directories for the one holding
+`vars/brikIntegrate.groovy` and uses it as `BRIK_HOME`, no extra clone.
 
 ### Docker integration and caches
 
-With `useDockerAgent: true`, `brikIntegrate` runs Init on the agent to read
-`brik.yml`, resolves the stack image, pulls it, and runs Build, Lint, Test, and
-Package inside it. Init and Notify run in the base image; SAST runs in the
-analysis image; Scan and Container Scan run in the scanner image; Deploy runs
-in the deploy image. It
-auto-detects the Docker network from the Jenkins container, mounts
-`/var/run/docker.sock` for the Package stage, and sets `HOME=$WORKSPACE` so tool
-caches (`npm`, `pip`, `Maven`, `Gradle`, `Cargo`, `NuGet`) persist in the
-workspace across builds. The `cleanWs` step preserves those cache directories.
+`brikIntegrate` reads `brik.yml` at Init, resolves the stack image, and pulls
+it, then runs each stage in its runner-class container. Init and Notify run in
+the base image; Build, Lint, Test, and Package run in the stack image; SAST runs
+in the analysis image; Scan and Container Scan run in the scanner image; Deploy
+runs in the deploy image. It auto-detects the Docker network from the Jenkins
+container, mounts `/var/run/docker.sock` for the Package stage, and sets
+`HOME=$WORKSPACE` so tool caches (`npm`, `pip`, `Maven`, `Gradle`, `Cargo`,
+`NuGet`) persist in the workspace across builds. The `cleanWs` step preserves
+those cache directories.
 
 Environment variables matching `NEXUS_*`, `BRIK_*`, `REGISTRY_*`, `ARGOCD_*`,
 `CARGO_*`, or `SSH_*` are forwarded into the containers via an env file.
@@ -234,12 +229,13 @@ every other container keeps the read-only registry account. See
 
 ## Prerequisites
 
-With Docker agents (default), the Jenkins **controller** needs Docker running
-and access to `ghcr.io/getbrik/*` images (or a private mirror).
+The Jenkins **controller** needs Docker running and access to
+`ghcr.io/getbrik/*` images (or a private mirror): every stage runs in a
+`brik-runner` container.
 
-Without Docker agents (`useDockerAgent: false`), the **agent node** needs
-`bash 4+`, `yq`, `jq`, `jv` (or `check-jsonschema` as a fallback), `git`, plus
-the tools required by your stack and stages.
+The **agent node** also needs `bash 4+`, `yq`, `jq`, and `git`: the planner runs
+directly on the agent (outside a container) to produce `plan.json` before the
+stage containers start.
 
 ## See also
 
