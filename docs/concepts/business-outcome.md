@@ -24,6 +24,9 @@ business.evaluate \
   --tech-status   success|failed|skipped \
   --context       snapshot|release \
   [--findings-ignored <integer>=0] \
+  [--findings-failing-has-fix <integer>=0] \
+  [--findings-failing-no-fix  <integer>=0] \
+  [--findings-failing-unknown <integer>=0] \
   [--tech-kind <string>=""]
 ```
 

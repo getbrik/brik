@@ -128,8 +128,8 @@ The provenance predicate CI emits carries a verifiable builder identity that
   signatures without key access or a KMS round-trip.
 - Trust material, endpoints, and credential references live in the
   [infrastructure referential](../reference/infrastructure-referential.md);
-  credentials are references (`env://`, `file://`), never values, and Brik
-  validates the referential fail-closed at init and deploy.
+  credentials are references (`env://`, `file://`, `bao://`), never values, and
+  Brik validates the referential fail-closed at init and deploy.
 
 ### Credential separation
 
