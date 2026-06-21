@@ -4,7 +4,7 @@ Unlike the other domain notions, the transverse notion has **no I/O
 artifact** to schematise. Its public functions (`lib/transverse/*.sh` +
 sub-directories) are pure helpers consumed by every other notion. The L0
 contract here is a set of **static code invariants** declared in
-[`docs/internals/layout.md`](../layout.md#invariants) and
+[`docs/contributing/layout.md`](../layout.md#invariants) and
 verified by `brik/spec/contracts/transverse_contract_spec.sh` via grep /
 file checks.
 
