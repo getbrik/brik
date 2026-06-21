@@ -15,8 +15,6 @@ package:
 publish:
   docker:
     registry: registry.example.com
-    username_var: BRIK_PUBLISH_DOCKER_USER
-    password_var: BRIK_PUBLISH_DOCKER_PASSWORD
 artifacts:
   channels:
     release:
@@ -24,7 +22,6 @@ artifacts:
   evidence:
     repo: https://git.example.com/payments/evidence.git
     branch: main
-    token_var: BRIK_GIT_TOKEN
     sign: true
 deploy:
   environments:
@@ -40,7 +37,6 @@ deploy:
         verify_issuer: "^https://token\\.actions\\.githubusercontent\\.com$"
         requires_eligibility: [artifact_authorized_for]
       repo: https://git.example.com/payments/config-deploy.git
-      git_token_var: BRIK_GIT_TOKEN
       path: k8s
       source: k8s
       controller: argocd

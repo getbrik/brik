@@ -15,15 +15,12 @@ package:
 publish:
   docker:
     registry: registry.example.com
-    username_var: BRIK_PUBLISH_DOCKER_USER
-    password_var: BRIK_PUBLISH_DOCKER_PASSWORD
 artifacts:
   channels:
     release:
       registry: registry.example.com/storefront/web
   evidence:
     repo: https://git.example.com/storefront/evidence.git
-    token_var: BRIK_GIT_TOKEN
     branch: main
     sign: false
 deploy:
@@ -75,7 +72,6 @@ deploy:
       when: "tag =~ 'v*'"
       accepts_channel: release
       repo: https://git.example.com/storefront/infra.git
-      git_token_var: BRIK_GIT_TOKEN
       path: apps/storefront
       source: k8s
       controller: argocd
