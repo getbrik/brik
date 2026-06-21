@@ -65,10 +65,10 @@ These guide every implementation decision in Brik.
 
 ```mermaid
 flowchart TD
-    L3["Layer 3 - brik.yml<br/>project configuration: stack, tools, thresholds, environments"]
-    L2["Layer 2 - Shared Library (per platform)<br/>maps the fixed flow to native CI constructs, invokes stage.run"]
-    L1["Layer 1 - brik-lib<br/>reusable CI/CD functions: stacks.*, verify.*, deploy.*, pkg.*, rollout.*, transverse.*"]
-    L0["Layer 0 - Bash Runtime<br/>stage.run lifecycle, logging, context, hooks, summary"]
+    L3["Layer 3: brik.yml<br/>project configuration: stack, tools, thresholds, environments"]
+    L2["Layer 2: Shared Library (per platform)<br/>maps the fixed flow to native CI constructs, invokes stage.run"]
+    L1["Layer 1: brik-lib<br/>reusable CI/CD functions: stacks.*, verify.*, deploy.*, pkg.*, rollout.*, transverse.*"]
+    L0["Layer 0: Bash Runtime<br/>stage.run lifecycle, logging, context, hooks, summary"]
     L3 --> L2 --> L1 --> L0
 ```
 
@@ -152,6 +152,6 @@ rotation happens at the secret-manager level, invisible to Brik code.
 
 - [Fixed flow](fixed-flows.md): the 12 stages and their order
 - [Data layout](data-layout.md): the runtime on-disk contract (`brik-artifacts/` vs `.brik-logs/`)
-- [Layout](../contributing/layout.md): the domain notions and the `lib/` tree (ten domain directories)
+- [Layout](../contributing/layout.md): the domain notions and the `lib/` tree (twelve notions)
 - [Stage lifecycle](../contributing/stage-lifecycle.md): the `stage.run` lifecycle in detail
 - [Business outcome](business-outcome.md): the tech/business two-axis result model

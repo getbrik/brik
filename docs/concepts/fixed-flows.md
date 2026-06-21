@@ -133,11 +133,12 @@ For every `brik.yml` section (what it is for and how to set it) see the
 - **Which stages run on a given commit** is decided up front by the
   [plan](plan.md) (`brik plan --explain`); on GitLab/Jenkins a `brik-plan` job
   computes it and each stage consults it via `brik plan gate`.
-- **Opt-in stages and triggers.** Release, Package, Container Scan, Deploy, and
-  Notify declare `gate.mode: opt_in` in their manifests and run only when the
-  matching context flag (`--with-release`, `--with-package`, `--with-deploy`) is
-  set, or when a `release.trigger` / `package.trigger` / `deploy.trigger` block
-  in `brik.yml` matches. See the
+- **Opt-in stages and triggers.** Release, Package, Container Scan, and Deploy
+  declare `gate.mode: opt_in` in their manifests and run only when the matching
+  context flag (`--with-release`, `--with-package`, `--with-deploy`) is set, or
+  when a `release.trigger` / `package.trigger` / `deploy.trigger` block in
+  `brik.yml` matches. Notify is `blocking`: it always closes the CI flow, and a
+  deploy run additionally schedules it after Deploy. See the
   [release](../reference/configuration/release.md),
   [package](../reference/configuration/package.md), and
   [deploy](../reference/configuration/deploy.md) reference pages.

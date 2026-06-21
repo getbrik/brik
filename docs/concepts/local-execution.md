@@ -5,8 +5,8 @@ Local execution is containerized: on a bare host, `brik integrate`,
 Each stage executes in a container of its runner class, with the same images,
 the same plan gate, and the same gates as the GitLab and Jenkins adapters. The
 host needs `bash`, `git`, `jq`, `yq` and a reachable container engine
-(`docker`; `brik doctor` checks them), nothing else: the project toolchain
-lives in the stack images.
+(`docker`), nothing else: the project toolchain lives in the stack images.
+`brik doctor` verifies the container engine and the `bash`/`git`/`jq`/`yq` tooling.
 
 ## Zero-setup first run
 
@@ -50,7 +50,7 @@ One run = one named workspace volume (`brik-run-<id>`):
    by init into the volume's `pipeline.env`. Stages sharing a placement
    group run as an independent wave: the verify group
    (`[lint || sast || scan || test]`) behaves exactly like the parallel CI
-   jobs -- a failure in one does **not** skip its siblings, so the local
+   jobs: a failure in one does **not** skip its siblings, so the local
    stage set and outcome match CI for the same commit. A failure still gates
    the next wave (downstream stages do not run unless `--continue-on-error`),
    and `notify` always runs.
@@ -113,7 +113,7 @@ accepted differences:
   Silicon); CI runners may build amd64. Digests pin content per platform.
   Pass `--platform <p>` (e.g. `brik integrate --platform linux/amd64`, or set
   `BRIK_LOCAL_PLATFORM`) to run every container on a specific platform for
-  exact CI parity -- slower on a mismatched host (Rosetta/QEMU).
+  exact CI parity; slower on a mismatched host (Rosetta/QEMU).
 - **Network**: stage containers sit on the default bridge. The
   referential's endpoint URLs must be reachable from a container; endpoint
   hosts the HOST resolves through a loopback `/etc/hosts` entry (a

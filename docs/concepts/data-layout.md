@@ -5,7 +5,7 @@ the contract between the runtime and external consumers (CI platforms,
 operators, downstream tooling), and the helpers stages should use to
 write under this layout.
 
-For the code-level domain layout (the `lib/` tree, nine notions), see
+For the code-level domain layout (the `lib/` tree, twelve notions), see
 [internals/layout.md](../contributing/layout.md). For the architectural
 rationale behind separating code from runtime data, see
 [architecture.md](architecture.md).
@@ -48,7 +48,7 @@ Both roots follow the same depth rule: **max two levels**, structure
 brik-artifacts/sast/findings.sarif        # OK (depth 2)
 brik-artifacts/sast/sast.sarif            # OK (raw tool output)
 brik-artifacts/test/junit.xml             # OK
-brik-artifacts/test/coverage/coverage.xml # OK -- coverage/ is a legitimate
+brik-artifacts/test/coverage/coverage.xml # OK: coverage/ is a legitimate
                                           # multi-output directory (cobertura
                                           # XML + lcov + HTML report)
 .brik-logs/init.log                       # OK

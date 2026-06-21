@@ -54,14 +54,16 @@ the documents it consumes before acting: `brik.yml` at validate/init, every
 referential document at init and deploy, the plan on write, promotion-journal
 events on write *and* on read (an invalid event poisons the whole read, never
 skipped). The validator chain prefers `jv` (Go) and falls back to
-`check-jsonschema` (Python); with neither available the operation fails as a
-missing dependency rather than running unvalidated.
+`check-jsonschema` (Python). For the journals and the referential, when neither
+is available the operation fails closed as a missing dependency rather than
+running unvalidated; `brik.yml` validation degrades to a logged skip instead.
 
 **Versioned evolution.** Each family lives in a versioned directory
 (`config/v1/`, `report/v1.1/`, ...). A breaking change is a new version
 directory consumed explicitly, never a silent mutation. Third-party formats
-(SARIF 2.1.0, CycloneDX 1.5) are vendored under `schemas/external/` behind a
-checksum, so they cannot drift with a network fetch. Spec campaigns validate
+(SARIF 2.1.0, CycloneDX 1.5) are vendored under `schemas/external/` and pinned by
+a `SCHEMAS.sha256` digest manifest that `make check` and CI verify, so a vendored
+copy cannot drift unnoticed. Spec campaigns validate
 real produced artifacts against the schemas, so a contract break fails the
 suite before it ships.
 
@@ -77,6 +79,7 @@ The schema families:
 | `policy/v1` | the org-wide policy document (findings posture, `state_repo_protection`) |
 | `report/v1`, `report/v1.1`, `stages/v1` | the pipeline report backbone, its per-stage fragments, and stage summaries |
 | `execution/v1` | the dotenv contract between stages |
+| `execution-environment/v1` | the `BRIK_*` wrapper context every platform adapter exports before delegating to the runtime |
 | `findings/v1` | Brik's extensions to SARIF findings |
 | `rollout/v1` | the built-in deployment workflow profiles |
 | `external/` | pinned third-party formats (SARIF, CycloneDX) |

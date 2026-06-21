@@ -15,7 +15,12 @@ against [`schemas/plan/v1/plan.schema.json`](../../schemas/plan/v1/plan.schema.j
   "schemaVersion": "v1",
   "brikVersion": "0.7.0",
   "context": "snapshot",
-  "mode": "balanced",
+  "mode": "safe",
+  "release": {
+    "profile": "trunk-based",
+    "version": "1.2.3",
+    "is_candidate": false
+  },
   "workspace": "/path/to/repo",
   "changes": {
     "source": "local",
@@ -52,6 +57,7 @@ Key fields:
 |---|---|
 | `context` | `snapshot` for tag-less commits, `release` when `BRIK_COMMIT_TAG` is set. Mirrors the `pipeline.context` concept. |
 | `mode` | `safe` (default), `balanced`, or `aggressive` (not yet implemented; currently errors). |
+| `release` | Release state computed by Init: `profile` (git workflow), `version` (semver from the latest tag), and `is_candidate`. Adapters route candidate vs release from it. |
 | `infra.fingerprint` | sha256 of the infrastructure referential (endpoints, credentials, policies, trust material). Used for audit: every deployment can be traced to the exact policy in effect when the plan was created. |
 | `stages[].decision` | `run` or `skip`. |
 | `stages[].reason` | Machine-readable code: `context-match`, `context-mismatch`, `opt-in-flag-missing`, `no-impact`, `no-impact-declared`, `no-diff`, `impacted`. |
@@ -79,7 +85,7 @@ pipeline:
     mode: balanced
     stages:
       # Optional per-stage glob overrides (not yet wired into the
-      # planner -- the registry's spec.impact wins).
+      # planner; the registry's spec.impact wins).
       lint:
         changes: ["src/**/*.ts"]
 ```
