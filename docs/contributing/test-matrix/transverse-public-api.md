@@ -171,17 +171,19 @@ Format: `<notion>.<submodule>.<verb>` (convention layout.md).
 | `infra.policy` | `transverse/infra.sh:295` |
 | `infra.policy_names` | `transverse/infra.sh:299` |
 | `infra.capability_norm` | `transverse/infra.sh:316` |
-| `infra.credential_for` | `transverse/infra.sh:338` |
-| `infra.credential_for_endpoint` | `transverse/infra.sh:370` |
-| `infra.endpoint_of_kind` | `transverse/infra.sh:407` |
-| `infra.registry_for` | `transverse/infra.sh:439` |
-| `infra.evidence_token_var` | `transverse/infra.sh:486` |
-| `infra.tls_ca` | `transverse/infra.sh:535` |
-| `infra.ssh_target_for` | `transverse/infra.sh:564` |
-| `infra.env_var_of_ref` | `transverse/infra.sh:592` |
-| `infra.resolve_ref` | `transverse/infra.sh:616` |
-| `infra.fingerprint` | `transverse/infra.sh:658` |
-| `infra.secret_vars` | `transverse/infra.sh:686` |
+| `infra.capability_provider` | `transverse/infra.sh:343` |
+| `infra.endpoint_for_capability` | `transverse/infra.sh:378` |
+| `infra.credential_for` | `transverse/infra.sh:424` |
+| `infra.credential_for_endpoint` | `transverse/infra.sh:456` |
+| `infra.endpoint_of_kind` | `transverse/infra.sh:493` |
+| `infra.registry_for` | `transverse/infra.sh:525` |
+| `infra.evidence_token_var` | `transverse/infra.sh:572` |
+| `infra.tls_ca` | `transverse/infra.sh:621` |
+| `infra.ssh_target_for` | `transverse/infra.sh:650` |
+| `infra.env_var_of_ref` | `transverse/infra.sh:678` |
+| `infra.resolve_ref` | `transverse/infra.sh:702` |
+| `infra.fingerprint` | `transverse/infra.sh:744` |
+| `infra.secret_vars` | `transverse/infra.sh:772` |
 | `_junit._sum_attr` | `transverse/junit.sh:16` |
 | `_junit._sum_duration_ms` | `transverse/junit.sh:27` |
 | `junit.parse` | `transverse/junit.sh:45` |
@@ -264,5 +266,5 @@ Format: `<notion>.<submodule>.<verb>` (convention layout.md).
 
 ## Total
 
-**252 unique public functions** in notion `transverse`.
+**254 unique public functions** in notion `transverse`.
 <!-- END AUTO-GENERATED -->

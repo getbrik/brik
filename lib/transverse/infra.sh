@@ -331,6 +331,92 @@ infra.capability_norm() {
     fi
 }
 
+# infra.capability_provider - echo (as JSON) the {provider, endpoint} an
+# environment binds for a capability. Reads the Binding's .capabilities[<cap>]
+# (scalar provider or {provider, endpoint?} object) and collapses both forms to
+# the single {provider, endpoint} shape via infra.capability_norm. An unbound
+# capability fails closed: a deliberately absent capability is a missing
+# binding, never an implicit default.
+# Usage: infra.capability_provider <environment> <capability>
+# Returns: 2 missing argument; 7 no binding or capability unbound; infra.root
+#          codes when unconfigured.
+infra.capability_provider() {
+    local env="$1" capability="$2"
+    if [[ -z "$env" || -z "$capability" ]]; then
+        log.error "infra.capability_provider: <environment> and <capability> are required"
+        return "$BRIK_EXIT_INVALID_INPUT"
+    fi
+
+    local root file
+    root="$(infra.root)" || return "$?"
+    if ! file="$(_infra._find_doc "$root" bindings "$env")"; then
+        log.error "no binding for environment '${env}'"
+        return "$BRIK_EXIT_CONFIG_ERROR"
+    fi
+
+    local value
+    value="$(capability="$capability" yq -o json '.capabilities[strenv(capability)]' "$file")"
+    if [[ -z "$value" || "$value" == "null" ]]; then
+        log.error "environment '${env}' binds no provider for capability '${capability}'"
+        return "$BRIK_EXIT_CONFIG_ERROR"
+    fi
+
+    infra.capability_norm "$value"
+}
+
+# infra.endpoint_for_capability - echo (as JSON) the endpoint a capability
+# resolves to in an environment, closing the chain the provider manifest
+# documents: capability -> provider -> endpoint_kind -> endpoint. The binding
+# selects the provider; an endpoint named explicitly in the binding wins,
+# otherwise the provider manifest's endpoint_kind resolves the single endpoint
+# of that kind. A provider unknown to the registry, or one implementing a
+# different capability than the one bound, is a configuration error and fails
+# closed.
+# Usage: infra.endpoint_for_capability <environment> <capability>
+# Returns: 2 missing argument; 7 unknown/mismatched provider or unresolved
+#          endpoint; infra.root codes when unconfigured.
+infra.endpoint_for_capability() {
+    local env="$1" capability="$2"
+    if [[ -z "$env" || -z "$capability" ]]; then
+        log.error "infra.endpoint_for_capability: <environment> and <capability> are required"
+        return "$BRIK_EXIT_INVALID_INPUT"
+    fi
+
+    local norm provider endpoint
+    norm="$(infra.capability_provider "$env" "$capability")" || return "$?"
+    provider="$(printf '%s' "$norm" | jq -r '.provider')"
+    endpoint="$(printf '%s' "$norm" | jq -r '.endpoint // ""')"
+
+    brik.use registry.registry || return "$?"
+
+    if ! registry.provider.exists "$provider" >/dev/null 2>&1; then
+        log.error "capability '${capability}' in environment '${env}' binds unknown provider '${provider}'"
+        return "$BRIK_EXIT_CONFIG_ERROR"
+    fi
+
+    local provider_cap
+    provider_cap="$(registry.provider.capability "$provider")" || return "$?"
+    if [[ "$provider_cap" != "$capability" ]]; then
+        log.error "provider '${provider}' implements capability '${provider_cap}', not '${capability}' as bound in environment '${env}'"
+        return "$BRIK_EXIT_CONFIG_ERROR"
+    fi
+
+    # An explicit endpoint in the binding wins; otherwise resolve the single
+    # endpoint of the provider's declared kind.
+    if [[ -n "$endpoint" ]]; then
+        infra.endpoint "$endpoint"
+        return "$?"
+    fi
+
+    local kind
+    kind="$(registry.provider.endpoint_kind "$provider")" || return "$?"
+    if [[ -z "$kind" ]]; then
+        log.error "provider '${provider}' declares no endpoint_kind; capability '${capability}' cannot resolve an endpoint"
+        return "$BRIK_EXIT_CONFIG_ERROR"
+    fi
+    infra.endpoint_of_kind "$kind"
+}
+
 # infra.credential_for - echo (as JSON) the credential an environment binds
 # for an endpoint. Unbound is an error: a deliberately anonymous endpoint
 # binds a credential with method 'none'.

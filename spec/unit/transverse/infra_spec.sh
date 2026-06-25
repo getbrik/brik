@@ -973,4 +973,116 @@ YAML
       The status should be success
     End
   End
+
+  # =========================================================================
+  # infra.capability_provider - read a Binding's .capabilities[<cap>] and
+  # normalize it to {provider, endpoint}. The runtime read path the audit
+  # found inert (Binding.capabilities x-pending, capability_norm unconsumed).
+  # =========================================================================
+  Describe "infra.capability_provider"
+    BeforeEach 'make_instance'
+    AfterEach 'cleanup_instance'
+
+    bind_cap() {
+      # Append a capabilities block to the e2e binding.
+      cat >> "$INFRA_DIR/bindings/e2e.yml" <<YAML
+capabilities:
+  artifact-attestation: $1
+YAML
+    }
+
+    It "resolves a scalar provider string to {provider, endpoint:null}"
+      bind_cap '"cosign-keyless"'
+      When call infra.capability_provider e2e artifact-attestation
+      The output should equal '{"provider":"cosign-keyless","endpoint":null}'
+    End
+
+    It "resolves an object {provider, endpoint}"
+      bind_cap '{provider: cosign-keyless, endpoint: sign-prod}'
+      When call infra.capability_provider e2e artifact-attestation
+      The output should equal '{"provider":"cosign-keyless","endpoint":"sign-prod"}'
+    End
+
+    It "fails closed (7) when no binding exists for the environment"
+      When call infra.capability_provider ghost-env artifact-attestation
+      The status should equal 7
+      The stderr should include "ghost-env"
+    End
+
+    It "fails closed (7) when the binding declares no such capability"
+      When call infra.capability_provider e2e artifact-attestation
+      The status should equal 7
+      The stderr should include "artifact-attestation"
+    End
+
+    It "requires an environment and a capability (2)"
+      When call infra.capability_provider e2e ''
+      The status should equal 2
+      The stderr should include "required"
+    End
+  End
+
+  # =========================================================================
+  # infra.endpoint_for_capability - join the binding's provider to its
+  # endpoint: an explicit binding endpoint wins, else the provider manifest's
+  # endpoint_kind resolves via infra.endpoint_of_kind. Closes the chain the
+  # provider schema documents: capability -> provider -> endpoint_kind -> endpoint.
+  # =========================================================================
+  Describe "infra.endpoint_for_capability"
+    BeforeAll '! [[ -f "$BRIK_HOME/lib/registry/cache/registry.json" ]] && "$BRIK_HOME/scripts/compile-registry.sh" >/dev/null 2>&1; true'
+    BeforeEach 'make_instance; add_signing'
+    AfterEach 'cleanup_instance'
+
+    # A Signing endpoint of the kind cosign-keyless operates against.
+    add_signing() {
+      cat > "$INFRA_DIR/endpoints/sign-prod.yml" <<'YAML'
+apiVersion: brik.dev/referential/v1
+kind: Signing
+name: sign-prod
+backend: keyless
+transparency: none
+YAML
+    }
+    bind_cap() {
+      cat >> "$INFRA_DIR/bindings/e2e.yml" <<YAML
+capabilities:
+  artifact-attestation: $1
+YAML
+    }
+
+    It "resolves the endpoint by the provider manifest's kind"
+      bind_cap '"cosign-keyless"'
+      When call infra.endpoint_for_capability e2e artifact-attestation
+      The output should include '"name": "sign-prod"'
+      The output should include '"kind": "Signing"'
+    End
+
+    It "honors an explicit endpoint named in the binding"
+      bind_cap '{provider: cosign-keyless, endpoint: sign-prod}'
+      When call infra.endpoint_for_capability e2e artifact-attestation
+      The output should include '"name": "sign-prod"'
+    End
+
+    It "fails closed (7) when the provider is unknown to the registry"
+      bind_cap '"no-such-provider"'
+      When call infra.endpoint_for_capability e2e artifact-attestation
+      The status should equal 7
+      The stderr should include "no-such-provider"
+    End
+
+    It "fails closed (7) when the provider implements a different capability"
+      bind_cap '"oras-transport"'
+      When call infra.endpoint_for_capability e2e artifact-attestation
+      The status should equal 7
+      The stderr should include "capability"
+    End
+
+    It "fails closed (7) when no endpoint of the provider's kind is declared"
+      rm -f "$INFRA_DIR/endpoints/sign-prod.yml"
+      bind_cap '"cosign-keyless"'
+      When call infra.endpoint_for_capability e2e artifact-attestation
+      The status should equal 7
+      The stderr should include "Signing"
+    End
+  End
 End
