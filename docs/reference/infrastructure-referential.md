@@ -224,10 +224,16 @@ each capability. Required: `name`.
 | Field | Shape | Meaning |
 |-------|-------|---------|
 | `endpoints` | `{ <endpoint-name>: <credential-name> }` | the credential each endpoint authenticates with |
-| `capabilities` | `{ <capability>: <provider> }` | which provider satisfies a capability |
+| `capabilities` | `{ <capability>: <provider> }` or `{ <capability>: { provider, endpoint } }` | which provider satisfies a capability, optionally pinned to a specific endpoint |
 
-The `capabilities` map is declared and structurally validated, but no pipeline
-runtime reads it yet to select a provider during a run.
+A capability value is a provider id, or a `{ provider, endpoint }` object that
+pins a specific endpoint. When no endpoint is pinned, the provider's registry
+manifest supplies the `endpoint_kind` that resolves the endpoint:
+`capability -> provider -> endpoint_kind -> endpoint`. The deploy attestation
+gate reads this map to resolve the Signing endpoint for `artifact-attestation`;
+the remaining capabilities resolve through the same chain as their runtimes are
+wired. An environment that binds no capability keeps the by-kind resolution of
+the single endpoint of that kind.
 
 Capabilities and the providers that implement them (from the registry):
 

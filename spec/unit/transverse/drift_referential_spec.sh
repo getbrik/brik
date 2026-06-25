@@ -229,7 +229,6 @@ Describe "referential schema-runtime drift detector"
     }
     When call list_pending
     The status should equal 0
-    The output should include "PENDING: binding.capabilities"
     The output should include "PENDING: k8starget.kubeconfig"
   End
 End

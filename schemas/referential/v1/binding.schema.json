@@ -15,7 +15,7 @@
     },
     "capabilities": {
       "type": "object",
-      "x-pending": "Declared but not consumed at runtime yet. The object-form normalizer infra.capability_norm exists, but no pipeline runtime reads .capabilities yet.",
+      "description": "Which provider implements each capability for this environment. A value is a provider id, or {provider, endpoint} to pin a specific endpoint; otherwise the provider's registry manifest supplies the endpoint_kind that resolves the endpoint (capability -> provider -> endpoint_kind -> endpoint). Consumed on the deploy attestation path (artifact-attestation); the remaining capabilities resolve through the same chain as their runtimes are wired.",
       "propertyNames": { "pattern": "^[a-z0-9][a-z0-9-]*$" },
       "additionalProperties": {
         "oneOf": [
