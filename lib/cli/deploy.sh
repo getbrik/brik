@@ -419,7 +419,10 @@ cli.deploy.run() {
         local -a verify_args=("$pinned")
         [[ -n "$verify_identity" ]] && verify_args+=(--identity "$verify_identity")
         [[ -n "$verify_issuer" ]]   && verify_args+=(--issuer "$verify_issuer")
-        if ! attest.verify "${verify_args[@]}"; then
+        # The deploy environment selects the attestation provider and Signing
+        # endpoint through its binding's artifact-attestation capability; absent
+        # such a binding, attest resolves the single Signing endpoint by kind.
+        if ! BRIK_ATTEST_ENV="$environment" attest.verify "${verify_args[@]}"; then
             brik_error "require_attestation: attestation did not verify for ${pinned} -- failing closed"
             return "${BRIK_EXIT_EXTERNAL_FAIL}"
         fi
@@ -438,7 +441,7 @@ cli.deploy.run() {
         [[ -n "$verify_identity" ]]  && prov_args+=(--identity "$verify_identity")
         [[ -n "$verify_issuer" ]]    && prov_args+=(--issuer "$verify_issuer")
         local prov_rc=0
-        attest.verify_provenance "${prov_args[@]}" || prov_rc=$?
+        BRIK_ATTEST_ENV="$environment" attest.verify_provenance "${prov_args[@]}" || prov_rc=$?
         if [[ "$prov_rc" -ne 0 ]]; then
             brik_error "require_attestation: provenance did not satisfy the deploy expectations for ${pinned} -- failing closed"
             return "$prov_rc"

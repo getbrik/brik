@@ -843,4 +843,74 @@ YAML
       The stderr should include "did not verify"
     End
   End
+
+  # The Signing endpoint resolves by the environment binding's
+  # artifact-attestation capability when a deploy environment is in context
+  # (BRIK_ATTEST_ENV), and falls back to the single by-kind Signing endpoint
+  # otherwise. registry.registry is sourced directly here: the spec stubs
+  # brik.use to a no-op, so the provider accessors must already be defined.
+  Describe "_attest._signing capability resolution"
+    Include "${BRIK_HOME}/lib/registry/registry.sh"
+    BeforeAll '! [[ -f "${BRIK_HOME}/lib/registry/cache/registry.json" ]] && "${BRIK_HOME}/scripts/compile-registry.sh" >/dev/null 2>&1; true'
+
+    bind_attestation() {
+      mkdir -p "$ATTEST_INFRA/bindings"
+      cat > "$ATTEST_INFRA/bindings/prod.yml" <<YAML
+apiVersion: brik.dev/referential/v1
+kind: Binding
+name: prod
+capabilities:
+  artifact-attestation: $1
+YAML
+    }
+
+    It "resolves the Signing endpoint via the environment binding capability"
+      resolve() { bind_attestation '"cosign-keyless"'; BRIK_ATTEST_ENV=prod _attest._signing; }
+      When call resolve
+      The output should include '"name": "signing"'
+      The output should include '"kind": "Signing"'
+    End
+
+    It "selects the named endpoint among several Signing endpoints (by-kind cannot)"
+      # Two Signing endpoints make the by-kind resolution ambiguous (fail-closed);
+      # only the capability path, honoring the binding's explicit endpoint, can
+      # pick one. This discriminates the new path from the legacy one.
+      resolve() {
+        cat > "$ATTEST_INFRA/endpoints/signing-alt.yml" <<'YAML'
+apiVersion: brik.dev/referential/v1
+kind: Signing
+name: signing-alt
+backend: keyless
+transparency: none
+YAML
+        bind_attestation '{provider: cosign-keyless, endpoint: signing-alt}'
+        BRIK_ATTEST_ENV=prod _attest._signing
+      }
+      When call resolve
+      The output should include '"name": "signing-alt"'
+    End
+
+    It "falls back to by-kind when the environment declares no attestation capability"
+      resolve() {
+        mkdir -p "$ATTEST_INFRA/bindings"
+        printf 'apiVersion: brik.dev/referential/v1\nkind: Binding\nname: prod\n' \
+          > "$ATTEST_INFRA/bindings/prod.yml"
+        BRIK_ATTEST_ENV=prod _attest._signing
+      }
+      When call resolve
+      The output should include '"name": "signing"'
+    End
+
+    It "falls back to by-kind when no environment is in context"
+      When call _attest._signing
+      The output should include '"name": "signing"'
+    End
+
+    It "propagates a hard error when the bound provider is unknown (no silent fallback)"
+      resolve() { bind_attestation '"no-such-provider"'; BRIK_ATTEST_ENV=prod _attest._signing; }
+      When call resolve
+      The status should equal 7
+      The stderr should include "no-such-provider"
+    End
+  End
 End

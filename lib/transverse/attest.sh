@@ -32,8 +32,21 @@
 _BRIK_MODULE_TRANSVERSE_ATTEST_LOADED=1
 
 # _attest._signing - echo (as JSON) the Signing endpoint of the referential.
+#
+# When a deploy environment is in context (BRIK_ATTEST_ENV) and its binding
+# declares the artifact-attestation capability, the binding selects the
+# provider and its Signing endpoint (capability -> provider -> endpoint_kind ->
+# endpoint). A provider unknown to the registry, or one of a different
+# capability, fails closed -- never silently falls back. Otherwise (CI-time
+# with no environment selected, or a pre-capability referential that does not
+# bind the capability) the single Signing endpoint resolves by kind.
 _attest._signing() {
     brik.use transverse.infra
+    local env="${BRIK_ATTEST_ENV:-}"
+    if [[ -n "$env" ]] && infra.capability_provider "$env" artifact-attestation >/dev/null 2>&1; then
+        infra.endpoint_for_capability "$env" artifact-attestation
+        return "$?"
+    fi
     infra.endpoint_of_kind Signing
 }
 
