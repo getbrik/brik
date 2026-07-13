@@ -28,7 +28,7 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - id: plumber
-        uses: getplumber/plumber@a697e9c316b058d279861719c73b87093fb5a60f # v0.3.86
+        uses: getplumber/plumber@feaea981266b40eea7985b7cb880d47a3426a570 # v0.4.2
         with:
           # Never fail the run: the badge must reflect the real score, and
           # findings are surfaced through Code Scanning instead of a red gate.
